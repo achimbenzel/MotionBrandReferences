@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# --- Your local content library ---------------------------------------
+# The data/ folder holds ALL uploaded videos, images, PDFs, generated
+# frames and the db.json metadata. It is intentionally OUTSIDE the source
+# code and never committed, so you can pull/update the app freely without
+# ever touching (or losing) your library.
+data/
+
+# Logs & OS cruft
+*.log
+.DS_Store
+Thumbs.db
