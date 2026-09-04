@@ -20,8 +20,14 @@ export default function ProjectCard({ project }) {
     || (project.type === 'branding' && `${(project.assets || []).length} files`)
     || '';
 
+  const open = () => {
+    // Keep the header tab highlighted for this project's section.
+    try { sessionStorage.setItem('lastTab', project.type); } catch { /* ignore */ }
+    navigate(`/project/${project.id}`);
+  };
+
   return (
-    <div className="card" onClick={() => navigate(`/project/${project.id}`)}>
+    <div className="card" onClick={open}>
       <div className="card-thumb">
         {thumb ? (
           <img src={thumb} alt={project.title} loading="lazy" />

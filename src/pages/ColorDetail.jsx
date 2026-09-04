@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { Palette, Plus, Tag } from 'lucide-react';
+import { Palette, Plus, Tag, Maximize2 } from 'lucide-react';
 import { api, fileUrl } from '../lib/api.js';
 import { useToast } from '../components/Toast.jsx';
 import ColorCard from '../components/ColorCard.jsx';
 import ColorBuilder from '../components/ColorBuilder.jsx';
 import TagInput from '../components/TagInput.jsx';
+import Lightbox from '../components/Lightbox.jsx';
 
 export default function ColorDetail({ project, setProject }) {
   const toast = useToast();
   const [adding, setAdding] = useState(false);
+  const [lightbox, setLightbox] = useState(false);
   const colors = project.colors || [];
 
   const persist = async (nextColors) => {
@@ -38,9 +40,10 @@ export default function ColorDetail({ project, setProject }) {
   return (
     <div>
       {project.example && (
-        <div className="example-img">
+        <figure className="media-frame" onClick={() => setLightbox(true)} title="Click to view fullscreen">
           <img src={fileUrl(project, project.example)} alt="example" />
-        </div>
+          <button className="media-fs icon-btn"><Maximize2 size={16} /></button>
+        </figure>
       )}
 
       <div className="section" style={{ marginTop: project.example ? 0 : 8 }}>
@@ -77,6 +80,15 @@ export default function ColorDetail({ project, setProject }) {
         <div className="section-head"><h2><Tag size={16} /> Tags</h2></div>
         <TagInput tags={project.tags || []} onChange={saveTags} placeholder="Add a tag…" />
       </div>
+
+      {lightbox && project.example && (
+        <Lightbox
+          items={[{ src: fileUrl(project, project.example), caption: project.title }]}
+          index={0}
+          onIndex={() => {}}
+          onClose={() => setLightbox(false)}
+        />
+      )}
     </div>
   );
 }

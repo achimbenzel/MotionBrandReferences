@@ -1,11 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Film, Palette, FileText, UploadCloud, Trash2, Scissors } from 'lucide-react';
+import { X, Film, Palette, FileText, UploadCloud, Trash2, Scissors, Crop } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { captureFrame, lengthTag, fmtTime } from '../lib/media.js';
+import { renderPdfPage, cropToBlob, centerCover } from '../lib/imaging.js';
 import { useToast } from './Toast.jsx';
 import TagInput from './TagInput.jsx';
 import ColorBuilder from './ColorBuilder.jsx';
 import ColorCard from './ColorCard.jsx';
+import ThumbnailStudio from './ThumbnailStudio.jsx';
+
+const ASPECT = 16 / 10;
+const isPdf = (f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
 
 const TYPES = [
   { key: 'branding', label: 'Branding', sub: 'PDFs & images', icon: FileText },
@@ -38,8 +43,28 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
   // branding
   const [files, setFiles] = useState([]);
 
+  // cover (all types)
+  const [coverBlob, setCoverBlob] = useState(null);
+  const [coverMeta, setCoverMeta] = useState(null);
+  const [coverPreview, setCoverPreview] = useState(null);
+  const [studioOpen, setStudioOpen] = useState(false);
+
   useEffect(() => () => { if (videoSrc) URL.revokeObjectURL(videoSrc); }, [videoSrc]);
   useEffect(() => () => { if (examplePreview) URL.revokeObjectURL(examplePreview); }, [examplePreview]);
+  useEffect(() => () => { if (coverPreview) URL.revokeObjectURL(coverPreview); }, [coverPreview]);
+
+  // Drop a chosen cover when the type changes (its source no longer applies).
+  const clearCover = () => {
+    setCoverBlob(null); setCoverMeta(null);
+    setCoverPreview((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
+  };
+  useEffect(() => { clearCover(); /* eslint-disable-next-line */ }, [type]);
+
+  const acceptCover = (blob, meta) => {
+    setCoverBlob(blob); setCoverMeta(meta);
+    setCoverPreview((prev) => { if (prev) URL.revokeObjectURL(prev); return URL.createObjectURL(blob); });
+    setStudioOpen(false);
+  };
 
   // Close on Escape.
   useEffect(() => {
@@ -83,6 +108,18 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
     (type === 'branding' && files.length > 0)
   );
 
+  const coverAvailable = (type === 'motion' && !!videoSrc)
+    || (type === 'branding' && files.length > 0)
+    || (type === 'color' && !!exampleFile);
+  const coverCtaLabel = type === 'branding' ? 'Choose cover (PDF page or image)'
+    : type === 'motion' ? 'Frame & crop cover' : 'Frame & crop cover';
+  const coverDefaultHint = type === 'branding' ? 'Default: first image, or PDF page 1'
+    : type === 'motion' ? 'Default: current video frame' : 'Default: the example image';
+
+  const brandingSources = files.map((f, i) => ({
+    id: String(i), kind: isPdf(f) ? 'pdf' : 'image', src: f, name: f.name,
+  }));
+
   const submit = async () => {
     if (!canSave || saving) return;
     setSaving(true);
@@ -97,20 +134,37 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
       if (type === 'motion') {
         fd.append('video', videoFile);
         fd.append('duration', String(duration));
-        // Capture the currently-shown frame as the cover thumbnail (WebP).
-        try {
-          const blob = await captureFrame(videoRef.current, 0.85);
-          fd.append('thumb', blob, 'thumb.webp');
-        } catch { /* cover is optional */ }
       }
-
       if (type === 'color') {
         if (exampleFile) fd.append('example', exampleFile);
         fd.append('colors', JSON.stringify(colors));
       }
-
       if (type === 'branding') {
         files.forEach((f) => fd.append('files', f));
+      }
+
+      // Cover thumbnail.
+      const out = { w: 900, h: Math.round(900 / ASPECT) };
+      if (coverBlob) {
+        fd.append('thumb', coverBlob, 'thumb.webp');
+        if (coverMeta) fd.append('thumbMeta', JSON.stringify(coverMeta));
+      } else if (type === 'motion') {
+        // Fallback: the currently-shown video frame.
+        try {
+          const blob = await captureFrame(videoRef.current, 0.85);
+          fd.append('thumb', blob, 'thumb.webp');
+        } catch { /* optional */ }
+      } else if (type === 'branding' && !files.some((f) => !isPdf(f))) {
+        // PDF-only branding with no chosen cover: auto-use page 1.
+        try {
+          const firstPdf = files.find(isPdf);
+          if (firstPdf) {
+            const { canvas } = await renderPdfPage(firstPdf, 1, 900);
+            const rect = centerCover(canvas.width, canvas.height, ASPECT);
+            const blob = await cropToBlob(canvas, rect, out);
+            fd.append('thumb', blob, 'thumb.webp');
+          }
+        } catch { /* optional */ }
       }
 
       const project = await api.create(fd);
@@ -122,6 +176,7 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
   };
 
   return (
+    <>
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget && !saving) onClose(); }}>
       <div className="modal" role="dialog" aria-modal="true">
         <div className="modal-head">
@@ -254,6 +309,23 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
             </>
           )}
 
+          {/* Cover thumbnail (all types) */}
+          {coverAvailable && (
+            <div className="field">
+              <label>Cover thumbnail</label>
+              <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+                {coverPreview ? (
+                  <img src={coverPreview} alt="cover" style={{ width: 168, aspectRatio: `${ASPECT}`, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }} />
+                ) : (
+                  <div className="cover-placeholder">{coverDefaultHint}</div>
+                )}
+                <button type="button" className="btn btn-sm" onClick={() => setStudioOpen(true)}>
+                  <Crop size={15} /> {coverPreview ? 'Adjust cover' : coverCtaLabel}
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Tags (all types) */}
           <div className="field" style={{ marginTop: 4 }}>
             <label>Tags {type === 'branding' && <span className="hint">— color scheme, type (tech, restaurant…)</span>}</label>
@@ -273,6 +345,19 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
         </div>
       </div>
     </div>
+
+    {studioOpen && (
+      <ThumbnailStudio
+        type={type}
+        video={type === 'motion' ? videoSrc : null}
+        assets={type === 'branding' ? brandingSources : []}
+        image={type === 'color' ? exampleFile : null}
+        initialMeta={coverMeta}
+        onDone={acceptCover}
+        onClose={() => setStudioOpen(false)}
+      />
+    )}
+    </>
   );
 }
 

@@ -155,10 +155,8 @@ app.post('/api/projects', upload.any(), async (req, res) => {
 
     if (type === 'motion') {
       const video = byField('video');
-      const thumb = byField('thumb');
       if (!video) { await cleanupTmp(req); return res.status(400).json({ error: 'video_required' }); }
       project.video = await moveInto(dir, video.path, `video${extOf(video.originalname) || '.mp4'}`);
-      if (thumb) project.thumb = await moveInto(dir, thumb.path, 'thumb.webp');
       project.duration = Number(req.body.duration) || 0;
       project.frames = [];
     }
@@ -180,9 +178,17 @@ app.post('/api/projects', upload.any(), async (req, res) => {
         const stored = await moveInto(dir, f.path, `${assetId}${ext || (kind === 'pdf' ? '.pdf' : '.png')}`);
         project.assets.push({ id: assetId, kind, file: stored, name: f.originalname });
       }
-      // First image asset (if any) becomes the card thumbnail.
+      // First image asset (if any) becomes the default card thumbnail.
       const firstImage = project.assets.find((a) => a.kind === 'image');
       if (firstImage) project.thumb = firstImage.file;
+    }
+
+    // A custom cropped cover (any type) overrides the type default.
+    const thumb = byField('thumb');
+    if (thumb) {
+      project.thumb = await moveInto(dir, thumb.path, 'thumb.webp');
+      const meta = parseJSON(req.body.thumbMeta, null);
+      if (meta) project.thumbMeta = meta;
     }
 
     await mutateDB((db) => { db.projects.push(project); });
@@ -217,6 +223,32 @@ app.patch('/api/projects/:id', async (req, res) => {
     res.json({ project: updated });
   } catch (err) {
     res.status(500).json({ error: 'update_failed', message: String(err.message || err) });
+  }
+});
+
+// ---- Set / replace the cover thumbnail (cropped WebP) ---------------------
+app.post('/api/projects/:id/thumb', upload.single('thumb'), async (req, res) => {
+  try {
+    const db = await readDB();
+    const project = db.projects.find((p) => p.id === req.params.id);
+    if (!project) { await cleanupTmp(req); return res.status(404).json({ error: 'not_found' }); }
+    if (!req.file) return res.status(400).json({ error: 'thumb_required' });
+
+    const dir = path.join(DATA_DIR, project.type, project.id);
+    // Always store the custom cover under a stable name so it overwrites cleanly.
+    await moveInto(dir, req.file.path, 'thumb.webp');
+    const meta = parseJSON(req.body.thumbMeta, null);
+    const updated = await mutateDB((d) => {
+      const p = d.projects.find((x) => x.id === project.id);
+      p.thumb = 'thumb.webp';
+      if (meta) p.thumbMeta = meta; else delete p.thumbMeta;
+      return p;
+    });
+    await cleanupTmp(req);
+    res.json({ project: updated });
+  } catch (err) {
+    await cleanupTmp(req);
+    res.status(500).json({ error: 'thumb_failed', message: String(err.message || err) });
   }
 });
 

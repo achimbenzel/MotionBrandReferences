@@ -55,9 +55,11 @@ never touched. To back up or move your library, just copy the `data/` folder.
 
 ### Branding
 Upload **PDFs** (brand guidelines, presentations) and/or **images**. PDFs open
-in a page-by-page viewer you can click through (arrow keys work too). Tag each
-project by **color scheme** and **type** (tech, restaurant, …) and filter the
-grid by those tags.
+in a page-by-page viewer you can click through (arrow keys work too) and open
+**fullscreen**. Images display at their true aspect ratio and open in a
+fullscreen lightbox with arrow navigation. You can pick **any PDF page as the
+cover** thumbnail. Tag each project by **color scheme** and **type** (tech,
+restaurant, …) and filter the grid by those tags.
 
 ### Motion Design
 Upload a **video**; scrub to the frame you want and it becomes the cover. On a
@@ -65,12 +67,23 @@ project you get:
 - a **player** with notes (auto-saved) and **tags** (used for filtering),
 - an automatic **length tag** — `≤ 30s`, `30–60s`, `60–90s`, `> 90s`,
 - a **“Add current frame”** button: pause anywhere and save that frame; frames
-  are stored as **WebP** in the project folder and shown in a gallery below.
+  are stored as **WebP** in the project folder,
+- a **big frame preview** with prev/next arrows, click-to-**fullscreen** with
+  arrow navigation, and the thumbnail strip below. Each frame has a **⋯ menu**
+  to delete (no accidental one-click deletes).
 
 ### Colors
 Add an **example image** plus colors entered in **any one** format — HEX, RGB,
 CMYK or Pantone — and every representation is shown automatically. Click any
-value to copy it.
+value to copy it. The example image shows at its **true aspect ratio** (never
+cropped) and opens fullscreen.
+
+### Covers & editing (all types)
+- **Crop & zoom the cover:** when you set a thumbnail — a Motion frame, a
+  Branding PDF page or image, or a Color image — drag to reposition and use the
+  zoom slider to frame exactly what shows on the card.
+- **Edit menu:** every project has an **Edit ⋯** menu (top-right) to **rename**,
+  edit year/category, **change the cover**, or **delete** — no bare delete icon.
 
 > **Note on conversions:** HEX ⇄ RGB is exact. CMYK is the standard device-neutral
 > approximation. **Pantone has no exact formula** to/from other spaces, so it is a

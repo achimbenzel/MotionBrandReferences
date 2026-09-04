@@ -53,6 +53,14 @@ export const api = {
     const { project } = await handle(await fetch(`/api/projects/${id}/frames/${frameId}`, { method: 'DELETE' }));
     return project;
   },
+
+  async setThumb(id, blob, meta) {
+    const fd = new FormData();
+    fd.append('thumb', blob, 'thumb.webp');
+    if (meta) fd.append('thumbMeta', JSON.stringify(meta));
+    const { project } = await handle(await fetch(`/api/projects/${id}/thumb`, { method: 'POST', body: fd }));
+    return project;
+  },
 };
 
 // Resolve a stored relative file path to a servable URL.

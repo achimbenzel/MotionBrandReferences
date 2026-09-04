@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Trash2 } from 'lucide-react';
-import { api } from '../lib/api.js';
+import { ArrowLeft, Trash2, Pencil, Image as ImageIcon, MoreHorizontal } from 'lucide-react';
+import { api, fileUrl } from '../lib/api.js';
 import { useToast } from '../components/Toast.jsx';
+import Menu from '../components/Menu.jsx';
+import EditDetailsModal from '../components/EditDetailsModal.jsx';
+import ThumbnailStudio from '../components/ThumbnailStudio.jsx';
 import MotionDetail from './MotionDetail.jsx';
 import ColorDetail from './ColorDetail.jsx';
 import BrandingDetail from './BrandingDetail.jsx';
@@ -13,6 +16,9 @@ export default function ProjectDetail() {
   const toast = useToast();
   const [project, setProject] = useState(null);
   const [error, setError] = useState(null);
+  const [editing, setEditing] = useState(false);
+  const [thumbing, setThumbing] = useState(false);
+  const [thumbSaving, setThumbSaving] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -35,10 +41,28 @@ export default function ProjectDetail() {
     }
   };
 
+  const saveThumb = async (blob, meta) => {
+    setThumbSaving(true);
+    try {
+      const updated = await api.setThumb(id, blob, meta);
+      setProject(updated);
+      setThumbing(false);
+      toast('Cover updated');
+    } catch (e) {
+      toast(`Could not save cover: ${e.message}`, 'error');
+    } finally {
+      setThumbSaving(false);
+    }
+  };
+
   if (error) return <div className="detail"><BackBtn /> <div className="center-msg">Couldn’t load: {error}</div></div>;
   if (!project) return <div className="detail"><div className="spinner" /></div>;
 
   const Body = { motion: MotionDetail, color: ColorDetail, branding: BrandingDetail }[project.type];
+
+  const canSetThumb = project.type === 'motion'
+    || (project.type === 'branding' && (project.assets || []).length > 0)
+    || project.type === 'color';
 
   return (
     <div className="detail">
@@ -46,16 +70,45 @@ export default function ProjectDetail() {
       <div className="detail-head">
         <div>
           <h1>{project.title}</h1>
-          <div className="sub">
-            {[project.category, project.year].filter(Boolean).join(' · ')}
-          </div>
+          <div className="sub">{[project.category, project.year].filter(Boolean).join(' · ')}</div>
         </div>
         <div className="detail-actions">
-          <button className="btn btn-danger btn-sm" onClick={remove}><Trash2 size={15} /> Delete</button>
+          <Menu
+            trigger={<button className="btn btn-sm"><Pencil size={15} /> Edit <MoreHorizontal size={15} /></button>}
+            items={[
+              { label: 'Rename / edit details', icon: <Pencil size={15} />, onClick: () => setEditing(true) },
+              ...(canSetThumb ? [{ label: 'Change cover', icon: <ImageIcon size={15} />, onClick: () => setThumbing(true) }] : []),
+              { separator: true },
+              { label: 'Delete project', icon: <Trash2 size={15} />, danger: true, onClick: remove },
+            ]}
+          />
         </div>
       </div>
 
       <Body project={project} setProject={setProject} />
+
+      {editing && (
+        <EditDetailsModal
+          project={project}
+          onClose={() => setEditing(false)}
+          onSaved={(p) => { setProject(p); setEditing(false); }}
+        />
+      )}
+
+      {thumbing && (
+        <ThumbnailStudio
+          type={project.type}
+          video={project.type === 'motion' ? fileUrl(project, project.video) : null}
+          assets={project.type === 'branding'
+            ? (project.assets || []).map((a) => ({ id: a.id, kind: a.kind, src: fileUrl(project, a.file), name: a.name }))
+            : []}
+          image={project.type === 'color' && project.example ? fileUrl(project, project.example) : null}
+          initialMeta={project.thumbMeta}
+          saving={thumbSaving}
+          onDone={saveThumb}
+          onClose={() => setThumbing(false)}
+        />
+      )}
     </div>
   );
 }
