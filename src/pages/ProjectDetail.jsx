@@ -9,6 +9,9 @@ import ThumbnailStudio from '../components/ThumbnailStudio.jsx';
 import MotionDetail from './MotionDetail.jsx';
 import ColorDetail from './ColorDetail.jsx';
 import BrandingDetail from './BrandingDetail.jsx';
+import LogoDetail from './LogoDetail.jsx';
+import BusinessCardDetail from './BusinessCardDetail.jsx';
+import { coverAspect } from '../lib/types.js';
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -58,10 +61,14 @@ export default function ProjectDetail() {
   if (error) return <div className="detail"><BackBtn /> <div className="center-msg">Couldn’t load: {error}</div></div>;
   if (!project) return <div className="detail"><div className="spinner" /></div>;
 
-  const Body = { motion: MotionDetail, color: ColorDetail, branding: BrandingDetail }[project.type];
+  const Body = {
+    motion: MotionDetail, color: ColorDetail, branding: BrandingDetail,
+    logo: LogoDetail, businesscard: BusinessCardDetail,
+  }[project.type];
 
   const canSetThumb = project.type === 'motion'
     || (project.type === 'branding' && (project.assets || []).length > 0)
+    || (project.type === 'logo' && (project.assets || []).length > 0)
     || project.type === 'color';
 
   return (
@@ -98,8 +105,9 @@ export default function ProjectDetail() {
       {thumbing && (
         <ThumbnailStudio
           type={project.type}
+          aspect={coverAspect(project.type, project)}
           video={project.type === 'motion' ? fileUrl(project, project.video) : null}
-          assets={project.type === 'branding'
+          assets={(project.type === 'branding' || project.type === 'logo')
             ? (project.assets || []).map((a) => ({ id: a.id, kind: a.kind, src: fileUrl(project, a.file), name: a.name }))
             : []}
           image={project.type === 'color' && project.example ? fileUrl(project, project.example) : null}

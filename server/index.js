@@ -28,17 +28,19 @@ const DIST_DIR = path.join(ROOT, 'dist');
 const PORT = process.env.API_PORT || 4300;
 const IS_PROD = process.env.NODE_ENV === 'production';
 
-const TYPES = new Set(['motion', 'color', 'branding']);
+const TYPES = new Set(['motion', 'color', 'branding', 'logo', 'businesscard']);
+const DEFAULT_STORAGE_LIMIT = 80 * 1024 * 1024 * 1024; // 80 GB
 
 // ---------------------------------------------------------------------------
 // Storage helpers
 // ---------------------------------------------------------------------------
 function ensureDirs() {
-  for (const d of [DATA_DIR, TMP_DIR, path.join(DATA_DIR, 'motion'), path.join(DATA_DIR, 'color'), path.join(DATA_DIR, 'branding')]) {
+  const typeDirs = [...TYPES].map((t) => path.join(DATA_DIR, t));
+  for (const d of [DATA_DIR, TMP_DIR, ...typeDirs]) {
     fs.mkdirSync(d, { recursive: true });
   }
   if (!fs.existsSync(DB_PATH)) {
-    fs.writeFileSync(DB_PATH, JSON.stringify({ projects: [] }, null, 2));
+    fs.writeFileSync(DB_PATH, JSON.stringify({ projects: [], galleries: [], settings: { storageLimitBytes: DEFAULT_STORAGE_LIMIT } }, null, 2));
   }
 }
 
@@ -46,7 +48,25 @@ function ensureDirs() {
 let writeChain = Promise.resolve();
 async function readDB() {
   const raw = await fsp.readFile(DB_PATH, 'utf8');
-  return JSON.parse(raw);
+  const db = JSON.parse(raw);
+  // Normalize older databases so new fields always exist.
+  if (!Array.isArray(db.projects)) db.projects = [];
+  if (!Array.isArray(db.galleries)) db.galleries = [];
+  if (!db.settings || typeof db.settings !== 'object') db.settings = {};
+  if (db.settings.storageLimitBytes == null) db.settings.storageLimitBytes = DEFAULT_STORAGE_LIMIT;
+  return db;
+}
+
+// Recursively sum the size of every file under a directory.
+async function folderSize(dir) {
+  let total = 0;
+  const entries = await fsp.readdir(dir, { withFileTypes: true }).catch(() => []);
+  for (const e of entries) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) total += await folderSize(p);
+    else { const st = await fsp.stat(p).catch(() => null); if (st) total += st.size; }
+  }
+  return total;
 }
 function mutateDB(mutator) {
   writeChain = writeChain.then(async () => {
@@ -183,6 +203,27 @@ app.post('/api/projects', upload.any(), async (req, res) => {
       if (firstImage) project.thumb = firstImage.file;
     }
 
+    if (type === 'logo') {
+      project.assets = [];
+      for (const f of files) {
+        if (f.fieldname !== 'files') continue;
+        const assetId = nanoid(6);
+        const stored = await moveInto(dir, f.path, `${assetId}${extOf(f.originalname) || '.png'}`);
+        project.assets.push({ id: assetId, kind: 'image', file: stored, name: f.originalname });
+      }
+      const first = project.assets[0];
+      if (first) project.thumb = first.file;
+    }
+
+    if (type === 'businesscard') {
+      project.size = req.body.size === '89x51' ? '89x51' : '85x55';
+      const front = byField('front');
+      const back = byField('back');
+      if (front) project.front = await moveInto(dir, front.path, `front${extOf(front.originalname) || '.webp'}`);
+      if (back) project.back = await moveInto(dir, back.path, `back${extOf(back.originalname) || '.webp'}`);
+      if (project.front) project.thumb = project.front;
+    }
+
     // A custom cropped cover (any type) overrides the type default.
     const thumb = byField('thumb');
     if (thumb) {
@@ -316,6 +357,10 @@ app.delete('/api/projects/:id', async (req, res) => {
       if (idx === -1) return false;
       type = db.projects[idx].type;
       db.projects.splice(idx, 1);
+      // Drop the project from any gallery it belonged to.
+      for (const g of db.galleries) {
+        if (g.projectIds) g.projectIds = g.projectIds.filter((pid) => pid !== req.params.id);
+      }
       return true;
     });
     if (!ok) return res.status(404).json({ error: 'not_found' });
@@ -324,6 +369,77 @@ app.delete('/api/projects/:id', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'delete_failed', message: String(err.message || err) });
   }
+});
+
+// ---------------------------------------------------------------------------
+// Galleries — named collections of projects, scoped to a type.
+// ---------------------------------------------------------------------------
+app.get('/api/galleries', async (req, res) => {
+  const db = await readDB();
+  let galleries = db.galleries;
+  if (req.query.type && TYPES.has(req.query.type)) galleries = galleries.filter((g) => g.type === req.query.type);
+  galleries = [...galleries].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  res.json({ galleries });
+});
+
+app.get('/api/galleries/:id', async (req, res) => {
+  const db = await readDB();
+  const gallery = db.galleries.find((g) => g.id === req.params.id);
+  if (!gallery) return res.status(404).json({ error: 'not_found' });
+  res.json({ gallery });
+});
+
+app.post('/api/galleries', async (req, res) => {
+  const type = req.body.type;
+  if (!TYPES.has(type)) return res.status(400).json({ error: 'invalid_type' });
+  const gallery = {
+    id: nanoid(10),
+    type,
+    name: (req.body.name || 'Neue Galerie').trim(),
+    projectIds: Array.isArray(req.body.projectIds) ? req.body.projectIds : [],
+    createdAt: Date.now(),
+  };
+  await mutateDB((db) => { db.galleries.push(gallery); });
+  res.status(201).json({ gallery });
+});
+
+app.patch('/api/galleries/:id', async (req, res) => {
+  const updated = await mutateDB((db) => {
+    const g = db.galleries.find((x) => x.id === req.params.id);
+    if (!g) return null;
+    if (typeof req.body.name === 'string') g.name = req.body.name.trim() || g.name;
+    if (Array.isArray(req.body.projectIds)) g.projectIds = req.body.projectIds;
+    return g;
+  });
+  if (!updated) return res.status(404).json({ error: 'not_found' });
+  res.json({ gallery: updated });
+});
+
+app.delete('/api/galleries/:id', async (req, res) => {
+  const ok = await mutateDB((db) => {
+    const idx = db.galleries.findIndex((g) => g.id === req.params.id);
+    if (idx === -1) return false;
+    db.galleries.splice(idx, 1);
+    return true;
+  });
+  if (!ok) return res.status(404).json({ error: 'not_found' });
+  res.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// Storage usage + editable limit.
+// ---------------------------------------------------------------------------
+app.get('/api/storage', async (_req, res) => {
+  const db = await readDB();
+  const usedBytes = await folderSize(DATA_DIR);
+  res.json({ usedBytes, limitBytes: db.settings.storageLimitBytes });
+});
+
+app.patch('/api/storage', async (req, res) => {
+  const limitBytes = Number(req.body.limitBytes);
+  if (!Number.isFinite(limitBytes) || limitBytes <= 0) return res.status(400).json({ error: 'invalid_limit' });
+  const settings = await mutateDB((db) => { db.settings.storageLimitBytes = Math.round(limitBytes); return db.settings; });
+  res.json({ limitBytes: settings.storageLimitBytes });
 });
 
 // ---------------------------------------------------------------------------

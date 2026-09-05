@@ -61,6 +61,42 @@ export const api = {
     const { project } = await handle(await fetch(`/api/projects/${id}/thumb`, { method: 'POST', body: fd }));
     return project;
   },
+
+  // --- Galleries ---
+  async listGalleries(type) {
+    const q = type ? `?type=${encodeURIComponent(type)}` : '';
+    const { galleries } = await handle(await fetch(`/api/galleries${q}`));
+    return galleries;
+  },
+  async getGallery(id) {
+    const { gallery } = await handle(await fetch(`/api/galleries/${id}`));
+    return gallery;
+  },
+  async createGallery(type, name) {
+    const { gallery } = await handle(await fetch('/api/galleries', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type, name }),
+    }));
+    return gallery;
+  },
+  async updateGallery(id, patch) {
+    const { gallery } = await handle(await fetch(`/api/galleries/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
+    }));
+    return gallery;
+  },
+  async removeGallery(id) {
+    return handle(await fetch(`/api/galleries/${id}`, { method: 'DELETE' }));
+  },
+
+  // --- Storage ---
+  async storage() {
+    return handle(await fetch('/api/storage'));
+  },
+  async setStorageLimit(limitBytes) {
+    return handle(await fetch('/api/storage', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ limitBytes }),
+    }));
+  },
 };
 
 // Resolve a stored relative file path to a servable URL.

@@ -9,7 +9,7 @@ import ThumbCropper from './ThumbCropper.jsx';
  * creating, /data URLs when editing an existing project). Calls
  * onDone(blob, meta); the parent performs the upload and closes.
  */
-export default function ThumbnailStudio({ type, video, assets = [], image, initialMeta, onDone, onClose, saving }) {
+export default function ThumbnailStudio({ type, video, assets = [], image, initialMeta, onDone, onClose, saving, aspect = 16 / 10 }) {
   const [step, setStep] = useState('pick');
   const [source, setSource] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -44,12 +44,16 @@ export default function ThumbnailStudio({ type, video, assets = [], image, initi
   };
 
   // Render the active PDF page for preview whenever page/asset changes.
+  // We keep the rendered canvas (crop source) plus a data-URL for display —
+  // rendering via <img> avoids inserting a raw canvas into React's tree.
   useEffect(() => {
     if (!active || active.kind !== 'pdf') { setPdfPreview(null); return; }
     let alive = true;
     setBusy(true); setError(null);
     renderPdfPage(active.src, pdfPage, 900)
-      .then(({ canvas, numPages }) => { if (alive) { setPdfPreview(canvas); setPdfInfo({ numPages }); } })
+      .then(({ canvas, numPages }) => {
+        if (alive) { setPdfPreview({ canvas, url: canvas.toDataURL('image/webp', 0.9) }); setPdfInfo({ numPages }); }
+      })
       .catch((e) => { if (alive) setError(e.message); })
       .finally(() => { if (alive) setBusy(false); });
     return () => { alive = false; };
@@ -85,7 +89,7 @@ export default function ThumbnailStudio({ type, video, assets = [], image, initi
                 <MotionPicker src={video} onUse={(canvas) => useSource(canvas)} busy={busy} />
               )}
 
-              {type === 'branding' && assets.length > 0 && (
+              {(type === 'branding' || type === 'logo') && assets.length > 0 && (
                 <div>
                   {assets.length > 1 && (
                     <div className="asset-tabs">
@@ -103,14 +107,14 @@ export default function ThumbnailStudio({ type, video, assets = [], image, initi
                     <div className="pdf-viewer">
                       <div className="pdf-stage" style={{ minHeight: 260 }}>
                         {busy && <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-faint)' }} />}
-                        {pdfPreview && <CanvasView canvas={pdfPreview} />}
+                        {pdfPreview && <img className="pdf-preview-img" src={pdfPreview.url} alt="PDF page preview" />}
                       </div>
                       <div className="pdf-controls">
                         <button className="icon-btn" disabled={pdfPage <= 1} onClick={() => setPdfPage((p) => Math.max(1, p - 1))}><ChevronLeft size={18} /></button>
                         <span className="page-num">{pdfPage} / {pdfInfo.numPages || '…'}</span>
                         <button className="icon-btn" disabled={pdfPage >= pdfInfo.numPages} onClick={() => setPdfPage((p) => p + 1)}><ChevronRight size={18} /></button>
                       </div>
-                      <button className="btn btn-primary" disabled={!pdfPreview || busy} onClick={() => useSource(pdfPreview)}>
+                      <button className="btn btn-primary" disabled={!pdfPreview || busy} onClick={() => useSource(pdfPreview.canvas)}>
                         <Check size={16} /> Use this page
                       </button>
                     </div>
@@ -144,7 +148,7 @@ export default function ThumbnailStudio({ type, video, assets = [], image, initi
 
           {step === 'crop' && source && (
             <div>
-              <ThumbCropper ref={cropRef} source={source} initial={initialMeta} />
+              <ThumbCropper ref={cropRef} source={source} initial={initialMeta} aspect={aspect} />
               <div className="hint" style={{ marginTop: 10 }}>Drag to reposition · use the slider to zoom. This is exactly what shows on the card.</div>
             </div>
           )}
@@ -190,17 +194,3 @@ function MotionPicker({ src, onUse, busy }) {
   );
 }
 
-/** Render a canvas element into the DOM (append the actual node). */
-function CanvasView({ canvas }) {
-  const holder = useRef(null);
-  useEffect(() => {
-    const el = holder.current;
-    if (!el) return;
-    canvas.style.maxWidth = '100%';
-    canvas.style.height = 'auto';
-    canvas.style.display = 'block';
-    el.innerHTML = '';
-    el.appendChild(canvas);
-  }, [canvas]);
-  return <div ref={holder} style={{ width: '100%' }} />;
-}

@@ -1,8 +1,12 @@
 # Design Reference
 
-A personal, **local-only** design reference library with three sections —
-**Branding**, **Motion Design** and **Colors**. Cards with thumbnails and text
-below, styled after [achimbenzel.com/de/work](https://achimbenzel.com/de/work).
+A personal, **local-only** design reference library with five sections —
+**Branding**, **Motion Design**, **Logos**, **Business Cards** and **Colors**.
+Cards with thumbnails and text below, styled after
+[achimbenzel.com/de/work](https://achimbenzel.com/de/work). Each section can be
+viewed as **Alle** (all projects) or **Galerien** (named collections you create,
+e.g. "Grüne Tech Firmen"). A storage meter in the header sums the `data/` folder
+against an editable limit (default 80 GB).
 
 It runs on its own ports (**4200** frontend / **4300** API) so it never clashes
 with your usual dev ports (5173, 3000, 3333, 8000).
@@ -37,12 +41,14 @@ is stored in a single top-level **`data/`** folder:
 
 ```
 data/
-├── db.json                     # all metadata (human-readable, easy to back up)
+├── db.json                     # all metadata + galleries + settings (human-readable)
 ├── motion/<id>/video.mp4       # original video
 │   ├── thumb.webp              # cover frame
 │   └── frames/*.webp           # captured keyframes (WebP = small)
 ├── color/<id>/example.<ext>    # example image
-└── branding/<id>/*.pdf|*.png   # guidelines / decks / images
+├── branding/<id>/*.pdf|*.png   # guidelines / decks / images
+├── logo/<id>/*.png             # logo image(s)
+└── businesscard/<id>/front.webp, back.webp
 ```
 
 `data/` is **git-ignored and lives outside the source code**, so you can pull
@@ -72,11 +78,32 @@ project you get:
   arrow navigation, and the thumbnail strip below. Each frame has a **⋯ menu**
   to delete (no accidental one-click deletes).
 
+### Logos
+Upload one (or more) images. They're shown as **square** previews in the grid
+(the whole logo, never cropped) and open fullscreen on the detail page. Tagable.
+
+### Business Cards
+Pick a size — **85 × 55 mm** or **89 × 51 mm** — then upload and **crop** a
+**front** and **back** image to that ratio. In the grid the two sides are shown
+stacked (front over back); the detail page shows both large, with fullscreen.
+
 ### Colors
 Add an **example image** plus colors entered in **any one** format — HEX, RGB,
 CMYK or Pantone — and every representation is shown automatically. Click any
 value to copy it. The example image shows at its **true aspect ratio** (never
 cropped) and opens fullscreen.
+
+### Galleries (Alle / Galerien)
+Every section has an **Alle / Galerien** toggle. Under **Galerien** you create
+named collections (e.g. "Grüne Tech Firmen"), open one, and add or remove
+projects of that section via a picker. A project can be in several galleries;
+deleting a project removes it from its galleries automatically. Galleries are
+just references — deleting a gallery never deletes the projects.
+
+### Storage meter
+The header shows how much of the `data/` folder is used against a limit
+(default **80 GB**). Use the **⋯** next to it to change the limit; usage is the
+real summed size of everything under `data/`.
 
 ### Covers & editing (all types)
 - **Crop & zoom the cover:** when you set a thumbnail — a Motion frame, a

@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Film, Palette, FileText, UploadCloud, Trash2, Scissors, Crop } from 'lucide-react';
+import { X, Film, Palette, FileText, UploadCloud, Trash2, Scissors, Crop, Square, CreditCard } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { captureFrame, lengthTag, fmtTime } from '../lib/media.js';
 import { renderPdfPage, cropToBlob, centerCover } from '../lib/imaging.js';
+import { CARD_SIZES, cardSizeAspect, coverAspect } from '../lib/types.js';
 import { useToast } from './Toast.jsx';
 import TagInput from './TagInput.jsx';
 import ColorBuilder from './ColorBuilder.jsx';
 import ColorCard from './ColorCard.jsx';
 import ThumbnailStudio from './ThumbnailStudio.jsx';
+import CropModal from './CropModal.jsx';
 
 const ASPECT = 16 / 10;
 const isPdf = (f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
@@ -15,6 +17,8 @@ const isPdf = (f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
 const TYPES = [
   { key: 'branding', label: 'Branding', sub: 'PDFs & images', icon: FileText },
   { key: 'motion', label: 'Motion Design', sub: 'Video', icon: Film },
+  { key: 'logo', label: 'Logos', sub: 'Square image', icon: Square },
+  { key: 'businesscard', label: 'Business Card', sub: 'Front & back', icon: CreditCard },
   { key: 'color', label: 'Colors', sub: 'Palette', icon: Palette },
 ];
 
@@ -43,6 +47,15 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
   // branding
   const [files, setFiles] = useState([]);
 
+  // logo
+  const [logoFiles, setLogoFiles] = useState([]);
+
+  // business card
+  const [bcSize, setBcSize] = useState('85x55');
+  const [bcFront, setBcFront] = useState(null); // { blob, preview }
+  const [bcBack, setBcBack] = useState(null);
+  const [cropReq, setCropReq] = useState(null); // { side, src }
+
   // cover (all types)
   const [coverBlob, setCoverBlob] = useState(null);
   const [coverMeta, setCoverMeta] = useState(null);
@@ -64,6 +77,23 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
     setCoverBlob(blob); setCoverMeta(meta);
     setCoverPreview((prev) => { if (prev) URL.revokeObjectURL(prev); return URL.createObjectURL(blob); });
     setStudioOpen(false);
+  };
+
+  // Business-card front/back cropping.
+  useEffect(() => () => { if (bcFront?.preview) URL.revokeObjectURL(bcFront.preview); }, [bcFront]);
+  useEffect(() => () => { if (bcBack?.preview) URL.revokeObjectURL(bcBack.preview); }, [bcBack]);
+
+  const changeSize = (s) => {
+    setBcSize(s);
+    // Existing crops no longer match the new ratio — clear them.
+    setBcFront((f) => { if (f?.preview) URL.revokeObjectURL(f.preview); return null; });
+    setBcBack((b) => { if (b?.preview) URL.revokeObjectURL(b.preview); return null; });
+  };
+  const onCropDone = (blob) => {
+    const preview = URL.createObjectURL(blob);
+    if (cropReq.side === 'front') setBcFront({ blob, preview });
+    else setBcBack({ blob, preview });
+    setCropReq(null);
   };
 
   // Close on Escape.
@@ -105,20 +135,25 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
   const canSave = title.trim() && (
     (type === 'motion' && videoFile) ||
     (type === 'color' && (colors.length > 0 || exampleFile)) ||
-    (type === 'branding' && files.length > 0)
+    (type === 'branding' && files.length > 0) ||
+    (type === 'logo' && logoFiles.length > 0) ||
+    (type === 'businesscard' && bcFront)
   );
 
   const coverAvailable = (type === 'motion' && !!videoSrc)
     || (type === 'branding' && files.length > 0)
+    || (type === 'logo' && logoFiles.length > 0)
     || (type === 'color' && !!exampleFile);
-  const coverCtaLabel = type === 'branding' ? 'Choose cover (PDF page or image)'
-    : type === 'motion' ? 'Frame & crop cover' : 'Frame & crop cover';
+  const coverCtaLabel = type === 'branding' ? 'Choose cover (PDF page or image)' : 'Frame & crop cover';
   const coverDefaultHint = type === 'branding' ? 'Default: first image, or PDF page 1'
-    : type === 'motion' ? 'Default: current video frame' : 'Default: the example image';
+    : type === 'motion' ? 'Default: current video frame'
+    : type === 'logo' ? 'Default: the first image (whole logo)'
+    : 'Default: the example image';
 
   const brandingSources = files.map((f, i) => ({
     id: String(i), kind: isPdf(f) ? 'pdf' : 'image', src: f, name: f.name,
   }));
+  const logoSources = logoFiles.map((f, i) => ({ id: String(i), kind: 'image', src: f, name: f.name }));
 
   const submit = async () => {
     if (!canSave || saving) return;
@@ -141,6 +176,14 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
       }
       if (type === 'branding') {
         files.forEach((f) => fd.append('files', f));
+      }
+      if (type === 'logo') {
+        logoFiles.forEach((f) => fd.append('files', f));
+      }
+      if (type === 'businesscard') {
+        fd.append('size', bcSize);
+        if (bcFront) fd.append('front', bcFront.blob, 'front.webp');
+        if (bcBack) fd.append('back', bcBack.blob, 'back.webp');
       }
 
       // Cover thumbnail.
@@ -309,15 +352,60 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
             </>
           )}
 
+          {type === 'logo' && (
+            <div className="field">
+              <label>Logo image{logoFiles.length > 1 ? 's' : ''}</label>
+              <FilePick accept="image/*" multiple onPick={(list) => {
+                const arr = Array.from(list);
+                setLogoFiles((prev) => [...prev, ...arr]);
+                if (!title && arr[0]) setTitle(arr[0].name.replace(/\.[^.]+$/, ''));
+              }}>
+                <UploadCloud size={22} />
+                <div>Select the logo image (usually one)</div>
+                <div className="hint">Shown as a square preview in the list</div>
+              </FilePick>
+              {logoFiles.length > 0 && (
+                <div className="taglist" style={{ marginTop: 12 }}>
+                  {logoFiles.map((f, i) => (
+                    <span key={i} className="tag">
+                      {f.name.length > 26 ? f.name.slice(0, 24) + '…' : f.name}
+                      <span className="x" onClick={() => setLogoFiles((prev) => prev.filter((_, j) => j !== i))}><X size={12} /></span>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {type === 'businesscard' && (
+            <>
+              <div className="field">
+                <label>Size</label>
+                <div className="segmented">
+                  {CARD_SIZES.map((s) => (
+                    <button key={s.key} type="button" className={bcSize === s.key ? 'on' : ''} onClick={() => changeSize(s.key)}>{s.label}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="row-2">
+                <BcSide label="Front" data={bcFront} ratio={cardSizeAspect(bcSize)}
+                  onPick={(f) => f && setCropReq({ side: 'front', src: f })} onClear={() => setBcFront(null)} />
+                <BcSide label="Back" data={bcBack} ratio={cardSizeAspect(bcSize)}
+                  onPick={(f) => f && setCropReq({ side: 'back', src: f })} onClear={() => setBcBack(null)} />
+              </div>
+              <div className="hint" style={{ marginTop: -4, marginBottom: 8 }}>Pick a size first — front & back are cropped to {bcSize.replace('x', ' × ')} mm.</div>
+            </>
+          )}
+
           {/* Cover thumbnail (all types) */}
           {coverAvailable && (
             <div className="field">
               <label>Cover thumbnail</label>
               <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
                 {coverPreview ? (
-                  <img src={coverPreview} alt="cover" style={{ width: 168, aspectRatio: `${ASPECT}`, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }} />
+                  <img src={coverPreview} alt="cover" style={{ width: 168, aspectRatio: `${coverAspect(type)}`, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }} />
                 ) : (
-                  <div className="cover-placeholder">{coverDefaultHint}</div>
+                  <div className="cover-placeholder" style={{ aspectRatio: `${coverAspect(type)}` }}>{coverDefaultHint}</div>
                 )}
                 <button type="button" className="btn btn-sm" onClick={() => setStudioOpen(true)}>
                   <Crop size={15} /> {coverPreview ? 'Adjust cover' : coverCtaLabel}
@@ -349,15 +437,47 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
     {studioOpen && (
       <ThumbnailStudio
         type={type}
+        aspect={coverAspect(type)}
         video={type === 'motion' ? videoSrc : null}
-        assets={type === 'branding' ? brandingSources : []}
+        assets={type === 'branding' ? brandingSources : type === 'logo' ? logoSources : []}
         image={type === 'color' ? exampleFile : null}
         initialMeta={coverMeta}
         onDone={acceptCover}
         onClose={() => setStudioOpen(false)}
       />
     )}
+
+    {cropReq && (
+      <CropModal
+        src={cropReq.src}
+        aspect={cardSizeAspect(bcSize)}
+        out={{ w: 1000, h: Math.round(1000 / cardSizeAspect(bcSize)) }}
+        title={cropReq.side === 'front' ? 'Crop front side' : 'Crop back side'}
+        onDone={onCropDone}
+        onClose={() => setCropReq(null)}
+      />
+    )}
     </>
+  );
+}
+
+/** Business-card side uploader with a cropped preview. */
+function BcSide({ label, data, ratio, onPick, onClear }) {
+  return (
+    <div className="field">
+      <label>{label}</label>
+      {data ? (
+        <div className="bc-upload-preview" style={{ aspectRatio: `${ratio}` }}>
+          <img src={data.preview} alt={label} />
+          <button type="button" className="icon-btn" style={{ position: 'absolute', top: 6, right: 6 }} onClick={onClear}><Trash2 size={15} /></button>
+        </div>
+      ) : (
+        <FilePick accept="image/*" onPick={(list) => onPick(list[0])}>
+          <UploadCloud size={20} />
+          <div>{label} hochladen</div>
+        </FilePick>
+      )}
+    </div>
   );
 }
 
