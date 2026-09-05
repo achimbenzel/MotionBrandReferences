@@ -1,20 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Film, Palette, FileText, UploadCloud, Trash2, Scissors, Crop, Square, CreditCard, Images, Plus } from 'lucide-react';
+import { X, Film, Palette, FileText, UploadCloud, Trash2, Scissors, Crop, Square, CreditCard, Images } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { captureFrame, lengthTag, fmtTime } from '../lib/media.js';
 import { renderPdfPage, cropToBlob, centerCover } from '../lib/imaging.js';
-import { CARD_SIZES, cardSizeAspect, coverAspect } from '../lib/types.js';
+import { CARD_SIZES, cardSizeAspect, coverAspect, DEFAULT_RENDITIONS } from '../lib/types.js';
 import { useToast } from './Toast.jsx';
 import TagInput from './TagInput.jsx';
 import ColorBuilder from './ColorBuilder.jsx';
 import ColorCard from './ColorCard.jsx';
 import ThumbnailStudio from './ThumbnailStudio.jsx';
 import CropModal from './CropModal.jsx';
-import LogoImage from './LogoImage.jsx';
+import LogoRenditionsEditor from './LogoRenditionsEditor.jsx';
 
 const ASPECT = 16 / 10;
 const isPdf = (f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
-const LOGO_BG_PRESETS = ['#FFFFFF', '#111114', 'transparent'];
 const IMG_ACCEPT = 'image/*,.svg';
 
 const TYPES = [
@@ -51,13 +50,11 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
   // branding
   const [files, setFiles] = useState([]);
 
-  // logo — one image + recolour renditions + bg + scale
+  // logo — one image + recolour renditions (colour+bg pairs) + scale
   const [logoImage, setLogoImage] = useState(null); // { file, url }
-  const [logoBg, setLogoBg] = useState('#FFFFFF');
   const [logoScale, setLogoScale] = useState(0.7);
-  const [logoRends, setLogoRends] = useState(['#111114', '#FFFFFF']);
-  const [logoOriginal, setLogoOriginal] = useState(true);
-  const [logoRend, setLogoRend] = useState('original');
+  const [logoRends, setLogoRends] = useState(DEFAULT_RENDITIONS);
+  const [logoRend, setLogoRend] = useState(DEFAULT_RENDITIONS[0]);
 
   // business card
   const [bcSize, setBcSize] = useState('85x55');
@@ -133,11 +130,6 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
     return prev.filter((_, j) => j !== i);
   });
 
-  // logo rendition helpers
-  const addRend = (c) => setLogoRends((r) => (r.includes(c) ? r : [...r, c]));
-  const removeRend = (c) => setLogoRends((r) => { const n = r.filter((x) => x !== c); if (logoRend === c) setLogoRend(logoOriginal ? 'original' : (n[0] || '#111114')); return n; });
-  const toggleOriginal = (v) => { setLogoOriginal(v); if (!v && logoRend === 'original') setLogoRend(logoRends[0] || '#111114'); if (v) setLogoRend('original'); };
-
   // business card
   const changeSize = (s) => {
     setBcSize(s);
@@ -197,11 +189,9 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
       if (type === 'branding') { files.forEach((f) => fd.append('files', f)); }
       if (type === 'logo') {
         fd.append('image', logoImage.file);
-        fd.append('bg', logoBg);
         fd.append('scale', String(logoScale));
         fd.append('renditions', JSON.stringify(logoRends));
-        fd.append('original', String(logoOriginal));
-        fd.append('rendition', logoRend);
+        fd.append('rendition', JSON.stringify(logoRend));
       }
       if (type === 'businesscard') {
         fd.append('size', bcSize);
@@ -364,44 +354,11 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
               </div>
 
               {logoImage && (
-                <>
-                  <div className="field">
-                    <div className={`logo-stage ${logoBg === 'transparent' ? 'checker' : ''}`} style={{ ...(logoBg === 'transparent' ? {} : { background: logoBg }), maxWidth: 340, margin: '0 auto' }}>
-                      <LogoImage url={logoImage.url} rendition={logoRend} scalePct={logoScale * 100} alt="preview" />
-                    </div>
-                    <div className="logo-swatches" style={{ marginTop: 12 }}>
-                      {logoRends.map((c) => (
-                        <span key={c} className="rend-edit">
-                          <button type="button" className={`rend-swatch ${c === 'transparent' ? 'checker' : ''} ${logoRend === c ? 'on' : ''}`} style={c === 'transparent' ? undefined : { background: c }} onClick={() => setLogoRend(c)} />
-                          <button type="button" className="rend-edit-x" onClick={() => removeRend(c)} title="Entfernen"><X size={11} /></button>
-                        </span>
-                      ))}
-                      <label className="bg-swatch bg-custom" title="Farbe hinzufügen"><Plus size={14} /><input type="color" onChange={(e) => addRend(e.target.value.toUpperCase())} /></label>
-                      {logoOriginal && (
-                        <button type="button" className={`rend-original ${logoRend === 'original' ? 'on' : ''}`} title="Original (Farbe)" onClick={() => setLogoRend('original')}><img src={logoImage.url} alt="original" /></button>
-                      )}
-                    </div>
-                    <label className="check-row" style={{ marginTop: 10 }}>
-                      <input type="checkbox" checked={logoOriginal} onChange={(e) => toggleOriginal(e.target.checked)} /> Original (Farbe) als Option
-                    </label>
-                  </div>
-
-                  <div className="row-2">
-                    <div className="field">
-                      <label>Hintergrund</label>
-                      <div className="bg-picker">
-                        {LOGO_BG_PRESETS.map((p) => (
-                          <button key={p} type="button" title={p} className={`bg-swatch ${p === 'transparent' ? 'checker' : ''} ${logoBg === p ? 'on' : ''}`} style={p === 'transparent' ? undefined : { background: p }} onClick={() => setLogoBg(p)} />
-                        ))}
-                        <label className="bg-swatch bg-custom" title="Custom" style={logoBg === 'transparent' ? undefined : { background: logoBg }}><input type="color" value={logoBg === 'transparent' ? '#ffffff' : logoBg} onChange={(e) => setLogoBg(e.target.value.toUpperCase())} /></label>
-                      </div>
-                    </div>
-                    <div className="field">
-                      <label>Größe · {Math.round(logoScale * 100)}%</label>
-                      <input type="range" min="0.2" max="1" step="0.01" value={logoScale} style={{ width: '100%', accentColor: 'var(--accent)' }} onChange={(e) => setLogoScale(Number(e.target.value))} />
-                    </div>
-                  </div>
-                </>
+                <div className="field">
+                  <label>Farb-Kombinationen <span className="hint">Logo-Farbe auf Hintergrund — z. B. Weiß auf Schwarz</span></label>
+                  <LogoRenditionsEditor url={logoImage.url} renditions={logoRends} setRenditions={setLogoRends}
+                    selected={logoRend} setSelected={setLogoRend} scale={logoScale} setScale={setLogoScale} />
+                </div>
               )}
             </>
           )}

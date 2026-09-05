@@ -204,17 +204,17 @@ app.post('/api/projects', upload.any(), async (req, res) => {
     }
 
     if (type === 'logo') {
-      // A logo is one image (SVG or PNG) that can be recoloured (silhouette via
-      // CSS mask) to any of a set of "renditions", plus an optional untouched
-      // "original" (colour) rendition. Background + scale are display settings.
+      // A logo is one image (SVG or PNG). Each "rendition" is a pair of a logo
+      // colour (a hex to recolour the silhouette via CSS mask, or 'original' to
+      // keep the image) and a background colour, so e.g. white-on-black and
+      // black-on-white are both switchable. scale is a display setting.
       const image = byField('image');
       if (image) project.image = await moveInto(dir, image.path, `logo${extOf(image.originalname) || '.png'}`);
-      project.bg = (req.body.bg || '#FFFFFF').trim();
       const sc = Number(req.body.scale);
       project.scale = Number.isFinite(sc) ? Math.min(1, Math.max(0.2, sc)) : 0.7;
-      project.renditions = parseJSON(req.body.renditions, ['#111114', '#FFFFFF']);
-      project.original = req.body.original !== 'false';
-      project.rendition = req.body.rendition || (project.original ? 'original' : (project.renditions[0] || '#111114'));
+      const DEF = [{ color: '#111114', bg: '#FFFFFF' }, { color: '#FFFFFF', bg: '#111114' }, { color: 'original', bg: '#FFFFFF' }];
+      project.renditions = parseJSON(req.body.renditions, DEF);
+      project.rendition = parseJSON(req.body.rendition, project.renditions[0] || DEF[0]);
       project.thumb = project.image; // gallery preview uses the raw image
     }
 

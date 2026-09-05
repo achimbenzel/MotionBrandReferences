@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Play, Palette, Square, X } from 'lucide-react';
 import { fileUrl } from '../lib/api.js';
 import { fmtTime } from '../lib/media.js';
-import { cardSize, logoSource, logoBg, logoScale, logoRendition } from '../lib/types.js';
+import { cardSize, logoSource, logoScale, logoActive } from '../lib/types.js';
 import LogoImage from './LogoImage.jsx';
 
 export default function ProjectCard({ project, onRemove }) {
@@ -74,14 +74,13 @@ export default function ProjectCard({ project, onRemove }) {
 
 function LogoThumb({ project }) {
   const src = logoSource(project);
-  const bg = logoBg(project);
   const scale = logoScale(project);
-  const rendition = logoRendition(project);
-  const transparent = bg === 'transparent';
+  const active = logoActive(project);
+  const transparent = active.bg === 'transparent';
   return (
     <div className="card-thumb square">
-      <div className={`logo-plate ${transparent ? 'checker' : ''}`} style={transparent ? undefined : { background: bg }}>
-        {src ? <LogoImage url={fileUrl(project, src)} rendition={rendition} scalePct={scale * 100} alt={project.title} />
+      <div className={`logo-plate ${transparent ? 'checker' : ''}`} style={transparent ? undefined : { background: active.bg }}>
+        {src ? <LogoImage url={fileUrl(project, src)} rendition={active.color} scalePct={scale * 100} alt={project.title} />
           : <div className="card-thumb-empty"><Square size={26} /></div>}
       </div>
     </div>

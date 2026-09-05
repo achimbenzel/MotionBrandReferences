@@ -81,13 +81,14 @@ project you get:
   delete (no accidental one-click deletes).
 
 ### Logos
-Upload one image — **SVG** or **PNG** (transparent silhouette). It can be
-**recoloured** to any colour (via CSS mask, so it works for SVG and PNG
-silhouettes) and you can keep the untouched **Original (colour)** rendition too.
-On the detail page the only thing under the canvas is a **colour switcher** to
-flip between the renditions; the appearance settings (**background**, **scale**,
-which colours, whether Original shows) live in the **Edit ▸ Logo-Optionen**
-dialog. Grid cards render the selected rendition live on the chosen background.
+Upload one image — **SVG** or **PNG** (transparent silhouette). Each colour
+option is a **pairing of a logo colour and a background** (via CSS mask, so it
+works for SVG and PNG silhouettes), so e.g. **black-on-white** and
+**white-on-black** are both switchable — picking one flips the logo colour *and*
+the background together. You can also keep an untouched **Original (colour)**
+pairing. On the detail page the only thing under the canvas is that **switcher**;
+the pairings and **scale** are edited in **Edit ▸ Logo-Optionen**. Grid cards
+render the selected pairing live.
 
 ### Business Cards
 Pick a size — **85 × 55 mm** or **89 × 51 mm** — then upload and **crop** a

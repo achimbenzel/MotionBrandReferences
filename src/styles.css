@@ -1151,11 +1151,12 @@ img { max-width: 100%; display: block; }
   -webkit-mask-size: contain; mask-size: contain;
 }
 .logo-swatches { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; margin-top: 10px; }
-.rend-swatch { width: 34px; height: 34px; border-radius: 8px; border: 2px solid var(--border); cursor: pointer; padding: 0; }
+.rend-swatch { width: 42px; height: 42px; border-radius: 8px; border: 2px solid var(--border); cursor: pointer; padding: 0; display: grid; place-items: center; overflow: hidden; }
 .rend-swatch.on { border-color: var(--accent); }
-.rend-original { width: 34px; height: 34px; border-radius: 8px; border: 2px solid var(--border); overflow: hidden; padding: 3px; cursor: pointer; background: var(--surface-2); }
-.rend-original.on { border-color: var(--accent); }
-.rend-original img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.logo-add-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
+.mini-color { position: relative; width: 30px; height: 30px; border-radius: 8px; overflow: hidden; border: 2px solid var(--border); cursor: pointer; display: block; flex-shrink: 0; }
+.mini-color > span { position: absolute; inset: 0; display: block; }
+.mini-color input[type=color] { position: absolute; inset: -20%; width: 140%; height: 140%; border: 0; padding: 0; background: none; cursor: pointer; }
 .rend-edit { position: relative; display: inline-flex; }
 .rend-edit-x {
   position: absolute; top: -6px; right: -6px;

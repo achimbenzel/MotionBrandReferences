@@ -27,17 +27,35 @@ export function coverAspect(type, project) {
   return 16 / 10;
 }
 
-// --- Logo display helpers (single image, recolour renditions, bg, scale) ---
-// The source image (SVG/PNG). Falls back to older light/dark/assets shapes.
+// --- Logo display helpers ---
+// A logo has one source image and a list of "renditions" — each a pair of a
+// logo colour ('#hex' to recolour the silhouette, or 'original') and a
+// background colour, so e.g. black-on-white and white-on-black both switch.
 export const logoSource = (project) =>
   project.image || project.logoDark || project.logoLight || project.assets?.[0]?.file || null;
-export const logoRenditions = (project) =>
-  (Array.isArray(project.renditions) && project.renditions.length ? project.renditions : ['#111114', '#FFFFFF']);
-export const logoHasOriginal = (project) => project.original !== false;
-export function logoRendition(project) {
-  const r = project.rendition;
-  if (r === 'original' || (typeof r === 'string' && r.startsWith('#'))) return r;
-  return logoHasOriginal(project) ? 'original' : logoRenditions(project)[0];
-}
-export const logoBg = (project) => project.bg || '#FFFFFF';
 export const logoScale = (project) => (typeof project.scale === 'number' ? project.scale : 0.7);
+export const DEFAULT_RENDITIONS = [
+  { color: '#111114', bg: '#FFFFFF' },
+  { color: '#FFFFFF', bg: '#111114' },
+  { color: 'original', bg: '#FFFFFF' },
+];
+export const sameRendition = (a, b) => !!a && !!b && a.color === b.color && a.bg === b.bg;
+
+export function logoRenditionList(project) {
+  const raw = project.renditions;
+  if (Array.isArray(raw) && raw.length && typeof raw[0] === 'object' && raw[0]) return raw;
+  // Migrate the older shape (array of hex strings + original flag + bg).
+  const bg = project.bg || '#FFFFFF';
+  const list = (Array.isArray(raw) && raw.length ? raw.map((c) => ({ color: c, bg })) : [
+    { color: '#111114', bg: '#FFFFFF' }, { color: '#FFFFFF', bg: '#111114' },
+  ]);
+  if (project.original !== false && !list.some((e) => e.color === 'original')) list.push({ color: 'original', bg });
+  return list;
+}
+export function logoActive(project) {
+  const list = logoRenditionList(project);
+  const r = project.rendition;
+  if (r && typeof r === 'object' && r.color) return r;
+  if (typeof r === 'string') return list.find((e) => e.color === r) || list[0];
+  return list[0] || { color: 'original', bg: '#FFFFFF' };
+}
