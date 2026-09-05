@@ -89,7 +89,8 @@ that live (square, on the chosen background). SVGs stay vector.
 Pick a size — **85 × 55 mm** or **89 × 51 mm** — then upload and **crop** a
 **front** and **back** image to that ratio. In the grid the two sides are shown
 stacked (front over back); the detail page shows both large, with fullscreen,
-plus a **rotatable 3D view** you can drag to spin and flip between front/back.
+plus a **rotatable 3D view** (a real cuboid with a thin white edge for
+thickness) you can drag to spin and flip between front/back.
 
 ### Colors
 Add an **example image** plus colors entered in **any one** format — HEX, RGB,
@@ -122,6 +123,8 @@ meter.
   zoom slider to frame exactly what shows on the card.
 - **Edit menu:** every project has an **Edit ⋯** menu (top-right) to **rename**,
   edit year/category, **change the cover**, or **delete** — no bare delete icon.
+- **Notes:** every project type (Branding, Motion, Logos, Business Cards,
+  Colors) has an auto-saved **Notes** field, shown at ~1.5× the normal text size.
 
 > **Note on conversions:** HEX ⇄ RGB is exact. CMYK is the standard device-neutral
 > approximation. **Pantone has no exact formula** to/from other spaces, so it is a

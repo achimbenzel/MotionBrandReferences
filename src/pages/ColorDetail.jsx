@@ -6,6 +6,7 @@ import ColorCard from '../components/ColorCard.jsx';
 import ColorBuilder from '../components/ColorBuilder.jsx';
 import TagInput from '../components/TagInput.jsx';
 import Lightbox from '../components/Lightbox.jsx';
+import NotesField from '../components/NotesField.jsx';
 
 export default function ColorDetail({ project, setProject }) {
   const toast = useToast();
@@ -80,6 +81,8 @@ export default function ColorDetail({ project, setProject }) {
         <div className="section-head"><h2><Tag size={16} /> Tags</h2></div>
         <TagInput tags={project.tags || []} onChange={saveTags} placeholder="Add a tag…" />
       </div>
+
+      <NotesField project={project} setProject={setProject} />
 
       {lightbox && project.example && (
         <Lightbox

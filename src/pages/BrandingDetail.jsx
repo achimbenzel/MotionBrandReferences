@@ -5,6 +5,7 @@ import { useToast } from '../components/Toast.jsx';
 import TagInput from '../components/TagInput.jsx';
 import PdfViewer from '../components/PdfViewer.jsx';
 import Lightbox from '../components/Lightbox.jsx';
+import NotesField from '../components/NotesField.jsx';
 
 const SUGGESTIONS = ['Tech', 'Restaurant', 'Fashion', 'Sport', 'Finance', 'Food', 'Retail', 'Minimal', 'Colorful', 'Monochrome', 'Warm', 'Cool'];
 
@@ -66,6 +67,8 @@ export default function BrandingDetail({ project, setProject }) {
         <TagInput tags={project.tags || []} onChange={saveTags} suggestions={SUGGESTIONS} placeholder="color scheme, type…" />
         <div className="hint" style={{ marginTop: 8 }}>Tag by color scheme and type (tech, restaurant…) to filter the grid.</div>
       </div>
+
+      <NotesField project={project} setProject={setProject} />
 
       {lightbox >= 0 && lightboxItems.length > 0 && (
         <Lightbox items={lightboxItems} index={lightbox} onIndex={setLightbox} onClose={() => setLightbox(-1)} />

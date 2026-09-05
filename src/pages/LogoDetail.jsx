@@ -4,6 +4,7 @@ import { api, fileUrl } from '../lib/api.js';
 import { useToast } from '../components/Toast.jsx';
 import TagInput from '../components/TagInput.jsx';
 import Lightbox from '../components/Lightbox.jsx';
+import NotesField from '../components/NotesField.jsx';
 import { logoVariants } from '../lib/types.js';
 
 const BG_PRESETS = [
@@ -105,6 +106,8 @@ export default function LogoDetail({ project, setProject }) {
         <div className="section-head"><h2><Tag size={16} /> Tags</h2></div>
         <TagInput tags={project.tags || []} onChange={saveTags} placeholder="Add a tag…" />
       </div>
+
+      <NotesField project={project} setProject={setProject} />
 
       {lightbox && currentFile && (
         <Lightbox items={[{ src: fileUrl(project, currentFile), caption: project.title }]} index={0} onIndex={() => {}} onClose={() => setLightbox(false)} />

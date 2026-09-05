@@ -1,23 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
-import { Camera, Images, StickyNote, Tag as TagIcon, Trash2, Clock, ChevronLeft, ChevronRight, Maximize2, MoreVertical } from 'lucide-react';
+import { Camera, Images, Tag as TagIcon, Trash2, Clock, ChevronLeft, ChevronRight, Maximize2, MoreVertical } from 'lucide-react';
 import { api, fileUrl } from '../lib/api.js';
 import { captureFrame, lengthTag, fmtTime } from '../lib/media.js';
 import { useToast } from '../components/Toast.jsx';
 import TagInput from '../components/TagInput.jsx';
 import Menu from '../components/Menu.jsx';
 import Lightbox from '../components/Lightbox.jsx';
+import NotesField from '../components/NotesField.jsx';
 
 export default function MotionDetail({ project, setProject }) {
   const toast = useToast();
   const videoRef = useRef(null);
-  const [notes, setNotes] = useState(project.notes || '');
-  const [noteState, setNoteState] = useState('idle');
   const [capturing, setCapturing] = useState(false);
   const [paused, setPaused] = useState(true);
   const [current, setCurrent] = useState(0);
   const [sel, setSel] = useState(0);
   const [lightbox, setLightbox] = useState(false);
-  const firstRender = useRef(true);
 
   const frames = [...(project.frames || [])].sort((a, b) => a.t - b.t);
   const autoLen = project.duration ? lengthTag(project.duration) : null;
@@ -25,25 +23,6 @@ export default function MotionDetail({ project, setProject }) {
 
   // Keep selection valid as frames change.
   useEffect(() => { if (sel > frames.length - 1) setSel(Math.max(0, frames.length - 1)); }, [frames.length, sel]);
-
-  // Debounced notes autosave.
-  useEffect(() => {
-    if (firstRender.current) { firstRender.current = false; return; }
-    setNoteState('saving');
-    const t = setTimeout(async () => {
-      try {
-        const updated = await api.update(project.id, { notes });
-        setProject(updated);
-        setNoteState('saved');
-        setTimeout(() => setNoteState('idle'), 1500);
-      } catch {
-        setNoteState('idle');
-        toast('Could not save notes', 'error');
-      }
-    }, 700);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notes]);
 
   const saveTags = async (tags) => {
     try { setProject(await api.update(project.id, { tags })); }
@@ -109,14 +88,7 @@ export default function MotionDetail({ project, setProject }) {
       </div>
 
       {/* Notes */}
-      <div className="section">
-        <div className="section-head"><h2><StickyNote size={16} /> Notes</h2></div>
-        <div className="notes-area">
-          <textarea className="textarea" style={{ minHeight: 130 }} value={notes}
-            onChange={(e) => setNotes(e.target.value)} placeholder="Ideas, feedback, references, what worked…" />
-          <span className="notes-status">{noteState === 'saving' ? 'Saving…' : noteState === 'saved' ? 'Saved' : ''}</span>
-        </div>
-      </div>
+      <NotesField project={project} setProject={setProject} />
 
       {/* Frames */}
       <div className="section">
