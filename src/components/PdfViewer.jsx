@@ -11,19 +11,18 @@ export default function PdfViewer({ url }) {
   const canvasRef = useRef(null);
   const pdfRef = useRef(null);
   const renderTaskRef = useRef(null);
-  const fsRef = useRef(false);
   const [numPages, setNumPages] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isFs, setIsFs] = useState(false);
 
-  // Load the document.
+  // Wrap-around page navigation (last → first, first → last).
+  const goPage = useCallback((d) => setPage((p) => (numPages ? ((p - 1 + d + numPages) % numPages) + 1 : 1)), [numPages]);
+
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
-    setPage(1);
+    setLoading(true); setError(null); setPage(1);
     const task = pdfjsLib.getDocument(url);
     task.promise.then((pdf) => {
       if (cancelled) { pdf.destroy(); return; }
@@ -49,18 +48,18 @@ export default function PdfViewer({ url }) {
       const pdfPage = await pdf.getPage(num);
       const unscaled = pdfPage.getViewport({ scale: 1 });
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const availW = stage.clientWidth - 2;
-      const availH = fsRef.current ? stage.clientHeight - 2 : Infinity;
-      let cssScale = availW / unscaled.width;
-      if (Number.isFinite(availH)) cssScale = Math.min(cssScale, availH / unscaled.height);
-      const scale = Math.max(0.2, cssScale) * dpr;
+      // Fit the page inside the fixed-size stage (both width and height) so the
+      // stage never changes size — the side arrows stay put.
+      const availW = stage.clientWidth - (pdf.numPages > 1 ? 108 : 32);
+      const availH = stage.clientHeight - 24;
+      const cssScale = Math.min(availW / unscaled.width, availH / unscaled.height);
+      const scale = Math.max(0.15, cssScale) * dpr;
       const viewport = pdfPage.getViewport({ scale });
       canvas.width = viewport.width;
       canvas.height = viewport.height;
       canvas.style.width = `${viewport.width / dpr}px`;
       canvas.style.height = `${viewport.height / dpr}px`;
-      const ctx = canvas.getContext('2d');
-      const task = pdfPage.render({ canvasContext: ctx, viewport });
+      const task = pdfPage.render({ canvasContext: canvas.getContext('2d'), viewport });
       renderTaskRef.current = task;
       await task.promise;
     } catch (e) {
@@ -76,7 +75,6 @@ export default function PdfViewer({ url }) {
     return () => window.removeEventListener('resize', onResize);
   }, [page, numPages, loading, renderPage]);
 
-  // Fullscreen handling.
   const toggleFs = () => {
     const el = stageRef.current;
     if (!document.fullscreenElement) el?.requestFullscreen?.();
@@ -84,24 +82,22 @@ export default function PdfViewer({ url }) {
   };
   useEffect(() => {
     const onFs = () => {
-      fsRef.current = !!document.fullscreenElement;
-      setIsFs(fsRef.current);
-      // Re-render at the new size after the transition settles.
+      setIsFs(!!document.fullscreenElement);
       setTimeout(() => { if (!loading && numPages) renderPage(page); }, 60);
     };
     document.addEventListener('fullscreenchange', onFs);
     return () => document.removeEventListener('fullscreenchange', onFs);
   }, [page, numPages, loading, renderPage]);
 
-  // Arrow-key navigation.
+  // Arrow-key navigation (also wraps).
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'ArrowRight') setPage((p) => Math.min(p + 1, numPages));
-      if (e.key === 'ArrowLeft') setPage((p) => Math.max(p - 1, 1));
+      if (e.key === 'ArrowRight') goPage(1);
+      if (e.key === 'ArrowLeft') goPage(-1);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [numPages]);
+  }, [goPage]);
 
   return (
     <div className="pdf-viewer">
@@ -115,11 +111,11 @@ export default function PdfViewer({ url }) {
         </button>
 
         {numPages > 1 && (
-          <div className="pdf-controls overlay-bar">
-            <button className="icon-btn" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}><ChevronLeft size={18} /></button>
-            <span className="page-num">{page} / {numPages}</span>
-            <button className="icon-btn" onClick={() => setPage((p) => Math.min(numPages, p + 1))} disabled={page >= numPages}><ChevronRight size={18} /></button>
-          </div>
+          <>
+            <button className="stage-nav prev icon-btn" onClick={() => goPage(-1)} aria-label="Previous page"><ChevronLeft size={22} /></button>
+            <button className="stage-nav next icon-btn" onClick={() => goPage(1)} aria-label="Next page"><ChevronRight size={22} /></button>
+            <div className="stage-counter">{page} / {numPages}</div>
+          </>
         )}
       </div>
     </div>

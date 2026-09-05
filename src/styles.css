@@ -55,6 +55,8 @@ img { max-width: 100%; display: block; }
   flex-wrap: wrap;
 }
 .header-bar {
+  position: relative;
+  z-index: 3; /* keep the hamburger dropdown above the storage pill */
   display: flex;
   align-items: center;
   gap: 6px;
@@ -76,12 +78,12 @@ img { max-width: 100%; display: block; }
 .tabs::-webkit-scrollbar { display: none; }
 .tab { flex-shrink: 0; }
 
-/* Hamburger (mobile only) — .header-bar prefix beats .icon-btn's display:grid */
-.header-bar .menu-toggle { display: none; align-items: center; gap: 8px; width: auto; padding: 0 14px; border-radius: 999px; }
-.menu-toggle-label { font-size: 14px; font-weight: 500; }
+/* Hamburger (mobile only) — .header-bar prefix beats .icon-btn's display:grid.
+   Icon-only so its width (and the pill's position) never changes with section. */
+.header-bar .menu-toggle { display: none; }
 @media (max-width: 760px) {
   .tabs { display: none; }
-  .header-bar .menu-toggle { display: inline-flex; }
+  .header-bar .menu-toggle { display: grid; }
   .header-inner { justify-content: center; }
 }
 .tab {
@@ -570,14 +572,43 @@ img { max-width: 100%; display: block; }
 .pdf-stage {
   position: relative;
   width: 100%;
+  height: 72vh;
   border-radius: var(--radius);
   overflow: hidden;
   border: 1px solid var(--border);
   background: #1a1a1d;
-  min-height: 300px;
   display: grid; place-items: center;
 }
-.pdf-stage canvas { max-width: 100%; height: auto; display: block; }
+.pdf-stage canvas { max-width: 100%; max-height: 100%; display: block; }
+
+/* Shared stage navigation (PDF pages, and anywhere a fixed stage needs arrows) */
+.stage-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 4;
+  width: 44px;
+  height: 44px;
+  background: rgba(0, 0, 0, .5);
+  border-color: transparent;
+  color: #fff;
+}
+.stage-nav:hover { background: rgba(0, 0, 0, .78); }
+.stage-nav.prev { left: 12px; }
+.stage-nav.next { right: 12px; }
+.stage-counter {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  font-size: 13px;
+  color: #fff;
+  background: rgba(0, 0, 0, .6);
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
 .pdf-controls {
   display: flex;
   align-items: center;
@@ -724,13 +755,14 @@ img { max-width: 100%; display: block; }
   display: flex;
   align-items: center;
   justify-content: center;
-  max-height: 62vh;
+  height: 60vh;
 }
 .frame-hero img { width: 100%; height: 100%; object-fit: contain; cursor: zoom-in; display: block; }
 .frame-hero-nav {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
+  z-index: 4;
   width: 44px;
   height: 44px;
   background: rgba(0, 0, 0, .5);
@@ -823,6 +855,8 @@ img { max-width: 100%; display: block; }
 
 /* ------------------------------------------------------------- Storage pill */
 .storage-pill {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1039,3 +1073,41 @@ img { max-width: 100%; display: block; }
   background: var(--surface-2);
 }
 .bc-upload-preview img { width: 100%; height: 100%; object-fit: cover; }
+
+/* Business-card 3D flip view */
+.bc3d { display: flex; flex-direction: column; gap: 14px; }
+.bc3d-scene {
+  perspective: 1500px;
+  display: flex;
+  justify-content: center;
+  padding: 40px 0;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  border-radius: var(--radius);
+  background: radial-gradient(120% 120% at 50% 30%, var(--surface) 0%, var(--bg) 80%);
+  border: 1px solid var(--border);
+}
+.bc3d-scene:active { cursor: grabbing; }
+.bc3d-card {
+  position: relative;
+  width: min(72%, 440px);
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.bc3d-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-2);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, .55);
+  display: grid;
+  place-items: center;
+}
+.bc3d-face img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.bc3d-face.back { transform: rotateY(180deg); }
+.bc3d-empty { color: var(--text-faint); font-size: 14px; }
+.bc3d-controls { display: flex; align-items: center; gap: 12px; justify-content: center; }

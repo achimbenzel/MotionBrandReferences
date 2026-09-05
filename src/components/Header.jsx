@@ -25,9 +25,8 @@ export default function Header({ onAdd, storageKey }) {
           <Menu
             align="left"
             trigger={
-              <button className="icon-btn menu-toggle" aria-label="Sections">
+              <button className="icon-btn menu-toggle" aria-label="Sections" title={activeLabel}>
                 <MenuIcon size={18} />
-                <span className="menu-toggle-label">{activeLabel}</span>
               </button>
             }
             items={TABS.map((t) => ({

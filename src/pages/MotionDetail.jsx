@@ -17,7 +17,6 @@ export default function MotionDetail({ project, setProject }) {
   const [current, setCurrent] = useState(0);
   const [sel, setSel] = useState(0);
   const [lightbox, setLightbox] = useState(false);
-  const [heroRatio, setHeroRatio] = useState(null); // keeps the hero a fixed height so arrows don't jump
   const firstRender = useRef(true);
 
   const frames = [...(project.frames || [])].sort((a, b) => a.t - b.t);
@@ -131,8 +130,8 @@ export default function MotionDetail({ project, setProject }) {
           </div>
         ) : (
           <>
-            {/* Big preview with arrows (fixed aspect ratio → arrows stay put) */}
-            <div className="frame-hero" style={{ aspectRatio: heroRatio || '16 / 9' }}>
+            {/* Big preview with arrows (fixed height → arrows stay put) */}
+            <div className="frame-hero">
               {frames.length > 1 && (
                 <button className="frame-hero-nav prev icon-btn" onClick={() => step(-1)} aria-label="Previous frame"><ChevronLeft size={22} /></button>
               )}
@@ -140,7 +139,6 @@ export default function MotionDetail({ project, setProject }) {
                 src={fileUrl(project, frames[selClamped].file)}
                 alt={`frame ${fmtTime(frames[selClamped].t)}`}
                 onClick={() => setLightbox(true)}
-                onLoad={(e) => { const { naturalWidth: w, naturalHeight: h } = e.target; if (w && h && !heroRatio) setHeroRatio(`${w} / ${h}`); }}
                 title="Click to view fullscreen"
               />
               {frames.length > 1 && (

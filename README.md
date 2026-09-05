@@ -61,8 +61,8 @@ never touched. To back up or move your library, just copy the `data/` folder.
 
 ### Branding
 Upload **PDFs** (brand guidelines, presentations) and/or **images**. PDFs open
-in a page-by-page viewer you can click through (arrow keys work too) and open
-**fullscreen**. Images display at their true aspect ratio and open in a
+in a page-by-page viewer with fixed side arrows (arrow keys work too; wrapping
+past the last page returns to the first) and open **fullscreen**. Images display at their true aspect ratio and open in a
 fullscreen lightbox with arrow navigation. You can pick **any PDF page as the
 cover** thumbnail. Tag each project by **color scheme** and **type** (tech,
 restaurant, …) and filter the grid by those tags.
@@ -74,9 +74,10 @@ project you get:
 - an automatic **length tag** — `≤ 30s`, `30–60s`, `60–90s`, `> 90s`,
 - a **“Add current frame”** button: pause anywhere and save that frame; frames
   are stored as **WebP** in the project folder,
-- a **big frame preview** with prev/next arrows, click-to-**fullscreen** with
-  arrow navigation, and the thumbnail strip below. Each frame has a **⋯ menu**
-  to delete (no accidental one-click deletes).
+- a **big frame preview** with prev/next arrows (fixed position; wrapping past
+  the last frame returns to the first), click-to-**fullscreen** with arrow
+  navigation, and the thumbnail strip below. Each frame has a **⋯ menu** to
+  delete (no accidental one-click deletes).
 
 ### Logos
 Upload a **light** and/or **dark** version (**SVG**, PNG or JPG). On the detail
@@ -87,7 +88,8 @@ that live (square, on the chosen background). SVGs stay vector.
 ### Business Cards
 Pick a size — **85 × 55 mm** or **89 × 51 mm** — then upload and **crop** a
 **front** and **back** image to that ratio. In the grid the two sides are shown
-stacked (front over back); the detail page shows both large, with fullscreen.
+stacked (front over back); the detail page shows both large, with fullscreen,
+plus a **rotatable 3D view** you can drag to spin and flip between front/back.
 
 ### Colors
 Add an **example image** plus colors entered in **any one** format — HEX, RGB,
@@ -109,8 +111,10 @@ real summed size of everything under `data/`.
 
 ### Responsive header
 On wide screens all five section tabs sit in the pill. On narrow/mobile widths
-they collapse into a **hamburger menu** (showing the current section), keeping
-the add button and storage meter reachable.
+they collapse into a **hamburger menu** whose dropdown lists all sections
+(current one checked). The toggle is icon-only so the pill's size and position
+never shift between sections, and the dropdown always renders above the storage
+meter.
 
 ### Covers & editing (all types)
 - **Crop & zoom the cover:** when you set a thumbnail — a Motion frame, a
