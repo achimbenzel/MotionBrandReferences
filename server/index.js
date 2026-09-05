@@ -204,15 +204,19 @@ app.post('/api/projects', upload.any(), async (req, res) => {
     }
 
     if (type === 'logo') {
-      project.assets = [];
-      for (const f of files) {
-        if (f.fieldname !== 'files') continue;
-        const assetId = nanoid(6);
-        const stored = await moveInto(dir, f.path, `${assetId}${extOf(f.originalname) || '.png'}`);
-        project.assets.push({ id: assetId, kind: 'image', file: stored, name: f.originalname });
-      }
-      const first = project.assets[0];
-      if (first) project.thumb = first.file;
+      // A logo has an optional light and dark variant (SVG or raster), a
+      // background colour and a display scale. Card + detail render live.
+      const light = byField('light');
+      const dark = byField('dark');
+      if (light) project.logoLight = await moveInto(dir, light.path, `light${extOf(light.originalname) || '.png'}`);
+      if (dark) project.logoDark = await moveInto(dir, dark.path, `dark${extOf(dark.originalname) || '.png'}`);
+      project.bg = (req.body.bg || '#FFFFFF').trim();
+      const sc = Number(req.body.scale);
+      project.scale = Number.isFinite(sc) ? Math.min(1, Math.max(0.2, sc)) : 0.7;
+      const v = req.body.variant;
+      project.variant = (v === 'light' || v === 'dark') ? v : (project.logoDark ? 'dark' : 'light');
+      const def = project.variant === 'dark' ? project.logoDark : project.logoLight;
+      project.thumb = def || project.logoLight || project.logoDark || undefined;
     }
 
     if (type === 'businesscard') {
@@ -243,7 +247,7 @@ app.post('/api/projects', upload.any(), async (req, res) => {
 });
 
 // ---- Update (notes / tags / colors / meta) --------------------------------
-const EDITABLE = ['title', 'year', 'category', 'notes', 'tags', 'colors'];
+const EDITABLE = ['title', 'year', 'category', 'notes', 'tags', 'colors', 'bg', 'scale', 'variant'];
 app.patch('/api/projects/:id', async (req, res) => {
   try {
     const updated = await mutateDB((db) => {
@@ -253,6 +257,11 @@ app.patch('/api/projects/:id', async (req, res) => {
         if (key in req.body) {
           if (key === 'colors' && Array.isArray(req.body.colors)) {
             project.colors = req.body.colors.map((c) => ({ id: c.id || nanoid(6), ...c }));
+          } else if (key === 'scale') {
+            const s = Number(req.body.scale);
+            if (Number.isFinite(s)) project.scale = Math.min(1, Math.max(0.2, s));
+          } else if (key === 'variant') {
+            if (req.body.variant === 'light' || req.body.variant === 'dark') project.variant = req.body.variant;
           } else {
             project[key] = req.body[key];
           }

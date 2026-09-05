@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Film, Palette, FileText, UploadCloud, Trash2, Scissors, Crop, Square, CreditCard } from 'lucide-react';
+import { X, Film, Palette, FileText, UploadCloud, Trash2, Scissors, Crop, Square, CreditCard, Sun, Moon } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { captureFrame, lengthTag, fmtTime } from '../lib/media.js';
 import { renderPdfPage, cropToBlob, centerCover } from '../lib/imaging.js';
@@ -13,6 +13,8 @@ import CropModal from './CropModal.jsx';
 
 const ASPECT = 16 / 10;
 const isPdf = (f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+const LOGO_BG_PRESETS = ['#FFFFFF', '#111114', 'transparent'];
+const LOGO_ACCEPT = 'image/*,.svg';
 
 const TYPES = [
   { key: 'branding', label: 'Branding', sub: 'PDFs & images', icon: FileText },
@@ -47,8 +49,12 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
   // branding
   const [files, setFiles] = useState([]);
 
-  // logo
-  const [logoFiles, setLogoFiles] = useState([]);
+  // logo — light/dark variants + background + scale
+  const [logoLight, setLogoLight] = useState(null); // { file, url }
+  const [logoDark, setLogoDark] = useState(null);
+  const [logoBg, setLogoBg] = useState('#FFFFFF');
+  const [logoScale, setLogoScale] = useState(0.7);
+  const [logoVariant, setLogoVariant] = useState('dark');
 
   // business card
   const [bcSize, setBcSize] = useState('85x55');
@@ -96,6 +102,18 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
     setCropReq(null);
   };
 
+  // Logo variant uploads (SVG or raster).
+  useEffect(() => () => { if (logoLight?.url) URL.revokeObjectURL(logoLight.url); }, [logoLight]);
+  useEffect(() => () => { if (logoDark?.url) URL.revokeObjectURL(logoDark.url); }, [logoDark]);
+  const setLogoSide = (side, file) => {
+    if (!file) return;
+    const entry = { file, url: URL.createObjectURL(file) };
+    if (side === 'light') { setLogoLight(entry); setLogoVariant((v) => (logoDark ? v : 'light')); }
+    else { setLogoDark(entry); setLogoVariant((v) => (logoLight ? v : 'dark')); }
+    if (!title) setTitle(file.name.replace(/\.[^.]+$/, ''));
+  };
+  const logoCurrent = logoVariant === 'dark' ? (logoDark || logoLight) : (logoLight || logoDark);
+
   // Close on Escape.
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape' && !saving) onClose(); };
@@ -136,24 +154,21 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
     (type === 'motion' && videoFile) ||
     (type === 'color' && (colors.length > 0 || exampleFile)) ||
     (type === 'branding' && files.length > 0) ||
-    (type === 'logo' && logoFiles.length > 0) ||
+    (type === 'logo' && (logoLight || logoDark)) ||
     (type === 'businesscard' && bcFront)
   );
 
   const coverAvailable = (type === 'motion' && !!videoSrc)
     || (type === 'branding' && files.length > 0)
-    || (type === 'logo' && logoFiles.length > 0)
     || (type === 'color' && !!exampleFile);
   const coverCtaLabel = type === 'branding' ? 'Choose cover (PDF page or image)' : 'Frame & crop cover';
   const coverDefaultHint = type === 'branding' ? 'Default: first image, or PDF page 1'
     : type === 'motion' ? 'Default: current video frame'
-    : type === 'logo' ? 'Default: the first image (whole logo)'
     : 'Default: the example image';
 
   const brandingSources = files.map((f, i) => ({
     id: String(i), kind: isPdf(f) ? 'pdf' : 'image', src: f, name: f.name,
   }));
-  const logoSources = logoFiles.map((f, i) => ({ id: String(i), kind: 'image', src: f, name: f.name }));
 
   const submit = async () => {
     if (!canSave || saving) return;
@@ -178,7 +193,11 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
         files.forEach((f) => fd.append('files', f));
       }
       if (type === 'logo') {
-        logoFiles.forEach((f) => fd.append('files', f));
+        if (logoLight) fd.append('light', logoLight.file);
+        if (logoDark) fd.append('dark', logoDark.file);
+        fd.append('bg', logoBg);
+        fd.append('scale', String(logoScale));
+        fd.append('variant', logoVariant);
       }
       if (type === 'businesscard') {
         fd.append('size', bcSize);
@@ -353,28 +372,53 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
           )}
 
           {type === 'logo' && (
-            <div className="field">
-              <label>Logo image{logoFiles.length > 1 ? 's' : ''}</label>
-              <FilePick accept="image/*" multiple onPick={(list) => {
-                const arr = Array.from(list);
-                setLogoFiles((prev) => [...prev, ...arr]);
-                if (!title && arr[0]) setTitle(arr[0].name.replace(/\.[^.]+$/, ''));
-              }}>
-                <UploadCloud size={22} />
-                <div>Select the logo image (usually one)</div>
-                <div className="hint">Shown as a square preview in the list</div>
-              </FilePick>
-              {logoFiles.length > 0 && (
-                <div className="taglist" style={{ marginTop: 12 }}>
-                  {logoFiles.map((f, i) => (
-                    <span key={i} className="tag">
-                      {f.name.length > 26 ? f.name.slice(0, 24) + '…' : f.name}
-                      <span className="x" onClick={() => setLogoFiles((prev) => prev.filter((_, j) => j !== i))}><X size={12} /></span>
-                    </span>
-                  ))}
+            <>
+              <div className="row-2">
+                <LogoSlot label="Logo hell" hint="für dunkle BG" data={logoLight} onPick={(f) => setLogoSide('light', f)} onClear={() => setLogoLight(null)} />
+                <LogoSlot label="Logo dunkel" hint="für helle BG" data={logoDark} onPick={(f) => setLogoSide('dark', f)} onClear={() => setLogoDark(null)} />
+              </div>
+              <div className="hint" style={{ marginTop: -4, marginBottom: 12 }}>SVG, PNG oder JPG. Mindestens eine Version — beide erlauben das Umschalten hell/dunkel.</div>
+
+              {logoCurrent && (
+                <div className="field">
+                  <label>Vorschau</label>
+                  <div className="logo-layout">
+                    <div className={`logo-stage ${logoBg === 'transparent' ? 'checker' : ''}`} style={logoBg === 'transparent' ? undefined : { background: logoBg }}>
+                      <img src={logoCurrent.url} alt="preview" style={{ width: `${logoScale * 100}%`, height: `${logoScale * 100}%`, objectFit: 'contain' }} />
+                    </div>
+                    <div className="logo-controls panel">
+                      {logoLight && logoDark && (
+                        <div className="field">
+                          <label>Standard-Version</label>
+                          <div className="segmented">
+                            <button type="button" className={logoVariant === 'light' ? 'on' : ''} onClick={() => setLogoVariant('light')}><Sun size={14} /> Hell</button>
+                            <button type="button" className={logoVariant === 'dark' ? 'on' : ''} onClick={() => setLogoVariant('dark')}><Moon size={14} /> Dunkel</button>
+                          </div>
+                        </div>
+                      )}
+                      <div className="field">
+                        <label>Hintergrund</label>
+                        <div className="bg-picker">
+                          {LOGO_BG_PRESETS.map((p) => (
+                            <button key={p} type="button" title={p}
+                              className={`bg-swatch ${p === 'transparent' ? 'checker' : ''} ${logoBg === p ? 'on' : ''}`}
+                              style={p === 'transparent' ? undefined : { background: p }} onClick={() => setLogoBg(p)} />
+                          ))}
+                          <label className="bg-swatch bg-custom" title="Custom" style={logoBg === 'transparent' ? undefined : { background: logoBg }}>
+                            <input type="color" value={logoBg === 'transparent' ? '#ffffff' : logoBg} onChange={(e) => setLogoBg(e.target.value.toUpperCase())} />
+                          </label>
+                        </div>
+                      </div>
+                      <div className="field" style={{ marginBottom: 0 }}>
+                        <label>Größe · {Math.round(logoScale * 100)}%</label>
+                        <input type="range" min="0.2" max="1" step="0.01" value={logoScale}
+                          style={{ width: '100%', accentColor: 'var(--accent)' }} onChange={(e) => setLogoScale(Number(e.target.value))} />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
-            </div>
+            </>
           )}
 
           {type === 'businesscard' && (
@@ -458,6 +502,26 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
       />
     )}
     </>
+  );
+}
+
+/** Logo variant uploader (SVG/raster) with a small preview. */
+function LogoSlot({ label, hint, data, onPick, onClear }) {
+  return (
+    <div className="field">
+      <label>{label} <span className="hint">{hint}</span></label>
+      {data ? (
+        <div className="logo-slot-preview checker">
+          <img src={data.url} alt={label} />
+          <button type="button" className="icon-btn" style={{ position: 'absolute', top: 6, right: 6 }} onClick={onClear}><Trash2 size={15} /></button>
+        </div>
+      ) : (
+        <FilePick accept={LOGO_ACCEPT} onPick={(list) => onPick(list[0])}>
+          <UploadCloud size={20} />
+          <div>Hochladen</div>
+        </FilePick>
+      )}
+    </div>
   );
 }
 

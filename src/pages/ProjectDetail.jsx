@@ -68,7 +68,6 @@ export default function ProjectDetail() {
 
   const canSetThumb = project.type === 'motion'
     || (project.type === 'branding' && (project.assets || []).length > 0)
-    || (project.type === 'logo' && (project.assets || []).length > 0)
     || project.type === 'color';
 
   return (
@@ -107,7 +106,7 @@ export default function ProjectDetail() {
           type={project.type}
           aspect={coverAspect(project.type, project)}
           video={project.type === 'motion' ? fileUrl(project, project.video) : null}
-          assets={(project.type === 'branding' || project.type === 'logo')
+          assets={project.type === 'branding'
             ? (project.assets || []).map((a) => ({ id: a.id, kind: a.kind, src: fileUrl(project, a.file), name: a.name }))
             : []}
           image={project.type === 'color' && project.example ? fileUrl(project, project.example) : null}

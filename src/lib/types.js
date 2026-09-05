@@ -22,7 +22,19 @@ export const cardSizeAspect = (key) => { const s = cardSize(key); return s.w / s
 
 // Aspect ratio used when cropping a project's cover thumbnail.
 export function coverAspect(type, project) {
-  if (type === 'logo') return 1;
   if (type === 'businesscard') return cardSizeAspect(project?.size);
   return 16 / 10;
 }
+
+// --- Logo display helpers (light/dark variant, background, scale) ---
+export function logoFileFor(project, variant) {
+  const v = variant || project.variant;
+  const pick = v === 'dark'
+    ? (project.logoDark || project.logoLight)
+    : (project.logoLight || project.logoDark);
+  // Backward-compat: older logos stored a single image under assets[].
+  return pick || project.assets?.[0]?.file || null;
+}
+export const logoBg = (project) => project.bg || '#FFFFFF';
+export const logoScale = (project) => (typeof project.scale === 'number' ? project.scale : 0.7);
+export const logoVariants = (project) => ({ light: project.logoLight || null, dark: project.logoDark || null });

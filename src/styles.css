@@ -75,6 +75,15 @@ img { max-width: 100%; display: block; }
 }
 .tabs::-webkit-scrollbar { display: none; }
 .tab { flex-shrink: 0; }
+
+/* Hamburger (mobile only) — .header-bar prefix beats .icon-btn's display:grid */
+.header-bar .menu-toggle { display: none; align-items: center; gap: 8px; width: auto; padding: 0 14px; border-radius: 999px; }
+.menu-toggle-label { font-size: 14px; font-weight: 500; }
+@media (max-width: 760px) {
+  .tabs { display: none; }
+  .header-bar .menu-toggle { display: inline-flex; }
+  .header-inner { justify-content: center; }
+}
 .tab {
   appearance: none;
   border: 0;
@@ -110,7 +119,7 @@ img { max-width: 100%; display: block; }
 .header-plus { margin-left: 4px; }
 
 /* ------------------------------------------------------------------- Intro */
-.page-head { margin: 4px 2px 22px; }
+.page-head { margin: 4px 2px 8px; }
 .page-head h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.01em; }
 .page-head p { margin: 0; color: var(--text-muted); font-size: 15px; }
 
@@ -119,7 +128,7 @@ img { max-width: 100%; display: block; }
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 0 2px 22px;
+  margin: 6px 2px 22px;
   align-items: center;
 }
 .filter-label {
@@ -715,9 +724,9 @@ img { max-width: 100%; display: block; }
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 200px;
+  max-height: 62vh;
 }
-.frame-hero img { max-height: 60vh; max-width: 100%; width: auto; height: auto; object-fit: contain; cursor: zoom-in; display: block; }
+.frame-hero img { width: 100%; height: 100%; object-fit: contain; cursor: zoom-in; display: block; }
 .frame-hero-nav {
   position: absolute;
   top: 50%;
@@ -833,7 +842,7 @@ img { max-width: 100%; display: block; }
 .storage-dots { width: 32px; height: 32px; }
 
 /* --------------------------------------------------------- Segmented toggle */
-.page-head-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.page-head-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
 .segmented {
   display: inline-flex;
   background: var(--surface);
@@ -960,23 +969,58 @@ img { max-width: 100%; display: block; }
 }
 .picker-title { display: block; font-size: 13px; margin-top: 6px; color: var(--text); }
 
-/* ------------------------------------------------------------- Logo detail */
-.logo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
-.logo-frame {
+/* ------------------------------------------------------------- Logos */
+.checker {
+  background-color: #fff;
+  background-image:
+    linear-gradient(45deg, #c9c9c9 25%, transparent 25%),
+    linear-gradient(-45deg, #c9c9c9 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #c9c9c9 75%),
+    linear-gradient(-45deg, transparent 75%, #c9c9c9 75%);
+  background-size: 18px 18px;
+  background-position: 0 0, 0 9px, 9px -9px, -9px 0;
+}
+.logo-plate {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.logo-layout { display: grid; grid-template-columns: 1fr 260px; gap: 16px; align-items: stretch; }
+@media (max-width: 640px) { .logo-layout { grid-template-columns: 1fr; } }
+.logo-stage {
   position: relative;
   margin: 0;
   aspect-ratio: 1 / 1;
   border-radius: var(--radius);
   border: 1px solid var(--border);
-  background: var(--surface-2);
-  display: grid;
-  place-items: center;
-  padding: 10%;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
   cursor: zoom-in;
 }
-.logo-frame img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
-.logo-frame .media-fs { opacity: 0; transition: opacity .15s; }
-.logo-frame:hover .media-fs { opacity: 1; }
+.logo-stage .media-fs { opacity: 0; transition: opacity .15s; }
+.logo-stage:hover .media-fs { opacity: 1; }
+.logo-controls { display: flex; flex-direction: column; gap: 2px; }
+.logo-controls .segmented button { flex: 1; justify-content: center; display: inline-flex; align-items: center; gap: 6px; }
+
+.bg-picker { display: flex; gap: 8px; align-items: center; }
+.bg-swatch {
+  width: 30px; height: 30px; border-radius: 8px;
+  border: 2px solid var(--border);
+  cursor: pointer; padding: 0; position: relative; overflow: hidden;
+}
+.bg-swatch.on { border-color: var(--accent); }
+.bg-custom { display: grid; place-items: center; }
+.bg-custom input[type=color] { position: absolute; inset: -20%; width: 140%; height: 140%; border: 0; padding: 0; background: none; cursor: pointer; }
+
+.logo-slot-preview {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+}
+.logo-slot-preview img { max-width: 72%; max-height: 72%; object-fit: contain; }
 
 /* --------------------------------------------------- Business-card detail */
 .bc-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }

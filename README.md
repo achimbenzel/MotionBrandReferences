@@ -47,7 +47,7 @@ data/
 │   └── frames/*.webp           # captured keyframes (WebP = small)
 ├── color/<id>/example.<ext>    # example image
 ├── branding/<id>/*.pdf|*.png   # guidelines / decks / images
-├── logo/<id>/*.png             # logo image(s)
+├── logo/<id>/light.svg, dark.png   # logo variants (SVG/raster)
 └── businesscard/<id>/front.webp, back.webp
 ```
 
@@ -79,8 +79,10 @@ project you get:
   to delete (no accidental one-click deletes).
 
 ### Logos
-Upload one (or more) images. They're shown as **square** previews in the grid
-(the whole logo, never cropped) and open fullscreen on the detail page. Tagable.
+Upload a **light** and/or **dark** version (**SVG**, PNG or JPG). On the detail
+page you can **switch** between the two versions, pick a **background colour**
+(white / black / transparent / custom) and **scale** the logo. Grid cards render
+that live (square, on the chosen background). SVGs stay vector.
 
 ### Business Cards
 Pick a size — **85 × 55 mm** or **89 × 51 mm** — then upload and **crop** a
@@ -104,6 +106,11 @@ just references — deleting a gallery never deletes the projects.
 The header shows how much of the `data/` folder is used against a limit
 (default **80 GB**). Use the **⋯** next to it to change the limit; usage is the
 real summed size of everything under `data/`.
+
+### Responsive header
+On wide screens all five section tabs sit in the pill. On narrow/mobile widths
+they collapse into a **hamburger menu** (showing the current section), keeping
+the add button and storage meter reachable.
 
 ### Covers & editing (all types)
 - **Crop & zoom the cover:** when you set a thumbnail — a Motion frame, a

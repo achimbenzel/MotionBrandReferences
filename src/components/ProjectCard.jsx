@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Play, Palette, FileText, Film, Square, CreditCard, X } from 'lucide-react';
 import { fileUrl } from '../lib/api.js';
 import { fmtTime } from '../lib/media.js';
-import { cardSize } from '../lib/types.js';
+import { cardSize, logoFileFor, logoBg, logoScale } from '../lib/types.js';
 
 const TYPE_META = {
   motion: { icon: Film, label: 'Motion' },
@@ -39,10 +39,12 @@ export default function ProjectCard({ project, onRemove }) {
 
       {project.type === 'businesscard' ? (
         <BusinessCardThumb project={project} />
+      ) : project.type === 'logo' ? (
+        <LogoThumb project={project} />
       ) : (
-        <div className={`card-thumb ${project.type === 'logo' ? 'square' : ''}`}>
+        <div className="card-thumb">
           {thumb ? (
-            <img src={thumb} alt={project.title} loading="lazy" className={project.type === 'logo' ? 'contain' : ''} />
+            <img src={thumb} alt={project.title} loading="lazy" />
           ) : project.type === 'color' ? (
             <ColorThumb colors={project.colors} />
           ) : (
@@ -92,6 +94,24 @@ function BusinessCardThumb({ project }) {
     <div className="bc-stack">
       <Side src={front} label="Front" />
       <Side src={back} label="Back" />
+    </div>
+  );
+}
+
+function LogoThumb({ project }) {
+  const file = logoFileFor(project);
+  const bg = logoBg(project);
+  const scale = logoScale(project);
+  const transparent = bg === 'transparent';
+  return (
+    <div className="card-thumb square">
+      <div className={`logo-plate ${transparent ? 'checker' : ''}`} style={transparent ? undefined : { background: bg }}>
+        {file ? (
+          <img src={fileUrl(project, file)} alt={project.title} loading="lazy"
+            style={{ width: `${scale * 100}%`, height: `${scale * 100}%`, objectFit: 'contain' }} />
+        ) : <div className="card-thumb-empty"><Square size={26} /></div>}
+      </div>
+      <span className="card-badge"><Square size={13} /> Logo</span>
     </div>
   );
 }
