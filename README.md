@@ -47,8 +47,9 @@ data/
 │   └── frames/*.webp           # captured keyframes (WebP = small)
 ├── color/<id>/example.<ext>    # example image
 ├── branding/<id>/*.pdf|*.png   # guidelines / decks / images
-├── logo/<id>/light.svg, dark.png   # logo variants (SVG/raster)
-└── businesscard/<id>/front.webp, back.webp
+├── logo/<id>/logo.svg              # one logo image (SVG/PNG), recoloured live
+├── businesscard/<id>/front.webp, back.webp
+└── imagegallery/<id>/image.<ext>   # one image per item
 ```
 
 `data/` is **git-ignored and lives outside the source code**, so you can pull
@@ -80,10 +81,13 @@ project you get:
   delete (no accidental one-click deletes).
 
 ### Logos
-Upload a **light** and/or **dark** version (**SVG**, PNG or JPG). On the detail
-page you can **switch** between the two versions, pick a **background colour**
-(white / black / transparent / custom) and **scale** the logo. Grid cards render
-that live (square, on the chosen background). SVGs stay vector.
+Upload one image — **SVG** or **PNG** (transparent silhouette). It can be
+**recoloured** to any colour (via CSS mask, so it works for SVG and PNG
+silhouettes) and you can keep the untouched **Original (colour)** rendition too.
+On the detail page the only thing under the canvas is a **colour switcher** to
+flip between the renditions; the appearance settings (**background**, **scale**,
+which colours, whether Original shows) live in the **Edit ▸ Logo-Optionen**
+dialog. Grid cards render the selected rendition live on the chosen background.
 
 ### Business Cards
 Pick a size — **85 × 55 mm** or **89 × 51 mm** — then upload and **crop** a
@@ -97,6 +101,13 @@ Add an **example image** plus colors entered in **any one** format — HEX, RGB,
 CMYK or Pantone — and every representation is shown automatically. Click any
 value to copy it. The example image shows at its **true aspect ratio** (never
 cropped) and opens fullscreen.
+
+### Image Gallery
+A moodboard section: add **images with no name and no tags** (several at once).
+They're listed **Pinterest-style** (masonry columns) at their true aspect
+ratio; click one for fullscreen. Each image's **⋯** menu deletes it or adds it
+to a gallery (existing or new). Like every section it has the Alle / Galerien
+toggle.
 
 ### Galleries (Alle / Galerien)
 Every section has an **Alle / Galerien** toggle. Under **Galerien** you create

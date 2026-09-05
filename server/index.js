@@ -28,7 +28,7 @@ const DIST_DIR = path.join(ROOT, 'dist');
 const PORT = process.env.API_PORT || 4300;
 const IS_PROD = process.env.NODE_ENV === 'production';
 
-const TYPES = new Set(['motion', 'color', 'branding', 'logo', 'businesscard']);
+const TYPES = new Set(['motion', 'color', 'branding', 'logo', 'businesscard', 'imagegallery']);
 const DEFAULT_STORAGE_LIMIT = 80 * 1024 * 1024 * 1024; // 80 GB
 
 // ---------------------------------------------------------------------------
@@ -204,19 +204,25 @@ app.post('/api/projects', upload.any(), async (req, res) => {
     }
 
     if (type === 'logo') {
-      // A logo has an optional light and dark variant (SVG or raster), a
-      // background colour and a display scale. Card + detail render live.
-      const light = byField('light');
-      const dark = byField('dark');
-      if (light) project.logoLight = await moveInto(dir, light.path, `light${extOf(light.originalname) || '.png'}`);
-      if (dark) project.logoDark = await moveInto(dir, dark.path, `dark${extOf(dark.originalname) || '.png'}`);
+      // A logo is one image (SVG or PNG) that can be recoloured (silhouette via
+      // CSS mask) to any of a set of "renditions", plus an optional untouched
+      // "original" (colour) rendition. Background + scale are display settings.
+      const image = byField('image');
+      if (image) project.image = await moveInto(dir, image.path, `logo${extOf(image.originalname) || '.png'}`);
       project.bg = (req.body.bg || '#FFFFFF').trim();
       const sc = Number(req.body.scale);
       project.scale = Number.isFinite(sc) ? Math.min(1, Math.max(0.2, sc)) : 0.7;
-      const v = req.body.variant;
-      project.variant = (v === 'light' || v === 'dark') ? v : (project.logoDark ? 'dark' : 'light');
-      const def = project.variant === 'dark' ? project.logoDark : project.logoLight;
-      project.thumb = def || project.logoLight || project.logoDark || undefined;
+      project.renditions = parseJSON(req.body.renditions, ['#111114', '#FFFFFF']);
+      project.original = req.body.original !== 'false';
+      project.rendition = req.body.rendition || (project.original ? 'original' : (project.renditions[0] || '#111114'));
+      project.thumb = project.image; // gallery preview uses the raw image
+    }
+
+    if (type === 'imagegallery') {
+      // One image per project, shown name-less in a masonry ("Alle") view.
+      const image = byField('image');
+      if (image) project.image = await moveInto(dir, image.path, `image${extOf(image.originalname) || '.png'}`);
+      project.thumb = project.image;
     }
 
     if (type === 'businesscard') {
@@ -247,7 +253,7 @@ app.post('/api/projects', upload.any(), async (req, res) => {
 });
 
 // ---- Update (notes / tags / colors / meta) --------------------------------
-const EDITABLE = ['title', 'year', 'category', 'notes', 'tags', 'colors', 'bg', 'scale', 'variant'];
+const EDITABLE = ['title', 'year', 'category', 'notes', 'tags', 'colors', 'bg', 'scale', 'variant', 'renditions', 'original', 'rendition'];
 app.patch('/api/projects/:id', async (req, res) => {
   try {
     const updated = await mutateDB((db) => {

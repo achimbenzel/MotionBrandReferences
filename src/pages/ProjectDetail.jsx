@@ -6,11 +6,13 @@ import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
 import EditDetailsModal from '../components/EditDetailsModal.jsx';
 import ThumbnailStudio from '../components/ThumbnailStudio.jsx';
+import LogoOptionsModal from '../components/LogoOptionsModal.jsx';
 import MotionDetail from './MotionDetail.jsx';
 import ColorDetail from './ColorDetail.jsx';
 import BrandingDetail from './BrandingDetail.jsx';
 import LogoDetail from './LogoDetail.jsx';
 import BusinessCardDetail from './BusinessCardDetail.jsx';
+import ImageGalleryItemDetail from './ImageGalleryItemDetail.jsx';
 import { coverAspect } from '../lib/types.js';
 
 export default function ProjectDetail() {
@@ -22,6 +24,7 @@ export default function ProjectDetail() {
   const [editing, setEditing] = useState(false);
   const [thumbing, setThumbing] = useState(false);
   const [thumbSaving, setThumbSaving] = useState(false);
+  const [logoOptions, setLogoOptions] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -63,30 +66,36 @@ export default function ProjectDetail() {
 
   const Body = {
     motion: MotionDetail, color: ColorDetail, branding: BrandingDetail,
-    logo: LogoDetail, businesscard: BusinessCardDetail,
+    logo: LogoDetail, businesscard: BusinessCardDetail, imagegallery: ImageGalleryItemDetail,
   }[project.type];
 
+  const isImage = project.type === 'imagegallery';
   const canSetThumb = project.type === 'motion'
     || (project.type === 'branding' && (project.assets || []).length > 0)
     || project.type === 'color';
+
+  const menuItems = isImage
+    ? [{ label: 'Delete', icon: <Trash2 size={15} />, danger: true, onClick: remove }]
+    : [
+        { label: 'Rename / edit details', icon: <Pencil size={15} />, onClick: () => setEditing(true) },
+        ...(project.type === 'logo' ? [{ label: 'Logo-Optionen', icon: <ImageIcon size={15} />, onClick: () => setLogoOptions(true) }] : []),
+        ...(canSetThumb ? [{ label: 'Change cover', icon: <ImageIcon size={15} />, onClick: () => setThumbing(true) }] : []),
+        { separator: true },
+        { label: 'Delete project', icon: <Trash2 size={15} />, danger: true, onClick: remove },
+      ];
 
   return (
     <div className="detail">
       <BackBtn to={`/${project.type}`} />
       <div className="detail-head">
         <div>
-          <h1>{project.title}</h1>
-          <div className="sub">{[project.category, project.year].filter(Boolean).join(' · ')}</div>
+          {!isImage && <h1>{project.title}</h1>}
+          {!isImage && <div className="sub">{[project.category, project.year].filter(Boolean).join(' · ')}</div>}
         </div>
         <div className="detail-actions">
           <Menu
             trigger={<button className="btn btn-sm"><Pencil size={15} /> Edit <MoreHorizontal size={15} /></button>}
-            items={[
-              { label: 'Rename / edit details', icon: <Pencil size={15} />, onClick: () => setEditing(true) },
-              ...(canSetThumb ? [{ label: 'Change cover', icon: <ImageIcon size={15} />, onClick: () => setThumbing(true) }] : []),
-              { separator: true },
-              { label: 'Delete project', icon: <Trash2 size={15} />, danger: true, onClick: remove },
-            ]}
+            items={menuItems}
           />
         </div>
       </div>
@@ -114,6 +123,14 @@ export default function ProjectDetail() {
           saving={thumbSaving}
           onDone={saveThumb}
           onClose={() => setThumbing(false)}
+        />
+      )}
+
+      {logoOptions && (
+        <LogoOptionsModal
+          project={project}
+          onClose={() => setLogoOptions(false)}
+          onSaved={(p) => { setProject(p); setLogoOptions(false); }}
         />
       )}
     </div>

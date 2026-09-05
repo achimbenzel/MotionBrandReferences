@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Film, Palette, FileText, UploadCloud, Trash2, Scissors, Crop, Square, CreditCard, Sun, Moon } from 'lucide-react';
+import { X, Film, Palette, FileText, UploadCloud, Trash2, Scissors, Crop, Square, CreditCard, Images, Plus } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { captureFrame, lengthTag, fmtTime } from '../lib/media.js';
 import { renderPdfPage, cropToBlob, centerCover } from '../lib/imaging.js';
@@ -10,18 +10,20 @@ import ColorBuilder from './ColorBuilder.jsx';
 import ColorCard from './ColorCard.jsx';
 import ThumbnailStudio from './ThumbnailStudio.jsx';
 import CropModal from './CropModal.jsx';
+import LogoImage from './LogoImage.jsx';
 
 const ASPECT = 16 / 10;
 const isPdf = (f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
 const LOGO_BG_PRESETS = ['#FFFFFF', '#111114', 'transparent'];
-const LOGO_ACCEPT = 'image/*,.svg';
+const IMG_ACCEPT = 'image/*,.svg';
 
 const TYPES = [
   { key: 'branding', label: 'Branding', sub: 'PDFs & images', icon: FileText },
   { key: 'motion', label: 'Motion Design', sub: 'Video', icon: Film },
-  { key: 'logo', label: 'Logos', sub: 'Square image', icon: Square },
+  { key: 'logo', label: 'Logos', sub: 'SVG / PNG', icon: Square },
   { key: 'businesscard', label: 'Business Card', sub: 'Front & back', icon: CreditCard },
   { key: 'color', label: 'Colors', sub: 'Palette', icon: Palette },
+  { key: 'imagegallery', label: 'Image Gallery', sub: 'Images only', icon: Images },
 ];
 
 const BRANDING_SUGGESTIONS = ['Tech', 'Restaurant', 'Fashion', 'Sport', 'Finance', 'Food', 'Retail', 'Minimal', 'Colorful', 'Monochrome', 'Warm', 'Cool'];
@@ -49,20 +51,25 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
   // branding
   const [files, setFiles] = useState([]);
 
-  // logo — light/dark variants + background + scale
-  const [logoLight, setLogoLight] = useState(null); // { file, url }
-  const [logoDark, setLogoDark] = useState(null);
+  // logo — one image + recolour renditions + bg + scale
+  const [logoImage, setLogoImage] = useState(null); // { file, url }
   const [logoBg, setLogoBg] = useState('#FFFFFF');
   const [logoScale, setLogoScale] = useState(0.7);
-  const [logoVariant, setLogoVariant] = useState('dark');
+  const [logoRends, setLogoRends] = useState(['#111114', '#FFFFFF']);
+  const [logoOriginal, setLogoOriginal] = useState(true);
+  const [logoRend, setLogoRend] = useState('original');
 
   // business card
   const [bcSize, setBcSize] = useState('85x55');
-  const [bcFront, setBcFront] = useState(null); // { blob, preview }
+  const [bcFront, setBcFront] = useState(null);
   const [bcBack, setBcBack] = useState(null);
-  const [cropReq, setCropReq] = useState(null); // { side, src }
+  const [cropReq, setCropReq] = useState(null);
 
-  // cover (all types)
+  // image gallery — many images at once
+  const [galleryItems, setGalleryItems] = useState([]); // [{file,url}]
+  const giRef = useRef([]); giRef.current = galleryItems;
+
+  // cover
   const [coverBlob, setCoverBlob] = useState(null);
   const [coverMeta, setCoverMeta] = useState(null);
   const [coverPreview, setCoverPreview] = useState(null);
@@ -71,8 +78,11 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
   useEffect(() => () => { if (videoSrc) URL.revokeObjectURL(videoSrc); }, [videoSrc]);
   useEffect(() => () => { if (examplePreview) URL.revokeObjectURL(examplePreview); }, [examplePreview]);
   useEffect(() => () => { if (coverPreview) URL.revokeObjectURL(coverPreview); }, [coverPreview]);
+  useEffect(() => () => { if (logoImage?.url) URL.revokeObjectURL(logoImage.url); }, [logoImage]);
+  useEffect(() => () => { giRef.current.forEach((it) => URL.revokeObjectURL(it.url)); }, []);
+  useEffect(() => () => { if (bcFront?.preview) URL.revokeObjectURL(bcFront.preview); }, [bcFront]);
+  useEffect(() => () => { if (bcBack?.preview) URL.revokeObjectURL(bcBack.preview); }, [bcBack]);
 
-  // Drop a chosen cover when the type changes (its source no longer applies).
   const clearCover = () => {
     setCoverBlob(null); setCoverMeta(null);
     setCoverPreview((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
@@ -85,77 +95,70 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
     setStudioOpen(false);
   };
 
-  // Business-card front/back cropping.
-  useEffect(() => () => { if (bcFront?.preview) URL.revokeObjectURL(bcFront.preview); }, [bcFront]);
-  useEffect(() => () => { if (bcBack?.preview) URL.revokeObjectURL(bcBack.preview); }, [bcBack]);
-
-  const changeSize = (s) => {
-    setBcSize(s);
-    // Existing crops no longer match the new ratio — clear them.
-    setBcFront((f) => { if (f?.preview) URL.revokeObjectURL(f.preview); return null; });
-    setBcBack((b) => { if (b?.preview) URL.revokeObjectURL(b.preview); return null; });
-  };
-  const onCropDone = (blob) => {
-    const preview = URL.createObjectURL(blob);
-    if (cropReq.side === 'front') setBcFront({ blob, preview });
-    else setBcBack({ blob, preview });
-    setCropReq(null);
-  };
-
-  // Logo variant uploads (SVG or raster).
-  useEffect(() => () => { if (logoLight?.url) URL.revokeObjectURL(logoLight.url); }, [logoLight]);
-  useEffect(() => () => { if (logoDark?.url) URL.revokeObjectURL(logoDark.url); }, [logoDark]);
-  const setLogoSide = (side, file) => {
-    if (!file) return;
-    const entry = { file, url: URL.createObjectURL(file) };
-    if (side === 'light') { setLogoLight(entry); setLogoVariant((v) => (logoDark ? v : 'light')); }
-    else { setLogoDark(entry); setLogoVariant((v) => (logoLight ? v : 'dark')); }
-    if (!title) setTitle(file.name.replace(/\.[^.]+$/, ''));
-  };
-  const logoCurrent = logoVariant === 'dark' ? (logoDark || logoLight) : (logoLight || logoDark);
-
-  // Close on Escape.
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape' && !saving) onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose, saving]);
 
+  // --- pickers ---
   const pickVideo = (file) => {
     if (!file) return;
     if (videoSrc) URL.revokeObjectURL(videoSrc);
-    setVideoFile(file);
-    setVideoSrc(URL.createObjectURL(file));
-    setDuration(0);
+    setVideoFile(file); setVideoSrc(URL.createObjectURL(file)); setDuration(0);
     if (!title) setTitle(file.name.replace(/\.[^.]+$/, ''));
   };
-
   const onVideoMeta = () => {
-    const v = videoRef.current;
-    if (!v) return;
+    const v = videoRef.current; if (!v) return;
     setDuration(v.duration || 0);
-    // Default the cover to ~15% in.
     v.currentTime = Math.min((v.duration || 0) * 0.15, (v.duration || 0) - 0.05);
   };
-
   const pickExample = (file) => {
     if (!file) return;
     if (examplePreview) URL.revokeObjectURL(examplePreview);
-    setExampleFile(file);
-    setExamplePreview(URL.createObjectURL(file));
+    setExampleFile(file); setExamplePreview(URL.createObjectURL(file));
+  };
+  const addFiles = (list) => setFiles((prev) => [...prev, ...Array.from(list || [])]);
+  const pickLogo = (file) => {
+    if (!file) return;
+    setLogoImage((prev) => { if (prev?.url) URL.revokeObjectURL(prev.url); return { file, url: URL.createObjectURL(file) }; });
+    if (!title) setTitle(file.name.replace(/\.[^.]+$/, ''));
+  };
+  const addGalleryImages = (list) => {
+    const arr = Array.from(list || []).map((file) => ({ file, url: URL.createObjectURL(file) }));
+    setGalleryItems((prev) => [...prev, ...arr]);
+  };
+  const removeGalleryImage = (i) => setGalleryItems((prev) => {
+    const it = prev[i]; if (it) URL.revokeObjectURL(it.url);
+    return prev.filter((_, j) => j !== i);
+  });
+
+  // logo rendition helpers
+  const addRend = (c) => setLogoRends((r) => (r.includes(c) ? r : [...r, c]));
+  const removeRend = (c) => setLogoRends((r) => { const n = r.filter((x) => x !== c); if (logoRend === c) setLogoRend(logoOriginal ? 'original' : (n[0] || '#111114')); return n; });
+  const toggleOriginal = (v) => { setLogoOriginal(v); if (!v && logoRend === 'original') setLogoRend(logoRends[0] || '#111114'); if (v) setLogoRend('original'); };
+
+  // business card
+  const changeSize = (s) => {
+    setBcSize(s);
+    setBcFront((f) => { if (f?.preview) URL.revokeObjectURL(f.preview); return null; });
+    setBcBack((b) => { if (b?.preview) URL.revokeObjectURL(b.preview); return null; });
+  };
+  const onCropDone = (blob) => {
+    const preview = URL.createObjectURL(blob);
+    if (cropReq.side === 'front') setBcFront({ blob, preview }); else setBcBack({ blob, preview });
+    setCropReq(null);
   };
 
-  const addFiles = (list) => {
-    const arr = Array.from(list || []);
-    setFiles((prev) => [...prev, ...arr]);
-  };
-
-  const canSave = title.trim() && (
+  const isImage = type === 'imagegallery';
+  const needsTitle = !isImage;
+  const canSave = (!needsTitle || title.trim()) && (
     (type === 'motion' && videoFile) ||
     (type === 'color' && (colors.length > 0 || exampleFile)) ||
     (type === 'branding' && files.length > 0) ||
-    (type === 'logo' && (logoLight || logoDark)) ||
-    (type === 'businesscard' && bcFront)
+    (type === 'logo' && logoImage) ||
+    (type === 'businesscard' && bcFront) ||
+    (type === 'imagegallery' && galleryItems.length > 0)
   );
 
   const coverAvailable = (type === 'motion' && !!videoSrc)
@@ -163,17 +166,25 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
     || (type === 'color' && !!exampleFile);
   const coverCtaLabel = type === 'branding' ? 'Choose cover (PDF page or image)' : 'Frame & crop cover';
   const coverDefaultHint = type === 'branding' ? 'Default: first image, or PDF page 1'
-    : type === 'motion' ? 'Default: current video frame'
-    : 'Default: the example image';
-
-  const brandingSources = files.map((f, i) => ({
-    id: String(i), kind: isPdf(f) ? 'pdf' : 'image', src: f, name: f.name,
-  }));
+    : type === 'motion' ? 'Default: current video frame' : 'Default: the example image';
+  const brandingSources = files.map((f, i) => ({ id: String(i), kind: isPdf(f) ? 'pdf' : 'image', src: f, name: f.name }));
 
   const submit = async () => {
     if (!canSave || saving) return;
     setSaving(true);
     try {
+      // Image gallery: one project per image (no title/tags).
+      if (type === 'imagegallery') {
+        for (const it of galleryItems) {
+          const fd = new FormData();
+          fd.append('type', 'imagegallery');
+          fd.append('image', it.file);
+          await api.create(fd);
+        }
+        onCreated({ type: 'imagegallery' });
+        return;
+      }
+
       const fd = new FormData();
       fd.append('type', type);
       fd.append('title', title.trim());
@@ -181,23 +192,16 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
       fd.append('category', category.trim());
       fd.append('tags', JSON.stringify(tags));
 
-      if (type === 'motion') {
-        fd.append('video', videoFile);
-        fd.append('duration', String(duration));
-      }
-      if (type === 'color') {
-        if (exampleFile) fd.append('example', exampleFile);
-        fd.append('colors', JSON.stringify(colors));
-      }
-      if (type === 'branding') {
-        files.forEach((f) => fd.append('files', f));
-      }
+      if (type === 'motion') { fd.append('video', videoFile); fd.append('duration', String(duration)); }
+      if (type === 'color') { if (exampleFile) fd.append('example', exampleFile); fd.append('colors', JSON.stringify(colors)); }
+      if (type === 'branding') { files.forEach((f) => fd.append('files', f)); }
       if (type === 'logo') {
-        if (logoLight) fd.append('light', logoLight.file);
-        if (logoDark) fd.append('dark', logoDark.file);
+        fd.append('image', logoImage.file);
         fd.append('bg', logoBg);
         fd.append('scale', String(logoScale));
-        fd.append('variant', logoVariant);
+        fd.append('renditions', JSON.stringify(logoRends));
+        fd.append('original', String(logoOriginal));
+        fd.append('rendition', logoRend);
       }
       if (type === 'businesscard') {
         fd.append('size', bcSize);
@@ -205,25 +209,19 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
         if (bcBack) fd.append('back', bcBack.blob, 'back.webp');
       }
 
-      // Cover thumbnail.
+      // Cover thumbnail (types that use a cropped cover).
       const out = { w: 900, h: Math.round(900 / ASPECT) };
       if (coverBlob) {
         fd.append('thumb', coverBlob, 'thumb.webp');
         if (coverMeta) fd.append('thumbMeta', JSON.stringify(coverMeta));
       } else if (type === 'motion') {
-        // Fallback: the currently-shown video frame.
-        try {
-          const blob = await captureFrame(videoRef.current, 0.85);
-          fd.append('thumb', blob, 'thumb.webp');
-        } catch { /* optional */ }
+        try { fd.append('thumb', await captureFrame(videoRef.current, 0.85), 'thumb.webp'); } catch { /* optional */ }
       } else if (type === 'branding' && !files.some((f) => !isPdf(f))) {
-        // PDF-only branding with no chosen cover: auto-use page 1.
         try {
           const firstPdf = files.find(isPdf);
           if (firstPdf) {
             const { canvas } = await renderPdfPage(firstPdf, 1, 900);
-            const rect = centerCover(canvas.width, canvas.height, ASPECT);
-            const blob = await cropToBlob(canvas, rect, out);
+            const blob = await cropToBlob(canvas, centerCover(canvas.width, canvas.height, ASPECT), out);
             fd.append('thumb', blob, 'thumb.webp');
           }
         } catch { /* optional */ }
@@ -247,17 +245,11 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
         </div>
 
         <div className="modal-body">
-          {/* Type picker */}
-          <div className="type-picker">
+          <div className="type-picker type-picker-6">
             {TYPES.map((t) => {
               const Icon = t.icon;
               return (
-                <button
-                  key={t.key}
-                  type="button"
-                  className={`type-option ${type === t.key ? 'on' : ''}`}
-                  onClick={() => setType(t.key)}
-                >
+                <button key={t.key} type="button" className={`type-option ${type === t.key ? 'on' : ''}`} onClick={() => setType(t.key)}>
                   <Icon size={22} />
                   <span>{t.label}</span>
                   <small>{t.sub}</small>
@@ -266,35 +258,34 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
             })}
           </div>
 
-          {/* Common fields */}
-          <div className="field">
-            <label>Title</label>
-            <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Project name" autoFocus />
-          </div>
-          <div className="row-2">
-            <div className="field">
-              <label>Year</label>
-              <input className="input" value={year} onChange={(e) => setYear(e.target.value)} placeholder="2026" />
-            </div>
-            <div className="field">
-              <label>Category / subtitle</label>
-              <input
-                className="input"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                placeholder={type === 'motion' ? 'Motion Design / Animation' : type === 'color' ? 'Palette' : 'Brand Identity'}
-              />
-            </div>
-          </div>
+          {/* Common fields (not for image gallery) */}
+          {needsTitle && (
+            <>
+              <div className="field">
+                <label>Title</label>
+                <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Project name" autoFocus />
+              </div>
+              <div className="row-2">
+                <div className="field">
+                  <label>Year</label>
+                  <input className="input" value={year} onChange={(e) => setYear(e.target.value)} placeholder="2026" />
+                </div>
+                <div className="field">
+                  <label>Category / subtitle</label>
+                  <input className="input" value={category} onChange={(e) => setCategory(e.target.value)}
+                    placeholder={type === 'motion' ? 'Motion Design / Animation' : type === 'color' ? 'Palette' : 'Brand Identity'} />
+                </div>
+              </div>
+            </>
+          )}
 
-          {/* Type-specific */}
+          {/* ---- Motion ---- */}
           {type === 'motion' && (
             <div className="field">
               <label>Video</label>
               {!videoSrc ? (
                 <FilePick accept="video/*" onPick={(f) => pickVideo(f[0])}>
-                  <UploadCloud size={22} />
-                  <div>Select a video file</div>
+                  <UploadCloud size={22} /><div>Select a video file</div>
                   <div className="hint">It is copied into your local library folder</div>
                 </FilePick>
               ) : (
@@ -303,14 +294,8 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
                     <video ref={videoRef} src={videoSrc} controls muted onLoadedMetadata={onVideoMeta} />
                   </div>
                   <div className="hint" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <Scissors size={13} />
-                    Scrub/pause on the frame you want as the cover — it’s captured on save.
-                    {duration > 0 && (
-                      <>
-                        <span className="tag auto" style={{ marginLeft: 4 }}>{fmtTime(duration)}</span>
-                        <span className="tag auto">{lengthTag(duration)}</span>
-                      </>
-                    )}
+                    <Scissors size={13} /> Scrub/pause on the frame you want as the cover — it’s captured on save.
+                    {duration > 0 && (<><span className="tag auto" style={{ marginLeft: 4 }}>{fmtTime(duration)}</span><span className="tag auto">{lengthTag(duration)}</span></>)}
                     <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setVideoFile(null); setVideoSrc(null); }}>Change</button>
                   </div>
                 </div>
@@ -318,15 +303,13 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
             </div>
           )}
 
+          {/* ---- Color ---- */}
           {type === 'color' && (
             <>
               <div className="field">
                 <label>Example image (optional)</label>
                 {!examplePreview ? (
-                  <FilePick accept="image/*" onPick={(f) => pickExample(f[0])}>
-                    <UploadCloud size={22} />
-                    <div>Select an image</div>
-                  </FilePick>
+                  <FilePick accept="image/*" onPick={(f) => pickExample(f[0])}><UploadCloud size={22} /><div>Select an image</div></FilePick>
                 ) : (
                   <div className="example-img" style={{ marginBottom: 0, position: 'relative' }}>
                     <img src={examplePreview} alt="example" />
@@ -340,108 +323,127 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
               </div>
               {colors.length > 0 && (
                 <div className="color-grid" style={{ marginTop: 4 }}>
-                  {colors.map((c, i) => (
-                    <ColorCard key={c.id} color={c} onRemove={() => setColors((prev) => prev.filter((_, j) => j !== i))} />
+                  {colors.map((c, i) => <ColorCard key={c.id} color={c} onRemove={() => setColors((prev) => prev.filter((_, j) => j !== i))} />)}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ---- Branding ---- */}
+          {type === 'branding' && (
+            <div className="field">
+              <label>PDFs & images</label>
+              <FilePick accept="application/pdf,image/*" multiple onPick={addFiles}>
+                <UploadCloud size={22} /><div>Select PDFs (guidelines / decks) or images</div>
+                <div className="hint">You can add several — click through PDFs page by page later</div>
+              </FilePick>
+              {files.length > 0 && (
+                <div className="taglist" style={{ marginTop: 12 }}>
+                  {files.map((f, i) => (
+                    <span key={i} className="tag">{f.name.length > 26 ? f.name.slice(0, 24) + '…' : f.name}
+                      <span className="x" onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))}><X size={12} /></span></span>
                   ))}
                 </div>
               )}
-            </>
+            </div>
           )}
 
-          {type === 'branding' && (
-            <>
-              <div className="field">
-                <label>PDFs & images</label>
-                <FilePick accept="application/pdf,image/*" multiple onPick={addFiles}>
-                  <UploadCloud size={22} />
-                  <div>Select PDFs (guidelines / decks) or images</div>
-                  <div className="hint">You can add several — click through PDFs page by page later</div>
-                </FilePick>
-                {files.length > 0 && (
-                  <div className="taglist" style={{ marginTop: 12 }}>
-                    {files.map((f, i) => (
-                      <span key={i} className="tag">
-                        {f.name.length > 26 ? f.name.slice(0, 24) + '…' : f.name}
-                        <span className="x" onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))}><X size={12} /></span>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-
+          {/* ---- Logo ---- */}
           {type === 'logo' && (
             <>
-              <div className="row-2">
-                <LogoSlot label="Logo hell" hint="für dunkle BG" data={logoLight} onPick={(f) => setLogoSide('light', f)} onClear={() => setLogoLight(null)} />
-                <LogoSlot label="Logo dunkel" hint="für helle BG" data={logoDark} onPick={(f) => setLogoSide('dark', f)} onClear={() => setLogoDark(null)} />
+              <div className="field">
+                <label>Logo <span className="hint">SVG oder PNG — umfärbbar (Silhouette)</span></label>
+                {logoImage ? (
+                  <div className="logo-slot-preview checker">
+                    <img src={logoImage.url} alt="logo" />
+                    <button type="button" className="icon-btn" style={{ position: 'absolute', top: 6, right: 6 }} onClick={() => setLogoImage(null)}><Trash2 size={15} /></button>
+                  </div>
+                ) : (
+                  <FilePick accept={IMG_ACCEPT} onPick={(f) => pickLogo(f[0])}><UploadCloud size={22} /><div>Hochladen</div></FilePick>
+                )}
               </div>
-              <div className="hint" style={{ marginTop: -4, marginBottom: 12 }}>SVG, PNG oder JPG. Mindestens eine Version — beide erlauben das Umschalten hell/dunkel.</div>
 
-              {logoCurrent && (
-                <div className="field">
-                  <label>Vorschau</label>
-                  <div className="logo-layout">
-                    <div className={`logo-stage ${logoBg === 'transparent' ? 'checker' : ''}`} style={logoBg === 'transparent' ? undefined : { background: logoBg }}>
-                      <img src={logoCurrent.url} alt="preview" style={{ width: `${logoScale * 100}%`, height: `${logoScale * 100}%`, objectFit: 'contain' }} />
+              {logoImage && (
+                <>
+                  <div className="field">
+                    <div className={`logo-stage ${logoBg === 'transparent' ? 'checker' : ''}`} style={{ ...(logoBg === 'transparent' ? {} : { background: logoBg }), maxWidth: 340, margin: '0 auto' }}>
+                      <LogoImage url={logoImage.url} rendition={logoRend} scalePct={logoScale * 100} alt="preview" />
                     </div>
-                    <div className="logo-controls panel">
-                      {logoLight && logoDark && (
-                        <div className="field">
-                          <label>Standard-Version</label>
-                          <div className="segmented">
-                            <button type="button" className={logoVariant === 'light' ? 'on' : ''} onClick={() => setLogoVariant('light')}><Sun size={14} /> Hell</button>
-                            <button type="button" className={logoVariant === 'dark' ? 'on' : ''} onClick={() => setLogoVariant('dark')}><Moon size={14} /> Dunkel</button>
-                          </div>
-                        </div>
+                    <div className="logo-swatches" style={{ marginTop: 12 }}>
+                      {logoRends.map((c) => (
+                        <span key={c} className="rend-edit">
+                          <button type="button" className={`rend-swatch ${c === 'transparent' ? 'checker' : ''} ${logoRend === c ? 'on' : ''}`} style={c === 'transparent' ? undefined : { background: c }} onClick={() => setLogoRend(c)} />
+                          <button type="button" className="rend-edit-x" onClick={() => removeRend(c)} title="Entfernen"><X size={11} /></button>
+                        </span>
+                      ))}
+                      <label className="bg-swatch bg-custom" title="Farbe hinzufügen"><Plus size={14} /><input type="color" onChange={(e) => addRend(e.target.value.toUpperCase())} /></label>
+                      {logoOriginal && (
+                        <button type="button" className={`rend-original ${logoRend === 'original' ? 'on' : ''}`} title="Original (Farbe)" onClick={() => setLogoRend('original')}><img src={logoImage.url} alt="original" /></button>
                       )}
-                      <div className="field">
-                        <label>Hintergrund</label>
-                        <div className="bg-picker">
-                          {LOGO_BG_PRESETS.map((p) => (
-                            <button key={p} type="button" title={p}
-                              className={`bg-swatch ${p === 'transparent' ? 'checker' : ''} ${logoBg === p ? 'on' : ''}`}
-                              style={p === 'transparent' ? undefined : { background: p }} onClick={() => setLogoBg(p)} />
-                          ))}
-                          <label className="bg-swatch bg-custom" title="Custom" style={logoBg === 'transparent' ? undefined : { background: logoBg }}>
-                            <input type="color" value={logoBg === 'transparent' ? '#ffffff' : logoBg} onChange={(e) => setLogoBg(e.target.value.toUpperCase())} />
-                          </label>
-                        </div>
+                    </div>
+                    <label className="check-row" style={{ marginTop: 10 }}>
+                      <input type="checkbox" checked={logoOriginal} onChange={(e) => toggleOriginal(e.target.checked)} /> Original (Farbe) als Option
+                    </label>
+                  </div>
+
+                  <div className="row-2">
+                    <div className="field">
+                      <label>Hintergrund</label>
+                      <div className="bg-picker">
+                        {LOGO_BG_PRESETS.map((p) => (
+                          <button key={p} type="button" title={p} className={`bg-swatch ${p === 'transparent' ? 'checker' : ''} ${logoBg === p ? 'on' : ''}`} style={p === 'transparent' ? undefined : { background: p }} onClick={() => setLogoBg(p)} />
+                        ))}
+                        <label className="bg-swatch bg-custom" title="Custom" style={logoBg === 'transparent' ? undefined : { background: logoBg }}><input type="color" value={logoBg === 'transparent' ? '#ffffff' : logoBg} onChange={(e) => setLogoBg(e.target.value.toUpperCase())} /></label>
                       </div>
-                      <div className="field" style={{ marginBottom: 0 }}>
-                        <label>Größe · {Math.round(logoScale * 100)}%</label>
-                        <input type="range" min="0.2" max="1" step="0.01" value={logoScale}
-                          style={{ width: '100%', accentColor: 'var(--accent)' }} onChange={(e) => setLogoScale(Number(e.target.value))} />
-                      </div>
+                    </div>
+                    <div className="field">
+                      <label>Größe · {Math.round(logoScale * 100)}%</label>
+                      <input type="range" min="0.2" max="1" step="0.01" value={logoScale} style={{ width: '100%', accentColor: 'var(--accent)' }} onChange={(e) => setLogoScale(Number(e.target.value))} />
                     </div>
                   </div>
-                </div>
+                </>
               )}
             </>
           )}
 
+          {/* ---- Business card ---- */}
           {type === 'businesscard' && (
             <>
               <div className="field">
                 <label>Size</label>
                 <div className="segmented">
-                  {CARD_SIZES.map((s) => (
-                    <button key={s.key} type="button" className={bcSize === s.key ? 'on' : ''} onClick={() => changeSize(s.key)}>{s.label}</button>
-                  ))}
+                  {CARD_SIZES.map((s) => <button key={s.key} type="button" className={bcSize === s.key ? 'on' : ''} onClick={() => changeSize(s.key)}>{s.label}</button>)}
                 </div>
               </div>
               <div className="row-2">
-                <BcSide label="Front" data={bcFront} ratio={cardSizeAspect(bcSize)}
-                  onPick={(f) => f && setCropReq({ side: 'front', src: f })} onClear={() => setBcFront(null)} />
-                <BcSide label="Back" data={bcBack} ratio={cardSizeAspect(bcSize)}
-                  onPick={(f) => f && setCropReq({ side: 'back', src: f })} onClear={() => setBcBack(null)} />
+                <BcSide label="Front" data={bcFront} ratio={cardSizeAspect(bcSize)} onPick={(f) => f && setCropReq({ side: 'front', src: f })} onClear={() => setBcFront(null)} />
+                <BcSide label="Back" data={bcBack} ratio={cardSizeAspect(bcSize)} onPick={(f) => f && setCropReq({ side: 'back', src: f })} onClear={() => setBcBack(null)} />
               </div>
               <div className="hint" style={{ marginTop: -4, marginBottom: 8 }}>Pick a size first — front & back are cropped to {bcSize.replace('x', ' × ')} mm.</div>
             </>
           )}
 
-          {/* Cover thumbnail (all types) */}
+          {/* ---- Image gallery ---- */}
+          {type === 'imagegallery' && (
+            <div className="field">
+              <label>Bilder <span className="hint">ohne Namen — im Pinterest-Stil aufgelistet</span></label>
+              <FilePick accept={IMG_ACCEPT} multiple onPick={addGalleryImages}>
+                <UploadCloud size={22} /><div>Bilder auswählen (mehrere möglich)</div>
+              </FilePick>
+              {galleryItems.length > 0 && (
+                <div className="gallery-upload-grid">
+                  {galleryItems.map((it, i) => (
+                    <div key={i} className="gallery-upload-item">
+                      <img src={it.url} alt="" />
+                      <button type="button" className="icon-btn" onClick={() => removeGalleryImage(i)}><X size={13} /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Cover (types that use a cropped cover) */}
           {coverAvailable && (
             <div className="field">
               <label>Cover thumbnail</label>
@@ -451,28 +453,24 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
                 ) : (
                   <div className="cover-placeholder" style={{ aspectRatio: `${coverAspect(type)}` }}>{coverDefaultHint}</div>
                 )}
-                <button type="button" className="btn btn-sm" onClick={() => setStudioOpen(true)}>
-                  <Crop size={15} /> {coverPreview ? 'Adjust cover' : coverCtaLabel}
-                </button>
+                <button type="button" className="btn btn-sm" onClick={() => setStudioOpen(true)}><Crop size={15} /> {coverPreview ? 'Adjust cover' : coverCtaLabel}</button>
               </div>
             </div>
           )}
 
-          {/* Tags (all types) */}
-          <div className="field" style={{ marginTop: 4 }}>
-            <label>Tags {type === 'branding' && <span className="hint">— color scheme, type (tech, restaurant…)</span>}</label>
-            <TagInput
-              tags={tags}
-              onChange={setTags}
-              suggestions={type === 'branding' ? BRANDING_SUGGESTIONS : []}
-            />
-          </div>
+          {/* Tags (not for image gallery) */}
+          {needsTitle && (
+            <div className="field" style={{ marginTop: 4 }}>
+              <label>Tags {type === 'branding' && <span className="hint">— color scheme, type (tech, restaurant…)</span>}</label>
+              <TagInput tags={tags} onChange={setTags} suggestions={type === 'branding' ? BRANDING_SUGGESTIONS : []} />
+            </div>
+          )}
         </div>
 
         <div className="modal-foot">
           <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
           <button className="btn btn-primary" onClick={submit} disabled={!canSave || saving}>
-            {saving ? 'Saving…' : 'Save to library'}
+            {saving ? 'Saving…' : isImage ? `Save ${galleryItems.length || ''} image${galleryItems.length === 1 ? '' : 's'}` : 'Save to library'}
           </button>
         </div>
       </div>
@@ -483,7 +481,7 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
         type={type}
         aspect={coverAspect(type)}
         video={type === 'motion' ? videoSrc : null}
-        assets={type === 'branding' ? brandingSources : type === 'logo' ? logoSources : []}
+        assets={type === 'branding' ? brandingSources : []}
         image={type === 'color' ? exampleFile : null}
         initialMeta={coverMeta}
         onDone={acceptCover}
@@ -505,27 +503,6 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
   );
 }
 
-/** Logo variant uploader (SVG/raster) with a small preview. */
-function LogoSlot({ label, hint, data, onPick, onClear }) {
-  return (
-    <div className="field">
-      <label>{label} <span className="hint">{hint}</span></label>
-      {data ? (
-        <div className="logo-slot-preview checker">
-          <img src={data.url} alt={label} />
-          <button type="button" className="icon-btn" style={{ position: 'absolute', top: 6, right: 6 }} onClick={onClear}><Trash2 size={15} /></button>
-        </div>
-      ) : (
-        <FilePick accept={LOGO_ACCEPT} onPick={(list) => onPick(list[0])}>
-          <UploadCloud size={20} />
-          <div>Hochladen</div>
-        </FilePick>
-      )}
-    </div>
-  );
-}
-
-/** Business-card side uploader with a cropped preview. */
 function BcSide({ label, data, ratio, onPick, onClear }) {
   return (
     <div className="field">
@@ -536,34 +513,19 @@ function BcSide({ label, data, ratio, onPick, onClear }) {
           <button type="button" className="icon-btn" style={{ position: 'absolute', top: 6, right: 6 }} onClick={onClear}><Trash2 size={15} /></button>
         </div>
       ) : (
-        <FilePick accept="image/*" onPick={(list) => onPick(list[0])}>
-          <UploadCloud size={20} />
-          <div>{label} hochladen</div>
-        </FilePick>
+        <FilePick accept="image/*" onPick={(list) => onPick(list[0])}><UploadCloud size={20} /><div>{label} hochladen</div></FilePick>
       )}
     </div>
   );
 }
 
-/** Clickable file dropzone. */
 function FilePick({ accept, multiple, onPick, children }) {
   const ref = useRef(null);
   return (
-    <div
-      className="dropzone"
-      onClick={() => ref.current?.click()}
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={(e) => { e.preventDefault(); onPick(e.dataTransfer.files); }}
-    >
+    <div className="dropzone" onClick={() => ref.current?.click()} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); onPick(e.dataTransfer.files); }}>
       {children}
-      <input
-        ref={ref}
-        type="file"
-        accept={accept}
-        multiple={multiple}
-        className="visually-hidden-input"
-        onChange={(e) => { if (e.target.files?.length) onPick(e.target.files); e.target.value = ''; }}
-      />
+      <input ref={ref} type="file" accept={accept} multiple={multiple} className="visually-hidden-input"
+        onChange={(e) => { if (e.target.files?.length) onPick(e.target.files); e.target.value = ''; }} />
     </div>
   );
 }

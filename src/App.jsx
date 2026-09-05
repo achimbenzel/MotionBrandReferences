@@ -21,8 +21,8 @@ function Shell() {
   const handleCreated = useCallback((project) => {
     setModalType(null);
     setReloadKey((k) => k + 1);
-    toast('Project added');
-    navigate(`/project/${project.id}`);
+    if (project?.id) { toast('Project added'); navigate(`/project/${project.id}`); }
+    else if (project?.type) { toast('Images added'); navigate(`/${project.type}`); }
   }, [navigate, toast]);
 
   return (

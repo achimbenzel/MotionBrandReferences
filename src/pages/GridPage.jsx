@@ -5,6 +5,7 @@ import { api, fileUrl } from '../lib/api.js';
 import { lengthTag } from '../lib/media.js';
 import ProjectCard from '../components/ProjectCard.jsx';
 import GalleryNameModal from '../components/GalleryNameModal.jsx';
+import ImageMasonry from '../components/ImageMasonry.jsx';
 
 const HEAD = {
   branding: { title: 'Branding', desc: 'Brand guidelines, presentations & identity work.', icon: FileText },
@@ -12,6 +13,7 @@ const HEAD = {
   logo: { title: 'Logos', desc: 'Logomarks — shown as square previews.', icon: Square },
   businesscard: { title: 'Business Cards', desc: 'Front & back, in 85×55 or 89×51 mm.', icon: CreditCard },
   color: { title: 'Colors', desc: 'Palettes with automatic hex / rgb / cmyk / pantone.', icon: Palette },
+  imagegallery: { title: 'Image Gallery', desc: 'Images only — listed like a moodboard.', icon: Images },
 };
 
 /** Effective, filterable tag list for a project (adds the auto length tag). */
@@ -28,8 +30,11 @@ export default function GridPage({ type, reloadKey, onAdd }) {
   const [error, setError] = useState(null);
   const [selected, setSelected] = useState([]);
   const [mode, setMode] = useState(() => sessionStorage.getItem(`galmode:${type}`) || 'all');
-  const [newGallery, setNewGallery] = useState(false);
+  const [newGallery, setNewGallery] = useState(null); // null | true | { imageId }
   const head = HEAD[type];
+  const isImage = type === 'imagegallery';
+
+  const refreshGalleries = () => api.listGalleries(type).then(setGalleries).catch(() => {});
 
   useEffect(() => {
     setMode(sessionStorage.getItem(`galmode:${type}`) || 'all');
@@ -64,7 +69,8 @@ export default function GridPage({ type, reloadKey, onAdd }) {
 
   const createGallery = async (name) => {
     const g = await api.createGallery(type, name);
-    setNewGallery(false);
+    if (newGallery && newGallery.imageId) await api.updateGallery(g.id, { projectIds: [newGallery.imageId] });
+    setNewGallery(null);
     navigate(`/gallery/${g.id}`);
   };
 
@@ -113,7 +119,17 @@ export default function GridPage({ type, reloadKey, onAdd }) {
           )}
 
           {filtered.length > 0 ? (
-            <div className="grid">{filtered.map((p) => <ProjectCard key={p.id} project={p} />)}</div>
+            isImage ? (
+              <ImageMasonry
+                projects={filtered}
+                setProjects={setProjects}
+                galleries={galleries}
+                onGalleriesChanged={refreshGalleries}
+                onNewGallery={(imageId) => setNewGallery({ imageId })}
+              />
+            ) : (
+              <div className="grid">{filtered.map((p) => <ProjectCard key={p.id} project={p} />)}</div>
+            )
           ) : projects.length === 0 ? (
             <div className="empty">
               <head.icon size={30} />
@@ -133,7 +149,7 @@ export default function GridPage({ type, reloadKey, onAdd }) {
       )}
 
       {newGallery && (
-        <GalleryNameModal onSubmit={createGallery} onClose={() => setNewGallery(false)} />
+        <GalleryNameModal onSubmit={createGallery} onClose={() => setNewGallery(null)} />
       )}
     </div>
   );

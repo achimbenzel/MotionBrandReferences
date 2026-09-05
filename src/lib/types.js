@@ -7,6 +7,7 @@ export const TABS = [
   { key: 'logo', label: 'Logos' },
   { key: 'businesscard', label: 'Business Cards' },
   { key: 'color', label: 'Colors' },
+  { key: 'imagegallery', label: 'Image Gallery' },
 ];
 
 export const TYPE_KEYS = TABS.map((t) => t.key);
@@ -26,15 +27,17 @@ export function coverAspect(type, project) {
   return 16 / 10;
 }
 
-// --- Logo display helpers (light/dark variant, background, scale) ---
-export function logoFileFor(project, variant) {
-  const v = variant || project.variant;
-  const pick = v === 'dark'
-    ? (project.logoDark || project.logoLight)
-    : (project.logoLight || project.logoDark);
-  // Backward-compat: older logos stored a single image under assets[].
-  return pick || project.assets?.[0]?.file || null;
+// --- Logo display helpers (single image, recolour renditions, bg, scale) ---
+// The source image (SVG/PNG). Falls back to older light/dark/assets shapes.
+export const logoSource = (project) =>
+  project.image || project.logoDark || project.logoLight || project.assets?.[0]?.file || null;
+export const logoRenditions = (project) =>
+  (Array.isArray(project.renditions) && project.renditions.length ? project.renditions : ['#111114', '#FFFFFF']);
+export const logoHasOriginal = (project) => project.original !== false;
+export function logoRendition(project) {
+  const r = project.rendition;
+  if (r === 'original' || (typeof r === 'string' && r.startsWith('#'))) return r;
+  return logoHasOriginal(project) ? 'original' : logoRenditions(project)[0];
 }
 export const logoBg = (project) => project.bg || '#FFFFFF';
 export const logoScale = (project) => (typeof project.scale === 'number' ? project.scale : 0.7);
-export const logoVariants = (project) => ({ light: project.logoLight || null, dark: project.logoDark || null });
