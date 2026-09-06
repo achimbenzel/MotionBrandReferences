@@ -84,8 +84,8 @@ export default function GridPage({ type, reloadKey, onAdd }) {
           <p>{head.desc}</p>
         </div>
         <div className="segmented">
-          <button className={mode === 'all' ? 'on' : ''} onClick={() => switchMode('all')}>Alle</button>
-          <button className={mode === 'galleries' ? 'on' : ''} onClick={() => switchMode('galleries')}>Galerien</button>
+          <button className={mode === 'all' ? 'on' : ''} onClick={() => switchMode('all')}>All</button>
+          <button className={mode === 'galleries' ? 'on' : ''} onClick={() => switchMode('galleries')}>Galleries</button>
         </div>
       </div>
 
@@ -100,7 +100,7 @@ export default function GridPage({ type, reloadKey, onAdd }) {
           ))}
           <button className="gallery-new" onClick={() => setNewGallery(true)}>
             <FolderPlus size={26} />
-            <span>Neue Galerie</span>
+            <span>New Gallery</span>
           </button>
         </div>
       )}
@@ -170,7 +170,7 @@ function GalleryCard({ gallery, byId, onOpen }) {
       <div className="card-meta">
         <span className="card-title">{gallery.name}</span>
       </div>
-      <div className="card-sub">{members.length} {members.length === 1 ? 'Projekt' : 'Projekte'}</div>
+      <div className="card-sub">{members.length} {members.length === 1 ? 'project' : 'projects'}</div>
     </div>
   );
 }

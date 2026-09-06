@@ -27,9 +27,9 @@ export default function LogoOptionsModal({ project, onClose, onSaved }) {
       const sel = list.some((r) => r.color === selected?.color && r.bg === selected?.bg) ? selected : list[0];
       const updated = await api.update(project.id, { renditions: list, rendition: sel, scale });
       onSaved(updated);
-      toast('Logo-Optionen gespeichert');
+      toast('Logo options saved');
     } catch (e) {
-      toast(`Speichern fehlgeschlagen: ${e.message}`, 'error');
+      toast(`Save failed: ${e.message}`, 'error');
       setSaving(false);
     }
   };
@@ -38,7 +38,7 @@ export default function LogoOptionsModal({ project, onClose, onSaved }) {
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget && !saving) onClose(); }}>
       <div className="modal" role="dialog" aria-modal="true" style={{ maxWidth: 520 }}>
         <div className="modal-head">
-          <h2>Logo-Optionen</h2>
+          <h2>Logo options</h2>
           <button className="icon-btn" onClick={onClose} disabled={saving}><X size={18} /></button>
         </div>
         <div className="modal-body">
@@ -46,8 +46,8 @@ export default function LogoOptionsModal({ project, onClose, onSaved }) {
             selected={selected} setSelected={setSelected} scale={scale} setScale={setScale} />
         </div>
         <div className="modal-foot">
-          <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Abbrechen</button>
-          <button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? 'Speichern…' : 'Speichern'}</button>
+          <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
         </div>
       </div>
     </div>

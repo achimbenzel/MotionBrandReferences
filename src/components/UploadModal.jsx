@@ -342,20 +342,20 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
           {type === 'logo' && (
             <>
               <div className="field">
-                <label>Logo <span className="hint">SVG oder PNG — umfärbbar (Silhouette)</span></label>
+                <label>Logo <span className="hint">SVG or PNG — recolourable (silhouette)</span></label>
                 {logoImage ? (
                   <div className="logo-slot-preview checker">
                     <img src={logoImage.url} alt="logo" />
                     <button type="button" className="icon-btn" style={{ position: 'absolute', top: 6, right: 6 }} onClick={() => setLogoImage(null)}><Trash2 size={15} /></button>
                   </div>
                 ) : (
-                  <FilePick accept={IMG_ACCEPT} onPick={(f) => pickLogo(f[0])}><UploadCloud size={22} /><div>Hochladen</div></FilePick>
+                  <FilePick accept={IMG_ACCEPT} onPick={(f) => pickLogo(f[0])}><UploadCloud size={22} /><div>Upload</div></FilePick>
                 )}
               </div>
 
               {logoImage && (
                 <div className="field">
-                  <label>Farb-Kombinationen <span className="hint">Logo-Farbe auf Hintergrund — z. B. Weiß auf Schwarz</span></label>
+                  <label>Colour combinations <span className="hint">logo colour on background — e.g. white on black</span></label>
                   <LogoRenditionsEditor url={logoImage.url} renditions={logoRends} setRenditions={setLogoRends}
                     selected={logoRend} setSelected={setLogoRend} scale={logoScale} setScale={setLogoScale} />
                 </div>
@@ -383,9 +383,9 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
           {/* ---- Image gallery ---- */}
           {type === 'imagegallery' && (
             <div className="field">
-              <label>Bilder <span className="hint">ohne Namen — im Pinterest-Stil aufgelistet</span></label>
+              <label>Images <span className="hint">no names — listed moodboard-style</span></label>
               <FilePick accept={IMG_ACCEPT} multiple onPick={addGalleryImages}>
-                <UploadCloud size={22} /><div>Bilder auswählen (mehrere möglich)</div>
+                <UploadCloud size={22} /><div>Select images (multiple)</div>
               </FilePick>
               {galleryItems.length > 0 && (
                 <div className="gallery-upload-grid">
@@ -470,7 +470,7 @@ function BcSide({ label, data, ratio, onPick, onClear }) {
           <button type="button" className="icon-btn" style={{ position: 'absolute', top: 6, right: 6 }} onClick={onClear}><Trash2 size={15} /></button>
         </div>
       ) : (
-        <FilePick accept="image/*" onPick={(list) => onPick(list[0])}><UploadCloud size={20} /><div>{label} hochladen</div></FilePick>
+        <FilePick accept="image/*" onPick={(list) => onPick(list[0])}><UploadCloud size={20} /><div>Upload {label.toLowerCase()}</div></FilePick>
       )}
     </div>
   );

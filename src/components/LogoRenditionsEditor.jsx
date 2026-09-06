@@ -7,7 +7,7 @@ import { sameRendition } from '../lib/types.js';
 /**
  * Full logo appearance editor: a preview, the rendition switcher (colour + bg
  * pairs), controls to add/remove pairs, and a scale slider. Used both when
- * creating a logo and in the Logo-Optionen edit dialog.
+ * creating a logo and in the Logo options edit dialog.
  */
 export default function LogoRenditionsEditor({ url, renditions, setRenditions, selected, setSelected, scale, setScale }) {
   const [newColor, setNewColor] = useState('#111114');
@@ -37,19 +37,19 @@ export default function LogoRenditionsEditor({ url, renditions, setRenditions, s
       <LogoSwitcher url={url} renditions={renditions} selected={selected} onSelect={setSelected} onRemove={removeAt} />
 
       <div className="logo-add-row">
-        <span className="hint">Neue Kombination:</span>
-        <label className="mini-color" title="Logo-Farbe"><span style={{ background: newColor }} /><input type="color" value={newColor} onChange={(e) => setNewColor(e.target.value.toUpperCase())} /></label>
-        <span className="hint">auf</span>
-        <label className="mini-color" title="Hintergrund"><span className={newBg === 'transparent' ? 'checker' : ''} style={newBg === 'transparent' ? undefined : { background: newBg }} /><input type="color" value={newBg === 'transparent' ? '#ffffff' : newBg} onChange={(e) => setNewBg(e.target.value.toUpperCase())} /></label>
-        <button type="button" className="btn btn-sm" onClick={() => addPair(newColor)}><Plus size={14} /> Farbe</button>
+        <span className="hint">New combination:</span>
+        <label className="mini-color" title="Logo colour"><span style={{ background: newColor }} /><input type="color" value={newColor} onChange={(e) => setNewColor(e.target.value.toUpperCase())} /></label>
+        <span className="hint">on</span>
+        <label className="mini-color" title="Background"><span className={newBg === 'transparent' ? 'checker' : ''} style={newBg === 'transparent' ? undefined : { background: newBg }} /><input type="color" value={newBg === 'transparent' ? '#ffffff' : newBg} onChange={(e) => setNewBg(e.target.value.toUpperCase())} /></label>
+        <button type="button" className="btn btn-sm" onClick={() => addPair(newColor)}><Plus size={14} /> Colour</button>
         <button type="button" className="btn btn-sm btn-ghost" onClick={() => addPair('original')}><Plus size={14} /> Original</button>
         <button type="button" className="btn btn-sm btn-ghost" onClick={() => setNewBg((b) => (b === 'transparent' ? '#FFFFFF' : 'transparent'))}>
-          {newBg === 'transparent' ? 'BG: Transparent' : 'BG: Farbe'}
+          {newBg === 'transparent' ? 'BG: Transparent' : 'BG: Colour'}
         </button>
       </div>
 
       <div className="field" style={{ marginTop: 14, marginBottom: 0 }}>
-        <label>Größe · {Math.round(scale * 100)}%</label>
+        <label>Size · {Math.round(scale * 100)}%</label>
         <input type="range" min="0.2" max="1" step="0.01" value={scale} style={{ width: '100%', accentColor: 'var(--accent)' }} onChange={(e) => setScale(Number(e.target.value))} />
       </div>
     </div>

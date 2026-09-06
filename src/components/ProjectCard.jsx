@@ -17,7 +17,6 @@ export default function ProjectCard({ project, onRemove }) {
 
   const subtitle = project.category
     || (project.type === 'color' && `${(project.colors || []).length} colors`)
-    || (project.type === 'branding' && `${(project.assets || []).length} files`)
     || (project.type === 'businesscard' && cardSize(project.size).label)
     || '';
 

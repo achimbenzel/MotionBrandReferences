@@ -36,11 +36,11 @@ const DEFAULT_STORAGE_LIMIT = 80 * 1024 * 1024 * 1024; // 80 GB
 // ---------------------------------------------------------------------------
 function ensureDirs() {
   const typeDirs = [...TYPES].map((t) => path.join(DATA_DIR, t));
-  for (const d of [DATA_DIR, TMP_DIR, ...typeDirs]) {
+  for (const d of [DATA_DIR, TMP_DIR, path.join(DATA_DIR, 'plan'), ...typeDirs]) {
     fs.mkdirSync(d, { recursive: true });
   }
   if (!fs.existsSync(DB_PATH)) {
-    fs.writeFileSync(DB_PATH, JSON.stringify({ projects: [], galleries: [], settings: { storageLimitBytes: DEFAULT_STORAGE_LIMIT } }, null, 2));
+    fs.writeFileSync(DB_PATH, JSON.stringify({ projects: [], galleries: [], plans: [], settings: { storageLimitBytes: DEFAULT_STORAGE_LIMIT } }, null, 2));
   }
 }
 
@@ -52,6 +52,7 @@ async function readDB() {
   // Normalize older databases so new fields always exist.
   if (!Array.isArray(db.projects)) db.projects = [];
   if (!Array.isArray(db.galleries)) db.galleries = [];
+  if (!Array.isArray(db.plans)) db.plans = [];
   if (!db.settings || typeof db.settings !== 'object') db.settings = {};
   if (db.settings.storageLimitBytes == null) db.settings.storageLimitBytes = DEFAULT_STORAGE_LIMIT;
   return db;
@@ -410,7 +411,7 @@ app.post('/api/galleries', async (req, res) => {
   const gallery = {
     id: nanoid(10),
     type,
-    name: (req.body.name || 'Neue Galerie').trim(),
+    name: (req.body.name || 'New Gallery').trim(),
     projectIds: Array.isArray(req.body.projectIds) ? req.body.projectIds : [],
     createdAt: Date.now(),
   };
@@ -438,6 +439,102 @@ app.delete('/api/galleries/:id', async (req, res) => {
     return true;
   });
   if (!ok) return res.status(404).json({ error: 'not_found' });
+  res.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// Plans (Plan mode) — a plan has a moodboard, text info and a timeframe.
+// ---------------------------------------------------------------------------
+const PLAN_EDITABLE = ['name', 'info', 'start', 'end'];
+
+app.get('/api/plans', async (_req, res) => {
+  const db = await readDB();
+  const plans = [...db.plans].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  res.json({ plans });
+});
+
+app.get('/api/plans/:id', async (req, res) => {
+  const db = await readDB();
+  const plan = db.plans.find((p) => p.id === req.params.id);
+  if (!plan) return res.status(404).json({ error: 'not_found' });
+  res.json({ plan });
+});
+
+app.post('/api/plans', async (req, res) => {
+  const plan = {
+    id: nanoid(10),
+    name: (req.body.name || 'Untitled plan').trim(),
+    info: '',
+    start: '',
+    end: '',
+    moodboard: [],
+    createdAt: Date.now(),
+  };
+  await mutateDB((db) => { db.plans.push(plan); });
+  res.status(201).json({ plan });
+});
+
+app.patch('/api/plans/:id', async (req, res) => {
+  const updated = await mutateDB((db) => {
+    const plan = db.plans.find((p) => p.id === req.params.id);
+    if (!plan) return null;
+    for (const k of PLAN_EDITABLE) if (k in req.body) plan[k] = req.body[k];
+    return plan;
+  });
+  if (!updated) return res.status(404).json({ error: 'not_found' });
+  res.json({ plan: updated });
+});
+
+app.post('/api/plans/:id/moodboard', upload.array('images', 50), async (req, res) => {
+  try {
+    const db = await readDB();
+    const plan = db.plans.find((p) => p.id === req.params.id);
+    if (!plan) { await cleanupTmp(req); return res.status(404).json({ error: 'not_found' }); }
+    const dir = path.join(DATA_DIR, 'plan', plan.id, 'moodboard');
+    const added = [];
+    for (const f of (req.files || [])) {
+      const imgId = nanoid(8);
+      const stored = await moveInto(dir, f.path, `${imgId}${extOf(f.originalname) || '.png'}`);
+      added.push({ id: imgId, file: `moodboard/${stored}` });
+    }
+    const updated = await mutateDB((d) => {
+      const p = d.plans.find((x) => x.id === plan.id);
+      p.moodboard = [...(p.moodboard || []), ...added];
+      return p;
+    });
+    await cleanupTmp(req);
+    res.status(201).json({ plan: updated });
+  } catch (err) {
+    await cleanupTmp(req);
+    res.status(500).json({ error: 'moodboard_failed', message: String(err.message || err) });
+  }
+});
+
+app.delete('/api/plans/:id/moodboard/:imgId', async (req, res) => {
+  let removedFile = null;
+  const updated = await mutateDB((db) => {
+    const plan = db.plans.find((p) => p.id === req.params.id);
+    if (!plan || !plan.moodboard) return null;
+    const idx = plan.moodboard.findIndex((m) => m.id === req.params.imgId);
+    if (idx === -1) return null;
+    removedFile = plan.moodboard[idx].file;
+    plan.moodboard.splice(idx, 1);
+    return plan;
+  });
+  if (!updated) return res.status(404).json({ error: 'not_found' });
+  if (removedFile) await fsp.rm(path.join(DATA_DIR, 'plan', req.params.id, removedFile), { force: true }).catch(() => {});
+  res.json({ plan: updated });
+});
+
+app.delete('/api/plans/:id', async (req, res) => {
+  const ok = await mutateDB((db) => {
+    const idx = db.plans.findIndex((p) => p.id === req.params.id);
+    if (idx === -1) return false;
+    db.plans.splice(idx, 1);
+    return true;
+  });
+  if (!ok) return res.status(404).json({ error: 'not_found' });
+  await fsp.rm(path.join(DATA_DIR, 'plan', req.params.id), { recursive: true, force: true }).catch(() => {});
   res.json({ ok: true });
 });
 

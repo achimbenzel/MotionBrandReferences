@@ -78,7 +78,7 @@ export default function ProjectDetail() {
     ? [{ label: 'Delete', icon: <Trash2 size={15} />, danger: true, onClick: remove }]
     : [
         { label: 'Rename / edit details', icon: <Pencil size={15} />, onClick: () => setEditing(true) },
-        ...(project.type === 'logo' ? [{ label: 'Logo-Optionen', icon: <ImageIcon size={15} />, onClick: () => setLogoOptions(true) }] : []),
+        ...(project.type === 'logo' ? [{ label: 'Logo options', icon: <ImageIcon size={15} />, onClick: () => setLogoOptions(true) }] : []),
         ...(canSetThumb ? [{ label: 'Change cover', icon: <ImageIcon size={15} />, onClick: () => setThumbing(true) }] : []),
         { separator: true },
         { label: 'Delete project', icon: <Trash2 size={15} />, danger: true, onClick: remove },

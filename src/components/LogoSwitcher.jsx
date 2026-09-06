@@ -19,7 +19,7 @@ export default function LogoSwitcher({ url, renditions, selected, onSelect, onRe
               type="button"
               className={`rend-swatch ${transparent ? 'checker' : ''} ${on ? 'on' : ''}`}
               style={transparent ? undefined : { background: r.bg }}
-              title={r.color === 'original' ? 'Original' : `${r.color} auf ${r.bg}`}
+              title={r.color === 'original' ? 'Original' : `${r.color} on ${r.bg}`}
               onClick={() => onSelect(r)}
             >
               {url && <LogoImage url={url} rendition={r.color} scalePct={72} alt="" />}

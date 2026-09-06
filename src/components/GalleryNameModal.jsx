@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 
 /** Small modal to create or rename a gallery. */
-export default function GalleryNameModal({ title = 'Neue Galerie', initialName = '', submitLabel = 'Erstellen', onSubmit, onClose }) {
+export default function GalleryNameModal({ title = 'New Gallery', initialName = '', submitLabel = 'Create', onSubmit, onClose }) {
   const [name, setName] = useState(initialName);
   const [busy, setBusy] = useState(false);
 
@@ -28,13 +28,13 @@ export default function GalleryNameModal({ title = 'Neue Galerie', initialName =
         <div className="modal-body">
           <div className="field" style={{ marginBottom: 0 }}>
             <label>Name</label>
-            <input className="input" value={name} autoFocus placeholder="z. B. Grüne Tech Firmen"
+            <input className="input" value={name} autoFocus placeholder="e.g. Green Tech Companies"
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') submit(); }} />
           </div>
         </div>
         <div className="modal-foot">
-          <button className="btn btn-ghost" onClick={onClose} disabled={busy}>Abbrechen</button>
+          <button className="btn btn-ghost" onClick={onClose} disabled={busy}>Cancel</button>
           <button className="btn btn-primary" onClick={submit} disabled={!name.trim() || busy}>{submitLabel}</button>
         </div>
       </div>

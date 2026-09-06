@@ -49,7 +49,8 @@ data/
 ├── branding/<id>/*.pdf|*.png   # guidelines / decks / images
 ├── logo/<id>/logo.svg              # one logo image (SVG/PNG), recoloured live
 ├── businesscard/<id>/front.webp, back.webp
-└── imagegallery/<id>/image.<ext>   # one image per item
+├── imagegallery/<id>/image.<ext>   # one image per item
+└── plan/<id>/moodboard/*.<ext>     # Plan-mode moodboards
 ```
 
 `data/` is **git-ignored and lives outside the source code**, so you can pull
@@ -57,6 +58,17 @@ updates, reinstall dependencies or rebuild the app any time — your library is
 never touched. To back up or move your library, just copy the `data/` folder.
 
 ---
+
+## Modes: Reference & Plan
+
+A toggle on the **left** of the header (mirroring the storage meter on the
+right) switches between two modes:
+
+- **Reference** — the library described below (Branding, Motion Design, Logos,
+  Business Cards, Colors, Image Gallery).
+- **Plan** — plan new projects. Each **plan** has a **moodboard** (images), a
+  free‑text **Information** field and a **timeframe** (start / end date). The
+  **+** creates a new plan; plans are listed like galleries.
 
 ## What each section does
 

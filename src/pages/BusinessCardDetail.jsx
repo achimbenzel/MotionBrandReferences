@@ -40,7 +40,7 @@ export default function BusinessCardDetail({ project, setProject }) {
       </div>
 
       <div className="section">
-        <div className="section-head"><h2><Box size={16} /> 3D-Ansicht</h2></div>
+        <div className="section-head"><h2><Box size={16} /> 3D view</h2></div>
         <BusinessCard3D front={front} back={back} size={size} />
       </div>
 
@@ -128,9 +128,9 @@ function BusinessCard3D({ front, back, size }) {
         <div className="bc3d-shadow" />
       </div>
       <div className="bc3d-controls">
-        <span className="hint">Ziehen zum Drehen</span>
-        <button className="btn btn-sm" onClick={flip}><RotateCw size={15} /> Umdrehen</button>
-        <button className="btn btn-ghost btn-sm" onClick={reset}>Zurücksetzen</button>
+        <span className="hint">Drag to rotate</span>
+        <button className="btn btn-sm" onClick={flip}><RotateCw size={15} /> Flip</button>
+        <button className="btn btn-ghost btn-sm" onClick={reset}>Reset</button>
       </div>
     </div>
   );

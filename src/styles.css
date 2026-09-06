@@ -20,6 +20,9 @@
 * { box-sizing: border-box; }
 
 html, body, #root { height: 100%; }
+/* Always reserve the scrollbar gutter so pages don't shift horizontally
+   depending on whether their content is tall enough to scroll. */
+html { scrollbar-gutter: stable; }
 
 body {
   margin: 0;
@@ -1192,3 +1195,56 @@ img { max-width: 100%; display: block; }
 .gallery-upload-item { position: relative; aspect-ratio: 1 / 1; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
 .gallery-upload-item img { width: 100%; height: 100%; object-fit: cover; }
 .gallery-upload-item .icon-btn { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; background: rgba(0, 0, 0, .6); color: #fff; border-color: transparent; }
+
+/* ------------------------------------------------------- Mode toggle (left) */
+.mode-toggle {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  gap: 4px;
+  background: rgba(20, 20, 22, 0.82);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 8px;
+  box-shadow: var(--shadow);
+}
+.mode-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13.5px;
+  font-weight: 500;
+  font-family: inherit;
+  padding: 8px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.mode-btn:hover { color: var(--text); }
+.mode-btn.on { background: var(--surface-3); color: var(--text); }
+@media (max-width: 520px) { .mode-label { display: none; } }
+
+.header-mode-label { font-size: 15px; font-weight: 600; padding: 0 10px; color: var(--text); }
+
+/* ---------------------------------------------------------------- Plan mode */
+.plan-title-input {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--text);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-family: inherit;
+  padding: 0 0 2px;
+  width: 100%;
+  max-width: 640px;
+  outline: none;
+}
+.plan-title-input:focus { border-bottom-color: var(--border-strong); }

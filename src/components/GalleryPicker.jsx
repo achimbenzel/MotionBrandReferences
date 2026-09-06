@@ -31,12 +31,12 @@ export default function GalleryPicker({ projects, selectedIds, onSave, onClose }
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
       <div className="modal" role="dialog" aria-modal="true" style={{ maxWidth: 720 }}>
         <div className="modal-head">
-          <h2>Projekte hinzufügen</h2>
+          <h2>Add projects</h2>
           <button className="icon-btn" onClick={onClose} disabled={busy}><X size={18} /></button>
         </div>
         <div className="modal-body">
           {projects.length === 0 ? (
-            <div className="center-msg">Noch keine Projekte dieses Typs.</div>
+            <div className="center-msg">No projects of this type yet.</div>
           ) : (
             <div className="picker-grid">
               {projects.map((p) => {
@@ -56,8 +56,8 @@ export default function GalleryPicker({ projects, selectedIds, onSave, onClose }
           )}
         </div>
         <div className="modal-foot">
-          <button className="btn btn-ghost" onClick={onClose} disabled={busy}>Abbrechen</button>
-          <button className="btn btn-primary" onClick={save} disabled={busy}>{busy ? 'Speichern…' : `Speichern (${sel.size})`}</button>
+          <button className="btn btn-ghost" onClick={onClose} disabled={busy}>Cancel</button>
+          <button className="btn btn-primary" onClick={save} disabled={busy}>{busy ? 'Saving…' : `Save (${sel.size})`}</button>
         </div>
       </div>
     </div>

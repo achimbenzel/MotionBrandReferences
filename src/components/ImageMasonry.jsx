@@ -16,17 +16,17 @@ export default function ImageMasonry({ projects, setProjects, galleries, onGalle
   const items = projects.map((p) => ({ src: p.image ? fileUrl(p, p.image) : fileUrl(p, p.thumb) }));
 
   const remove = async (id) => {
-    try { await api.remove(id); setProjects((prev) => prev.filter((p) => p.id !== id)); toast('Bild gelöscht'); }
-    catch (e) { toast(`Löschen fehlgeschlagen: ${e.message}`, 'error'); }
+    try { await api.remove(id); setProjects((prev) => prev.filter((p) => p.id !== id)); toast('Image deleted'); }
+    catch (e) { toast(`Delete failed: ${e.message}`, 'error'); }
   };
 
   const addToGallery = async (gallery, projectId) => {
     try {
       const ids = Array.from(new Set([...(gallery.projectIds || []), projectId]));
       await api.updateGallery(gallery.id, { projectIds: ids });
-      toast(`Zu „${gallery.name}" hinzugefügt`);
+      toast(`Added to “${gallery.name}”`);
       onGalleriesChanged?.();
-    } catch (e) { toast(`Fehlgeschlagen: ${e.message}`, 'error'); }
+    } catch (e) { toast(`Failed: ${e.message}`, 'error'); }
   };
 
   if (!projects.length) return null;
@@ -38,9 +38,9 @@ export default function ImageMasonry({ projects, setProjects, galleries, onGalle
           const src = p.image ? fileUrl(p, p.image) : fileUrl(p, p.thumb);
           const galleryItems = [
             ...(galleries || []).map((g) => ({ label: g.name, icon: <FolderPlus size={15} />, onClick: () => addToGallery(g, p.id) })),
-            { label: 'Neue Galerie…', icon: <Plus size={15} />, onClick: () => onNewGallery?.(p.id) },
+            { label: 'New gallery…', icon: <Plus size={15} />, onClick: () => onNewGallery?.(p.id) },
             { separator: true },
-            { label: 'Löschen', icon: <Trash2 size={15} />, danger: true, onClick: () => remove(p.id) },
+            { label: 'Delete', icon: <Trash2 size={15} />, danger: true, onClick: () => remove(p.id) },
           ];
           return (
             <div className="masonry-item" key={p.id}>
