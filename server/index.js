@@ -24,9 +24,14 @@ const ROOT = path.resolve(__dirname, '..');
 const DATA_DIR = path.join(ROOT, 'data');
 const TMP_DIR = path.join(DATA_DIR, 'tmp');
 const DB_PATH = path.join(DATA_DIR, 'db.json');
+const DB_BAK = path.join(DATA_DIR, 'db.json.bak');   // mirror of the last good db.json
+const BACKUP_DIR = path.join(DATA_DIR, 'backups');   // rotating db snapshots
 const DIST_DIR = path.join(ROOT, 'dist');
 const PORT = process.env.API_PORT || 4300;
 const IS_PROD = process.env.NODE_ENV === 'production';
+
+const MAX_SNAPSHOTS = 10;                             // how many db snapshots to keep
+const SNAPSHOT_INTERVAL_MS = 3 * 60 * 1000;          // at most one snapshot per 3 min
 
 const TYPES = new Set(['motion', 'color', 'branding', 'logo', 'businesscard', 'imagegallery', 'font']);
 const DEFAULT_STORAGE_LIMIT = 80 * 1024 * 1024 * 1024; // 80 GB
@@ -36,19 +41,52 @@ const DEFAULT_STORAGE_LIMIT = 80 * 1024 * 1024 * 1024; // 80 GB
 // ---------------------------------------------------------------------------
 function ensureDirs() {
   const typeDirs = [...TYPES].map((t) => path.join(DATA_DIR, t));
-  for (const d of [DATA_DIR, TMP_DIR, path.join(DATA_DIR, 'plan'), ...typeDirs]) {
+  for (const d of [DATA_DIR, TMP_DIR, BACKUP_DIR, path.join(DATA_DIR, 'plan'), ...typeDirs]) {
     fs.mkdirSync(d, { recursive: true });
   }
   if (!fs.existsSync(DB_PATH)) {
     fs.writeFileSync(DB_PATH, JSON.stringify({ projects: [], galleries: [], plans: [], settings: { storageLimitBytes: DEFAULT_STORAGE_LIMIT } }, null, 2));
   }
+  // Sweep leftover atomic-write temp files from a previous crash.
+  for (const f of fs.readdirSync(DATA_DIR).filter((n) => /^\.db-.*\.tmp$/.test(n))) {
+    fs.rmSync(path.join(DATA_DIR, f), { force: true });
+  }
 }
 
 // Serialize db writes so concurrent requests can't clobber each other.
 let writeChain = Promise.resolve();
+
+// Read + parse one db file (throws if missing or corrupt).
+async function parseDBFile(p) {
+  return JSON.parse(await fsp.readFile(p, 'utf8'));
+}
+
+// Load the database, tolerating a missing or corrupt db.json by falling back
+// to the .bak mirror and then the newest snapshot. When a fallback is used the
+// good copy is written back to db.json so the app self-heals.
+async function loadDB() {
+  const candidates = [DB_PATH, DB_BAK];
+  try {
+    const snaps = (await fsp.readdir(BACKUP_DIR).catch(() => []))
+      .filter((f) => /^db-.*\.json$/.test(f)).sort();
+    if (snaps.length) candidates.push(path.join(BACKUP_DIR, snaps[snaps.length - 1]));
+  } catch { /* no snapshots */ }
+
+  for (const p of candidates) {
+    try {
+      const db = await parseDBFile(p);
+      if (p !== DB_PATH) {
+        console.warn(`  db.json unreadable — recovered from ${path.basename(p)}`);
+        await writeDBAtomic(db).catch(() => {});
+      }
+      return db;
+    } catch { /* try the next candidate */ }
+  }
+  return null; // nothing readable — caller starts from a fresh, empty DB
+}
+
 async function readDB() {
-  const raw = await fsp.readFile(DB_PATH, 'utf8');
-  const db = JSON.parse(raw);
+  const db = (await loadDB()) || { projects: [], galleries: [], plans: [], settings: {} };
   // Normalize older databases so new fields always exist.
   if (!Array.isArray(db.projects)) db.projects = [];
   if (!Array.isArray(db.galleries)) db.galleries = [];
@@ -57,6 +95,37 @@ async function readDB() {
   if (!db.settings || typeof db.settings !== 'object') db.settings = {};
   if (db.settings.storageLimitBytes == null) db.settings.storageLimitBytes = DEFAULT_STORAGE_LIMIT;
   return db;
+}
+
+// Write db.json atomically: write a temp file, fsync it, then rename over the
+// target (atomic on the same filesystem) so a crash/power-loss mid-write can
+// never leave a truncated db.json. Mirror the last good version to .bak and
+// keep rotating snapshots so you can go back.
+let lastSnapshotAt = 0;
+async function writeDBAtomic(db) {
+  const json = JSON.stringify(db, null, 2);
+  const tmp = path.join(DATA_DIR, `.db-${nanoid(8)}.tmp`);
+  const fh = await fsp.open(tmp, 'w');
+  try { await fh.writeFile(json); await fh.sync(); } finally { await fh.close(); }
+  await fsp.rename(tmp, DB_PATH);                    // atomic replace
+  await fsp.writeFile(DB_BAK, json).catch(() => {}); // mirror the last good version
+  await snapshotDB(json).catch(() => {});
+}
+
+// Keep the newest MAX_SNAPSHOTS db versions under data/backups/, throttled so a
+// burst of autosaves doesn't churn the disk while snapshots still span time.
+async function snapshotDB(json) {
+  const now = Date.now();
+  if (now - lastSnapshotAt < SNAPSHOT_INTERVAL_MS) return;
+  lastSnapshotAt = now;
+  await fsp.mkdir(BACKUP_DIR, { recursive: true });
+  const stamp = new Date(now).toISOString().replace(/[:.]/g, '-');
+  await fsp.writeFile(path.join(BACKUP_DIR, `db-${stamp}.json`), json);
+  const files = (await fsp.readdir(BACKUP_DIR).catch(() => []))
+    .filter((f) => /^db-.*\.json$/.test(f)).sort();
+  for (const f of files.slice(0, Math.max(0, files.length - MAX_SNAPSHOTS))) {
+    await fsp.rm(path.join(BACKUP_DIR, f), { force: true }).catch(() => {});
+  }
 }
 
 // Recursively sum the size of every file under a directory.
@@ -71,13 +140,17 @@ async function folderSize(dir) {
   return total;
 }
 function mutateDB(mutator) {
-  writeChain = writeChain.then(async () => {
+  const run = async () => {
     const db = await readDB();
     const result = await mutator(db);
-    await fsp.writeFile(DB_PATH, JSON.stringify(db, null, 2));
+    await writeDBAtomic(db);
     return result;
-  });
-  return writeChain;
+  };
+  // Run after the previous write settles — whether it resolved OR rejected — so
+  // a single failed write can't poison the chain for every write after it.
+  const result = writeChain.then(run, run);
+  writeChain = result.catch(() => {}); // keep the internal chain always-resolved
+  return result;                       // callers still see this write's real outcome
 }
 
 const sanitize = (name) => String(name || '').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120);
@@ -659,9 +732,28 @@ function parseJSON(value, fallback) {
   try { return JSON.parse(value); } catch { return fallback; }
 }
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`\n  Design Reference API  →  http://localhost:${PORT}`);
   console.log(`  Library folder        →  ${DATA_DIR}`);
   if (IS_PROD) console.log(`  Serving built app     →  http://localhost:${PORT}\n`);
   else console.log(`  Frontend (dev)        →  http://localhost:4200\n`);
 });
+
+// Graceful shutdown: stop taking new requests, let in-flight writes finish, and
+// only then exit — so a restart/deploy can't interrupt a db write.
+let shuttingDown = false;
+async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`\n  ${signal} received — finishing pending writes…`);
+  const hardExit = setTimeout(() => process.exit(0), 5000);
+  hardExit.unref();
+  await new Promise((resolve) => server.close(resolve));
+  // Drain the write chain until it stops growing.
+  let prev;
+  do { prev = writeChain; await prev.catch(() => {}); } while (writeChain !== prev);
+  clearTimeout(hardExit);
+  process.exit(0);
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

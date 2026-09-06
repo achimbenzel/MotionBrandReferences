@@ -43,6 +43,8 @@ is stored in a single top-level **`data/`** folder:
 ```
 data/
 ├── db.json                     # all metadata + galleries + settings (human-readable)
+├── db.json.bak                 # mirror of the last good db.json (crash safety)
+├── backups/db-<timestamp>.json # rotating db snapshots (last 10)
 ├── motion/<id>/video.mp4       # original video
 │   ├── thumb.webp              # cover frame
 │   └── frames/*.webp           # captured keyframes (WebP = small)
@@ -60,6 +62,24 @@ data/
 `data/` is **git-ignored and lives outside the source code**, so you can pull
 updates, reinstall dependencies or rebuild the app any time — your library is
 never touched. To back up or move your library, just copy the `data/` folder.
+
+### Crash-safe metadata
+
+`db.json` holds all your metadata, so it's written defensively:
+
+- **Atomic writes** — every change is written to a temp file, flushed to disk
+  (`fsync`) and then atomically renamed over `db.json`, so a crash or power loss
+  mid-write can never leave a truncated, unreadable file.
+- **Self-healing** — if `db.json` is ever missing or corrupt, the app
+  automatically recovers from `db.json.bak` (a mirror of the last good version)
+  or the newest snapshot under `backups/`, then rewrites a good `db.json`.
+- **Rotating snapshots** — the last 10 versions are kept under `backups/` (at
+  most one every few minutes) so you can go back to an earlier state.
+- **Graceful shutdown** — on `SIGTERM`/`SIGINT` the server stops accepting
+  requests and finishes any in-flight write before exiting, so a restart or
+  deploy can't interrupt a save.
+- **Resilient write queue** — writes are serialized, and a single failed write
+  (e.g. a full disk) no longer blocks the writes that come after it.
 
 ---
 
