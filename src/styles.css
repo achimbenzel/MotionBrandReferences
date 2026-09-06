@@ -1248,3 +1248,64 @@ img { max-width: 100%; display: block; }
   outline: none;
 }
 .plan-title-input:focus { border-bottom-color: var(--border-strong); }
+
+/* ------------------------------------------------------------- Plan detail */
+.plan-topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.plan-banner {
+  position: relative;
+  height: 210px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-2) center/cover no-repeat;
+}
+.plan-banner.empty { background: linear-gradient(120deg, var(--surface-3), var(--surface)); }
+.plan-banner-actions { position: absolute; top: 12px; right: 12px; display: flex; gap: 8px; opacity: 0; transition: opacity .15s; }
+.plan-banner:hover .plan-banner-actions { opacity: 1; }
+.plan-banner-actions .btn { background: rgba(0, 0, 0, .55); color: #fff; border-color: transparent; backdrop-filter: blur(6px); }
+.plan-banner-actions .btn:hover { background: rgba(0, 0, 0, .75); }
+
+.plan-idrow { display: flex; align-items: center; gap: 16px; margin: -40px 0 22px 24px; position: relative; z-index: 1; }
+.plan-avatar {
+  width: 84px; height: 84px; border-radius: 20px;
+  border: 4px solid var(--bg); background: var(--surface-3);
+  overflow: hidden; position: relative; cursor: pointer;
+  display: grid; place-items: center; flex-shrink: 0; padding: 0;
+}
+.plan-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.plan-avatar > span { font-size: 34px; font-weight: 700; color: var(--text-muted); }
+.plan-avatar-edit { position: absolute; inset: 0; background: rgba(0, 0, 0, .45); color: #fff; display: grid; place-items: center; opacity: 0; transition: opacity .15s; }
+.plan-avatar:hover .plan-avatar-edit { opacity: 1; }
+.plan-name { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0; padding-bottom: 6px; }
+
+/* Milestones */
+.milestones { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+.milestone { display: flex; align-items: center; gap: 10px; }
+.ms-check { width: 24px; height: 24px; border-radius: 7px; border: 2px solid var(--border-strong); background: transparent; cursor: pointer; display: grid; place-items: center; color: #04191b; flex-shrink: 0; }
+.ms-check.on { background: var(--accent); border-color: var(--accent); }
+.ms-title { flex: 1; }
+.ms-date { width: 160px; flex-shrink: 0; color-scheme: dark; }
+.ms-del { width: 34px; height: 34px; flex-shrink: 0; color: var(--text-muted); }
+.milestone.done .ms-title { text-decoration: line-through; color: var(--text-faint); }
+.ms-add { align-self: flex-start; margin-top: 4px; }
+
+/* Moodboards */
+.moodboard { border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 14px; overflow: hidden; }
+.moodboard-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; background: var(--surface); }
+.mb-collapse { display: flex; align-items: center; gap: 8px; background: transparent; border: 0; color: var(--text); cursor: pointer; font-size: 15px; font-weight: 600; font-family: inherit; }
+.mb-collapse .count { color: var(--text-faint); font-weight: 400; }
+.moodboard-actions { display: flex; align-items: center; gap: 8px; }
+.moodboard .masonry { padding: 12px; }
+.moodboard .dropzone { margin: 12px; }
+
+/* Plan grid card (Notion-style) */
+.plan-card-head { position: relative; margin-bottom: 24px; }
+.plan-card-banner { aspect-ratio: 16 / 9; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface-2) center/cover no-repeat; }
+.plan-card-banner.empty { background: linear-gradient(120deg, var(--surface-3), var(--surface)); }
+.plan-card-avatar {
+  position: absolute; left: 12px; bottom: -16px;
+  width: 46px; height: 46px; border-radius: 12px;
+  border: 3px solid var(--bg); background: var(--surface-3);
+  overflow: hidden; display: grid; place-items: center;
+}
+.plan-card-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.plan-card-avatar > span { font-weight: 700; color: var(--text-muted); }

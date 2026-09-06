@@ -112,14 +112,40 @@ export const api = {
   async removePlan(id) {
     return handle(await fetch(`/api/plans/${id}`, { method: 'DELETE' }));
   },
-  async addMoodboard(id, fileList) {
+  async setPlanImage(id, kind, file) { // kind: 'banner' | 'avatar'
     const fd = new FormData();
-    Array.from(fileList).forEach((f) => fd.append('images', f));
-    const { plan } = await handle(await fetch(`/api/plans/${id}/moodboard`, { method: 'POST', body: fd }));
+    fd.append(kind, file, `${kind}.img`);
+    const { plan } = await handle(await fetch(`/api/plans/${id}/${kind}`, { method: 'POST', body: fd }));
     return plan;
   },
-  async removeMoodboard(id, imgId) {
-    const { plan } = await handle(await fetch(`/api/plans/${id}/moodboard/${imgId}`, { method: 'DELETE' }));
+  async removePlanImage(id, kind) {
+    const { plan } = await handle(await fetch(`/api/plans/${id}/${kind}`, { method: 'DELETE' }));
+    return plan;
+  },
+  async addMoodboard(id, name) {
+    const { plan } = await handle(await fetch(`/api/plans/${id}/moodboards`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
+    }));
+    return plan;
+  },
+  async updateMoodboard(id, mbId, patch) {
+    const { plan } = await handle(await fetch(`/api/plans/${id}/moodboards/${mbId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
+    }));
+    return plan;
+  },
+  async removeMoodboard(id, mbId) {
+    const { plan } = await handle(await fetch(`/api/plans/${id}/moodboards/${mbId}`, { method: 'DELETE' }));
+    return plan;
+  },
+  async addMoodboardImages(id, mbId, fileList) {
+    const fd = new FormData();
+    Array.from(fileList).forEach((f) => fd.append('images', f));
+    const { plan } = await handle(await fetch(`/api/plans/${id}/moodboards/${mbId}/images`, { method: 'POST', body: fd }));
+    return plan;
+  },
+  async removeMoodboardImage(id, mbId, imgId) {
+    const { plan } = await handle(await fetch(`/api/plans/${id}/moodboards/${mbId}/images/${imgId}`, { method: 'DELETE' }));
     return plan;
   },
 

@@ -53,6 +53,7 @@ async function readDB() {
   if (!Array.isArray(db.projects)) db.projects = [];
   if (!Array.isArray(db.galleries)) db.galleries = [];
   if (!Array.isArray(db.plans)) db.plans = [];
+  for (const plan of db.plans) normalizePlan(plan);
   if (!db.settings || typeof db.settings !== 'object') db.settings = {};
   if (db.settings.storageLimitBytes == null) db.settings.storageLimitBytes = DEFAULT_STORAGE_LIMIT;
   return db;
@@ -84,6 +85,27 @@ const extOf = (name) => {
   const e = path.extname(String(name || '')).toLowerCase();
   return e && e.length <= 6 ? e : '';
 };
+
+// Bring a plan up to the current shape (multiple moodboards, milestones,
+// banner/avatar), migrating the older single-moodboard array in place.
+function normalizePlan(plan) {
+  if (!plan) return plan;
+  if (!Array.isArray(plan.moodboards)) {
+    const imgs = Array.isArray(plan.moodboard) ? plan.moodboard : [];
+    plan.moodboards = [{ id: nanoid(6), name: 'Moodboard', collapsed: false, images: imgs }];
+  }
+  for (const mb of plan.moodboards) {
+    if (!mb.id) mb.id = nanoid(6);
+    if (typeof mb.name !== 'string') mb.name = 'Moodboard';
+    if (typeof mb.collapsed !== 'boolean') mb.collapsed = false;
+    if (!Array.isArray(mb.images)) mb.images = [];
+  }
+  delete plan.moodboard;
+  if (!Array.isArray(plan.milestones)) plan.milestones = [];
+  if (!('banner' in plan)) plan.banner = null;
+  if (!('avatar' in plan)) plan.avatar = null;
+  return plan;
+}
 
 // ---------------------------------------------------------------------------
 // Upload middleware — files land in a per-request tmp folder, then the route
@@ -445,7 +467,7 @@ app.delete('/api/galleries/:id', async (req, res) => {
 // ---------------------------------------------------------------------------
 // Plans (Plan mode) — a plan has a moodboard, text info and a timeframe.
 // ---------------------------------------------------------------------------
-const PLAN_EDITABLE = ['name', 'info', 'start', 'end'];
+const PLAN_EDITABLE = ['name', 'info', 'start', 'end', 'milestones'];
 
 app.get('/api/plans', async (_req, res) => {
   const db = await readDB();
@@ -467,7 +489,10 @@ app.post('/api/plans', async (req, res) => {
     info: '',
     start: '',
     end: '',
-    moodboard: [],
+    banner: null,
+    avatar: null,
+    milestones: [],
+    moodboards: [{ id: nanoid(6), name: 'Moodboard', collapsed: false, images: [] }],
     createdAt: Date.now(),
   };
   await mutateDB((db) => { db.plans.push(plan); });
@@ -485,41 +510,94 @@ app.patch('/api/plans/:id', async (req, res) => {
   res.json({ plan: updated });
 });
 
-app.post('/api/plans/:id/moodboard', upload.array('images', 50), async (req, res) => {
+// Banner / avatar (Notion-style header images)
+for (const kind of ['banner', 'avatar']) {
+  app.post(`/api/plans/:id/${kind}`, upload.single(kind), async (req, res) => {
+    try {
+      const db = await readDB();
+      const plan = db.plans.find((p) => p.id === req.params.id);
+      if (!plan) { await cleanupTmp(req); return res.status(404).json({ error: 'not_found' }); }
+      if (!req.file) return res.status(400).json({ error: 'file_required' });
+      const dir = path.join(DATA_DIR, 'plan', plan.id);
+      const stored = await moveInto(dir, req.file.path, `${kind}${extOf(req.file.originalname) || '.png'}`);
+      const updated = await mutateDB((d) => { const p = d.plans.find((x) => x.id === plan.id); p[kind] = stored; return p; });
+      await cleanupTmp(req);
+      res.json({ plan: updated });
+    } catch (err) { await cleanupTmp(req); res.status(500).json({ error: `${kind}_failed`, message: String(err.message || err) }); }
+  });
+  app.delete(`/api/plans/:id/${kind}`, async (req, res) => {
+    let file = null;
+    const updated = await mutateDB((db) => { const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null; file = p[kind]; p[kind] = null; return p; });
+    if (!updated) return res.status(404).json({ error: 'not_found' });
+    if (file) await fsp.rm(path.join(DATA_DIR, 'plan', req.params.id, file), { force: true }).catch(() => {});
+    res.json({ plan: updated });
+  });
+}
+
+// Moodboards (multiple per plan)
+app.post('/api/plans/:id/moodboards', async (req, res) => {
+  const mb = { id: nanoid(6), name: (req.body.name || 'Moodboard').trim(), collapsed: false, images: [] };
+  const updated = await mutateDB((db) => { const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null; p.moodboards.push(mb); return p; });
+  if (!updated) return res.status(404).json({ error: 'not_found' });
+  res.status(201).json({ plan: updated, moodboard: mb });
+});
+
+app.patch('/api/plans/:id/moodboards/:mbId', async (req, res) => {
+  const updated = await mutateDB((db) => {
+    const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null;
+    const mb = p.moodboards.find((m) => m.id === req.params.mbId); if (!mb) return null;
+    if (typeof req.body.name === 'string') mb.name = req.body.name.trim() || mb.name;
+    if (typeof req.body.collapsed === 'boolean') mb.collapsed = req.body.collapsed;
+    return p;
+  });
+  if (!updated) return res.status(404).json({ error: 'not_found' });
+  res.json({ plan: updated });
+});
+
+app.delete('/api/plans/:id/moodboards/:mbId', async (req, res) => {
+  const updated = await mutateDB((db) => {
+    const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null;
+    const idx = p.moodboards.findIndex((m) => m.id === req.params.mbId); if (idx === -1) return null;
+    p.moodboards.splice(idx, 1);
+    return p;
+  });
+  if (!updated) return res.status(404).json({ error: 'not_found' });
+  await fsp.rm(path.join(DATA_DIR, 'plan', req.params.id, 'moodboard', req.params.mbId), { recursive: true, force: true }).catch(() => {});
+  res.json({ plan: updated });
+});
+
+app.post('/api/plans/:id/moodboards/:mbId/images', upload.array('images', 50), async (req, res) => {
   try {
     const db = await readDB();
     const plan = db.plans.find((p) => p.id === req.params.id);
-    if (!plan) { await cleanupTmp(req); return res.status(404).json({ error: 'not_found' }); }
-    const dir = path.join(DATA_DIR, 'plan', plan.id, 'moodboard');
+    const mb0 = plan && plan.moodboards.find((m) => m.id === req.params.mbId);
+    if (!plan || !mb0) { await cleanupTmp(req); return res.status(404).json({ error: 'not_found' }); }
+    const dir = path.join(DATA_DIR, 'plan', plan.id, 'moodboard', mb0.id);
     const added = [];
     for (const f of (req.files || [])) {
       const imgId = nanoid(8);
       const stored = await moveInto(dir, f.path, `${imgId}${extOf(f.originalname) || '.png'}`);
-      added.push({ id: imgId, file: `moodboard/${stored}` });
+      added.push({ id: imgId, file: `moodboard/${mb0.id}/${stored}` });
     }
     const updated = await mutateDB((d) => {
-      const p = d.plans.find((x) => x.id === plan.id);
-      p.moodboard = [...(p.moodboard || []), ...added];
-      return p;
+      const mb = d.plans.find((x) => x.id === plan.id).moodboards.find((m) => m.id === mb0.id);
+      mb.images = [...(mb.images || []), ...added];
+      return d.plans.find((x) => x.id === plan.id);
     });
     await cleanupTmp(req);
     res.status(201).json({ plan: updated });
-  } catch (err) {
-    await cleanupTmp(req);
-    res.status(500).json({ error: 'moodboard_failed', message: String(err.message || err) });
-  }
+  } catch (err) { await cleanupTmp(req); res.status(500).json({ error: 'moodboard_failed', message: String(err.message || err) }); }
 });
 
-app.delete('/api/plans/:id/moodboard/:imgId', async (req, res) => {
+app.delete('/api/plans/:id/moodboards/:mbId/images/:imgId', async (req, res) => {
   let removedFile = null;
   const updated = await mutateDB((db) => {
-    const plan = db.plans.find((p) => p.id === req.params.id);
-    if (!plan || !plan.moodboard) return null;
-    const idx = plan.moodboard.findIndex((m) => m.id === req.params.imgId);
-    if (idx === -1) return null;
-    removedFile = plan.moodboard[idx].file;
-    plan.moodboard.splice(idx, 1);
-    return plan;
+    const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null;
+    const mb = p.moodboards.find((m) => m.id === req.params.mbId); if (!mb) return null;
+    const idx = mb.images.findIndex((im) => im.id === req.params.imgId); if (idx === -1) return null;
+    removedFile = mb.images[idx].file;
+    mb.images.splice(idx, 1);
+    return p;
   });
   if (!updated) return res.status(404).json({ error: 'not_found' });
   if (removedFile) await fsp.rm(path.join(DATA_DIR, 'plan', req.params.id, removedFile), { force: true }).catch(() => {});

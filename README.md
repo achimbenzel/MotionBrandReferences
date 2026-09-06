@@ -1,12 +1,13 @@
 # Design Reference
 
-A personal, **local-only** design reference library with five sections —
-**Branding**, **Motion Design**, **Logos**, **Business Cards** and **Colors**.
-Cards with thumbnails and text below, styled after
+A personal, **local-only** design reference library with six sections —
+**Branding**, **Motion Design**, **Logos**, **Business Cards**, **Colors** and
+**Image Gallery** — plus a **Plan** mode for planning new projects. Cards with
+thumbnails and text below, styled after
 [achimbenzel.com/de/work](https://achimbenzel.com/de/work). Each section can be
-viewed as **Alle** (all projects) or **Galerien** (named collections you create,
-e.g. "Grüne Tech Firmen"). A storage meter in the header sums the `data/` folder
-against an editable limit (default 80 GB).
+viewed as **All** (all projects) or **Galleries** (named collections you create,
+e.g. "Green Tech Companies"). A storage meter in the header sums the `data/`
+folder against an editable limit (default 80 GB).
 
 It runs on its own ports (**4200** frontend / **4300** API) so it never clashes
 with your usual dev ports (5173, 3000, 3333, 8000).
@@ -50,7 +51,9 @@ data/
 ├── logo/<id>/logo.svg              # one logo image (SVG/PNG), recoloured live
 ├── businesscard/<id>/front.webp, back.webp
 ├── imagegallery/<id>/image.<ext>   # one image per item
-└── plan/<id>/moodboard/*.<ext>     # Plan-mode moodboards
+└── plan/<id>/                      # Plan-mode plans
+    ├── banner.<ext>, avatar.<ext>  # Notion-style banner + profile image
+    └── moodboard/<mbId>/*.<ext>    # one folder per moodboard
 ```
 
 `data/` is **git-ignored and lives outside the source code**, so you can pull
@@ -66,9 +69,19 @@ right) switches between two modes:
 
 - **Reference** — the library described below (Branding, Motion Design, Logos,
   Business Cards, Colors, Image Gallery).
-- **Plan** — plan new projects. Each **plan** has a **moodboard** (images), a
-  free‑text **Information** field and a **timeframe** (start / end date). The
-  **+** creates a new plan; plans are listed like galleries.
+- **Plan** — plan new projects. The **+** creates a new plan; plans are listed
+  in a grid like galleries. Each **plan** has:
+  - a **Notion-style banner and profile image** you can pick — both also show on
+    the plan's card in the grid,
+  - a **timeframe** (start / end date) with **checkable milestones** — each has a
+    title, an optional date and a checkbox that strikes it through when done,
+  - **multiple moodboards** (e.g. one for colours, one for UI): each is
+    **collapsible** and holds its own images, and can be renamed or removed from
+    its own **⋯** menu,
+  - a free‑text **Information** field (auto-saved).
+
+  Following the general rule below, a plan's title is only editable via the
+  **⋯** menu (top-right, next to **Edit**) — there is no bare Delete button.
 
 ## What each section does
 
@@ -122,9 +135,9 @@ ratio; click one for fullscreen. Each image's **⋯** menu deletes it or adds it
 to a gallery (existing or new). Like every section it has the Alle / Galerien
 toggle.
 
-### Galleries (Alle / Galerien)
-Every section has an **Alle / Galerien** toggle. Under **Galerien** you create
-named collections (e.g. "Grüne Tech Firmen"), open one, and add or remove
+### Galleries (All / Galleries)
+Every section has an **All / Galleries** toggle. Under **Galleries** you create
+named collections (e.g. "Green Tech Companies"), open one, and add or remove
 projects of that section via a picker. A project can be in several galleries;
 deleting a project removes it from its galleries automatically. Galleries are
 just references — deleting a gallery never deletes the projects.
@@ -135,11 +148,12 @@ The header shows how much of the `data/` folder is used against a limit
 real summed size of everything under `data/`.
 
 ### Responsive header
-On wide screens all five section tabs sit in the pill. On narrow/mobile widths
+On wide screens all six section tabs sit in the pill. On narrow/mobile widths
 they collapse into a **hamburger menu** whose dropdown lists all sections
 (current one checked). The toggle is icon-only so the pill's size and position
 never shift between sections, and the dropdown always renders above the storage
-meter.
+meter. In **Plan** mode the tabs are replaced by a single **Plans** label and
+the **+** creates a new plan.
 
 ### Covers & editing (all types)
 - **Crop & zoom the cover:** when you set a thumbnail — a Motion frame, a

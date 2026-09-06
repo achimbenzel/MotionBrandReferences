@@ -33,22 +33,26 @@ export default function PlansPage({ reloadKey, onNewPlan }) {
       {plans && !error && (
         plans.length ? (
           <div className="grid">
-            {plans.map((p) => (
-              <div key={p.id} className="card gallery-card" onClick={() => navigate(`/plan/${p.id}`)}>
-                <div className="gallery-mosaic">
-                  {(p.moodboard || []).slice(0, 4).length ? (
-                    p.moodboard.slice(0, 4).map((m) => <img key={m.id} src={planFileUrl(p, m.file)} alt="" loading="lazy" />)
-                  ) : (
-                    <div className="card-thumb-empty"><PencilRuler size={26} /></div>
-                  )}
+            {plans.map((p) => {
+              const imgCount = (p.moodboards || []).reduce((n, mb) => n + (mb.images || []).length, 0);
+              const banner = p.banner ? planFileUrl(p, p.banner) : null;
+              const avatar = p.avatar ? planFileUrl(p, p.avatar) : null;
+              return (
+                <div key={p.id} className="card plan-card" onClick={() => navigate(`/plan/${p.id}`)}>
+                  <div className="plan-card-head">
+                    <div className={`plan-card-banner ${banner ? '' : 'empty'}`} style={banner ? { backgroundImage: `url("${banner}")` } : undefined} />
+                    <div className="plan-card-avatar">
+                      {avatar ? <img src={avatar} alt="" loading="lazy" /> : <span>{(p.name || '?').charAt(0).toUpperCase()}</span>}
+                    </div>
+                  </div>
+                  <div className="card-meta"><span className="card-title">{p.name}</span></div>
+                  <div className="card-sub" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    {fmtRange(p.start, p.end) && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><CalendarRange size={13} /> {fmtRange(p.start, p.end)}</span>}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><Images size={13} /> {imgCount}</span>
+                  </div>
                 </div>
-                <div className="card-meta"><span className="card-title">{p.name}</span></div>
-                <div className="card-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  {fmtRange(p.start, p.end) && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><CalendarRange size={13} /> {fmtRange(p.start, p.end)}</span>}
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><Images size={13} /> {(p.moodboard || []).length}</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
             <button className="gallery-new" onClick={onNewPlan}>
               <Plus size={26} /><span>New plan</span>
             </button>
