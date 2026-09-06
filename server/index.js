@@ -51,6 +51,11 @@ function ensureDirs() {
   for (const f of fs.readdirSync(DATA_DIR).filter((n) => /^\.db-.*\.tmp$/.test(n))) {
     fs.rmSync(path.join(DATA_DIR, f), { force: true });
   }
+  // Sweep leftover upload temp dirs (aborted uploads) from a previous crash —
+  // nothing is in flight at startup, so data/tmp/ can be safely emptied.
+  for (const f of fs.readdirSync(TMP_DIR)) {
+    fs.rmSync(path.join(TMP_DIR, f), { recursive: true, force: true });
+  }
 }
 
 // Serialize db writes so concurrent requests can't clobber each other.
@@ -110,6 +115,7 @@ async function writeDBAtomic(db) {
   await fsp.rename(tmp, DB_PATH);                    // atomic replace
   await fsp.writeFile(DB_BAK, json).catch(() => {}); // mirror the last good version
   await snapshotDB(json).catch(() => {});
+  invalidateStorage();
 }
 
 // Keep the newest MAX_SNAPSHOTS db versions under data/backups/, throttled so a
@@ -124,7 +130,7 @@ async function snapshotDB(json) {
   const files = (await fsp.readdir(BACKUP_DIR).catch(() => []))
     .filter((f) => /^db-.*\.json$/.test(f)).sort();
   for (const f of files.slice(0, Math.max(0, files.length - MAX_SNAPSHOTS))) {
-    await fsp.rm(path.join(BACKUP_DIR, f), { force: true }).catch(() => {});
+    await safeRm(path.join(BACKUP_DIR, f), { force: true }).catch(() => {});
   }
 }
 
@@ -138,6 +144,36 @@ async function folderSize(dir) {
     else { const st = await fsp.stat(p).catch(() => null); if (st) total += st.size; }
   }
   return total;
+}
+
+// Storage usage cache: folderSize walks the whole tree, so cache the result
+// with a short TTL and invalidate it whenever files change (see moveInto,
+// safeRm and writeDBAtomic). The TTL is just a backstop for out-of-band edits.
+const STORAGE_TTL_MS = 60 * 1000;
+let storageCache = { bytes: null, at: 0 };
+function invalidateStorage() { storageCache = { bytes: null, at: 0 }; }
+async function getUsedBytes() {
+  const now = Date.now();
+  if (storageCache.bytes != null && now - storageCache.at < STORAGE_TTL_MS) return storageCache.bytes;
+  const bytes = await folderSize(DATA_DIR);
+  storageCache = { bytes, at: now };
+  return bytes;
+}
+
+// Path containment: refuse to rm/rename anything that resolves outside data/,
+// as a defensive backstop against traversal via request-derived path segments.
+function assertInside(target) {
+  const resolved = path.resolve(target);
+  const base = path.resolve(DATA_DIR);
+  if (resolved !== base && !resolved.startsWith(base + path.sep)) {
+    throw new Error(`refusing to touch a path outside data/: ${target}`);
+  }
+  return resolved;
+}
+function safeRm(target, opts) {
+  assertInside(target);
+  invalidateStorage();
+  return fsp.rm(target, opts);
 }
 function mutateDB(mutator) {
   const run = async () => {
@@ -199,6 +235,7 @@ const upload = multer({ storage, limits: { fileSize: 1024 * 1024 * 1024 } }); //
 async function moveInto(dir, tmpPath, finalName) {
   await fsp.mkdir(dir, { recursive: true });
   const dest = path.join(dir, finalName);
+  assertInside(dest);
   await fsp.rename(tmpPath, dest).catch(async (err) => {
     // rename across devices can fail — fall back to copy.
     if (err.code === 'EXDEV') {
@@ -206,10 +243,11 @@ async function moveInto(dir, tmpPath, finalName) {
       await fsp.unlink(tmpPath);
     } else throw err;
   });
+  invalidateStorage();
   return finalName;
 }
 async function cleanupTmp(req) {
-  if (req.tmpDir) await fsp.rm(req.tmpDir, { recursive: true, force: true }).catch(() => {});
+  if (req.tmpDir) await safeRm(req.tmpDir, { recursive: true, force: true }).catch(() => {});
 }
 
 // ---------------------------------------------------------------------------
@@ -461,7 +499,7 @@ app.delete('/api/projects/:id/frames/:frameId', async (req, res) => {
     if (!updated) return res.status(404).json({ error: 'not_found' });
     if (removedFile) {
       // removedFile is stored relative to the project dir (e.g. "frames/x.webp").
-      await fsp.rm(path.join(DATA_DIR, 'motion', req.params.id, removedFile), { force: true }).catch(() => {});
+      await safeRm(path.join(DATA_DIR, 'motion', req.params.id, removedFile), { force: true }).catch(() => {});
     }
     res.json({ project: updated });
   } catch (err) {
@@ -485,7 +523,7 @@ app.delete('/api/projects/:id', async (req, res) => {
       return true;
     });
     if (!ok) return res.status(404).json({ error: 'not_found' });
-    await fsp.rm(path.join(DATA_DIR, type, req.params.id), { recursive: true, force: true }).catch(() => {});
+    await safeRm(path.join(DATA_DIR, type, req.params.id), { recursive: true, force: true }).catch(() => {});
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: 'delete_failed', message: String(err.message || err) });
@@ -612,7 +650,7 @@ for (const kind of ['banner', 'avatar']) {
     let file = null;
     const updated = await mutateDB((db) => { const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null; file = p[kind]; p[kind] = null; return p; });
     if (!updated) return res.status(404).json({ error: 'not_found' });
-    if (file) await fsp.rm(path.join(DATA_DIR, 'plan', req.params.id, file), { force: true }).catch(() => {});
+    if (file) await safeRm(path.join(DATA_DIR, 'plan', req.params.id, file), { force: true }).catch(() => {});
     res.json({ plan: updated });
   });
 }
@@ -645,7 +683,7 @@ app.delete('/api/plans/:id/moodboards/:mbId', async (req, res) => {
     return p;
   });
   if (!updated) return res.status(404).json({ error: 'not_found' });
-  await fsp.rm(path.join(DATA_DIR, 'plan', req.params.id, 'moodboard', req.params.mbId), { recursive: true, force: true }).catch(() => {});
+  await safeRm(path.join(DATA_DIR, 'plan', req.params.id, 'moodboard', req.params.mbId), { recursive: true, force: true }).catch(() => {});
   res.json({ plan: updated });
 });
 
@@ -683,7 +721,7 @@ app.delete('/api/plans/:id/moodboards/:mbId/images/:imgId', async (req, res) => 
     return p;
   });
   if (!updated) return res.status(404).json({ error: 'not_found' });
-  if (removedFile) await fsp.rm(path.join(DATA_DIR, 'plan', req.params.id, removedFile), { force: true }).catch(() => {});
+  if (removedFile) await safeRm(path.join(DATA_DIR, 'plan', req.params.id, removedFile), { force: true }).catch(() => {});
   res.json({ plan: updated });
 });
 
@@ -695,7 +733,7 @@ app.delete('/api/plans/:id', async (req, res) => {
     return true;
   });
   if (!ok) return res.status(404).json({ error: 'not_found' });
-  await fsp.rm(path.join(DATA_DIR, 'plan', req.params.id), { recursive: true, force: true }).catch(() => {});
+  await safeRm(path.join(DATA_DIR, 'plan', req.params.id), { recursive: true, force: true }).catch(() => {});
   res.json({ ok: true });
 });
 
@@ -704,7 +742,7 @@ app.delete('/api/plans/:id', async (req, res) => {
 // ---------------------------------------------------------------------------
 app.get('/api/storage', async (_req, res) => {
   const db = await readDB();
-  const usedBytes = await folderSize(DATA_DIR);
+  const usedBytes = await getUsedBytes();
   res.json({ usedBytes, limitBytes: db.settings.storageLimitBytes });
 });
 

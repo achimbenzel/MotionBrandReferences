@@ -80,6 +80,10 @@ never touched. To back up or move your library, just copy the `data/` folder.
   deploy can't interrupt a save.
 - **Resilient write queue** — writes are serialized, and a single failed write
   (e.g. a full disk) no longer blocks the writes that come after it.
+- **Startup cleanup** — leftover upload temp folders (`data/tmp/`) and stale
+  atomic-write temp files from an earlier crash are swept on boot.
+- **Path containment** — every file delete/move is checked to stay inside
+  `data/`, as a defensive guard against path traversal.
 
 ---
 
@@ -176,7 +180,9 @@ just references — deleting a gallery never deletes the projects.
 ### Storage meter
 The header shows how much of the `data/` folder is used against a limit
 (default **80 GB**). Use the **⋯** next to it to change the limit; usage is the
-real summed size of everything under `data/`.
+real summed size of everything under `data/`, cached briefly and recomputed
+whenever the library changes so the meter never rescans the whole tree on every
+poll.
 
 ### Responsive header
 On wide screens all seven section tabs sit in the pill. On narrow/mobile widths
