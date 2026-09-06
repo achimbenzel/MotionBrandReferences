@@ -18,6 +18,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createZipToStream, validateLibraryZip, extractZip } from './zip.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -231,6 +232,7 @@ const storage = multer.diskStorage({
   filename: (_req, file, cb) => cb(null, `${nanoid(8)}__${sanitize(file.originalname)}`),
 });
 const upload = multer({ storage, limits: { fileSize: 1024 * 1024 * 1024 } }); // 1 GB/file
+const uploadArchive = multer({ storage }); // library import: no per-file size cap
 
 async function moveInto(dir, tmpPath, finalName) {
   await fsp.mkdir(dir, { recursive: true });
@@ -751,6 +753,74 @@ app.patch('/api/storage', async (req, res) => {
   if (!Number.isFinite(limitBytes) || limitBytes <= 0) return res.status(400).json({ error: 'invalid_limit' });
   const settings = await mutateDB((db) => { db.settings.storageLimitBytes = Math.round(limitBytes); return db.settings; });
   res.json({ limitBytes: settings.storageLimitBytes });
+});
+
+// ---------------------------------------------------------------------------
+// Export / import the whole library as a single .zip (STORE + ZIP64).
+// ---------------------------------------------------------------------------
+// Skip working/backup files so the archive holds just the library itself.
+const EXPORT_SKIP = (rel) =>
+  rel === 'db.json.bak'
+  || rel.startsWith('backups/') || rel === 'backups'
+  || rel.startsWith('tmp/') || rel === 'tmp'
+  || /^\.db-.*\.tmp$/.test(rel);
+
+app.get('/api/export', async (_req, res) => {
+  const stamp = new Date().toISOString().slice(0, 10);
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', `attachment; filename="design-reference-${stamp}.zip"`);
+  try {
+    await createZipToStream(DATA_DIR, res, { skip: EXPORT_SKIP });
+    res.end();
+  } catch (err) {
+    console.error('export failed', err);
+    if (!res.headersSent) res.status(500).json({ error: 'export_failed', message: String(err.message || err) });
+    else res.destroy(err);
+  }
+});
+
+// Replace the live library with the freshly-extracted staging dir, preserving
+// backups/ and tmp/ (which holds the staging dir itself).
+async function swapLibrary(stage) {
+  const preserve = new Set(['backups', 'tmp']);
+  for (const name of await fsp.readdir(DATA_DIR)) {
+    if (preserve.has(name)) continue;
+    await safeRm(path.join(DATA_DIR, name), { recursive: true, force: true });
+  }
+  for (const name of await fsp.readdir(stage)) {
+    const src = path.join(stage, name);
+    if (preserve.has(name)) { await safeRm(src, { recursive: true, force: true }); continue; }
+    await fsp.rename(src, path.join(DATA_DIR, name));
+  }
+  invalidateStorage();
+}
+
+app.post('/api/import', uploadArchive.single('archive'), async (req, res) => {
+  if (!req.file) { await cleanupTmp(req); return res.status(400).json({ error: 'archive_required' }); }
+  try {
+    // 1) Validate the archive completely before touching the current library.
+    await validateLibraryZip(req.file.path);
+    // 2) Auto-backup the current library as a safety net (kept in backups/).
+    await fsp.mkdir(BACKUP_DIR, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backup = path.join(BACKUP_DIR, `pre-import-${stamp}.zip`);
+    const ws = fs.createWriteStream(backup);
+    await createZipToStream(DATA_DIR, ws, { skip: EXPORT_SKIP });
+    await new Promise((resolve, reject) => ws.end((err) => (err ? reject(err) : resolve())));
+    // 3) Extract into staging (verifies CRCs) — still non-destructive.
+    const stage = path.join(req.tmpDir, 'stage');
+    await fsp.mkdir(stage, { recursive: true });
+    await extractZip(req.file.path, stage);
+    // 4) Let pending writes finish, then swap the new library into place.
+    await writeChain.catch(() => {});
+    await swapLibrary(stage);
+    await cleanupTmp(req);
+    res.json({ ok: true, backup: path.basename(backup) });
+  } catch (err) {
+    await cleanupTmp(req);
+    console.error('import failed', err);
+    res.status(400).json({ error: 'import_failed', message: String(err.message || err) });
+  }
 });
 
 // ---------------------------------------------------------------------------

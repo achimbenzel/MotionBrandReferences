@@ -149,6 +149,14 @@ export const api = {
     return plan;
   },
 
+  // --- Export / Import ---
+  exportUrl: '/api/export',
+  async importLibrary(file) {
+    const fd = new FormData();
+    fd.append('archive', file);
+    return handle(await fetch('/api/import', { method: 'POST', body: fd }));
+  },
+
   // --- Storage ---
   async storage() {
     return handle(await fetch('/api/storage'));

@@ -45,6 +45,7 @@ data/
 ├── db.json                     # all metadata + galleries + settings (human-readable)
 ├── db.json.bak                 # mirror of the last good db.json (crash safety)
 ├── backups/db-<timestamp>.json # rotating db snapshots (last 10)
+│   └── pre-import-<ts>.zip      # safety backup made before a library import
 ├── motion/<id>/video.mp4       # original video
 │   ├── thumb.webp              # cover frame
 │   └── frames/*.webp           # captured keyframes (WebP = small)
@@ -84,6 +85,24 @@ never touched. To back up or move your library, just copy the `data/` folder.
   atomic-write temp files from an earlier crash are swept on boot.
 - **Path containment** — every file delete/move is checked to stay inside
   `data/`, as a defensive guard against path traversal.
+
+### Export & import your whole library
+
+The storage meter's **⋯** menu has **Export library (.zip)** and **Import
+library (.zip)…**:
+
+- **Export** downloads a single `.zip` containing `db.json` and every file in
+  your library — a complete, portable backup you can move to another machine.
+- **Import** replaces the current library with the contents of such a `.zip`.
+  It's destructive, so it asks for confirmation, **validates the archive first**
+  (it must be a real Design Reference export with a parseable `db.json`), and
+  automatically saves a safety backup of your current library to
+  `data/backups/pre-import-<timestamp>.zip` before swapping anything in.
+
+The ZIP support is written from scratch with no extra dependencies. Files are
+**stored uncompressed** (videos/images/PDFs are already compressed) and streamed,
+and full **ZIP64** is supported, so archives and individual files larger than
+4 GB work. Exports open in any standard unzip tool.
 
 ---
 
