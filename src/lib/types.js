@@ -8,10 +8,23 @@ export const TABS = [
   { key: 'businesscard', label: 'Business Cards' },
   { key: 'color', label: 'Colors' },
   { key: 'imagegallery', label: 'Image Gallery' },
+  { key: 'font', label: 'Fonts' },
 ];
 
 export const TYPE_KEYS = TABS.map((t) => t.key);
 export const isType = (t) => TYPE_KEYS.includes(t);
+
+// Normalize a user-typed URL (add https:// if no scheme) and pull out the host
+// for compact display on font cards.
+export function normalizeUrl(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : `https://${s}`;
+}
+export function hostOf(raw) {
+  try { return new URL(normalizeUrl(raw)).hostname.replace(/^www\./, ''); }
+  catch { return String(raw || '').trim(); }
+}
 
 // The two most common business-card sizes (mm), landscape.
 export const CARD_SIZES = [

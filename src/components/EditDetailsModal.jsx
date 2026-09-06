@@ -9,7 +9,9 @@ export default function EditDetailsModal({ project, onClose, onSaved, focusField
   const [title, setTitle] = useState(project.title || '');
   const [year, setYear] = useState(project.year || '');
   const [category, setCategory] = useState(project.category || '');
+  const [url, setUrl] = useState(project.url || '');
   const [saving, setSaving] = useState(false);
+  const isFont = project.type === 'font';
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape' && !saving) onClose(); };
@@ -21,7 +23,9 @@ export default function EditDetailsModal({ project, onClose, onSaved, focusField
     if (!title.trim() || saving) return;
     setSaving(true);
     try {
-      const updated = await api.update(project.id, { title: title.trim(), year: year.trim(), category: category.trim() });
+      const patch = { title: title.trim(), year: year.trim(), category: category.trim() };
+      if (isFont) patch.url = url.trim();
+      const updated = await api.update(project.id, patch);
       onSaved(updated);
       toast('Project updated');
     } catch (e) {
@@ -44,6 +48,14 @@ export default function EditDetailsModal({ project, onClose, onSaved, focusField
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') save(); }} />
           </div>
+          {isFont && (
+            <div className="field">
+              <label>Website URL</label>
+              <input className="input" type="url" value={url} placeholder="e.g. fonts.google.com"
+                onChange={(e) => setUrl(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') save(); }} />
+            </div>
+          )}
           <div className="row-2">
             <div className="field">
               <label>Year</label>

@@ -1,8 +1,8 @@
 import { useNavigate } from 'react-router-dom';
-import { Play, Palette, Square, X } from 'lucide-react';
+import { Play, Palette, Square, X, Type } from 'lucide-react';
 import { fileUrl } from '../lib/api.js';
 import { fmtTime } from '../lib/media.js';
-import { cardSize, logoSource, logoScale, logoActive } from '../lib/types.js';
+import { cardSize, logoSource, logoScale, logoActive, hostOf } from '../lib/types.js';
 import LogoImage from './LogoImage.jsx';
 
 export default function ProjectCard({ project, onRemove }) {
@@ -18,6 +18,7 @@ export default function ProjectCard({ project, onRemove }) {
   const subtitle = project.category
     || (project.type === 'color' && `${(project.colors || []).length} colors`)
     || (project.type === 'businesscard' && cardSize(project.size).label)
+    || (project.type === 'font' && hostOf(project.url))
     || '';
 
   return (
@@ -37,6 +38,8 @@ export default function ProjectCard({ project, onRemove }) {
             <img src={thumb} alt={project.title || ''} loading="lazy" />
           ) : project.type === 'color' ? (
             <ColorThumb colors={project.colors} />
+          ) : project.type === 'font' ? (
+            <div className="font-plate"><Type size={30} /><span>{hostOf(project.url) || 'Fonts'}</span></div>
           ) : (
             <div className="card-thumb-empty"><Palette size={26} /></div>
           )}

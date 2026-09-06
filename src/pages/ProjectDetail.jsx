@@ -13,6 +13,7 @@ import BrandingDetail from './BrandingDetail.jsx';
 import LogoDetail from './LogoDetail.jsx';
 import BusinessCardDetail from './BusinessCardDetail.jsx';
 import ImageGalleryItemDetail from './ImageGalleryItemDetail.jsx';
+import FontDetail from './FontDetail.jsx';
 import { coverAspect } from '../lib/types.js';
 
 export default function ProjectDetail() {
@@ -67,12 +68,14 @@ export default function ProjectDetail() {
   const Body = {
     motion: MotionDetail, color: ColorDetail, branding: BrandingDetail,
     logo: LogoDetail, businesscard: BusinessCardDetail, imagegallery: ImageGalleryItemDetail,
+    font: FontDetail,
   }[project.type];
 
   const isImage = project.type === 'imagegallery';
   const canSetThumb = project.type === 'motion'
     || (project.type === 'branding' && (project.assets || []).length > 0)
-    || project.type === 'color';
+    || project.type === 'color'
+    || (project.type === 'font' && !!project.shot);
 
   const menuItems = isImage
     ? [{ label: 'Delete', icon: <Trash2 size={15} />, danger: true, onClick: remove }]
@@ -118,7 +121,8 @@ export default function ProjectDetail() {
           assets={project.type === 'branding'
             ? (project.assets || []).map((a) => ({ id: a.id, kind: a.kind, src: fileUrl(project, a.file), name: a.name }))
             : []}
-          image={project.type === 'color' && project.example ? fileUrl(project, project.example) : null}
+          image={project.type === 'color' && project.example ? fileUrl(project, project.example)
+            : project.type === 'font' && project.shot ? fileUrl(project, project.shot) : null}
           initialMeta={project.thumbMeta}
           saving={thumbSaving}
           onDone={saveThumb}

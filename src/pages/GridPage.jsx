@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Filter, X, Film, Palette, FileText, Square, CreditCard, FolderPlus, Images } from 'lucide-react';
+import { Plus, Filter, X, Film, Palette, FileText, Square, CreditCard, FolderPlus, Images, Type } from 'lucide-react';
 import { api, fileUrl } from '../lib/api.js';
 import { lengthTag } from '../lib/media.js';
 import ProjectCard from '../components/ProjectCard.jsx';
@@ -14,6 +14,7 @@ const HEAD = {
   businesscard: { title: 'Business Cards', desc: 'Front & back, in 85×55 or 89×51 mm.', icon: CreditCard },
   color: { title: 'Colors', desc: 'Palettes with automatic hex / rgb / cmyk / pantone.', icon: Palette },
   imagegallery: { title: 'Image Gallery', desc: 'Images only — listed like a moodboard.', icon: Images },
+  font: { title: 'Fonts', desc: 'Websites & sources for free fonts.', icon: Type },
 };
 
 /** Effective, filterable tag list for a project (adds the auto length tag). */

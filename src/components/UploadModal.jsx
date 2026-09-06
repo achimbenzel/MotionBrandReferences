@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Film, Palette, FileText, UploadCloud, Trash2, Scissors, Crop, Square, CreditCard, Images } from 'lucide-react';
+import { X, Film, Palette, FileText, UploadCloud, Trash2, Scissors, Crop, Square, CreditCard, Images, Type } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { captureFrame, lengthTag, fmtTime } from '../lib/media.js';
 import { renderPdfPage, cropToBlob, centerCover } from '../lib/imaging.js';
@@ -23,6 +23,7 @@ const TYPES = [
   { key: 'businesscard', label: 'Business Card', sub: 'Front & back', icon: CreditCard },
   { key: 'color', label: 'Colors', sub: 'Palette', icon: Palette },
   { key: 'imagegallery', label: 'Image Gallery', sub: 'Images only', icon: Images },
+  { key: 'font', label: 'Fonts', sub: 'Website link', icon: Type },
 ];
 
 const BRANDING_SUGGESTIONS = ['Tech', 'Restaurant', 'Fashion', 'Sport', 'Finance', 'Food', 'Retail', 'Minimal', 'Colorful', 'Monochrome', 'Warm', 'Cool'];
@@ -66,6 +67,10 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
   const [galleryItems, setGalleryItems] = useState([]); // [{file,url}]
   const giRef = useRef([]); giRef.current = galleryItems;
 
+  // font — a website link + optional screenshot cover
+  const [fontUrl, setFontUrl] = useState('');
+  const [fontShot, setFontShot] = useState(null); // { file, url }
+
   // cover
   const [coverBlob, setCoverBlob] = useState(null);
   const [coverMeta, setCoverMeta] = useState(null);
@@ -79,6 +84,7 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
   useEffect(() => () => { giRef.current.forEach((it) => URL.revokeObjectURL(it.url)); }, []);
   useEffect(() => () => { if (bcFront?.preview) URL.revokeObjectURL(bcFront.preview); }, [bcFront]);
   useEffect(() => () => { if (bcBack?.preview) URL.revokeObjectURL(bcBack.preview); }, [bcBack]);
+  useEffect(() => () => { if (fontShot?.url) URL.revokeObjectURL(fontShot.url); }, [fontShot]);
 
   const clearCover = () => {
     setCoverBlob(null); setCoverMeta(null);
@@ -129,6 +135,10 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
     const it = prev[i]; if (it) URL.revokeObjectURL(it.url);
     return prev.filter((_, j) => j !== i);
   });
+  const pickFontShot = (file) => {
+    if (!file) return;
+    setFontShot((prev) => { if (prev?.url) URL.revokeObjectURL(prev.url); return { file, url: URL.createObjectURL(file) }; });
+  };
 
   // business card
   const changeSize = (s) => {
@@ -150,15 +160,18 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
     (type === 'branding' && files.length > 0) ||
     (type === 'logo' && logoImage) ||
     (type === 'businesscard' && bcFront) ||
-    (type === 'imagegallery' && galleryItems.length > 0)
+    (type === 'imagegallery' && galleryItems.length > 0) ||
+    (type === 'font' && fontUrl.trim())
   );
 
   const coverAvailable = (type === 'motion' && !!videoSrc)
     || (type === 'branding' && files.length > 0)
-    || (type === 'color' && !!exampleFile);
+    || (type === 'color' && !!exampleFile)
+    || (type === 'font' && !!fontShot);
   const coverCtaLabel = type === 'branding' ? 'Choose cover (PDF page or image)' : 'Frame & crop cover';
   const coverDefaultHint = type === 'branding' ? 'Default: first image, or PDF page 1'
-    : type === 'motion' ? 'Default: current video frame' : 'Default: the example image';
+    : type === 'motion' ? 'Default: current video frame'
+    : type === 'font' ? 'Default: the screenshot' : 'Default: the example image';
   const brandingSources = files.map((f, i) => ({ id: String(i), kind: isPdf(f) ? 'pdf' : 'image', src: f, name: f.name }));
 
   const submit = async () => {
@@ -197,6 +210,10 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
         fd.append('size', bcSize);
         if (bcFront) fd.append('front', bcFront.blob, 'front.webp');
         if (bcBack) fd.append('back', bcBack.blob, 'back.webp');
+      }
+      if (type === 'font') {
+        fd.append('url', fontUrl.trim());
+        if (fontShot) fd.append('shot', fontShot.file);
       }
 
       // Cover thumbnail (types that use a cropped cover).
@@ -400,6 +417,28 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
             </div>
           )}
 
+          {/* ---- Fonts ---- */}
+          {type === 'font' && (
+            <>
+              <div className="field">
+                <label>Website URL</label>
+                <input className="input" type="url" value={fontUrl} onChange={(e) => setFontUrl(e.target.value)}
+                  placeholder="e.g. fonts.google.com" />
+              </div>
+              <div className="field">
+                <label>Screenshot <span className="hint">optional — used as the card cover</span></label>
+                {fontShot ? (
+                  <div className="example-img" style={{ marginBottom: 0, position: 'relative' }}>
+                    <img src={fontShot.url} alt="screenshot" />
+                    <button className="icon-btn" style={{ position: 'absolute', top: 8, right: 8 }} onClick={() => setFontShot(null)}><Trash2 size={16} /></button>
+                  </div>
+                ) : (
+                  <FilePick accept="image/*" onPick={(f) => pickFontShot(f[0])}><UploadCloud size={22} /><div>Select a screenshot</div></FilePick>
+                )}
+              </div>
+            </>
+          )}
+
           {/* Cover (types that use a cropped cover) */}
           {coverAvailable && (
             <div className="field">
@@ -439,7 +478,7 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
         aspect={coverAspect(type)}
         video={type === 'motion' ? videoSrc : null}
         assets={type === 'branding' ? brandingSources : []}
-        image={type === 'color' ? exampleFile : null}
+        image={type === 'color' ? exampleFile : type === 'font' ? fontShot?.file : null}
         initialMeta={coverMeta}
         onDone={acceptCover}
         onClose={() => setStudioOpen(false)}

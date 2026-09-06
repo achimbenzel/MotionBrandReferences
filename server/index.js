@@ -28,7 +28,7 @@ const DIST_DIR = path.join(ROOT, 'dist');
 const PORT = process.env.API_PORT || 4300;
 const IS_PROD = process.env.NODE_ENV === 'production';
 
-const TYPES = new Set(['motion', 'color', 'branding', 'logo', 'businesscard', 'imagegallery']);
+const TYPES = new Set(['motion', 'color', 'branding', 'logo', 'businesscard', 'imagegallery', 'font']);
 const DEFAULT_STORAGE_LIMIT = 80 * 1024 * 1024 * 1024; // 80 GB
 
 // ---------------------------------------------------------------------------
@@ -248,6 +248,16 @@ app.post('/api/projects', upload.any(), async (req, res) => {
       project.thumb = project.image;
     }
 
+    if (type === 'font') {
+      // A font entry is a link to a website for free fonts, plus an optional
+      // screenshot used as the cover (the full shot is kept, like a color's
+      // example; a cropped thumb below overrides it on the card).
+      project.url = (req.body.url || '').trim();
+      const shot = byField('shot');
+      if (shot) project.shot = await moveInto(dir, shot.path, `shot${extOf(shot.originalname) || '.png'}`);
+      if (!project.thumb && project.shot) project.thumb = project.shot;
+    }
+
     if (type === 'businesscard') {
       project.size = req.body.size === '89x51' ? '89x51' : '85x55';
       const front = byField('front');
@@ -276,7 +286,7 @@ app.post('/api/projects', upload.any(), async (req, res) => {
 });
 
 // ---- Update (notes / tags / colors / meta) --------------------------------
-const EDITABLE = ['title', 'year', 'category', 'notes', 'tags', 'colors', 'bg', 'scale', 'variant', 'renditions', 'original', 'rendition'];
+const EDITABLE = ['title', 'year', 'category', 'notes', 'tags', 'colors', 'bg', 'scale', 'variant', 'renditions', 'original', 'rendition', 'url'];
 app.patch('/api/projects/:id', async (req, res) => {
   try {
     const updated = await mutateDB((db) => {

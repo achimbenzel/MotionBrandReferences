@@ -59,9 +59,9 @@ export default function ThumbnailStudio({ type, video, assets = [], image, initi
     return () => { alive = false; };
   }, [active, pdfPage]);
 
-  // Color: jump straight into cropping the example image if present.
+  // Color / Font: jump straight into cropping the provided image if present.
   useEffect(() => {
-    if (type === 'color' && image && step === 'pick') fromImage(image);
+    if ((type === 'color' || type === 'font') && image && step === 'pick') fromImage(image);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -129,7 +129,7 @@ export default function ThumbnailStudio({ type, video, assets = [], image, initi
                 </div>
               )}
 
-              {type === 'color' && !image && (
+              {(type === 'color' || type === 'font') && !image && (
                 <div className="dropzone" onClick={() => uploadRef.current?.click()}>
                   <Upload size={22} />
                   <div>Upload an image to use as the cover</div>
@@ -155,7 +155,7 @@ export default function ThumbnailStudio({ type, video, assets = [], image, initi
         </div>
 
         <div className="modal-foot">
-          {step === 'crop' && !(type === 'color' && !video && assets.length === 0) && (
+          {step === 'crop' && !((type === 'color' || type === 'font') && !video && assets.length === 0) && (
             <button className="btn btn-ghost" onClick={() => { setStep('pick'); }} disabled={saving} style={{ marginRight: 'auto' }}>
               <ChevronLeft size={15} /> Back
             </button>

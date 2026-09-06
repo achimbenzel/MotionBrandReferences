@@ -1,9 +1,9 @@
 # Design Reference
 
-A personal, **local-only** design reference library with six sections —
-**Branding**, **Motion Design**, **Logos**, **Business Cards**, **Colors** and
-**Image Gallery** — plus a **Plan** mode for planning new projects. Cards with
-thumbnails and text below, styled after
+A personal, **local-only** design reference library with seven sections —
+**Branding**, **Motion Design**, **Logos**, **Business Cards**, **Colors**,
+**Image Gallery** and **Fonts** — plus a **Plan** mode for planning new
+projects. Cards with thumbnails and text below, styled after
 [achimbenzel.com/de/work](https://achimbenzel.com/de/work). Each section can be
 viewed as **All** (all projects) or **Galleries** (named collections you create,
 e.g. "Green Tech Companies"). A storage meter in the header sums the `data/`
@@ -51,6 +51,7 @@ data/
 ├── logo/<id>/logo.svg              # one logo image (SVG/PNG), recoloured live
 ├── businesscard/<id>/front.webp, back.webp
 ├── imagegallery/<id>/image.<ext>   # one image per item
+├── font/<id>/shot.<ext>            # optional screenshot of a free-font site
 └── plan/<id>/                      # Plan-mode plans
     ├── banner.<ext>, avatar.<ext>  # Notion-style banner + profile image
     └── moodboard/<mbId>/*.<ext>    # one folder per moodboard
@@ -135,6 +136,16 @@ ratio; click one for fullscreen. Each image's **⋯** menu deletes it or adds it
 to a gallery (existing or new). Like every section it has the Alle / Galerien
 toggle.
 
+### Fonts
+A bookmark collection of **websites where you can get free fonts** (Google
+Fonts, DaFont, Velvetyne…). Each entry is a **link**: give it a name and a
+**URL**, and optionally upload a **screenshot** as the cover (frame & crop it
+like any other cover). Cards show the screenshot — or, without one, a tile with
+the site's domain — plus the domain as subtitle. Opening an entry shows the
+screenshot as a big **“Visit site”** button, the link, tags and a notes field;
+the URL is edited from the **Edit ⋯** menu. Like every section it has the All /
+Galleries toggle.
+
 ### Galleries (All / Galleries)
 Every section has an **All / Galleries** toggle. Under **Galleries** you create
 named collections (e.g. "Green Tech Companies"), open one, and add or remove
@@ -148,7 +159,7 @@ The header shows how much of the `data/` folder is used against a limit
 real summed size of everything under `data/`.
 
 ### Responsive header
-On wide screens all six section tabs sit in the pill. On narrow/mobile widths
+On wide screens all seven section tabs sit in the pill. On narrow/mobile widths
 they collapse into a **hamburger menu** whose dropdown lists all sections
 (current one checked). The toggle is icon-only so the pill's size and position
 never shift between sections, and the dropdown always renders above the storage
@@ -157,12 +168,14 @@ the **+** creates a new plan.
 
 ### Covers & editing (all types)
 - **Crop & zoom the cover:** when you set a thumbnail — a Motion frame, a
-  Branding PDF page or image, or a Color image — drag to reposition and use the
-  zoom slider to frame exactly what shows on the card.
+  Branding PDF page or image, a Color image, or a Font screenshot — drag to
+  reposition and use the zoom slider to frame exactly what shows on the card.
 - **Edit menu:** every project has an **Edit ⋯** menu (top-right) to **rename**,
-  edit year/category, **change the cover**, or **delete** — no bare delete icon.
+  edit year/category (and the URL for Fonts), **change the cover**, or
+  **delete** — no bare delete icon.
 - **Notes:** every project type (Branding, Motion, Logos, Business Cards,
-  Colors) has an auto-saved **Notes** field, shown at ~1.5× the normal text size.
+  Colors, Fonts) has an auto-saved **Notes** field, shown at ~1.5× the normal
+  text size.
 
 > **Note on conversions:** HEX ⇄ RGB is exact. CMYK is the standard device-neutral
 > approximation. **Pantone has no exact formula** to/from other spaces, so it is a
