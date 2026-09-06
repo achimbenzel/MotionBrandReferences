@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, PencilRuler, CalendarRange, Images } from 'lucide-react';
 import { api, planFileUrl } from '../lib/api.js';
+import { gradientCss } from '../lib/types.js';
 
 const fmtRange = (s, e) => {
   if (s && e) return `${s} – ${e}`;
@@ -36,11 +37,13 @@ export default function PlansPage({ reloadKey, onNewPlan }) {
             {plans.map((p) => {
               const imgCount = (p.moodboards || []).reduce((n, mb) => n + (mb.images || []).length, 0);
               const banner = p.banner ? planFileUrl(p, p.banner) : null;
+              const grad = !banner ? gradientCss(p.bannerGradient) : null;
+              const bannerBg = banner ? `url("${banner}")` : grad || null;
               const avatar = p.avatar ? planFileUrl(p, p.avatar) : null;
               return (
                 <div key={p.id} className="card plan-card" onClick={() => navigate(`/plan/${p.id}`)}>
                   <div className="plan-card-head">
-                    <div className={`plan-card-banner ${banner ? '' : 'empty'}`} style={banner ? { backgroundImage: `url("${banner}")` } : undefined} />
+                    <div className={`plan-card-banner ${bannerBg ? '' : 'empty'}`} style={bannerBg ? { backgroundImage: bannerBg } : undefined} />
                     <div className="plan-card-avatar">
                       {avatar ? <img src={avatar} alt="" loading="lazy" /> : <span>{(p.name || '?').charAt(0).toUpperCase()}</span>}
                     </div>

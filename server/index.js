@@ -212,7 +212,9 @@ function normalizePlan(plan) {
   }
   delete plan.moodboard;
   if (!Array.isArray(plan.milestones)) plan.milestones = [];
+  if (!Array.isArray(plan.todos)) plan.todos = [];
   if (!('banner' in plan)) plan.banner = null;
+  if (!('bannerGradient' in plan)) plan.bannerGradient = null;
   if (!('avatar' in plan)) plan.avatar = null;
   return plan;
 }
@@ -590,7 +592,7 @@ app.delete('/api/galleries/:id', async (req, res) => {
 // ---------------------------------------------------------------------------
 // Plans (Plan mode) — a plan has a moodboard, text info and a timeframe.
 // ---------------------------------------------------------------------------
-const PLAN_EDITABLE = ['name', 'info', 'start', 'end', 'milestones'];
+const PLAN_EDITABLE = ['name', 'info', 'start', 'end', 'milestones', 'todos', 'bannerGradient'];
 
 app.get('/api/plans', async (_req, res) => {
   const db = await readDB();
@@ -613,8 +615,10 @@ app.post('/api/plans', async (req, res) => {
     start: '',
     end: '',
     banner: null,
+    bannerGradient: null,
     avatar: null,
     milestones: [],
+    todos: [],
     moodboards: [{ id: nanoid(6), name: 'Moodboard', collapsed: false, images: [] }],
     createdAt: Date.now(),
   };
@@ -643,14 +647,14 @@ for (const kind of ['banner', 'avatar']) {
       if (!req.file) return res.status(400).json({ error: 'file_required' });
       const dir = path.join(DATA_DIR, 'plan', plan.id);
       const stored = await moveInto(dir, req.file.path, `${kind}${extOf(req.file.originalname) || '.png'}`);
-      const updated = await mutateDB((d) => { const p = d.plans.find((x) => x.id === plan.id); p[kind] = stored; return p; });
+      const updated = await mutateDB((d) => { const p = d.plans.find((x) => x.id === plan.id); p[kind] = stored; if (kind === 'banner') p.bannerGradient = null; return p; });
       await cleanupTmp(req);
       res.json({ plan: updated });
     } catch (err) { await cleanupTmp(req); res.status(500).json({ error: `${kind}_failed`, message: String(err.message || err) }); }
   });
   app.delete(`/api/plans/:id/${kind}`, async (req, res) => {
     let file = null;
-    const updated = await mutateDB((db) => { const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null; file = p[kind]; p[kind] = null; return p; });
+    const updated = await mutateDB((db) => { const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null; file = p[kind]; p[kind] = null; if (kind === 'banner') p.bannerGradient = null; return p; });
     if (!updated) return res.status(404).json({ error: 'not_found' });
     if (file) await safeRm(path.join(DATA_DIR, 'plan', req.params.id, file), { force: true }).catch(() => {});
     res.json({ plan: updated });

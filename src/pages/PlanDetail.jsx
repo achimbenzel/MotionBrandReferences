@@ -3,8 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Trash2, Pencil, MoreHorizontal, CalendarRange, Images, StickyNote,
   UploadCloud, X, Plus, Check, ChevronDown, ChevronRight, Image as ImageIcon, Camera,
+  ListChecks,
 } from 'lucide-react';
 import { api, planFileUrl } from '../lib/api.js';
+import { PLAN_GRADIENTS, gradientCss } from '../lib/types.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
 import Lightbox from '../components/Lightbox.jsx';
@@ -20,12 +22,15 @@ export default function PlanDetail() {
   const [error, setError] = useState(null);
   const [info, setInfo] = useState('');
   const [milestones, setMilestones] = useState([]);
+  const [todos, setTodos] = useState([]);
   const [lightbox, setLightbox] = useState(null); // { items, index }
   const [renaming, setRenaming] = useState(false);
   const [newMb, setNewMb] = useState(false);
   const [renameMb, setRenameMb] = useState(null); // moodboard object
+  const [bannerPicker, setBannerPicker] = useState(false);
   const skipInfo = useRef(true);
   const skipMs = useRef(true);
+  const skipTodos = useRef(true);
   const bannerRef = useRef(null);
   const avatarRef = useRef(null);
   const imgRef = useRef(null);
@@ -33,10 +38,10 @@ export default function PlanDetail() {
 
   useEffect(() => {
     let alive = true;
-    setPlan(null); setError(null); skipInfo.current = true; skipMs.current = true;
+    setPlan(null); setError(null); skipInfo.current = true; skipMs.current = true; skipTodos.current = true;
     api.getPlan(id).then((p) => {
       if (!alive) return;
-      setPlan(p); setInfo(p.info || ''); setMilestones(p.milestones || []);
+      setPlan(p); setInfo(p.info || ''); setMilestones(p.milestones || []); setTodos(p.todos || []);
     }).catch((e) => { if (alive) setError(e.message); });
     return () => { alive = false; };
   }, [id]);
@@ -54,6 +59,12 @@ export default function PlanDetail() {
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [milestones]);
+  useEffect(() => {
+    if (skipTodos.current) { skipTodos.current = false; return; }
+    const t = setTimeout(() => api.updatePlan(id, { todos }).then(setPlan).catch((e) => toast(`Could not save: ${e.message}`, 'error')), 500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todos]);
 
   const patch = (p) => api.updatePlan(id, p).then(setPlan).catch((e) => toast(`Could not save: ${e.message}`, 'error'));
 
@@ -62,6 +73,21 @@ export default function PlanDetail() {
     try { setPlan(await api.setPlanImage(id, kind, file)); } catch (e) { toast(`Upload failed: ${e.message}`, 'error'); }
   };
   const clearImage = async (kind) => { try { setPlan(await api.removePlanImage(id, kind)); } catch (e) { toast(`Failed: ${e.message}`, 'error'); } };
+
+  // Banner: a preset gradient or a custom image (mutually exclusive).
+  const pickGradient = async (gid) => {
+    try {
+      if (plan.banner) await api.removePlanImage(id, 'banner');
+      setPlan(await api.updatePlan(id, { bannerGradient: gid }));
+      setBannerPicker(false);
+    } catch (e) { toast(`Failed: ${e.message}`, 'error'); }
+  };
+  const removeBanner = async () => {
+    try {
+      if (plan.banner) setPlan(await api.removePlanImage(id, 'banner'));
+      else setPlan(await api.updatePlan(id, { bannerGradient: null }));
+    } catch (e) { toast(`Failed: ${e.message}`, 'error'); }
+  };
 
   const remove = async () => {
     if (!window.confirm(`Delete plan “${plan.name}”? This can’t be undone.`)) return;
@@ -73,6 +99,11 @@ export default function PlanDetail() {
   const addMilestone = () => setMilestones((m) => [...m, { id: rid(), title: '', date: '', done: false }]);
   const editMilestone = (mid, patchObj) => setMilestones((m) => m.map((x) => (x.id === mid ? { ...x, ...patchObj } : x)));
   const removeMilestone = (mid) => setMilestones((m) => m.filter((x) => x.id !== mid));
+
+  // To-dos
+  const addTodo = () => setTodos((t) => [...t, { id: rid(), text: '', done: false }]);
+  const editTodo = (tid, patchObj) => setTodos((t) => t.map((x) => (x.id === tid ? { ...x, ...patchObj } : x)));
+  const removeTodo = (tid) => setTodos((t) => t.filter((x) => x.id !== tid));
 
   // Moodboards
   const addImagesFor = (mbId) => { pendingMb.current = mbId; imgRef.current?.click(); };
@@ -91,6 +122,9 @@ export default function PlanDetail() {
   if (!plan) return <div className="detail"><div className="spinner" /></div>;
 
   const bannerUrl = plan.banner ? planFileUrl(plan, plan.banner) : null;
+  const bannerGrad = !bannerUrl ? gradientCss(plan.bannerGradient) : null;
+  const hasBanner = !!(bannerUrl || bannerGrad);
+  const bannerStyle = bannerUrl ? { backgroundImage: `url("${bannerUrl}")` } : bannerGrad ? { backgroundImage: bannerGrad } : undefined;
   const avatarUrl = plan.avatar ? planFileUrl(plan, plan.avatar) : null;
 
   return (
@@ -108,11 +142,26 @@ export default function PlanDetail() {
       </div>
 
       {/* Notion-style banner + avatar */}
-      <div className={`plan-banner ${bannerUrl ? '' : 'empty'}`} style={bannerUrl ? { backgroundImage: `url("${bannerUrl}")` } : undefined}>
+      <div className={`plan-banner ${hasBanner ? '' : 'empty'}`} style={bannerStyle}>
         <div className="plan-banner-actions">
-          <button className="btn btn-sm" onClick={() => bannerRef.current?.click()}><ImageIcon size={15} /> {bannerUrl ? 'Change banner' : 'Add banner'}</button>
-          {bannerUrl && <button className="btn btn-sm btn-ghost" onClick={() => clearImage('banner')}>Remove</button>}
+          <button className="btn btn-sm" onClick={() => setBannerPicker((v) => !v)}><ImageIcon size={15} /> {hasBanner ? 'Change banner' : 'Add banner'}</button>
+          {hasBanner && <button className="btn btn-sm btn-ghost" onClick={removeBanner}>Remove</button>}
         </div>
+        {bannerPicker && <div className="banner-picker-backdrop" onClick={() => setBannerPicker(false)} />}
+        {bannerPicker && (
+          <div className="banner-picker" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="banner-picker-head">Gradients</div>
+            <div className="banner-picker-grid">
+              {PLAN_GRADIENTS.map((g) => (
+                <button key={g.id} className={`banner-swatch ${plan.bannerGradient === g.id && !bannerUrl ? 'on' : ''}`}
+                  style={{ backgroundImage: g.css }} title={g.id} onClick={() => pickGradient(g.id)} />
+              ))}
+            </div>
+            <button className="btn btn-sm banner-picker-upload" onClick={() => { setBannerPicker(false); bannerRef.current?.click(); }}>
+              <UploadCloud size={14} /> Upload custom image…
+            </button>
+          </div>
+        )}
       </div>
       <div className="plan-idrow">
         <button className="plan-avatar" onClick={() => avatarRef.current?.click()} title="Change profile image">
@@ -210,6 +259,25 @@ export default function PlanDetail() {
         <div className="section-head"><h2><StickyNote size={16} /> Information</h2></div>
         <textarea className="textarea notes-textarea" value={info} onChange={(e) => setInfo(e.target.value)}
           placeholder="Concept, goals, references, requirements…" />
+      </div>
+
+      {/* To-dos */}
+      <div className="section">
+        <div className="section-head">
+          <h2><ListChecks size={16} /> To-dos {todos.length > 0 && <span className="count">{todos.filter((t) => t.done).length}/{todos.length}</span>}</h2>
+        </div>
+        <div className="milestones">
+          {todos.map((t) => (
+            <div className={`milestone ${t.done ? 'done' : ''}`} key={t.id}>
+              <button className={`ms-check ${t.done ? 'on' : ''}`} onClick={() => editTodo(t.id, { done: !t.done })} title="Toggle done">
+                {t.done && <Check size={13} />}
+              </button>
+              <input className="ms-title input" value={t.text} placeholder="To-do…" onChange={(e) => editTodo(t.id, { text: e.target.value })} />
+              <button className="ms-del icon-btn" onClick={() => removeTodo(t.id)}><X size={14} /></button>
+            </div>
+          ))}
+          <button className="btn btn-ghost btn-sm ms-add" onClick={addTodo}><Plus size={15} /> Add to-do</button>
+        </div>
       </div>
 
       {lightbox && (

@@ -115,14 +115,16 @@ right) switches between two modes:
   Business Cards, Colors, Image Gallery).
 - **Plan** — plan new projects. The **+** creates a new plan; plans are listed
   in a grid like galleries. Each **plan** has:
-  - a **Notion-style banner and profile image** you can pick — both also show on
-    the plan's card in the grid,
+  - a **Notion-style banner** — pick a **preset gradient** or upload a **custom
+    image** — plus a **profile image**; both also show on the plan's card in the
+    grid,
   - a **timeframe** (start / end date) with **checkable milestones** — each has a
     title, an optional date and a checkbox that strikes it through when done,
   - **multiple moodboards** (e.g. one for colours, one for UI): each is
     **collapsible** and holds its own images, and can be renamed or removed from
     its own **⋯** menu,
-  - a free‑text **Information** field (auto-saved).
+  - a free‑text **Information** field and a **To-dos** checklist (add items and
+    tick them off) — both auto-saved.
 
   Following the general rule below, a plan's title is only editable via the
   **⋯** menu (top-right, next to **Edit**) — there is no bare Delete button.

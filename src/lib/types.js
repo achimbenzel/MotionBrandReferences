@@ -14,6 +14,23 @@ export const TABS = [
 export const TYPE_KEYS = TABS.map((t) => t.key);
 export const isType = (t) => TYPE_KEYS.includes(t);
 
+// Preset banner gradients for Plan mode (id is stored; css is rendered).
+export const PLAN_GRADIENTS = [
+  { id: 'dusk', css: 'linear-gradient(120deg, #6a11cb, #2575fc)' },
+  { id: 'sunset', css: 'linear-gradient(120deg, #ff6a88, #ff9a44)' },
+  { id: 'aurora', css: 'linear-gradient(120deg, #00c6a7, #1e4fd6)' },
+  { id: 'peach', css: 'linear-gradient(120deg, #f6d365, #fda085)' },
+  { id: 'grape', css: 'linear-gradient(120deg, #a18cd1, #fbc2eb)' },
+  { id: 'ocean', css: 'linear-gradient(120deg, #2193b0, #6dd5ed)' },
+  { id: 'ember', css: 'linear-gradient(120deg, #f83600, #f9d423)' },
+  { id: 'forest', css: 'linear-gradient(120deg, #134e5e, #71b280)' },
+  { id: 'berry', css: 'linear-gradient(120deg, #c31432, #240b36)' },
+  { id: 'slate', css: 'linear-gradient(120deg, #434343, #000000)' },
+  { id: 'mint', css: 'linear-gradient(120deg, #43e97b, #38f9d7)' },
+  { id: 'candy', css: 'linear-gradient(120deg, #ff5f6d, #ffc371)' },
+];
+export const gradientCss = (id) => PLAN_GRADIENTS.find((g) => g.id === id)?.css || null;
+
 // Normalize a user-typed URL (add https:// if no scheme) and pull out the host
 // for compact display on font cards.
 export function normalizeUrl(raw) {
