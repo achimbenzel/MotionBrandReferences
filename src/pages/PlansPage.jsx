@@ -35,7 +35,7 @@ export default function PlansPage({ reloadKey, onNewPlan }) {
         plans.length ? (
           <div className="grid">
             {plans.map((p) => {
-              const imgCount = (p.moodboards || []).reduce((n, mb) => n + (mb.images || []).length, 0);
+              const imgCount = (p.blocks || []).reduce((n, b) => n + (b.images || []).length + (b.files || []).length, 0);
               const banner = p.banner ? planFileUrl(p, p.banner) : null;
               const grad = !banner ? gradientCss(p.bannerGradient) : null;
               const bannerBg = banner ? `url("${banner}")` : grad || null;

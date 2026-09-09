@@ -13,7 +13,7 @@ const fmt = (bytes) => {
   return `${Math.max(0, Math.round(bytes / 1024))} KB`;
 };
 
-export default function StorageMeter({ refreshKey }) {
+export default function StorageMeter({ refreshKey, menuUp = false }) {
   const toast = useToast();
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -79,6 +79,7 @@ export default function StorageMeter({ refreshKey }) {
         </div>
         <Menu
           align="right"
+          direction={menuUp ? 'up' : 'down'}
           trigger={<button className="icon-btn storage-dots" title="Storage options"><MoreVertical size={15} /></button>}
           items={[
             { label: 'Edit limit', onClick: openEdit },

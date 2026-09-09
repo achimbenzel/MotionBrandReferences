@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
  * array of { label, icon, onClick, danger } (or { separator: true }).
  * `align` = 'left' | 'right'.
  */
-export default function Menu({ trigger, items, align = 'right' }) {
+export default function Menu({ trigger, items, align = 'right', direction = 'down' }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -22,7 +22,7 @@ export default function Menu({ trigger, items, align = 'right' }) {
     <div className="menu-wrap" ref={ref}>
       <span onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}>{trigger}</span>
       {open && (
-        <div className={`menu ${align}`} role="menu">
+        <div className={`menu ${align} ${direction === 'up' ? 'up' : ''}`} role="menu">
           {items.map((it, i) => it.separator ? (
             <div key={i} className="menu-sep" />
           ) : (

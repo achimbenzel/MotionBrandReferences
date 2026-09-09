@@ -238,23 +238,44 @@ const extOf = (name) => {
   return e && e.length <= 6 ? e : '';
 };
 
-// Bring a plan up to the current shape (multiple moodboards, milestones,
-// banner/avatar), migrating the older single-moodboard array in place.
+const BLOCK_TYPES = new Set(['moodboard', 'text', 'todos', 'files']);
+const BLOCK_TITLES = { moodboard: 'Moodboard', text: 'Text', todos: 'To-dos', files: 'Files' };
+
+function normalizeBlock(b) {
+  if (!b || typeof b !== 'object') return null;
+  if (!BLOCK_TYPES.has(b.type)) return null;
+  if (!b.id) b.id = nanoid(8);
+  if (typeof b.title !== 'string') b.title = BLOCK_TITLES[b.type];
+  if (b.type === 'moodboard') {
+    if (typeof b.collapsed !== 'boolean') b.collapsed = false;
+    if (!Array.isArray(b.images)) b.images = [];
+  } else if (b.type === 'text') {
+    if (typeof b.content !== 'string') b.content = '';
+  } else if (b.type === 'todos') {
+    if (!Array.isArray(b.items)) b.items = [];
+  } else if (b.type === 'files') {
+    if (!Array.isArray(b.files)) b.files = [];
+    if (!('cover' in b)) b.cover = null;
+  }
+  return b;
+}
+
+// Bring a plan up to the current shape. Sections are now a `blocks` array;
+// older plans (moodboards / info / todos fields) are migrated into blocks.
 function normalizePlan(plan) {
   if (!plan) return plan;
-  if (!Array.isArray(plan.moodboards)) {
-    const imgs = Array.isArray(plan.moodboard) ? plan.moodboard : [];
-    plan.moodboards = [{ id: nanoid(6), name: 'Moodboard', collapsed: false, images: imgs }];
+  if (!Array.isArray(plan.blocks)) {
+    const blocks = [];
+    for (const mb of (Array.isArray(plan.moodboards) ? plan.moodboards : [])) {
+      blocks.push({ id: mb.id || nanoid(8), type: 'moodboard', title: mb.name || 'Moodboard', collapsed: !!mb.collapsed, images: Array.isArray(mb.images) ? mb.images : [] });
+    }
+    if (typeof plan.info === 'string' && plan.info.trim()) blocks.push({ id: nanoid(8), type: 'text', title: 'Information', content: plan.info });
+    if (Array.isArray(plan.todos) && plan.todos.length) blocks.push({ id: nanoid(8), type: 'todos', title: 'To-dos', items: plan.todos });
+    plan.blocks = blocks;
   }
-  for (const mb of plan.moodboards) {
-    if (!mb.id) mb.id = nanoid(6);
-    if (typeof mb.name !== 'string') mb.name = 'Moodboard';
-    if (typeof mb.collapsed !== 'boolean') mb.collapsed = false;
-    if (!Array.isArray(mb.images)) mb.images = [];
-  }
-  delete plan.moodboard;
+  plan.blocks = plan.blocks.map(normalizeBlock).filter(Boolean);
+  delete plan.moodboard; delete plan.moodboards; delete plan.info; delete plan.todos;
   if (!Array.isArray(plan.milestones)) plan.milestones = [];
-  if (!Array.isArray(plan.todos)) plan.todos = [];
   if (!('banner' in plan)) plan.banner = null;
   if (!('bannerGradient' in plan)) plan.bannerGradient = null;
   if (!('avatar' in plan)) plan.avatar = null;
@@ -638,9 +659,9 @@ app.delete('/api/galleries/:id', async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Plans (Plan mode) — a plan has a moodboard, text info and a timeframe.
+// Plans (Work mode) — a header + timeframe, plus a list of content blocks.
 // ---------------------------------------------------------------------------
-const PLAN_EDITABLE = ['name', 'info', 'start', 'end', 'milestones', 'todos', 'bannerGradient', 'avatarEmoji'];
+const PLAN_EDITABLE = ['name', 'start', 'end', 'milestones', 'bannerGradient', 'avatarEmoji'];
 
 app.get('/api/plans', async (_req, res) => {
   const db = await readDB();
@@ -659,7 +680,6 @@ app.post('/api/plans', async (req, res) => {
   const plan = {
     id: nanoid(10),
     name: (req.body.name || 'Untitled plan').trim(),
-    info: '',
     start: '',
     end: '',
     banner: null,
@@ -667,8 +687,7 @@ app.post('/api/plans', async (req, res) => {
     avatar: null,
     avatarEmoji: null,
     milestones: [],
-    todos: [],
-    moodboards: [{ id: nanoid(6), name: 'Moodboard', collapsed: false, images: [] }],
+    blocks: [], // a new project is empty — blocks are added by the user
     createdAt: Date.now(),
   };
   await mutateDB((db) => { db.plans.push(plan); });
@@ -710,69 +729,124 @@ for (const kind of ['banner', 'avatar']) {
   });
 }
 
-// Moodboards (multiple per plan)
-app.post('/api/plans/:id/moodboards', async (req, res) => {
-  const mb = { id: nanoid(6), name: (req.body.name || 'Moodboard').trim(), collapsed: false, images: [] };
-  const updated = await mutateDB((db) => { const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null; p.moodboards.push(mb); return p; });
+// --- Content blocks (moodboard / text / todos / files) ---
+const findBlock = (plan, blockId) => (plan && Array.isArray(plan.blocks)) ? plan.blocks.find((b) => b.id === blockId) : null;
+const blockDir = (planId, blockId) => path.join(DATA_DIR, 'plan', planId, 'blocks', blockId);
+
+app.post('/api/plans/:id/blocks', async (req, res) => {
+  const type = req.body.type;
+  if (!BLOCK_TYPES.has(type)) return res.status(400).json({ error: 'invalid_block_type' });
+  const base = { id: nanoid(8), type, title: BLOCK_TITLES[type] };
+  const block = type === 'moodboard' ? { ...base, collapsed: false, images: [] }
+    : type === 'text' ? { ...base, content: '' }
+      : type === 'todos' ? { ...base, items: [] }
+        : { ...base, cover: null, files: [] };
+  const updated = await mutateDB((db) => { const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null; p.blocks.push(block); return p; });
   if (!updated) return res.status(404).json({ error: 'not_found' });
-  res.status(201).json({ plan: updated, moodboard: mb });
+  res.status(201).json({ plan: updated, block });
 });
 
-app.patch('/api/plans/:id/moodboards/:mbId', async (req, res) => {
+// Update only the content/label fields — never the file arrays.
+const BLOCK_EDITABLE = ['title', 'collapsed', 'content', 'items'];
+app.patch('/api/plans/:id/blocks/:blockId', async (req, res) => {
   const updated = await mutateDB((db) => {
     const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null;
-    const mb = p.moodboards.find((m) => m.id === req.params.mbId); if (!mb) return null;
-    if (typeof req.body.name === 'string') mb.name = req.body.name.trim() || mb.name;
-    if (typeof req.body.collapsed === 'boolean') mb.collapsed = req.body.collapsed;
+    const b = findBlock(p, req.params.blockId); if (!b) return null;
+    for (const k of BLOCK_EDITABLE) if (k in req.body) b[k] = req.body[k];
     return p;
   });
   if (!updated) return res.status(404).json({ error: 'not_found' });
   res.json({ plan: updated });
 });
 
-app.delete('/api/plans/:id/moodboards/:mbId', async (req, res) => {
+app.post('/api/plans/:id/blocks/:blockId/move', async (req, res) => {
+  const dir = req.body.dir === 'up' ? -1 : 1;
   const updated = await mutateDB((db) => {
     const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null;
-    const idx = p.moodboards.findIndex((m) => m.id === req.params.mbId); if (idx === -1) return null;
-    p.moodboards.splice(idx, 1);
+    const i = p.blocks.findIndex((b) => b.id === req.params.blockId); if (i === -1) return null;
+    const j = i + dir; if (j < 0 || j >= p.blocks.length) return p;
+    [p.blocks[i], p.blocks[j]] = [p.blocks[j], p.blocks[i]];
     return p;
   });
   if (!updated) return res.status(404).json({ error: 'not_found' });
-  await safeRm(path.join(DATA_DIR, 'plan', req.params.id, 'moodboard', req.params.mbId), { recursive: true, force: true }).catch(() => {});
   res.json({ plan: updated });
 });
 
-app.post('/api/plans/:id/moodboards/:mbId/images', upload.array('images', 50), async (req, res) => {
+app.delete('/api/plans/:id/blocks/:blockId', async (req, res) => {
+  const updated = await mutateDB((db) => {
+    const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null;
+    const i = p.blocks.findIndex((b) => b.id === req.params.blockId); if (i === -1) return null;
+    p.blocks.splice(i, 1);
+    return p;
+  });
+  if (!updated) return res.status(404).json({ error: 'not_found' });
+  await safeRm(blockDir(req.params.id, req.params.blockId), { recursive: true, force: true }).catch(() => {});
+  await safeRm(path.join(DATA_DIR, 'plan', req.params.id, 'moodboard', req.params.blockId), { recursive: true, force: true }).catch(() => {});
+  res.json({ plan: updated });
+});
+
+// Add files to a moodboard (images) or a files block.
+app.post('/api/plans/:id/blocks/:blockId/files', upload.array('files', 50), async (req, res) => {
   try {
     const db = await readDB();
     const plan = db.plans.find((p) => p.id === req.params.id);
-    const mb0 = plan && plan.moodboards.find((m) => m.id === req.params.mbId);
-    if (!plan || !mb0) { await cleanupTmp(req); return res.status(404).json({ error: 'not_found' }); }
-    const dir = path.join(DATA_DIR, 'plan', plan.id, 'moodboard', mb0.id);
+    const b0 = findBlock(plan, req.params.blockId);
+    if (!plan || !b0 || (b0.type !== 'moodboard' && b0.type !== 'files')) { await cleanupTmp(req); return res.status(404).json({ error: 'not_found' }); }
+    const dir = blockDir(plan.id, b0.id);
     const added = [];
     for (const f of (req.files || [])) {
-      const imgId = nanoid(8);
-      const stored = await moveInto(dir, f.path, `${imgId}${extOf(f.originalname) || '.png'}`);
-      added.push({ id: imgId, file: `moodboard/${mb0.id}/${stored}` });
+      const fid = nanoid(8);
+      const stored = await moveInto(dir, f.path, `${fid}${extOf(f.originalname) || ''}`);
+      added.push({ id: fid, file: `blocks/${b0.id}/${stored}`, name: f.originalname, size: f.size });
     }
     const updated = await mutateDB((d) => {
-      const mb = d.plans.find((x) => x.id === plan.id).moodboards.find((m) => m.id === mb0.id);
-      mb.images = [...(mb.images || []), ...added];
+      const b = findBlock(d.plans.find((x) => x.id === plan.id), b0.id);
+      if (b.type === 'moodboard') b.images = [...(b.images || []), ...added.map((a) => ({ id: a.id, file: a.file }))];
+      else b.files = [...(b.files || []), ...added];
       return d.plans.find((x) => x.id === plan.id);
     });
     await cleanupTmp(req);
     res.status(201).json({ plan: updated });
-  } catch (err) { await cleanupTmp(req); res.status(500).json({ error: 'moodboard_failed', message: String(err.message || err) }); }
+  } catch (err) { await cleanupTmp(req); res.status(500).json({ error: 'files_failed', message: String(err.message || err) }); }
 });
 
-app.delete('/api/plans/:id/moodboards/:mbId/images/:imgId', async (req, res) => {
+app.delete('/api/plans/:id/blocks/:blockId/files/:fileId', async (req, res) => {
   let removedFile = null;
   const updated = await mutateDB((db) => {
     const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null;
-    const mb = p.moodboards.find((m) => m.id === req.params.mbId); if (!mb) return null;
-    const idx = mb.images.findIndex((im) => im.id === req.params.imgId); if (idx === -1) return null;
-    removedFile = mb.images[idx].file;
-    mb.images.splice(idx, 1);
+    const b = findBlock(p, req.params.blockId); if (!b) return null;
+    const arr = b.type === 'moodboard' ? b.images : b.files; if (!Array.isArray(arr)) return null;
+    const idx = arr.findIndex((f) => f.id === req.params.fileId); if (idx === -1) return null;
+    removedFile = arr[idx].file;
+    arr.splice(idx, 1);
+    return p;
+  });
+  if (!updated) return res.status(404).json({ error: 'not_found' });
+  if (removedFile) await safeRm(path.join(DATA_DIR, 'plan', req.params.id, removedFile), { force: true }).catch(() => {});
+  res.json({ plan: updated });
+});
+
+// Example/preview image (cover) for a files block.
+app.post('/api/plans/:id/blocks/:blockId/cover', upload.single('cover'), async (req, res) => {
+  try {
+    const db = await readDB();
+    const plan = db.plans.find((p) => p.id === req.params.id);
+    const b0 = findBlock(plan, req.params.blockId);
+    if (!plan || !b0 || b0.type !== 'files') { await cleanupTmp(req); return res.status(404).json({ error: 'not_found' }); }
+    if (!req.file) return res.status(400).json({ error: 'file_required' });
+    const stored = await moveInto(blockDir(plan.id, b0.id), req.file.path, `cover${extOf(req.file.originalname) || '.png'}`);
+    const updated = await mutateDB((d) => { findBlock(d.plans.find((x) => x.id === plan.id), b0.id).cover = `blocks/${b0.id}/${stored}`; return d.plans.find((x) => x.id === plan.id); });
+    await cleanupTmp(req);
+    res.json({ plan: updated });
+  } catch (err) { await cleanupTmp(req); res.status(500).json({ error: 'cover_failed', message: String(err.message || err) }); }
+});
+
+app.delete('/api/plans/:id/blocks/:blockId/cover', async (req, res) => {
+  let removedFile = null;
+  const updated = await mutateDB((db) => {
+    const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null;
+    const b = findBlock(p, req.params.blockId); if (!b || b.type !== 'files') return null;
+    removedFile = b.cover; b.cover = null;
     return p;
   });
   if (!updated) return res.status(404).json({ error: 'not_found' });
@@ -828,8 +902,11 @@ app.get('/api/search', async (req, res) => {
     });
   }
   for (const pl of db.plans) {
-    const hay = [pl.name, pl.info, ...(pl.milestones || []).map((m) => m.title),
-      ...(pl.todos || []).map((t) => t.text)].filter(Boolean).join(' ').toLowerCase();
+    const blockText = (pl.blocks || []).flatMap((b) => [
+      b.title, b.content, ...(b.items || []).map((t) => t.text), ...(b.files || []).map((f) => f.name),
+    ]);
+    const hay = [pl.name, ...(pl.milestones || []).map((m) => m.title), ...blockText]
+      .filter(Boolean).join(' ').toLowerCase();
     const score = scoreMatch(terms, pl.name || '', hay);
     if (score > 0) results.push({
       kind: 'plan', id: pl.id, title: pl.name || 'Untitled plan', subtitle: 'Plan',

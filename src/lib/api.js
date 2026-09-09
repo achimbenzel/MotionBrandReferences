@@ -122,30 +122,47 @@ export const api = {
     const { plan } = await handle(await fetch(`/api/plans/${id}/${kind}`, { method: 'DELETE' }));
     return plan;
   },
-  async addMoodboard(id, name) {
-    const { plan } = await handle(await fetch(`/api/plans/${id}/moodboards`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
+  // --- Plan content blocks (moodboard / text / todos / files) ---
+  async addBlock(id, type) {
+    const { plan } = await handle(await fetch(`/api/plans/${id}/blocks`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type }),
     }));
     return plan;
   },
-  async updateMoodboard(id, mbId, patch) {
-    const { plan } = await handle(await fetch(`/api/plans/${id}/moodboards/${mbId}`, {
+  async updateBlock(id, blockId, patch) {
+    const { plan } = await handle(await fetch(`/api/plans/${id}/blocks/${blockId}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
     }));
     return plan;
   },
-  async removeMoodboard(id, mbId) {
-    const { plan } = await handle(await fetch(`/api/plans/${id}/moodboards/${mbId}`, { method: 'DELETE' }));
+  async moveBlock(id, blockId, dir) {
+    const { plan } = await handle(await fetch(`/api/plans/${id}/blocks/${blockId}/move`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dir }),
+    }));
     return plan;
   },
-  async addMoodboardImages(id, mbId, fileList) {
+  async removeBlock(id, blockId) {
+    const { plan } = await handle(await fetch(`/api/plans/${id}/blocks/${blockId}`, { method: 'DELETE' }));
+    return plan;
+  },
+  async addBlockFiles(id, blockId, fileList) {
     const fd = new FormData();
-    Array.from(fileList).forEach((f) => fd.append('images', f));
-    const { plan } = await handle(await fetch(`/api/plans/${id}/moodboards/${mbId}/images`, { method: 'POST', body: fd }));
+    Array.from(fileList).forEach((f) => fd.append('files', f));
+    const { plan } = await handle(await fetch(`/api/plans/${id}/blocks/${blockId}/files`, { method: 'POST', body: fd }));
     return plan;
   },
-  async removeMoodboardImage(id, mbId, imgId) {
-    const { plan } = await handle(await fetch(`/api/plans/${id}/moodboards/${mbId}/images/${imgId}`, { method: 'DELETE' }));
+  async removeBlockFile(id, blockId, fileId) {
+    const { plan } = await handle(await fetch(`/api/plans/${id}/blocks/${blockId}/files/${fileId}`, { method: 'DELETE' }));
+    return plan;
+  },
+  async setBlockCover(id, blockId, file) {
+    const fd = new FormData();
+    fd.append('cover', file, 'cover.img');
+    const { plan } = await handle(await fetch(`/api/plans/${id}/blocks/${blockId}/cover`, { method: 'POST', body: fd }));
+    return plan;
+  },
+  async removeBlockCover(id, blockId) {
+    const { plan } = await handle(await fetch(`/api/plans/${id}/blocks/${blockId}/cover`, { method: 'DELETE' }));
     return plan;
   },
 

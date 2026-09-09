@@ -58,7 +58,8 @@ data/
 ├── font/<id>/shot.<ext>            # optional screenshot of a free-font site
 └── plan/<id>/                      # Plan-mode plans
     ├── banner.<ext>, avatar.<ext>  # Notion-style banner + profile image
-    └── moodboard/<mbId>/*.<ext>    # one folder per moodboard
+    └── blocks/<blockId>/*          # one folder per content block
+                                    # (moodboard images, uploaded files, cover)
 ```
 
 `data/` is **git-ignored and lives outside the source code**, so you can pull
@@ -143,15 +144,20 @@ Plan new projects. The **+** creates a new plan; plans are listed
     also show on the plan's card in the grid,
   - a **timeframe** (start / end date) with **checkable milestones** — each has a
     title, an optional date and a checkbox that strikes it through when done,
-  - **multiple moodboards** (e.g. one for colours, one for UI): each is
-    **collapsible** and holds its own images, and can be renamed or removed from
-    its own **⋯** menu. Add images by button, by **dropping** files onto a board,
-    or by **pasting** (⌘V) into the last-used board,
-  - a free‑text **Information** field and a **To-dos** checklist (add items and
-    tick them off) — both auto-saved.
+  - a stack of **content blocks** below the timeframe. A **new plan is empty**;
+    add blocks with **+ Add block** at the bottom, reorder them (**Move up /
+    down**), rename them, or remove them — each block has its own **⋯** menu.
+    Four block types are available:
+    - **Moodboard** — a **collapsible** board of images. Add images by button, by
+      **dropping** files onto the board, or by **pasting** (⌘V) into the last-used
+      board.
+    - **Text** — a free-text notes area, auto-saved.
+    - **To-dos** — a checklist you add items to and tick off, auto-saved.
+    - **Files** — uploaded files shown as a downloadable list (name + size, open
+      in a new tab), plus an optional **example image** preview for the block.
 
-  Following the general rule below, a plan's title is only editable via the
-  **⋯** menu (top-right, next to **Edit**) — there is no bare Delete button.
+  Following the general rule below, a plan's title and each block's name are only
+  editable via a **⋯** menu — there is no bare Delete button.
 
 ### Logo Tester
 A sandbox (nothing is saved) to stress-test a logo. Upload a **PNG or SVG**,
@@ -244,10 +250,11 @@ just references — deleting a gallery never deletes the projects.
 ### Storage meter
 The storage meter (sidebar footer on desktop, header on mobile) shows how much
 of the `data/` folder is used against a limit
-(default **80 GB**). Use the **⋯** next to it to change the limit; usage is the
-real summed size of everything under `data/`, cached briefly and recomputed
-whenever the library changes so the meter never rescans the whole tree on every
-poll.
+(default **80 GB**). Use the **⋯** next to it (its menu opens **upward** on the
+sidebar footer, so nothing is clipped off the bottom) to change the limit,
+export / import the library or open the Trash; usage is the real summed size of
+everything under `data/`, cached briefly and recomputed whenever the library
+changes so the meter never rescans the whole tree on every poll.
 
 ### Navigation: sidebar (desktop) & header (mobile)
 On **desktop** the app uses a **Notion-style left sidebar** that holds

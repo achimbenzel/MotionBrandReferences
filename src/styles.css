@@ -698,6 +698,7 @@ img { max-width: 100%; display: block; }
 }
 .menu.right { right: 0; }
 .menu.left { left: 0; }
+.menu.up { top: auto; bottom: calc(100% + 6px); }
 .menu-item {
   display: flex;
   align-items: center;
@@ -1339,6 +1340,47 @@ img { max-width: 100%; display: block; }
 .moodboard-actions { display: flex; align-items: center; gap: 8px; }
 .moodboard .masonry { padding: 12px; }
 .moodboard .dropzone { margin: 12px; }
+
+/* -------------------------------------------------- Plan content blocks */
+/* A generic (non-moodboard) block highlights on drag-over just like a moodboard. */
+.block.dragover { outline: 2px dashed var(--accent); outline-offset: 4px; border-radius: 12px; }
+
+/* Files block — example image (cover) + a list of downloadable files. */
+.files-cover .media-frame { cursor: default; }
+.files-cover-actions {
+  position: absolute; bottom: 10px; right: 10px;
+  display: flex; gap: 8px; opacity: 0; transition: opacity .15s;
+}
+.files-cover .media-frame:hover .files-cover-actions { opacity: 1; }
+.files-cover-add { margin-bottom: 12px; }
+
+.filelist { display: flex; flex-direction: column; gap: 6px; }
+.filerow {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface);
+}
+.filerow-icon { flex-shrink: 0; color: var(--text-muted); }
+.filerow-name {
+  flex: 1; min-width: 0; color: var(--text); text-decoration: none; font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.filerow-name:hover { color: var(--accent); text-decoration: underline; }
+.filerow-size { flex-shrink: 0; font-size: 12px; color: var(--text-faint); }
+.filerow-open { color: var(--text-muted); }
+.filerow-open:hover { color: var(--accent); }
+.filerow-del { color: var(--text-muted); }
+.filerow-del:hover { color: var(--danger); }
+
+/* Add-block button pinned below the last block. */
+.add-block { margin-top: 26px; }
+.add-block .menu-wrap { display: inline-block; }
+.add-block-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 16px; border: 1.5px dashed var(--border-strong); border-radius: 12px;
+  background: transparent; color: var(--text-muted); font: inherit; font-weight: 600; cursor: pointer;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.add-block-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--surface-2); }
 
 /* Plan grid card (Notion-style) */
 .plan-card-head { position: relative; margin-bottom: 24px; }

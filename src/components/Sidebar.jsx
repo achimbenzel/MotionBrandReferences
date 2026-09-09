@@ -78,7 +78,7 @@ export default function Sidebar({ onAdd, onSearch, onToggle, storageKey }) {
           <button className={`sb-item ${onTrash ? 'active' : ''}`} onClick={() => navigate('/trash')}>
             <Trash2 size={17} /> <span>Trash</span>
           </button>
-          <StorageMeter refreshKey={storageKey} />
+          <StorageMeter refreshKey={storageKey} menuUp />
         </div>
       </div>
     </aside>

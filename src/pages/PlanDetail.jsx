@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Trash2, Pencil, MoreHorizontal, CalendarRange, Images, StickyNote,
-  UploadCloud, X, Plus, Check, ChevronDown, ChevronRight, Image as ImageIcon, Camera,
-  ListChecks,
+  ListChecks, Paperclip, UploadCloud, X, Plus, Check, ChevronDown, ChevronRight,
+  Image as ImageIcon, Camera, ArrowUp, ArrowDown, File as FileIcon, ExternalLink,
 } from 'lucide-react';
 import { api, planFileUrl } from '../lib/api.js';
 import { PLAN_GRADIENTS, gradientCss } from '../lib/types.js';
@@ -14,12 +14,9 @@ import GalleryNameModal from '../components/GalleryNameModal.jsx';
 
 const rid = () => Math.random().toString(36).slice(2, 8);
 
-// Quick-pick emojis for a plan's profile image.
 const PLAN_EMOJIS = ['🎨', '✏️', '🖌️', '🧠', '💡', '🚀', '🔥', '⭐', '🌈', '🎯',
   '📦', '🏷️', '🖼️', '📐', '🧩', '🎬', '📸', '🎵', '🏗️', '🛠️',
   '💎', '🌱', '☕', '📊', '🗂️', '🔮', '🦄', '🍎', '🌍', '🏀'];
-
-// The first grapheme of a typed/pasted string (handles multi-codepoint emoji).
 function firstEmoji(str) {
   const t = String(str || '').trim();
   if (!t) return '';
@@ -27,158 +24,135 @@ function firstEmoji(str) {
   catch { return [...t][0]; }
 }
 
+const BLOCK_META = {
+  moodboard: { label: 'Moodboard', icon: Images },
+  text: { label: 'Text', icon: StickyNote },
+  todos: { label: 'To-dos', icon: ListChecks },
+  files: { label: 'Files', icon: Paperclip },
+};
+const fmtBytes = (n) => {
+  if (n == null) return '';
+  const u = ['B', 'KB', 'MB', 'GB']; let v = n; let i = 0;
+  while (v >= 1024 && i < u.length - 1) { v /= 1024; i += 1; }
+  return `${v.toFixed(v < 10 && i > 0 ? 1 : 0)} ${u[i]}`;
+};
+
 export default function PlanDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
   const [plan, setPlan] = useState(null);
   const [error, setError] = useState(null);
-  const [info, setInfo] = useState('');
   const [milestones, setMilestones] = useState([]);
-  const [todos, setTodos] = useState([]);
   const [lightbox, setLightbox] = useState(null); // { items, index }
   const [renaming, setRenaming] = useState(false);
-  const [newMb, setNewMb] = useState(false);
-  const [renameMb, setRenameMb] = useState(null); // moodboard object
+  const [renameBlock, setRenameBlock] = useState(null); // block being renamed
+  const [addOpen, setAddOpen] = useState(false);
   const [bannerPicker, setBannerPicker] = useState(false);
   const [avatarPicker, setAvatarPicker] = useState(false);
   const [emojiInput, setEmojiInput] = useState('');
-  const [dragMb, setDragMb] = useState(null);
-  const skipInfo = useRef(true);
+  const [dragBlock, setDragBlock] = useState(null);
   const skipMs = useRef(true);
-  const skipTodos = useRef(true);
   const planRef = useRef(null);
   const bannerRef = useRef(null);
   const avatarRef = useRef(null);
-  const imgRef = useRef(null);
-  const pendingMb = useRef(null);
+  const filesRef = useRef(null);
+  const coverRef = useRef(null);
+  const pending = useRef(null);       // { blockId } for the files/cover inputs
+  const lastMoodboard = useRef(null); // block id for paste target
+  const timers = useRef({});
   planRef.current = plan;
-
-  // Paste images (⌘V) into the last-used moodboard (or the first one).
-  useEffect(() => {
-    const onPaste = async (e) => {
-      const files = [...(e.clipboardData?.items || [])]
-        .filter((it) => it.type.startsWith('image/')).map((it) => it.getAsFile()).filter(Boolean);
-      if (!files.length) return;
-      e.preventDefault();
-      const boards = planRef.current?.moodboards || [];
-      const target = boards.find((m) => m.id === pendingMb.current) || boards.find((m) => !m.collapsed) || boards[0];
-      if (!target) return;
-      try {
-        setPlan(await api.addMoodboardImages(id, target.id, files));
-        pendingMb.current = target.id;
-        toast(`Pasted into “${target.name}”`);
-      } catch (err) { toast(`Paste failed: ${err.message}`, 'error'); }
-    };
-    window.addEventListener('paste', onPaste);
-    return () => window.removeEventListener('paste', onPaste);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
 
   useEffect(() => {
     let alive = true;
-    setPlan(null); setError(null); skipInfo.current = true; skipMs.current = true; skipTodos.current = true;
+    setPlan(null); setError(null); skipMs.current = true;
     api.getPlan(id).then((p) => {
       if (!alive) return;
-      setPlan(p); setInfo(p.info || ''); setMilestones(p.milestones || []); setTodos(p.todos || []);
+      setPlan(p); setMilestones(p.milestones || []);
     }).catch((e) => { if (alive) setError(e.message); });
     return () => { alive = false; };
   }, [id]);
 
-  // Debounced autosave for info and milestones.
-  useEffect(() => {
-    if (skipInfo.current) { skipInfo.current = false; return; }
-    const t = setTimeout(() => api.updatePlan(id, { info }).then(setPlan).catch((e) => toast(`Could not save: ${e.message}`, 'error')), 600);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [info]);
   useEffect(() => {
     if (skipMs.current) { skipMs.current = false; return; }
     const t = setTimeout(() => api.updatePlan(id, { milestones }).then(setPlan).catch((e) => toast(`Could not save: ${e.message}`, 'error')), 500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [milestones]);
+
+  // Paste images into the last-used (or first) moodboard block.
   useEffect(() => {
-    if (skipTodos.current) { skipTodos.current = false; return; }
-    const t = setTimeout(() => api.updatePlan(id, { todos }).then(setPlan).catch((e) => toast(`Could not save: ${e.message}`, 'error')), 500);
-    return () => clearTimeout(t);
+    const onPaste = async (e) => {
+      const files = [...(e.clipboardData?.items || [])]
+        .filter((it) => it.type.startsWith('image/')).map((it) => it.getAsFile()).filter(Boolean);
+      if (!files.length) return;
+      const boards = (planRef.current?.blocks || []).filter((b) => b.type === 'moodboard');
+      if (!boards.length) return;
+      e.preventDefault();
+      const target = boards.find((b) => b.id === lastMoodboard.current) || boards[0];
+      try { setPlan(await api.addBlockFiles(id, target.id, files)); lastMoodboard.current = target.id; toast(`Pasted into “${target.title}”`); }
+      catch (err) { toast(`Paste failed: ${err.message}`, 'error'); }
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [todos]);
+  }, [id]);
 
   const patch = (p) => api.updatePlan(id, p).then(setPlan).catch((e) => toast(`Could not save: ${e.message}`, 'error'));
 
-  const setImage = async (kind, file) => {
-    if (!file) return;
-    try { setPlan(await api.setPlanImage(id, kind, file)); } catch (e) { toast(`Upload failed: ${e.message}`, 'error'); }
-  };
-  const clearImage = async (kind) => { try { setPlan(await api.removePlanImage(id, kind)); } catch (e) { toast(`Failed: ${e.message}`, 'error'); } };
-
-  // Banner: a preset gradient or a custom image (mutually exclusive).
+  // Header images (banner / avatar)
+  const setImage = async (kind, file) => { if (!file) return; try { setPlan(await api.setPlanImage(id, kind, file)); } catch (e) { toast(`Upload failed: ${e.message}`, 'error'); } };
   const pickGradient = async (gid) => {
-    try {
-      if (plan.banner) await api.removePlanImage(id, 'banner');
-      setPlan(await api.updatePlan(id, { bannerGradient: gid }));
-      setBannerPicker(false);
-    } catch (e) { toast(`Failed: ${e.message}`, 'error'); }
+    try { if (plan.banner) await api.removePlanImage(id, 'banner'); setPlan(await api.updatePlan(id, { bannerGradient: gid })); setBannerPicker(false); }
+    catch (e) { toast(`Failed: ${e.message}`, 'error'); }
   };
   const removeBanner = async () => {
-    try {
-      if (plan.banner) setPlan(await api.removePlanImage(id, 'banner'));
-      else setPlan(await api.updatePlan(id, { bannerGradient: null }));
-    } catch (e) { toast(`Failed: ${e.message}`, 'error'); }
+    try { if (plan.banner) setPlan(await api.removePlanImage(id, 'banner')); else setPlan(await api.updatePlan(id, { bannerGradient: null })); }
+    catch (e) { toast(`Failed: ${e.message}`, 'error'); }
   };
-
-  // Avatar: an emoji or a custom image (mutually exclusive).
   const pickEmoji = async (raw) => {
-    const emoji = firstEmoji(raw);
-    if (!emoji) return;
-    try {
-      if (plan.avatar) await api.removePlanImage(id, 'avatar');
-      setPlan(await api.updatePlan(id, { avatarEmoji: emoji }));
-      setEmojiInput(''); setAvatarPicker(false);
-    } catch (e) { toast(`Failed: ${e.message}`, 'error'); }
+    const emoji = firstEmoji(raw); if (!emoji) return;
+    try { if (plan.avatar) await api.removePlanImage(id, 'avatar'); setPlan(await api.updatePlan(id, { avatarEmoji: emoji })); setEmojiInput(''); setAvatarPicker(false); }
+    catch (e) { toast(`Failed: ${e.message}`, 'error'); }
   };
   const removeAvatar = async () => {
-    try {
-      if (plan.avatar) setPlan(await api.removePlanImage(id, 'avatar'));
-      else setPlan(await api.updatePlan(id, { avatarEmoji: null }));
-      setAvatarPicker(false);
-    } catch (e) { toast(`Failed: ${e.message}`, 'error'); }
+    try { if (plan.avatar) setPlan(await api.removePlanImage(id, 'avatar')); else setPlan(await api.updatePlan(id, { avatarEmoji: null })); setAvatarPicker(false); }
+    catch (e) { toast(`Failed: ${e.message}`, 'error'); }
   };
-  const uploadAvatar = () => { setAvatarPicker(false); avatarRef.current?.click(); };
 
   const remove = async () => {
     try {
       const { trashId } = await api.removePlan(id);
       navigate('/plan');
-      toast('Moved to Trash', 'ok', { label: 'Undo', onClick: async () => {
-        try { await api.restoreTrash(trashId); navigate(`/plan/${id}`); } catch (e) { toast(`Undo failed: ${e.message}`, 'error'); }
-      } });
+      toast('Moved to Trash', 'ok', { label: 'Undo', onClick: async () => { try { await api.restoreTrash(trashId); navigate(`/plan/${id}`); } catch (e) { toast(`Undo failed: ${e.message}`, 'error'); } } });
     } catch (e) { toast(`Delete failed: ${e.message}`, 'error'); }
   };
 
   // Milestones
   const addMilestone = () => setMilestones((m) => [...m, { id: rid(), title: '', date: '', done: false }]);
-  const editMilestone = (mid, patchObj) => setMilestones((m) => m.map((x) => (x.id === mid ? { ...x, ...patchObj } : x)));
+  const editMilestone = (mid, p) => setMilestones((m) => m.map((x) => (x.id === mid ? { ...x, ...p } : x)));
   const removeMilestone = (mid) => setMilestones((m) => m.filter((x) => x.id !== mid));
 
-  // To-dos
-  const addTodo = () => setTodos((t) => [...t, { id: rid(), text: '', done: false }]);
-  const editTodo = (tid, patchObj) => setTodos((t) => t.map((x) => (x.id === tid ? { ...x, ...patchObj } : x)));
-  const removeTodo = (tid) => setTodos((t) => t.filter((x) => x.id !== tid));
-
-  // Moodboards
-  const addImagesFor = (mbId) => { pendingMb.current = mbId; imgRef.current?.click(); };
-  const onImages = async (files) => {
-    if (!files?.length || !pendingMb.current) return;
-    try { setPlan(await api.addMoodboardImages(id, pendingMb.current, files)); } catch (e) { toast(`Upload failed: ${e.message}`, 'error'); }
+  // Blocks
+  const addBlock = async (type) => { setAddOpen(false); try { setPlan(await api.addBlock(id, type)); } catch (e) { toast(`Could not add block: ${e.message}`, 'error'); } };
+  const moveBlock = async (bid, dir) => { try { setPlan(await api.moveBlock(id, bid, dir)); } catch (e) { toast(`Failed: ${e.message}`, 'error'); } };
+  const deleteBlock = async (b) => {
+    const heavy = (b.images && b.images.length) || (b.files && b.files.length);
+    if (heavy && !window.confirm(`Delete the “${b.title}” block and its files?`)) return;
+    try { setPlan(await api.removeBlock(id, b.id)); } catch (e) { toast(`Failed: ${e.message}`, 'error'); }
   };
-  const toggleCollapse = (mb) => api.updateMoodboard(id, mb.id, { collapsed: !mb.collapsed }).then(setPlan).catch(() => {});
-  const deleteMoodboard = async (mb) => {
-    if (!window.confirm(`Delete moodboard “${mb.name}” and its images?`)) return;
-    try { setPlan(await api.removeMoodboard(id, mb.id)); } catch (e) { toast(`Failed: ${e.message}`, 'error'); }
+  const editBlock = (bid, p, immediate = false) => {
+    setPlan((prev) => ({ ...prev, blocks: prev.blocks.map((b) => (b.id === bid ? { ...b, ...p } : b)) }));
+    clearTimeout(timers.current[bid]);
+    const send = () => api.updateBlock(id, bid, p).catch((e) => toast(`Could not save: ${e.message}`, 'error'));
+    if (immediate) send(); else timers.current[bid] = setTimeout(send, 500);
   };
-  const removeImage = async (mbId, imgId) => { try { setPlan(await api.removeMoodboardImage(id, mbId, imgId)); } catch (e) { toast(`Failed: ${e.message}`, 'error'); } };
+  const addFilesTo = (bid) => { pending.current = bid; filesRef.current?.click(); };
+  const onFiles = async (files) => { if (!files?.length || !pending.current) return; try { setPlan(await api.addBlockFiles(id, pending.current, files)); } catch (e) { toast(`Upload failed: ${e.message}`, 'error'); } };
+  const removeFile = async (bid, fid) => { try { setPlan(await api.removeBlockFile(id, bid, fid)); } catch (e) { toast(`Failed: ${e.message}`, 'error'); } };
+  const setCover = (bid) => { pending.current = bid; coverRef.current?.click(); };
+  const onCover = async (file) => { if (!file || !pending.current) return; try { setPlan(await api.setBlockCover(id, pending.current, file)); } catch (e) { toast(`Failed: ${e.message}`, 'error'); } };
+  const clearCover = async (bid) => { try { setPlan(await api.removeBlockCover(id, bid)); } catch (e) { toast(`Failed: ${e.message}`, 'error'); } };
 
   if (error) return <div className="detail"><BackBtn /> <div className="center-msg">Couldn’t load: {error}</div></div>;
   if (!plan) return <div className="detail"><div className="spinner" /></div>;
@@ -189,6 +163,14 @@ export default function PlanDetail() {
   const bannerStyle = bannerUrl ? { backgroundImage: `url("${bannerUrl}")` } : bannerGrad ? { backgroundImage: bannerGrad } : undefined;
   const avatarUrl = plan.avatar ? planFileUrl(plan, plan.avatar) : null;
   const avatarEmoji = !avatarUrl ? (plan.avatarEmoji || null) : null;
+
+  const blockMenu = (b, i) => [
+    { label: 'Rename', icon: <Pencil size={15} />, onClick: () => setRenameBlock(b) },
+    ...(i > 0 ? [{ label: 'Move up', icon: <ArrowUp size={15} />, onClick: () => moveBlock(b.id, 'up') }] : []),
+    ...(i < plan.blocks.length - 1 ? [{ label: 'Move down', icon: <ArrowDown size={15} />, onClick: () => moveBlock(b.id, 'down') }] : []),
+    { separator: true },
+    { label: 'Delete block', icon: <Trash2 size={15} />, danger: true, onClick: () => deleteBlock(b) },
+  ];
 
   return (
     <div className="detail">
@@ -204,7 +186,7 @@ export default function PlanDetail() {
         />
       </div>
 
-      {/* Notion-style banner + avatar */}
+      {/* Banner + avatar */}
       <div className={`plan-banner ${hasBanner ? '' : 'empty'}`} style={bannerStyle}>
         <div className="plan-banner-actions">
           <button className="btn btn-sm" onClick={() => setBannerPicker((v) => !v)}><ImageIcon size={15} /> {hasBanner ? 'Change banner' : 'Add banner'}</button>
@@ -246,7 +228,7 @@ export default function PlanDetail() {
                 onChange={(ev) => setEmojiInput(ev.target.value)}
                 onKeyDown={(ev) => { if (ev.key === 'Enter') { ev.preventDefault(); pickEmoji(emojiInput); } }} />
               <div className="ap-actions">
-                <button className="btn btn-sm" onClick={uploadAvatar}><UploadCloud size={14} /> Upload image…</button>
+                <button className="btn btn-sm" onClick={() => { setAvatarPicker(false); avatarRef.current?.click(); }}><UploadCloud size={14} /> Upload image…</button>
                 {(avatarUrl || plan.avatarEmoji) && <button className="btn btn-sm btn-ghost" onClick={removeAvatar}>Remove</button>}
               </div>
             </div>
@@ -257,9 +239,10 @@ export default function PlanDetail() {
 
       <input ref={bannerRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { setImage('banner', e.target.files[0]); e.target.value = ''; }} />
       <input ref={avatarRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { setImage('avatar', e.target.files[0]); e.target.value = ''; }} />
-      <input ref={imgRef} type="file" accept="image/*,.svg" multiple className="visually-hidden-input" onChange={(e) => { onImages(e.target.files); e.target.value = ''; }} />
+      <input ref={filesRef} type="file" multiple className="visually-hidden-input" onChange={(e) => { onFiles(e.target.files); e.target.value = ''; }} />
+      <input ref={coverRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { onCover(e.target.files[0]); e.target.value = ''; }} />
 
-      {/* Timeframe + milestones */}
+      {/* Timeframe + milestones (fixed) */}
       <div className="section">
         <div className="section-head"><h2><CalendarRange size={16} /> Timeframe</h2></div>
         <div className="row-2">
@@ -272,13 +255,10 @@ export default function PlanDetail() {
             <input type="date" className="input" value={plan.end || ''} onChange={(e) => patch({ end: e.target.value })} />
           </div>
         </div>
-
         <div className="milestones">
           {milestones.map((m) => (
             <div className={`milestone ${m.done ? 'done' : ''}`} key={m.id}>
-              <button className={`ms-check ${m.done ? 'on' : ''}`} onClick={() => editMilestone(m.id, { done: !m.done })} title="Toggle done">
-                {m.done && <Check size={13} />}
-              </button>
+              <button className={`ms-check ${m.done ? 'on' : ''}`} onClick={() => editMilestone(m.id, { done: !m.done })} title="Toggle done">{m.done && <Check size={13} />}</button>
               <input className="ms-title input" value={m.title} placeholder="Milestone…" onChange={(e) => editMilestone(m.id, { title: e.target.value })} />
               <input className="ms-date input" type="date" value={m.date || ''} onChange={(e) => editMilestone(m.id, { date: e.target.value })} />
               <button className="ms-del icon-btn" onClick={() => removeMilestone(m.id)}><X size={14} /></button>
@@ -288,81 +268,137 @@ export default function PlanDetail() {
         </div>
       </div>
 
-      {/* Moodboards */}
-      <div className="section">
-        <div className="section-head">
-          <h2><Images size={16} /> Moodboards</h2>
-          <button className="btn btn-sm" onClick={() => setNewMb(true)}><Plus size={15} /> Add moodboard</button>
-        </div>
+      {/* Content blocks (dynamic) */}
+      {plan.blocks.map((b, i) => {
+        const Meta = BLOCK_META[b.type] || BLOCK_META.text;
+        const menu = <Menu align="right" trigger={<button className="icon-btn" style={{ width: 34, height: 34 }}><MoreHorizontal size={16} /></button>} items={blockMenu(b, i)} />;
 
-        {(plan.moodboards || []).map((mb) => (
-          <div className={`moodboard ${dragMb === mb.id ? 'dragover' : ''}`} key={mb.id}
-            onDragOver={(e) => { e.preventDefault(); setDragMb(mb.id); }}
-            onDragLeave={(e) => { if (e.target === e.currentTarget) setDragMb(null); }}
-            onDrop={(e) => { e.preventDefault(); setDragMb(null); pendingMb.current = mb.id; onImages(e.dataTransfer.files); }}>
-            <div className="moodboard-head">
-              <button className="mb-collapse" onClick={() => toggleCollapse(mb)}>
-                {mb.collapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                <span className="mb-name">{mb.name}</span>
-                <span className="count">{(mb.images || []).length}</span>
-              </button>
-              <div className="moodboard-actions">
-                <button className="btn btn-sm" onClick={() => addImagesFor(mb.id)}><UploadCloud size={14} /> Add images</button>
-                <Menu align="right" trigger={<button className="icon-btn" style={{ width: 34, height: 34 }}><MoreHorizontal size={16} /></button>}
-                  items={[
-                    { label: 'Rename', icon: <Pencil size={15} />, onClick: () => setRenameMb(mb) },
-                    { separator: true },
-                    { label: 'Delete moodboard', icon: <Trash2 size={15} />, danger: true, onClick: () => deleteMoodboard(mb) },
-                  ]} />
+        if (b.type === 'moodboard') {
+          return (
+            <div className={`section block moodboard ${dragBlock === b.id ? 'dragover' : ''}`} key={b.id}
+              onDragOver={(e) => { e.preventDefault(); setDragBlock(b.id); }}
+              onDragLeave={(e) => { if (e.target === e.currentTarget) setDragBlock(null); }}
+              onDrop={(e) => { e.preventDefault(); setDragBlock(null); pending.current = b.id; lastMoodboard.current = b.id; onFiles(e.dataTransfer.files); }}>
+              <div className="moodboard-head">
+                <button className="mb-collapse" onClick={() => editBlock(b.id, { collapsed: !b.collapsed }, true)}>
+                  {b.collapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                  <Meta.icon size={16} /><span className="mb-name">{b.title}</span>
+                  <span className="count">{(b.images || []).length}</span>
+                </button>
+                <div className="moodboard-actions">
+                  <button className="btn btn-sm" onClick={() => { lastMoodboard.current = b.id; addFilesTo(b.id); }}><UploadCloud size={14} /> Add images</button>
+                  {menu}
+                </div>
               </div>
-            </div>
-            {!mb.collapsed && (
-              (mb.images || []).length ? (
+              {!b.collapsed && ((b.images || []).length ? (
                 <div className="masonry">
-                  {mb.images.map((im, i) => (
+                  {b.images.map((im, idx) => (
                     <div className="masonry-item" key={im.id}>
                       <img src={planFileUrl(plan, im.file)} alt="" loading="lazy"
-                        onClick={() => setLightbox({ items: mb.images.map((x) => ({ src: planFileUrl(plan, x.file) })), index: i })} />
+                        onClick={() => setLightbox({ items: b.images.map((x) => ({ src: planFileUrl(plan, x.file) })), index: idx })} />
                       <div className="masonry-menu" onClick={(e) => e.stopPropagation()}>
-                        <button className="icon-btn masonry-menu-btn" title="Remove" onClick={() => removeImage(mb.id, im.id)}><X size={15} /></button>
+                        <button className="icon-btn masonry-menu-btn" title="Remove" onClick={() => removeFile(b.id, im.id)}><X size={15} /></button>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="dropzone" onClick={() => addImagesFor(mb.id)}>
+                <div className="dropzone" onClick={() => { lastMoodboard.current = b.id; addFilesTo(b.id); }}>
                   <UploadCloud size={20} /><div>Drop or select images · or paste (⌘V)</div>
                 </div>
-              )
+              ))}
+            </div>
+          );
+        }
+
+        if (b.type === 'text') {
+          return (
+            <div className="section block" key={b.id}>
+              <div className="section-head"><h2><Meta.icon size={16} /> {b.title}</h2>{menu}</div>
+              <textarea className="textarea notes-textarea" value={b.content || ''}
+                onChange={(e) => editBlock(b.id, { content: e.target.value })} placeholder="Write here…" />
+            </div>
+          );
+        }
+
+        if (b.type === 'todos') {
+          const items = b.items || [];
+          const setItems = (next) => editBlock(b.id, { items: next });
+          return (
+            <div className="section block" key={b.id}>
+              <div className="section-head">
+                <h2><Meta.icon size={16} /> {b.title} {items.length > 0 && <span className="count">{items.filter((t) => t.done).length}/{items.length}</span>}</h2>{menu}
+              </div>
+              <div className="milestones">
+                {items.map((t) => (
+                  <div className={`milestone ${t.done ? 'done' : ''}`} key={t.id}>
+                    <button className={`ms-check ${t.done ? 'on' : ''}`} onClick={() => setItems(items.map((x) => (x.id === t.id ? { ...x, done: !x.done } : x)))}>{t.done && <Check size={13} />}</button>
+                    <input className="ms-title input" value={t.text} placeholder="To-do…" onChange={(e) => setItems(items.map((x) => (x.id === t.id ? { ...x, text: e.target.value } : x)))} />
+                    <button className="ms-del icon-btn" onClick={() => setItems(items.filter((x) => x.id !== t.id))}><X size={14} /></button>
+                  </div>
+                ))}
+                <button className="btn btn-ghost btn-sm ms-add" onClick={() => setItems([...items, { id: rid(), text: '', done: false }])}><Plus size={15} /> Add to-do</button>
+              </div>
+            </div>
+          );
+        }
+
+        // files
+        const cover = b.cover ? planFileUrl(plan, b.cover) : null;
+        return (
+          <div className={`section block ${dragBlock === b.id ? 'dragover' : ''}`} key={b.id}
+            onDragOver={(e) => { e.preventDefault(); setDragBlock(b.id); }}
+            onDragLeave={(e) => { if (e.target === e.currentTarget) setDragBlock(null); }}
+            onDrop={(e) => { e.preventDefault(); setDragBlock(null); pending.current = b.id; onFiles(e.dataTransfer.files); }}>
+            <div className="section-head">
+              <h2><Meta.icon size={16} /> {b.title} {(b.files || []).length > 0 && <span className="count">{b.files.length}</span>}</h2>
+              <div className="moodboard-actions">
+                <button className="btn btn-sm" onClick={() => addFilesTo(b.id)}><UploadCloud size={14} /> Add files</button>{menu}
+              </div>
+            </div>
+
+            <div className="files-cover">
+              {cover ? (
+                <figure className="media-frame" style={{ marginBottom: 12 }}>
+                  <img src={cover} alt="example" />
+                  <div className="files-cover-actions">
+                    <button className="btn btn-sm" onClick={() => setCover(b.id)}><ImageIcon size={14} /> Change</button>
+                    <button className="btn btn-sm btn-ghost" onClick={() => clearCover(b.id)}>Remove</button>
+                  </div>
+                </figure>
+              ) : (
+                <button className="btn btn-sm files-cover-add" onClick={() => setCover(b.id)}><ImageIcon size={14} /> Set example image</button>
+              )}
+            </div>
+
+            {(b.files || []).length ? (
+              <div className="filelist">
+                {b.files.map((f) => (
+                  <div className="filerow" key={f.id}>
+                    <FileIcon size={18} className="filerow-icon" />
+                    <a className="filerow-name" href={planFileUrl(plan, f.file)} target="_blank" rel="noopener noreferrer" title={f.name}>{f.name}</a>
+                    <span className="filerow-size">{fmtBytes(f.size)}</span>
+                    <a className="icon-btn filerow-open" href={planFileUrl(plan, f.file)} target="_blank" rel="noopener noreferrer" title="Open"><ExternalLink size={15} /></a>
+                    <button className="icon-btn filerow-del" onClick={() => removeFile(b.id, f.id)} title="Remove"><X size={15} /></button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="dropzone" onClick={() => addFilesTo(b.id)}>
+                <UploadCloud size={20} /><div>Drop or select files</div>
+              </div>
             )}
           </div>
-        ))}
-      </div>
+        );
+      })}
 
-      {/* Information */}
-      <div className="section">
-        <div className="section-head"><h2><StickyNote size={16} /> Information</h2></div>
-        <textarea className="textarea notes-textarea" value={info} onChange={(e) => setInfo(e.target.value)}
-          placeholder="Concept, goals, references, requirements…" />
-      </div>
-
-      {/* To-dos */}
-      <div className="section">
-        <div className="section-head">
-          <h2><ListChecks size={16} /> To-dos {todos.length > 0 && <span className="count">{todos.filter((t) => t.done).length}/{todos.length}</span>}</h2>
-        </div>
-        <div className="milestones">
-          {todos.map((t) => (
-            <div className={`milestone ${t.done ? 'done' : ''}`} key={t.id}>
-              <button className={`ms-check ${t.done ? 'on' : ''}`} onClick={() => editTodo(t.id, { done: !t.done })} title="Toggle done">
-                {t.done && <Check size={13} />}
-              </button>
-              <input className="ms-title input" value={t.text} placeholder="To-do…" onChange={(e) => editTodo(t.id, { text: e.target.value })} />
-              <button className="ms-del icon-btn" onClick={() => removeTodo(t.id)}><X size={14} /></button>
-            </div>
-          ))}
-          <button className="btn btn-ghost btn-sm ms-add" onClick={addTodo}><Plus size={15} /> Add to-do</button>
-        </div>
+      {/* Add block */}
+      <div className="add-block">
+        <Menu
+          align="left"
+          trigger={<button className="add-block-btn" onClick={() => setAddOpen((v) => !v)}><Plus size={16} /> Add block</button>}
+          items={Object.entries(BLOCK_META).map(([type, m]) => ({ label: m.label, icon: <m.icon size={15} />, onClick: () => addBlock(type) }))}
+        />
       </div>
 
       {lightbox && (
@@ -372,13 +408,9 @@ export default function PlanDetail() {
         <GalleryNameModal title="Rename plan" initialName={plan.name} submitLabel="Save" placeholder="Plan name"
           onSubmit={async (name) => { await patch({ name }); setRenaming(false); }} onClose={() => setRenaming(false)} />
       )}
-      {newMb && (
-        <GalleryNameModal title="New moodboard" submitLabel="Create" placeholder="e.g. Colors, UI, Typography"
-          onSubmit={async (name) => { setPlan(await api.addMoodboard(id, name)); setNewMb(false); }} onClose={() => setNewMb(false)} />
-      )}
-      {renameMb && (
-        <GalleryNameModal title="Rename moodboard" initialName={renameMb.name} submitLabel="Save" placeholder="Moodboard name"
-          onSubmit={async (name) => { setPlan(await api.updateMoodboard(id, renameMb.id, { name })); setRenameMb(null); }} onClose={() => setRenameMb(null)} />
+      {renameBlock && (
+        <GalleryNameModal title="Rename block" initialName={renameBlock.title} submitLabel="Save" placeholder="Block name"
+          onSubmit={async (name) => { editBlock(renameBlock.id, { title: name }, true); setRenameBlock(null); }} onClose={() => setRenameBlock(null)} />
       )}
     </div>
   );
