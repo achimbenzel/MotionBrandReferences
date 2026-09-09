@@ -14,6 +14,19 @@ import GalleryNameModal from '../components/GalleryNameModal.jsx';
 
 const rid = () => Math.random().toString(36).slice(2, 8);
 
+// Quick-pick emojis for a plan's profile image.
+const PLAN_EMOJIS = ['🎨', '✏️', '🖌️', '🧠', '💡', '🚀', '🔥', '⭐', '🌈', '🎯',
+  '📦', '🏷️', '🖼️', '📐', '🧩', '🎬', '📸', '🎵', '🏗️', '🛠️',
+  '💎', '🌱', '☕', '📊', '🗂️', '🔮', '🦄', '🍎', '🌍', '🏀'];
+
+// The first grapheme of a typed/pasted string (handles multi-codepoint emoji).
+function firstEmoji(str) {
+  const t = String(str || '').trim();
+  if (!t) return '';
+  try { const seg = new Intl.Segmenter(undefined, { granularity: 'grapheme' }); return [...seg.segment(t)][0].segment; }
+  catch { return [...t][0]; }
+}
+
 export default function PlanDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -28,6 +41,8 @@ export default function PlanDetail() {
   const [newMb, setNewMb] = useState(false);
   const [renameMb, setRenameMb] = useState(null); // moodboard object
   const [bannerPicker, setBannerPicker] = useState(false);
+  const [avatarPicker, setAvatarPicker] = useState(false);
+  const [emojiInput, setEmojiInput] = useState('');
   const [dragMb, setDragMb] = useState(null);
   const skipInfo = useRef(true);
   const skipMs = useRef(true);
@@ -113,6 +128,25 @@ export default function PlanDetail() {
     } catch (e) { toast(`Failed: ${e.message}`, 'error'); }
   };
 
+  // Avatar: an emoji or a custom image (mutually exclusive).
+  const pickEmoji = async (raw) => {
+    const emoji = firstEmoji(raw);
+    if (!emoji) return;
+    try {
+      if (plan.avatar) await api.removePlanImage(id, 'avatar');
+      setPlan(await api.updatePlan(id, { avatarEmoji: emoji }));
+      setEmojiInput(''); setAvatarPicker(false);
+    } catch (e) { toast(`Failed: ${e.message}`, 'error'); }
+  };
+  const removeAvatar = async () => {
+    try {
+      if (plan.avatar) setPlan(await api.removePlanImage(id, 'avatar'));
+      else setPlan(await api.updatePlan(id, { avatarEmoji: null }));
+      setAvatarPicker(false);
+    } catch (e) { toast(`Failed: ${e.message}`, 'error'); }
+  };
+  const uploadAvatar = () => { setAvatarPicker(false); avatarRef.current?.click(); };
+
   const remove = async () => {
     try {
       const { trashId } = await api.removePlan(id);
@@ -154,6 +188,7 @@ export default function PlanDetail() {
   const hasBanner = !!(bannerUrl || bannerGrad);
   const bannerStyle = bannerUrl ? { backgroundImage: `url("${bannerUrl}")` } : bannerGrad ? { backgroundImage: bannerGrad } : undefined;
   const avatarUrl = plan.avatar ? planFileUrl(plan, plan.avatar) : null;
+  const avatarEmoji = !avatarUrl ? (plan.avatarEmoji || null) : null;
 
   return (
     <div className="detail">
@@ -192,10 +227,31 @@ export default function PlanDetail() {
         )}
       </div>
       <div className="plan-idrow">
-        <button className="plan-avatar" onClick={() => avatarRef.current?.click()} title="Change profile image">
-          {avatarUrl ? <img src={avatarUrl} alt="" /> : <span>{(plan.name || '?').charAt(0).toUpperCase()}</span>}
-          <span className="plan-avatar-edit"><Camera size={15} /></span>
-        </button>
+        <div className="plan-avatar-wrap">
+          <button className="plan-avatar" onClick={() => setAvatarPicker((v) => !v)} title="Change profile image">
+            {avatarUrl ? <img src={avatarUrl} alt="" />
+              : avatarEmoji ? <span className="plan-avatar-emoji">{avatarEmoji}</span>
+                : <span>{(plan.name || '?').charAt(0).toUpperCase()}</span>}
+            <span className="plan-avatar-edit"><Camera size={15} /></span>
+          </button>
+          {avatarPicker && <div className="avatar-picker-backdrop" onClick={() => setAvatarPicker(false)} />}
+          {avatarPicker && (
+            <div className="avatar-picker" onMouseDown={(e) => e.stopPropagation()}>
+              <div className="avatar-picker-emojis">
+                {PLAN_EMOJIS.map((e) => (
+                  <button key={e} className={`ap-emoji ${plan.avatarEmoji === e && !avatarUrl ? 'on' : ''}`} onClick={() => pickEmoji(e)}>{e}</button>
+                ))}
+              </div>
+              <input className="input ap-input" value={emojiInput} placeholder="Type or paste an emoji…"
+                onChange={(ev) => setEmojiInput(ev.target.value)}
+                onKeyDown={(ev) => { if (ev.key === 'Enter') { ev.preventDefault(); pickEmoji(emojiInput); } }} />
+              <div className="ap-actions">
+                <button className="btn btn-sm" onClick={uploadAvatar}><UploadCloud size={14} /> Upload image…</button>
+                {(avatarUrl || plan.avatarEmoji) && <button className="btn btn-sm btn-ghost" onClick={removeAvatar}>Remove</button>}
+              </div>
+            </div>
+          )}
+        </div>
         <h1 className="plan-name">{plan.name}</h1>
       </div>
 

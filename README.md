@@ -134,8 +134,9 @@ right) switches between two modes:
 - **Plan** — plan new projects. The **+** creates a new plan; plans are listed
   in a grid like galleries. Each **plan** has:
   - a **Notion-style banner** — pick a **preset gradient** or upload a **custom
-    image** — plus a **profile image**; both also show on the plan's card in the
-    grid,
+    image** — plus a **profile image** that can be an **emoji** (quick-pick grid
+    or type/paste your own) or an **uploaded image**; both banner and profile
+    also show on the plan's card in the grid,
   - a **timeframe** (start / end date) with **checkable milestones** — each has a
     title, an optional date and a checkbox that strikes it through when done,
   - **multiple moodboards** (e.g. one for colours, one for UI): each is

@@ -45,7 +45,9 @@ export default function PlansPage({ reloadKey, onNewPlan }) {
                   <div className="plan-card-head">
                     <div className={`plan-card-banner ${bannerBg ? '' : 'empty'}`} style={bannerBg ? { backgroundImage: bannerBg } : undefined} />
                     <div className="plan-card-avatar">
-                      {avatar ? <img src={avatar} alt="" loading="lazy" /> : <span>{(p.name || '?').charAt(0).toUpperCase()}</span>}
+                      {avatar ? <img src={avatar} alt="" loading="lazy" />
+                        : p.avatarEmoji ? <span className="plan-card-emoji">{p.avatarEmoji}</span>
+                          : <span>{(p.name || '?').charAt(0).toUpperCase()}</span>}
                     </div>
                   </div>
                   <div className="card-meta"><span className="card-title">{p.name}</span></div>
