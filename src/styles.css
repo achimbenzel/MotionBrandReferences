@@ -1467,3 +1467,75 @@ img { max-width: 100%; display: block; }
 .ct-badge { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border); }
 .ct-badge.pass { background: rgba(46, 197, 211, .16); color: var(--accent); border-color: transparent; }
 .ct-badge.fail { color: var(--text-faint); }
+
+/* ================================================================ Sidebar */
+/* Mobile / narrow: no sidebar, the header (with its hamburger) stays. */
+.sidebar { display: none; }
+.sb-reopen { display: none; }
+
+@media (min-width: 900px) {
+  .header { display: none; }               /* desktop: the sidebar replaces it */
+  .app {
+    max-width: none; margin: 0; padding: 0;
+    display: flex; align-items: flex-start; min-height: 100vh;
+  }
+  .main { flex: 1; min-width: 0; }
+  .main-inner { max-width: var(--maxw); margin: 0 auto; padding: 26px 34px 90px; }
+
+  .sidebar {
+    position: sticky; top: 0; align-self: flex-start;
+    height: 100vh; width: 260px; flex-shrink: 0;
+    display: flex; flex-direction: column; gap: 8px;
+    padding: 14px 12px;
+    background: var(--surface); border-right: 1px solid var(--border);
+    overflow-y: auto;
+  }
+  .app[data-sidebar="collapsed"] .sidebar { display: none; }
+  .app[data-sidebar="collapsed"] .sb-reopen {
+    display: grid; position: fixed; top: 16px; left: 16px; z-index: 45;
+    background: rgba(20, 20, 22, 0.82); backdrop-filter: blur(14px); box-shadow: var(--shadow);
+  }
+  /* Give the floating reopen button its own row so it never overlaps the title. */
+  .app[data-sidebar="collapsed"] .main-inner { padding-top: 66px; }
+}
+
+.sb-head { display: flex; align-items: center; gap: 8px; }
+.sb-search {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+  color: var(--text-muted); font: inherit; font-size: 13px; padding: 9px 12px; cursor: pointer;
+}
+.sb-search:hover { border-color: var(--border-strong); color: var(--text); }
+.sb-search > span { margin-right: auto; }
+.sb-search kbd {
+  font: inherit; font-size: 11px; color: var(--text-faint);
+  border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px;
+}
+.sb-collapse { width: 36px; height: 36px; flex-shrink: 0; }
+
+.sidebar .mode-toggle { width: 100%; margin-top: 2px; }
+.sidebar .mode-btn { flex: 1; justify-content: center; }
+
+.sb-nav { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+.sb-item {
+  display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
+  border: 0; background: transparent; color: var(--text-muted);
+  font: inherit; font-size: 14px; font-weight: 500;
+  padding: 8px 10px; border-radius: 8px; cursor: pointer;
+}
+.sb-item:hover { background: var(--surface-2); color: var(--text); }
+.sb-item.active { background: var(--surface-3); color: var(--text); }
+.sb-item svg { flex-shrink: 0; color: var(--text-faint); }
+.sb-item:hover svg, .sb-item.active svg { color: var(--text-muted); }
+
+.sb-add {
+  display: flex; align-items: center; gap: 9px; width: 100%; margin-top: 8px;
+  border: 1px dashed var(--border-strong); background: transparent; color: var(--text-muted);
+  font: inherit; font-size: 14px; font-weight: 600; padding: 9px 12px; border-radius: 10px; cursor: pointer;
+}
+.sb-add:hover { color: var(--text); border-color: var(--accent); background: var(--accent-dim); }
+
+.sb-grow { flex: 1; min-height: 12px; }
+.sb-footer { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--border); padding-top: 10px; }
+.sidebar .storage-pill { width: 100%; background: var(--surface-2); box-shadow: none; }
+.sidebar .storage-text { flex: 1; }

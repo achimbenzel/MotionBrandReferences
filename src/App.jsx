@@ -2,7 +2,9 @@ import { useState, useCallback, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { ToastProvider, useToast } from './components/Toast.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
+import { PanelLeft } from 'lucide-react';
 import Header from './components/Header.jsx';
+import Sidebar from './components/Sidebar.jsx';
 import UploadModal from './components/UploadModal.jsx';
 import CommandPalette from './components/CommandPalette.jsx';
 import GridPage from './pages/GridPage.jsx';
@@ -18,6 +20,9 @@ function Shell() {
   const [modalType, setModalType] = useState(null); // null = closed
   const [reloadKey, setReloadKey] = useState(0);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem('sidebarCollapsed') === '1'; } catch { return false; }
+  });
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
@@ -35,6 +40,10 @@ function Shell() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  useEffect(() => {
+    try { localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0'); } catch { /* ignore */ }
+  }, [collapsed]);
+
   const handleCreated = useCallback((project) => {
     setModalType(null);
     setReloadKey((k) => k + 1);
@@ -50,23 +59,33 @@ function Shell() {
     } catch (e) { toast(`Could not create plan: ${e.message}`, 'error'); }
   }, [navigate, toast]);
 
+  const onAdd = planMode ? createPlan : openModal;
+
   return (
-    <div className="app">
-      <Header onAdd={planMode ? createPlan : openModal} onSearch={() => setPaletteOpen(true)} storageKey={reloadKey} />
-      <ErrorBoundary>
-        <Routes>
-          <Route path="/" element={<Navigate to="/branding" replace />} />
-          {TABS.map((t) => (
-            <Route key={t.key} path={`/${t.key}`} element={<GridPage type={t.key} reloadKey={reloadKey} onAdd={openModal} />} />
-          ))}
-          <Route path="/gallery/:id" element={<GalleryDetail />} />
-          <Route path="/project/:id" element={<ProjectDetail />} />
-          <Route path="/plan" element={<PlansPage reloadKey={reloadKey} onNewPlan={createPlan} />} />
-          <Route path="/plan/:id" element={<PlanDetail />} />
-          <Route path="/trash" element={<TrashPage />} />
-          <Route path="*" element={<Navigate to="/branding" replace />} />
-        </Routes>
-      </ErrorBoundary>
+    <div className="app" data-sidebar={collapsed ? 'collapsed' : 'open'}>
+      <Sidebar onAdd={onAdd} onSearch={() => setPaletteOpen(true)} onToggle={() => setCollapsed((c) => !c)} storageKey={reloadKey} />
+      <button className="sb-reopen icon-btn" onClick={() => setCollapsed(false)} title="Open sidebar" aria-label="Open sidebar">
+        <PanelLeft size={17} />
+      </button>
+      <Header onAdd={onAdd} onSearch={() => setPaletteOpen(true)} storageKey={reloadKey} />
+      <main className="main">
+        <div className="main-inner">
+          <ErrorBoundary>
+            <Routes>
+              <Route path="/" element={<Navigate to="/branding" replace />} />
+              {TABS.map((t) => (
+                <Route key={t.key} path={`/${t.key}`} element={<GridPage type={t.key} reloadKey={reloadKey} onAdd={openModal} />} />
+              ))}
+              <Route path="/gallery/:id" element={<GalleryDetail />} />
+              <Route path="/project/:id" element={<ProjectDetail />} />
+              <Route path="/plan" element={<PlansPage reloadKey={reloadKey} onNewPlan={createPlan} />} />
+              <Route path="/plan/:id" element={<PlanDetail />} />
+              <Route path="/trash" element={<TrashPage />} />
+              <Route path="*" element={<Navigate to="/branding" replace />} />
+            </Routes>
+          </ErrorBoundary>
+        </div>
+      </main>
 
       {modalType && (
         <UploadModal initialType={modalType} onClose={closeModal} onCreated={handleCreated} />

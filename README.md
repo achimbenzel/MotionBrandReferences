@@ -227,19 +227,25 @@ deleting a project removes it from its galleries automatically. Galleries are
 just references — deleting a gallery never deletes the projects.
 
 ### Storage meter
-The header shows how much of the `data/` folder is used against a limit
+The storage meter (sidebar footer on desktop, header on mobile) shows how much
+of the `data/` folder is used against a limit
 (default **80 GB**). Use the **⋯** next to it to change the limit; usage is the
 real summed size of everything under `data/`, cached briefly and recomputed
 whenever the library changes so the meter never rescans the whole tree on every
 poll.
 
-### Responsive header
-On wide screens all seven section tabs sit in the pill. On narrow/mobile widths
-they collapse into a **hamburger menu** whose dropdown lists all sections
-(current one checked). The toggle is icon-only so the pill's size and position
-never shift between sections, and the dropdown always renders above the storage
-meter. In **Plan** mode the tabs are replaced by a single **Plans** label and
-the **+** creates a new plan.
+### Navigation: sidebar (desktop) & header (mobile)
+On **desktop** the app uses a **Notion-style left sidebar** that holds
+everything: search (⌘K), the Reference / Plan toggle, the section list (with
+icons, current one highlighted), an **Add** button for the current section, and
+a footer with **Trash** and the storage meter. A button at the top collapses
+the sidebar for a full-width canvas; a small floating button re-opens it, and
+the collapsed state is remembered.
+
+On **narrow / mobile** widths the sidebar gives way to the original floating
+**header**: the section tabs collapse into a **hamburger menu** (current one
+checked), with search, add and the storage pill alongside. In **Plan** mode the
+tabs become a single **Plans** entry and **Add** creates a new plan.
 
 ### Covers & editing (all types)
 - **Crop & zoom the cover:** when you set a thumbnail — a Motion frame, a
