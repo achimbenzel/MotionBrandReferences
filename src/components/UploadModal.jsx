@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Film, Palette, FileText, UploadCloud, Trash2, Scissors, Crop, Square, CreditCard, Images, Type } from 'lucide-react';
+import { X, Film, Palette, FileText, UploadCloud, Trash2, Scissors, Crop, Square, CreditCard, Images, Type, Wand2 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { captureFrame, lengthTag, fmtTime } from '../lib/media.js';
-import { renderPdfPage, cropToBlob, centerCover } from '../lib/imaging.js';
+import { renderPdfPage, cropToBlob, centerCover, extractPalette } from '../lib/imaging.js';
+import { expandColor } from '../lib/color.js';
 import { CARD_SIZES, cardSizeAspect, coverAspect, DEFAULT_RENDITIONS } from '../lib/types.js';
 import { useToast } from './Toast.jsx';
 import TagInput from './TagInput.jsx';
@@ -47,6 +48,7 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
   const [colors, setColors] = useState([]);
   const [exampleFile, setExampleFile] = useState(null);
   const [examplePreview, setExamplePreview] = useState(null);
+  const [extracting, setExtracting] = useState(false);
 
   // branding
   const [files, setFiles] = useState([]);
@@ -122,6 +124,23 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
     setExampleFile(file); setExamplePreview(URL.createObjectURL(file));
   };
   const addFiles = (list) => setFiles((prev) => [...prev, ...Array.from(list || [])]);
+  const extractColors = async () => {
+    if (!exampleFile) return;
+    setExtracting(true);
+    try {
+      const rgbs = await extractPalette(exampleFile, 6);
+      setColors((prev) => {
+        const have = new Set(prev.map((c) => (c.hex || '').toUpperCase()));
+        const added = [];
+        for (const rgb of rgbs) {
+          const c = expandColor('rgb', rgb);
+          if (c && !have.has(c.hex.toUpperCase())) { have.add(c.hex.toUpperCase()); added.push({ id: Math.random().toString(36).slice(2, 8), name: 'Color', ...c }); }
+        }
+        return [...prev, ...added];
+      });
+    } catch (e) { toast(`Could not read image: ${e.message}`, 'error'); }
+    finally { setExtracting(false); }
+  };
   const pickLogo = (file) => {
     if (!file) return;
     setLogoImage((prev) => { if (prev?.url) URL.revokeObjectURL(prev.url); return { file, url: URL.createObjectURL(file) }; });
@@ -324,6 +343,11 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
                   </div>
                 )}
               </div>
+              {exampleFile && (
+                <button type="button" className="btn btn-sm" style={{ marginBottom: 14 }} onClick={extractColors} disabled={extracting}>
+                  <Wand2 size={15} /> {extracting ? 'Extracting…' : 'Extract palette from image'}
+                </button>
+              )}
               <div className="field">
                 <label>Colors — enter any one type, the rest are derived</label>
                 <ColorBuilder onAdd={(c) => setColors((prev) => [...prev, { id: Math.random().toString(36).slice(2, 8), ...c }])} />

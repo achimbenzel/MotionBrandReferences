@@ -28,13 +28,37 @@ export default function PlanDetail() {
   const [newMb, setNewMb] = useState(false);
   const [renameMb, setRenameMb] = useState(null); // moodboard object
   const [bannerPicker, setBannerPicker] = useState(false);
+  const [dragMb, setDragMb] = useState(null);
   const skipInfo = useRef(true);
   const skipMs = useRef(true);
   const skipTodos = useRef(true);
+  const planRef = useRef(null);
   const bannerRef = useRef(null);
   const avatarRef = useRef(null);
   const imgRef = useRef(null);
   const pendingMb = useRef(null);
+  planRef.current = plan;
+
+  // Paste images (⌘V) into the last-used moodboard (or the first one).
+  useEffect(() => {
+    const onPaste = async (e) => {
+      const files = [...(e.clipboardData?.items || [])]
+        .filter((it) => it.type.startsWith('image/')).map((it) => it.getAsFile()).filter(Boolean);
+      if (!files.length) return;
+      e.preventDefault();
+      const boards = planRef.current?.moodboards || [];
+      const target = boards.find((m) => m.id === pendingMb.current) || boards.find((m) => !m.collapsed) || boards[0];
+      if (!target) return;
+      try {
+        setPlan(await api.addMoodboardImages(id, target.id, files));
+        pendingMb.current = target.id;
+        toast(`Pasted into “${target.name}”`);
+      } catch (err) { toast(`Paste failed: ${err.message}`, 'error'); }
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   useEffect(() => {
     let alive = true;
@@ -216,7 +240,10 @@ export default function PlanDetail() {
         </div>
 
         {(plan.moodboards || []).map((mb) => (
-          <div className="moodboard" key={mb.id}>
+          <div className={`moodboard ${dragMb === mb.id ? 'dragover' : ''}`} key={mb.id}
+            onDragOver={(e) => { e.preventDefault(); setDragMb(mb.id); }}
+            onDragLeave={(e) => { if (e.target === e.currentTarget) setDragMb(null); }}
+            onDrop={(e) => { e.preventDefault(); setDragMb(null); pendingMb.current = mb.id; onImages(e.dataTransfer.files); }}>
             <div className="moodboard-head">
               <button className="mb-collapse" onClick={() => toggleCollapse(mb)}>
                 {mb.collapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
@@ -247,10 +274,8 @@ export default function PlanDetail() {
                   ))}
                 </div>
               ) : (
-                <div className="dropzone" onClick={() => addImagesFor(mb.id)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => { e.preventDefault(); pendingMb.current = mb.id; onImages(e.dataTransfer.files); }}>
-                  <UploadCloud size={20} /><div>Drop or select images</div>
+                <div className="dropzone" onClick={() => addImagesFor(mb.id)}>
+                  <UploadCloud size={20} /><div>Drop or select images · or paste (⌘V)</div>
                 </div>
               )
             )}

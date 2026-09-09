@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Filter, X, Film, Palette, FileText, Square, CreditCard, FolderPlus, Images, Type } from 'lucide-react';
+import { Plus, Filter, X, Film, Palette, FileText, Square, CreditCard, FolderPlus, Images, Type, UploadCloud } from 'lucide-react';
 import { api, fileUrl } from '../lib/api.js';
 import { lengthTag } from '../lib/media.js';
+import { hexToRgb, readableText } from '../lib/color.js';
+import { useToast } from '../components/Toast.jsx';
 import ProjectCard from '../components/ProjectCard.jsx';
 import GalleryNameModal from '../components/GalleryNameModal.jsx';
 import ImageMasonry from '../components/ImageMasonry.jsx';
@@ -13,7 +15,7 @@ const HEAD = {
   logo: { title: 'Logos', desc: 'Logomarks — shown as square previews.', icon: Square },
   businesscard: { title: 'Business Cards', desc: 'Front & back, in 85×55 or 89×51 mm.', icon: CreditCard },
   color: { title: 'Colors', desc: 'Palettes with automatic hex / rgb / cmyk / pantone.', icon: Palette },
-  imagegallery: { title: 'Image Gallery', desc: 'Images only — listed like a moodboard.', icon: Images },
+  imagegallery: { title: 'Image Gallery', desc: 'Images only — listed like a moodboard. Paste (⌘V) or drop images to add.', icon: Images },
   font: { title: 'Fonts', desc: 'Websites & sources for free fonts.', icon: Type },
 };
 
@@ -26,12 +28,15 @@ export function effectiveTags(project) {
 
 export default function GridPage({ type, reloadKey, onAdd }) {
   const navigate = useNavigate();
+  const toast = useToast();
   const [projects, setProjects] = useState(null);
   const [galleries, setGalleries] = useState([]);
   const [error, setError] = useState(null);
   const [selected, setSelected] = useState([]);
   const [mode, setMode] = useState(() => sessionStorage.getItem(`galmode:${type}`) || 'all');
   const [newGallery, setNewGallery] = useState(null); // null | true | { imageId }
+  const [showAllColors, setShowAllColors] = useState(false);
+  const [dropping, setDropping] = useState(false);
   const head = HEAD[type];
   const isImage = type === 'imagegallery';
 
@@ -77,16 +82,76 @@ export default function GridPage({ type, reloadKey, onAdd }) {
 
   const byId = useMemo(() => Object.fromEntries((projects || []).map((p) => [p.id, p])), [projects]);
 
+  // Every unique colour across all colour projects (for the "All colours" view).
+  const allColorList = useMemo(() => {
+    if (type !== 'color' || !projects) return [];
+    const seen = new Map();
+    for (const p of projects) for (const c of (p.colors || [])) {
+      const hex = (c.hex || '').toUpperCase();
+      if (hex && !seen.has(hex)) seen.set(hex, { hex, name: c.name });
+    }
+    return [...seen.values()];
+  }, [type, projects]);
+
+  const copyHex = async (hex) => {
+    try { await navigator.clipboard.writeText(hex); toast(`${hex} copied`); }
+    catch { toast('Clipboard unavailable (needs HTTPS or localhost)', 'error'); }
+  };
+
+  // Image Gallery: add images fast via paste (⌘V) or drag-and-drop.
+  const refreshProjects = () => api.list(type).then(setProjects).catch(() => {});
+  const addImages = async (fileList) => {
+    const images = Array.from(fileList || []).filter((f) => f.type && f.type.startsWith('image/'));
+    if (!images.length) return;
+    try {
+      for (const file of images) {
+        const fd = new FormData();
+        fd.append('type', 'imagegallery');
+        fd.append('image', file);
+        await api.create(fd);
+      }
+      await refreshProjects();
+      toast(`Added ${images.length} image${images.length === 1 ? '' : 's'}`);
+    } catch (e) { toast(`Upload failed: ${e.message}`, 'error'); }
+  };
+  useEffect(() => {
+    if (!isImage) return undefined;
+    const onPaste = (e) => {
+      const files = [...(e.clipboardData?.items || [])]
+        .filter((it) => it.type.startsWith('image/')).map((it) => it.getAsFile()).filter(Boolean);
+      if (files.length) { e.preventDefault(); addImages(files); }
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isImage, type]);
+
+  const dropProps = isImage ? {
+    onDragOver: (e) => { e.preventDefault(); setDropping(true); },
+    onDragLeave: (e) => { if (e.target === e.currentTarget) setDropping(false); },
+    onDrop: (e) => { e.preventDefault(); setDropping(false); addImages(e.dataTransfer.files); },
+  } : {};
+
   return (
-    <div>
+    <div {...dropProps}>
+      {isImage && dropping && (
+        <div className="drop-overlay"><UploadCloud size={30} /><div>Drop images to add</div></div>
+      )}
       <div className="page-head-row">
         <div className="page-head">
           <h1>{head.title}</h1>
           <p>{head.desc}</p>
         </div>
-        <div className="segmented">
-          <button className={mode === 'all' ? 'on' : ''} onClick={() => switchMode('all')}>All</button>
-          <button className={mode === 'galleries' ? 'on' : ''} onClick={() => switchMode('galleries')}>Galleries</button>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          {type === 'color' && mode === 'all' && (
+            <button className={`btn btn-sm ${showAllColors ? 'btn-primary' : ''}`} onClick={() => setShowAllColors((v) => !v)}>
+              <Palette size={15} /> All colours
+            </button>
+          )}
+          <div className="segmented">
+            <button className={mode === 'all' ? 'on' : ''} onClick={() => switchMode('all')}>All</button>
+            <button className={mode === 'galleries' ? 'on' : ''} onClick={() => switchMode('galleries')}>Galleries</button>
+          </div>
         </div>
       </div>
 
@@ -109,6 +174,14 @@ export default function GridPage({ type, reloadKey, onAdd }) {
       {/* -------- All mode -------- */}
       {projects && !error && mode === 'all' && (
         <>
+          {type === 'color' && showAllColors && (
+            <div className="allcolors">
+              {allColorList.length ? allColorList.map((c) => (
+                <button key={c.hex} className="allcolor" style={{ background: c.hex, color: readableText(hexToRgb(c.hex)) }}
+                  title={`${c.name || 'Color'} — click to copy`} onClick={() => copyHex(c.hex)}>{c.hex}</button>
+              )) : <div className="hint" style={{ padding: 8 }}>No colours yet.</div>}
+            </div>
+          )}
           {allTags.length > 0 && (
             <div className="filter-row">
               <span className="filter-label"><Filter size={14} /> Filter</span>

@@ -140,7 +140,8 @@ right) switches between two modes:
     title, an optional date and a checkbox that strikes it through when done,
   - **multiple moodboards** (e.g. one for colours, one for UI): each is
     **collapsible** and holds its own images, and can be renamed or removed from
-    its own **⋯** menu,
+    its own **⋯** menu. Add images by button, by **dropping** files onto a board,
+    or by **pasting** (⌘V) into the last-used board,
   - a free‑text **Information** field and a **To-dos** checklist (add items and
     tick them off) — both auto-saved.
 
@@ -190,14 +191,23 @@ thickness) you can drag to spin and flip between front/back.
 Add an **example image** plus colors entered in **any one** format — HEX, RGB,
 CMYK or Pantone — and every representation is shown automatically. Click any
 value to copy it. The example image shows at its **true aspect ratio** (never
-cropped) and opens fullscreen.
+cropped) and opens fullscreen. Beyond that:
+- **Extract from image** — pull the dominant colours out of the example image
+  (or any image you pick) and add them to the palette in one click.
+- **Contrast checker** — pick a text and a background colour and see the WCAG
+  contrast ratio with AA / AAA pass/fail for normal and large text.
+- **Export** the palette as **CSS variables**, **JSON** or a **Tailwind** config
+  (copied to the clipboard).
+- **All colours** — on the Colors grid, toggle an overview of every unique
+  colour across all your palettes; click a swatch to copy its hex.
 
 ### Image Gallery
 A moodboard section: add **images with no name and no tags** (several at once).
-They're listed **Pinterest-style** (masonry columns) at their true aspect
-ratio; click one for fullscreen. Each image's **⋯** menu deletes it or adds it
-to a gallery (existing or new). Like every section it has the Alle / Galerien
-toggle.
+Add them the fast way — **paste** from the clipboard (⌘V) or **drag & drop**
+files straight onto the page — or via the header **+**. They're listed
+**Pinterest-style** (masonry columns) at their true aspect ratio; click one for
+fullscreen. Each image's **⋯** menu deletes it or adds it to a gallery (existing
+or new). Like every section it has the All / Galleries toggle.
 
 ### Fonts
 A bookmark collection of **websites where you can get free fonts** (Google

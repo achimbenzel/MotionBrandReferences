@@ -137,6 +137,54 @@ export function expandColor(space, value) {
 export const rgbString = ({ r, g, b }) => `rgb(${r}, ${g}, ${b})`;
 export const cmykString = ({ c, m, y, k }) => `C${c} M${m} Y${y} K${k}`;
 
+// --- Palette export (CSS variables / JSON / Tailwind) ----------------------
+function slugify(name, i) {
+  const s = String(name || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return s || `color-${i + 1}`;
+}
+function uniqueSlugs(colors) {
+  const seen = new Map();
+  return colors.map((c, i) => {
+    let s = slugify(c.name, i);
+    if (seen.has(s)) { const k = seen.get(s) + 1; seen.set(s, k); s = `${s}-${k}`; } else seen.set(s, 1);
+    return s;
+  });
+}
+export function paletteToCss(colors) {
+  const slugs = uniqueSlugs(colors);
+  return `:root {\n${colors.map((c, i) => `  --${slugs[i]}: ${c.hex};`).join('\n')}\n}`;
+}
+export function paletteToJson(colors) {
+  const slugs = uniqueSlugs(colors);
+  return JSON.stringify(colors.map((c, i) => ({ name: slugs[i], hex: c.hex, rgb: c.rgb, cmyk: c.cmyk })), null, 2);
+}
+export function paletteToTailwind(colors) {
+  const slugs = uniqueSlugs(colors);
+  return `colors: {\n${colors.map((c, i) => `  '${slugs[i]}': '${c.hex}',`).join('\n')}\n}`;
+}
+
+// --- WCAG contrast ---------------------------------------------------------
+export function relativeLuminance({ r, g, b }) {
+  const f = (v) => { const s = v / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+}
+export function contrastRatio(a, b) {
+  if (!a || !b) return 1;
+  const l1 = relativeLuminance(a);
+  const l2 = relativeLuminance(b);
+  const [hi, lo] = l1 >= l2 ? [l1, l2] : [l2, l1];
+  return (hi + 0.05) / (lo + 0.05);
+}
+// WCAG pass levels for a contrast ratio.
+export function contrastLevels(ratio) {
+  return {
+    normalAA: ratio >= 4.5,
+    normalAAA: ratio >= 7,
+    largeAA: ratio >= 3,
+    largeAAA: ratio >= 4.5,
+  };
+}
+
 // Choose readable text color for a given background.
 export function readableText(rgb) {
   if (!rgb) return '#fff';

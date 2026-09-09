@@ -2,6 +2,7 @@
 // Uses the same pdf.js that powers the branding viewer (no extra dependency).
 import * as pdfjsLib from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import { rgbToLab, deltaE } from './color.js';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -79,4 +80,47 @@ export function sourceSize(source) {
     w: source.naturalWidth || source.width,
     h: source.naturalHeight || source.height,
   };
+}
+
+/**
+ * Extract up to `n` dominant colours from an image (File or URL). Samples a
+ * downscaled copy, buckets colours coarsely, then keeps the most frequent
+ * buckets that are perceptually distinct (ΔE). Returns [{ r, g, b }].
+ */
+export async function extractPalette(src, n = 6) {
+  const { img, cleanup } = await loadImage(src);
+  try {
+    const S = 80;
+    const canvas = document.createElement('canvas');
+    canvas.width = S; canvas.height = S;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const { w, h } = sourceSize(img);
+    const scale = Math.max(S / w, S / h); // cover-fit
+    const dw = w * scale, dh = h * scale;
+    ctx.drawImage(img, (S - dw) / 2, (S - dh) / 2, dw, dh);
+    const data = ctx.getImageData(0, 0, S, S).data;
+
+    const buckets = new Map();
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] < 125) continue; // skip transparent
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      const key = `${r >> 4},${g >> 4},${b >> 4}`; // 16 levels / channel
+      const e = buckets.get(key) || { r: 0, g: 0, b: 0, n: 0 };
+      e.r += r; e.g += g; e.b += b; e.n++;
+      buckets.set(key, e);
+    }
+    const ranked = [...buckets.values()]
+      .map((e) => ({ r: Math.round(e.r / e.n), g: Math.round(e.g / e.n), b: Math.round(e.b / e.n), n: e.n }))
+      .sort((a, b) => b.n - a.n);
+
+    const chosen = [];
+    for (const col of ranked) {
+      const lab = rgbToLab(col);
+      if (chosen.every((c) => deltaE(c.lab, lab) > 12)) chosen.push({ r: col.r, g: col.g, b: col.b, lab });
+      if (chosen.length >= n) break;
+    }
+    return chosen.map(({ r, g, b }) => ({ r, g, b }));
+  } finally {
+    cleanup();
+  }
 }
