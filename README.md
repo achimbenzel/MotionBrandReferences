@@ -236,11 +236,12 @@ poll.
 
 ### Navigation: sidebar (desktop) & header (mobile)
 On **desktop** the app uses a **Notion-style left sidebar** that holds
-everything: search (⌘K), the Reference / Plan toggle, the section list (with
-icons, current one highlighted), an **Add** button for the current section, and
-a footer with **Trash** and the storage meter. A button at the top collapses
-the sidebar for a full-width canvas; a small floating button re-opens it, and
-the collapsed state is remembered.
+everything: the **logo** and a collapse button at the top, search (⌘K) below
+it, the Reference / Plan toggle, the section list (with icons, current one
+highlighted), an **Add Work** button, and a footer with **Trash** and the
+storage meter. The collapse button **slides** the sidebar out for a full-width
+canvas; a small floating button slides it back in, and the collapsed state is
+remembered.
 
 On **narrow / mobile** widths the sidebar gives way to the original floating
 **header**: the section tabs collapse into a **hamburger menu** (current one

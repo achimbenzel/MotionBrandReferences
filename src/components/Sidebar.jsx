@@ -6,6 +6,7 @@ import {
 import { TABS } from '../lib/types.js';
 import ModeToggle from './ModeToggle.jsx';
 import StorageMeter from './StorageMeter.jsx';
+import logoWide from '../../logo_wide_dark.svg';
 
 const ICON = {
   branding: FileText, motion: Film, logo: Square, businesscard: CreditCard,
@@ -20,22 +21,24 @@ export default function Sidebar({ onAdd, onSearch, onToggle, storageKey }) {
   const onTrash = pathname === '/trash';
   const active = TABS.find((t) => pathname.startsWith(`/${t.key}`))?.key
     || sessionStorage.getItem('lastTab') || 'branding';
-  const activeLabel = TABS.find((t) => t.key === active)?.label || '';
 
   const go = (key) => { sessionStorage.setItem('lastTab', key); navigate(`/${key}`); };
 
   return (
     <aside className="sidebar">
-      <div className="sb-head">
+      <div className="sb-inner">
+        <div className="sb-brand">
+          <img className="sb-logo" src={logoWide} alt="Design Reference" />
+          <button className="sb-collapse icon-btn" onClick={onToggle} title="Collapse sidebar" aria-label="Collapse sidebar">
+            <PanelLeftClose size={17} />
+          </button>
+        </div>
+
         <button className="sb-search" onClick={() => onSearch?.()} title="Search (⌘K)">
           <Search size={16} /> <span>Search</span> <kbd>⌘K</kbd>
         </button>
-        <button className="sb-collapse icon-btn" onClick={onToggle} title="Collapse sidebar" aria-label="Collapse sidebar">
-          <PanelLeftClose size={17} />
-        </button>
-      </div>
 
-      <ModeToggle planMode={planMode} />
+        <ModeToggle planMode={planMode} />
 
       <nav className="sb-nav">
         {planMode ? (
@@ -54,17 +57,18 @@ export default function Sidebar({ onAdd, onSearch, onToggle, storageKey }) {
         )}
       </nav>
 
-      <button className="sb-add" onClick={() => onAdd(active)}>
-        <Plus size={16} /> <span>{planMode ? 'New plan' : `Add ${activeLabel}`}</span>
-      </button>
-
-      <div className="sb-grow" />
-
-      <div className="sb-footer">
-        <button className={`sb-item ${onTrash ? 'active' : ''}`} onClick={() => navigate('/trash')}>
-          <Trash2 size={17} /> <span>Trash</span>
+        <button className="sb-add" onClick={() => onAdd(active)}>
+          <Plus size={16} /> <span>{planMode ? 'New plan' : 'Add Work'}</span>
         </button>
-        <StorageMeter refreshKey={storageKey} />
+
+        <div className="sb-grow" />
+
+        <div className="sb-footer">
+          <button className={`sb-item ${onTrash ? 'active' : ''}`} onClick={() => navigate('/trash')}>
+            <Trash2 size={17} /> <span>Trash</span>
+          </button>
+          <StorageMeter refreshKey={storageKey} />
+        </div>
       </div>
     </aside>
   );

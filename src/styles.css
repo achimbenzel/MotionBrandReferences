@@ -1480,17 +1480,25 @@ img { max-width: 100%; display: block; }
     display: flex; align-items: flex-start; min-height: 100vh;
   }
   .main { flex: 1; min-width: 0; }
-  .main-inner { max-width: var(--maxw); margin: 0 auto; padding: 26px 34px 90px; }
+  .main-inner { max-width: var(--maxw); margin: 0 auto; padding: 26px 34px 90px; transition: padding-top .2s ease; }
 
+  /* Outer rail animates its width; the fixed-width inner is clipped so the
+     content slides away instead of reflowing. */
   .sidebar {
+    display: block; box-sizing: border-box;
     position: sticky; top: 0; align-self: flex-start;
-    height: 100vh; width: 260px; flex-shrink: 0;
-    display: flex; flex-direction: column; gap: 8px;
-    padding: 14px 12px;
+    height: 100vh; width: 264px; flex-shrink: 0;
     background: var(--surface); border-right: 1px solid var(--border);
-    overflow-y: auto;
+    overflow-x: hidden; overflow-y: auto;
+    transition: width .24s ease, border-color .24s ease;
   }
-  .app[data-sidebar="collapsed"] .sidebar { display: none; }
+  .sb-inner {
+    width: 264px; height: 100%; box-sizing: border-box;
+    display: flex; flex-direction: column; gap: 8px; padding: 14px 12px;
+    transition: opacity .2s ease, transform .24s ease;
+  }
+  .app[data-sidebar="collapsed"] .sidebar { width: 0; border-right-color: transparent; }
+  .app[data-sidebar="collapsed"] .sb-inner { opacity: 0; transform: translateX(-14px); }
   .app[data-sidebar="collapsed"] .sb-reopen {
     display: grid; position: fixed; top: 16px; left: 16px; z-index: 45;
     background: rgba(20, 20, 22, 0.82); backdrop-filter: blur(14px); box-shadow: var(--shadow);
@@ -1498,10 +1506,14 @@ img { max-width: 100%; display: block; }
   /* Give the floating reopen button its own row so it never overlaps the title. */
   .app[data-sidebar="collapsed"] .main-inner { padding-top: 66px; }
 }
+@media (prefers-reduced-motion: reduce) {
+  .sidebar, .sb-inner, .main-inner { transition: none; }
+}
 
-.sb-head { display: flex; align-items: center; gap: 8px; }
+.sb-brand { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 2px 4px; }
+.sb-logo { height: 22px; width: auto; max-width: 170px; display: block; }
 .sb-search {
-  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;
+  width: 100%; min-width: 0; display: flex; align-items: center; gap: 8px;
   background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
   color: var(--text-muted); font: inherit; font-size: 13px; padding: 9px 12px; cursor: pointer;
 }
