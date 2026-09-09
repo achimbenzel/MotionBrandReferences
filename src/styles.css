@@ -1575,3 +1575,40 @@ img { max-width: 100%; display: block; }
 .sb-footer { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--border); padding-top: 10px; }
 .sidebar .storage-pill { width: 100%; background: var(--surface-2); box-shadow: none; }
 .sidebar .storage-text { flex: 1; }
+
+/* ============================================================ Logo Tester */
+.lt-drop { min-height: 220px; }
+.lt-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.lt-color { width: 40px; height: 32px; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: none; cursor: pointer; }
+.lt-check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted); cursor: pointer; }
+.lt-spacer { flex: 1; }
+.lt-sliders { display: flex; gap: 22px; flex-wrap: wrap; margin-bottom: 16px; }
+.lt-slider { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-muted); }
+.lt-slider span { color: var(--text); font-variant-numeric: tabular-nums; min-width: 42px; }
+.lt-slider input[type=range] { width: 220px; max-width: 46vw; accent-color: var(--accent); }
+
+.lt-stage {
+  min-height: 340px; height: 46vh; border-radius: var(--radius); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 24px; margin-bottom: 22px;
+}
+
+.lt-previews { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+.lt-card { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); padding: 16px; }
+.lt-card-wide { grid-column: 1 / -1; }
+.lt-card-title { font-size: 12px; color: var(--text-muted); margin-bottom: 14px; text-transform: uppercase; letter-spacing: .04em; }
+
+.lt-tab {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--surface-3); border: 1px solid var(--border); border-bottom: none;
+  border-radius: 8px 8px 0 0; padding: 8px 12px; font-size: 13px; color: var(--text); max-width: 100%;
+}
+.lt-tab span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lt-tab-x { color: var(--text-faint); margin-left: 4px; }
+
+.lt-appicons { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.lt-appicon { border-radius: 22%; border: 1px solid var(--border); display: grid; place-items: center; overflow: hidden; box-shadow: var(--shadow); }
+
+.lt-sizes { display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; border-radius: 10px; padding: 8px 4px; }
+.lt-size { display: flex; flex-direction: column; align-items: center; gap: 7px; }
+.lt-size span { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.lt-size-box { display: grid; place-items: center; padding: 8px; border-radius: 8px; border: 1px solid var(--border); }

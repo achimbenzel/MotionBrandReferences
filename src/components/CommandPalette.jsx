@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, CornerDownLeft, FileText, Film, Square, CreditCard, Palette, Images, Type,
-  PencilRuler, FolderOpen, Trash2, LayoutGrid,
+  PencilRuler, FolderOpen, Trash2, LayoutGrid, FlaskConical,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { TABS } from '../lib/types.js';
@@ -14,7 +14,8 @@ const TYPE_ICON = {
 
 const NAV = [
   ...TABS.map((t) => ({ kind: 'nav', title: t.label, subtitle: 'Section', to: `/${t.key}`, icon: TYPE_ICON[t.key] || LayoutGrid })),
-  { kind: 'nav', title: 'Plans', subtitle: 'Plan mode', to: '/plan', icon: PencilRuler },
+  { kind: 'nav', title: 'Plans', subtitle: 'Work mode', to: '/plan', icon: PencilRuler },
+  { kind: 'nav', title: 'Logo Tester', subtitle: 'Work mode', to: '/logo-tester', icon: FlaskConical },
   { kind: 'nav', title: 'Trash', subtitle: 'Deleted items', to: '/trash', icon: Trash2 },
 ];
 

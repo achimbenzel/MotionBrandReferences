@@ -14,6 +14,15 @@ export const TABS = [
 export const TYPE_KEYS = TABS.map((t) => t.key);
 export const isType = (t) => TYPE_KEYS.includes(t);
 
+// "Work" mode (the counterpart to Reference mode) groups working tools:
+// the Plans area and the Logo Tester.
+export const WORK_TABS = [
+  { key: 'plan', label: 'Plans', path: '/plan' },
+  { key: 'logotester', label: 'Logo Tester', path: '/logo-tester' },
+];
+export const isWorkPath = (pathname) =>
+  WORK_TABS.some((t) => pathname === t.path || pathname.startsWith(`${t.path}/`));
+
 // Preset banner gradients for Plan mode (id is stored; css is rendered).
 export const PLAN_GRADIENTS = [
   { id: 'dusk', css: 'linear-gradient(120deg, #6a11cb, #2575fc)' },

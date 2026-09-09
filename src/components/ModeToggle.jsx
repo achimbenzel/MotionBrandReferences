@@ -1,11 +1,11 @@
 import { useNavigate } from 'react-router-dom';
-import { LayoutGrid, PencilRuler } from 'lucide-react';
+import { LayoutGrid, Briefcase } from 'lucide-react';
 
 /**
- * Switches between Reference mode (the library) and Plan mode (planning new
- * projects). Sits on the left of the header, mirroring the storage pill.
+ * Switches between Reference mode (the library) and Work mode (the working
+ * area: Plans and the Logo Tester).
  */
-export default function ModeToggle({ planMode }) {
+export default function ModeToggle({ workMode }) {
   const navigate = useNavigate();
   const toReference = () => {
     const last = sessionStorage.getItem('lastTab') || 'branding';
@@ -14,20 +14,20 @@ export default function ModeToggle({ planMode }) {
   return (
     <div className="mode-toggle" role="tablist" aria-label="Mode">
       <button
-        className={`mode-btn ${!planMode ? 'on' : ''}`}
+        className={`mode-btn ${!workMode ? 'on' : ''}`}
         title="Reference mode"
-        aria-selected={!planMode}
+        aria-selected={!workMode}
         onClick={toReference}
       >
         <LayoutGrid size={16} /> <span className="mode-label">Reference</span>
       </button>
       <button
-        className={`mode-btn ${planMode ? 'on' : ''}`}
-        title="Plan mode"
-        aria-selected={planMode}
+        className={`mode-btn ${workMode ? 'on' : ''}`}
+        title="Work mode"
+        aria-selected={workMode}
         onClick={() => navigate('/plan')}
       >
-        <PencilRuler size={16} /> <span className="mode-label">Plan</span>
+        <Briefcase size={16} /> <span className="mode-label">Work</span>
       </button>
     </div>
   );

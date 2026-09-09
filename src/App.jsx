@@ -12,8 +12,9 @@ import ProjectDetail from './pages/ProjectDetail.jsx';
 import GalleryDetail from './pages/GalleryDetail.jsx';
 import PlansPage from './pages/PlansPage.jsx';
 import PlanDetail from './pages/PlanDetail.jsx';
+import LogoTester from './pages/LogoTester.jsx';
 import TrashPage from './pages/TrashPage.jsx';
-import { TABS } from './lib/types.js';
+import { TABS, isWorkPath } from './lib/types.js';
 import { api } from './lib/api.js';
 
 function Shell() {
@@ -26,7 +27,7 @@ function Shell() {
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
-  const planMode = location.pathname.startsWith('/plan');
+  const workMode = isWorkPath(location.pathname);
 
   const openModal = useCallback((type) => setModalType(type || 'branding'), []);
   const closeModal = useCallback(() => setModalType(null), []);
@@ -59,7 +60,7 @@ function Shell() {
     } catch (e) { toast(`Could not create plan: ${e.message}`, 'error'); }
   }, [navigate, toast]);
 
-  const onAdd = planMode ? createPlan : openModal;
+  const onAdd = workMode ? createPlan : openModal;
 
   return (
     <div className="app" data-sidebar={collapsed ? 'collapsed' : 'open'}>
@@ -80,6 +81,7 @@ function Shell() {
               <Route path="/project/:id" element={<ProjectDetail />} />
               <Route path="/plan" element={<PlansPage reloadKey={reloadKey} onNewPlan={createPlan} />} />
               <Route path="/plan/:id" element={<PlanDetail />} />
+              <Route path="/logo-tester" element={<LogoTester />} />
               <Route path="/trash" element={<TrashPage />} />
               <Route path="*" element={<Navigate to="/branding" replace />} />
             </Routes>

@@ -110,8 +110,9 @@ and full **ZIP64** is supported, so archives and individual files larger than
 Press **⌘K** (macOS) / **Ctrl-K**, or the header search button, to open a
 command palette that searches **across every section at once** — project
 titles, categories, tags and notes, colours (by hex), font sites, and plan
-names, milestones and to-dos. It also lets you **jump to any section** (or Plans
-/ Trash) by name. Arrow keys to move, Enter to open, Esc to close.
+names, milestones and to-dos. It also lets you **jump to any section** (or
+Plans, Logo Tester, Trash) by name. Arrow keys to move, Enter to open, Esc to
+close.
 
 ### Trash (recoverable deletes)
 
@@ -124,14 +125,17 @@ auto-empties items older than **30 days**. (Trashed items live under
 
 ---
 
-## Modes: Reference & Plan
+## Modes: Reference & Work
 
-A toggle on the **left** of the header (mirroring the storage meter on the
-right) switches between two modes:
+A toggle switches between two modes:
 
 - **Reference** — the library described below (Branding, Motion Design, Logos,
-  Business Cards, Colors, Image Gallery).
-- **Plan** — plan new projects. The **+** creates a new plan; plans are listed
+  Business Cards, Colors, Image Gallery, Fonts).
+- **Work** — your working area, with two tools: **Plans** and the **Logo
+  Tester** (see below).
+
+### Plans
+Plan new projects. The **+** creates a new plan; plans are listed
   in a grid like galleries. Each **plan** has:
   - a **Notion-style banner** — pick a **preset gradient** or upload a **custom
     image** — plus a **profile image** that can be an **emoji** (quick-pick grid
@@ -148,6 +152,16 @@ right) switches between two modes:
 
   Following the general rule below, a plan's title is only editable via the
   **⋯** menu (top-right, next to **Edit**) — there is no bare Delete button.
+
+### Logo Tester
+A sandbox (nothing is saved) to stress-test a logo. Upload a **PNG or SVG**,
+then preview it live:
+- a big **stage** with adjustable **background** (light / dark / transparent
+  checker / custom colour), **scale** and **blur** sliders, plus **grayscale**
+  and **invert** toggles;
+- real-world previews: a **browser tab** favicon, **app icons** (rounded
+  128 / 64 px tiles), exact **favicon sizes** (16 / 32 / 48 px) and a **small
+  sizes** row (24–96 px) to check legibility when tiny.
 
 ## What each section does
 
@@ -238,16 +252,16 @@ poll.
 ### Navigation: sidebar (desktop) & header (mobile)
 On **desktop** the app uses a **Notion-style left sidebar** that holds
 everything: the **logo** and a collapse button at the top, search (⌘K) below
-it, the Reference / Plan toggle, the section list (with icons, current one
-highlighted), an **Add Work** button, and a footer with **Trash** and the
-storage meter. The collapse button **slides** the sidebar out for a full-width
-canvas; a small floating button slides it back in, and the collapsed state is
-remembered.
+it, the Reference / Work toggle, the section list (with icons, current one
+highlighted), an **Add** button, and a footer with **Trash** and the storage
+meter. In **Work** mode the section list becomes **Plans** and **Logo Tester**.
+The collapse button **slides** the sidebar out for a full-width canvas; a small
+floating button slides it back in, and the collapsed state is remembered.
 
 On **narrow / mobile** widths the sidebar gives way to the original floating
 **header**: the section tabs collapse into a **hamburger menu** (current one
-checked), with search, add and the storage pill alongside. In **Plan** mode the
-tabs become a single **Plans** entry and **Add** creates a new plan.
+checked), with search, add and the storage pill alongside. In **Work** mode the
+tabs become **Plans** / **Logo Tester** and **Add** creates a new plan.
 
 ### Covers & editing (all types)
 - **Crop & zoom the cover:** when you set a thumbnail — a Motion frame, a
