@@ -46,6 +46,7 @@ data/
 ├── db.json.bak                 # mirror of the last good db.json (crash safety)
 ├── backups/db-<timestamp>.json # rotating db snapshots (last 10)
 │   └── pre-import-<ts>.zip      # safety backup made before a library import
+├── trash/<trashId>/            # soft-deleted items (auto-purged after 30 days)
 ├── motion/<id>/video.mp4       # original video
 │   ├── thumb.webp              # cover frame
 │   └── frames/*.webp           # captured keyframes (WebP = small)
@@ -103,6 +104,23 @@ The ZIP support is written from scratch with no extra dependencies. Files are
 **stored uncompressed** (videos/images/PDFs are already compressed) and streamed,
 and full **ZIP64** is supported, so archives and individual files larger than
 4 GB work. Exports open in any standard unzip tool.
+
+### Search everything (⌘K / Ctrl-K)
+
+Press **⌘K** (macOS) / **Ctrl-K**, or the header search button, to open a
+command palette that searches **across every section at once** — project
+titles, categories, tags and notes, colours (by hex), font sites, and plan
+names, milestones and to-dos. It also lets you **jump to any section** (or Plans
+/ Trash) by name. Arrow keys to move, Enter to open, Esc to close.
+
+### Trash (recoverable deletes)
+
+Deleting a **project, plan or gallery** now moves it to **Trash** instead of
+removing it immediately, and a toast offers a one-click **Undo**. Open Trash
+from the storage **⋯** menu (or the palette) to **restore** items — files and
+gallery membership come back intact — or delete them permanently. Trash
+auto-empties items older than **30 days**. (Trashed items live under
+`data/trash/` and are excluded from exports.)
 
 ---
 

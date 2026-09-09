@@ -53,9 +53,14 @@ export default function GalleryDetail() {
   };
 
   const remove = async () => {
-    if (!window.confirm(`Delete gallery “${gallery.name}”? The projects are kept.`)) return;
-    try { await api.removeGallery(id); toast('Gallery deleted'); navigate(`/${gallery.type}`); }
-    catch (e) { toast(`Delete failed: ${e.message}`, 'error'); }
+    const type = gallery.type;
+    try {
+      const { trashId } = await api.removeGallery(id);
+      navigate(`/${type}`);
+      toast('Gallery moved to Trash', 'ok', { label: 'Undo', onClick: async () => {
+        try { await api.restoreTrash(trashId); navigate(`/gallery/${id}`); } catch (e) { toast(`Undo failed: ${e.message}`, 'error'); }
+      } });
+    } catch (e) { toast(`Delete failed: ${e.message}`, 'error'); }
   };
 
   if (error) return <div className="detail"><Back /> <div className="center-msg">Couldn’t load: {error}</div></div>;

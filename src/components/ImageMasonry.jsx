@@ -16,8 +16,14 @@ export default function ImageMasonry({ projects, setProjects, galleries, onGalle
   const items = projects.map((p) => ({ src: p.image ? fileUrl(p, p.image) : fileUrl(p, p.thumb) }));
 
   const remove = async (id) => {
-    try { await api.remove(id); setProjects((prev) => prev.filter((p) => p.id !== id)); toast('Image deleted'); }
-    catch (e) { toast(`Delete failed: ${e.message}`, 'error'); }
+    try {
+      const { trashId } = await api.remove(id);
+      setProjects((prev) => prev.filter((p) => p.id !== id));
+      toast('Moved to Trash', 'ok', { label: 'Undo', onClick: async () => {
+        try { await api.restoreTrash(trashId); const p = await api.get(id); setProjects((prev) => [p, ...prev]); }
+        catch (e) { toast(`Undo failed: ${e.message}`, 'error'); }
+      } });
+    } catch (e) { toast(`Delete failed: ${e.message}`, 'error'); }
   };
 
   const addToGallery = async (gallery, projectId) => {

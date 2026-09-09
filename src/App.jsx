@@ -1,20 +1,23 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { ToastProvider, useToast } from './components/Toast.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import Header from './components/Header.jsx';
 import UploadModal from './components/UploadModal.jsx';
+import CommandPalette from './components/CommandPalette.jsx';
 import GridPage from './pages/GridPage.jsx';
 import ProjectDetail from './pages/ProjectDetail.jsx';
 import GalleryDetail from './pages/GalleryDetail.jsx';
 import PlansPage from './pages/PlansPage.jsx';
 import PlanDetail from './pages/PlanDetail.jsx';
+import TrashPage from './pages/TrashPage.jsx';
 import { TABS } from './lib/types.js';
 import { api } from './lib/api.js';
 
 function Shell() {
   const [modalType, setModalType] = useState(null); // null = closed
   const [reloadKey, setReloadKey] = useState(0);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
@@ -22,6 +25,15 @@ function Shell() {
 
   const openModal = useCallback((type) => setModalType(type || 'branding'), []);
   const closeModal = useCallback(() => setModalType(null), []);
+
+  // ⌘/Ctrl-K toggles the command palette anywhere in the app.
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); setPaletteOpen((v) => !v); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const handleCreated = useCallback((project) => {
     setModalType(null);
@@ -40,7 +52,7 @@ function Shell() {
 
   return (
     <div className="app">
-      <Header onAdd={planMode ? createPlan : openModal} storageKey={reloadKey} />
+      <Header onAdd={planMode ? createPlan : openModal} onSearch={() => setPaletteOpen(true)} storageKey={reloadKey} />
       <ErrorBoundary>
         <Routes>
           <Route path="/" element={<Navigate to="/branding" replace />} />
@@ -51,6 +63,7 @@ function Shell() {
           <Route path="/project/:id" element={<ProjectDetail />} />
           <Route path="/plan" element={<PlansPage reloadKey={reloadKey} onNewPlan={createPlan} />} />
           <Route path="/plan/:id" element={<PlanDetail />} />
+          <Route path="/trash" element={<TrashPage />} />
           <Route path="*" element={<Navigate to="/branding" replace />} />
         </Routes>
       </ErrorBoundary>
@@ -58,6 +71,7 @@ function Shell() {
       {modalType && (
         <UploadModal initialType={modalType} onClose={closeModal} onCreated={handleCreated} />
       )}
+      {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
     </div>
   );
 }

@@ -90,9 +90,13 @@ export default function PlanDetail() {
   };
 
   const remove = async () => {
-    if (!window.confirm(`Delete plan “${plan.name}”? This can’t be undone.`)) return;
-    try { await api.removePlan(id); toast('Plan deleted'); navigate('/plan'); }
-    catch (e) { toast(`Delete failed: ${e.message}`, 'error'); }
+    try {
+      const { trashId } = await api.removePlan(id);
+      navigate('/plan');
+      toast('Moved to Trash', 'ok', { label: 'Undo', onClick: async () => {
+        try { await api.restoreTrash(trashId); navigate(`/plan/${id}`); } catch (e) { toast(`Undo failed: ${e.message}`, 'error'); }
+      } });
+    } catch (e) { toast(`Delete failed: ${e.message}`, 'error'); }
   };
 
   // Milestones

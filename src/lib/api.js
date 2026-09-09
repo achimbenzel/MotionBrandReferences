@@ -149,6 +149,26 @@ export const api = {
     return plan;
   },
 
+  // --- Search ---
+  async search(q) {
+    const { results } = await handle(await fetch(`/api/search?q=${encodeURIComponent(q)}`));
+    return results;
+  },
+
+  // --- Trash (soft delete) ---
+  async listTrash() {
+    return handle(await fetch('/api/trash'));
+  },
+  async restoreTrash(trashId) {
+    return handle(await fetch(`/api/trash/${trashId}/restore`, { method: 'POST' }));
+  },
+  async purgeTrash(trashId) {
+    return handle(await fetch(`/api/trash/${trashId}`, { method: 'DELETE' }));
+  },
+  async emptyTrash() {
+    return handle(await fetch('/api/trash', { method: 'DELETE' }));
+  },
+
   // --- Export / Import ---
   exportUrl: '/api/export',
   async importLibrary(file) {

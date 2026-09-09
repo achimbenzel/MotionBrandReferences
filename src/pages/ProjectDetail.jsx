@@ -38,11 +38,13 @@ export default function ProjectDetail() {
   }, [id]);
 
   const remove = async () => {
-    if (!window.confirm(`Delete “${project.title}” and all its files? This can’t be undone.`)) return;
+    const type = project.type;
     try {
-      await api.remove(id);
-      toast('Project deleted');
-      navigate(`/${project.type}`);
+      const { trashId } = await api.remove(id);
+      navigate(`/${type}`);
+      toast('Moved to Trash', 'ok', { label: 'Undo', onClick: async () => {
+        try { await api.restoreTrash(trashId); navigate(`/project/${id}`); } catch (e) { toast(`Undo failed: ${e.message}`, 'error'); }
+      } });
     } catch (e) {
       toast(`Delete failed: ${e.message}`, 'error');
     }

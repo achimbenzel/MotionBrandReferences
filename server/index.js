@@ -27,14 +27,20 @@ const TMP_DIR = path.join(DATA_DIR, 'tmp');
 const DB_PATH = path.join(DATA_DIR, 'db.json');
 const DB_BAK = path.join(DATA_DIR, 'db.json.bak');   // mirror of the last good db.json
 const BACKUP_DIR = path.join(DATA_DIR, 'backups');   // rotating db snapshots
+const TRASH_DIR = path.join(DATA_DIR, 'trash');      // soft-deleted items
 const DIST_DIR = path.join(ROOT, 'dist');
 const PORT = process.env.API_PORT || 4300;
 const IS_PROD = process.env.NODE_ENV === 'production';
 
 const MAX_SNAPSHOTS = 10;                             // how many db snapshots to keep
 const SNAPSHOT_INTERVAL_MS = 3 * 60 * 1000;          // at most one snapshot per 3 min
+const TRASH_TTL_DAYS = 30;                           // auto-purge trashed items after this
 
 const TYPES = new Set(['motion', 'color', 'branding', 'logo', 'businesscard', 'imagegallery', 'font']);
+const TYPE_LABEL = {
+  motion: 'Motion Design', color: 'Colors', branding: 'Branding', logo: 'Logos',
+  businesscard: 'Business Cards', imagegallery: 'Image Gallery', font: 'Fonts',
+};
 const DEFAULT_STORAGE_LIMIT = 80 * 1024 * 1024 * 1024; // 80 GB
 
 // ---------------------------------------------------------------------------
@@ -42,7 +48,7 @@ const DEFAULT_STORAGE_LIMIT = 80 * 1024 * 1024 * 1024; // 80 GB
 // ---------------------------------------------------------------------------
 function ensureDirs() {
   const typeDirs = [...TYPES].map((t) => path.join(DATA_DIR, t));
-  for (const d of [DATA_DIR, TMP_DIR, BACKUP_DIR, path.join(DATA_DIR, 'plan'), ...typeDirs]) {
+  for (const d of [DATA_DIR, TMP_DIR, BACKUP_DIR, TRASH_DIR, path.join(DATA_DIR, 'plan'), ...typeDirs]) {
     fs.mkdirSync(d, { recursive: true });
   }
   if (!fs.existsSync(DB_PATH)) {
@@ -97,6 +103,7 @@ async function readDB() {
   if (!Array.isArray(db.projects)) db.projects = [];
   if (!Array.isArray(db.galleries)) db.galleries = [];
   if (!Array.isArray(db.plans)) db.plans = [];
+  if (!Array.isArray(db.trash)) db.trash = [];
   for (const plan of db.plans) normalizePlan(plan);
   if (!db.settings || typeof db.settings !== 'object') db.settings = {};
   if (db.settings.storageLimitBytes == null) db.settings.storageLimitBytes = DEFAULT_STORAGE_LIMIT;
@@ -176,6 +183,41 @@ function safeRm(target, opts) {
   invalidateStorage();
   return fsp.rm(target, opts);
 }
+
+// --- Trash (soft delete): move a folder aside instead of removing it. ---
+async function moveToTrash(from, to) {
+  assertInside(from); assertInside(to);
+  if (!fs.existsSync(from)) return; // nothing on disk (e.g. a gallery, or a fileless item)
+  await fsp.mkdir(TRASH_DIR, { recursive: true });
+  await fsp.rename(from, to).catch(async (err) => {
+    if (err.code === 'EXDEV') { await fsp.cp(from, to, { recursive: true }); await fsp.rm(from, { recursive: true, force: true }); }
+    else if (err.code !== 'ENOENT') throw err;
+  });
+  invalidateStorage();
+}
+async function restoreFromTrash(from, to) {
+  assertInside(from); assertInside(to);
+  if (!fs.existsSync(from)) return;
+  await fsp.mkdir(path.dirname(to), { recursive: true });
+  await safeRm(to, { recursive: true, force: true }).catch(() => {});
+  await fsp.rename(from, to).catch(async (err) => {
+    if (err.code === 'EXDEV') { await fsp.cp(from, to, { recursive: true }); await fsp.rm(from, { recursive: true, force: true }); }
+    else throw err;
+  });
+  invalidateStorage();
+}
+async function purgeExpiredTrash() {
+  const db = await readDB();
+  const cutoff = Date.now() - TRASH_TTL_DAYS * 86400000;
+  const expired = (db.trash || []).filter((t) => (t.deletedAt || 0) < cutoff);
+  if (!expired.length) return;
+  await mutateDB((d) => { d.trash = (d.trash || []).filter((t) => (t.deletedAt || 0) >= cutoff); });
+  for (const t of expired) await safeRm(path.join(TRASH_DIR, t.trashId), { recursive: true, force: true }).catch(() => {});
+}
+const trashThumb = (t) => {
+  const rel = t.kind === 'project' ? t.data.thumb : t.kind === 'plan' ? (t.data.avatar || t.data.banner) : null;
+  return rel ? `/data/trash/${t.trashId}/${rel}` : null;
+};
 function mutateDB(mutator) {
   const run = async () => {
     const db = await readDB();
@@ -511,24 +553,26 @@ app.delete('/api/projects/:id/frames/:frameId', async (req, res) => {
   }
 });
 
-// ---- Delete a whole project ----------------------------------------------
+// ---- Delete a whole project (soft delete → Trash) -------------------------
 app.delete('/api/projects/:id', async (req, res) => {
   try {
-    let type = null;
+    const trashId = nanoid(10);
+    let move = null;
     const ok = await mutateDB((db) => {
       const idx = db.projects.findIndex((p) => p.id === req.params.id);
       if (idx === -1) return false;
-      type = db.projects[idx].type;
+      const project = db.projects[idx];
+      // Remember gallery membership so restore can put it back.
+      const galleryIds = db.galleries.filter((g) => (g.projectIds || []).includes(project.id)).map((g) => g.id);
+      for (const g of db.galleries) if (g.projectIds) g.projectIds = g.projectIds.filter((pid) => pid !== project.id);
       db.projects.splice(idx, 1);
-      // Drop the project from any gallery it belonged to.
-      for (const g of db.galleries) {
-        if (g.projectIds) g.projectIds = g.projectIds.filter((pid) => pid !== req.params.id);
-      }
+      db.trash.unshift({ trashId, kind: 'project', deletedAt: Date.now(), galleryIds, data: project });
+      move = { from: path.join(DATA_DIR, project.type, project.id), to: path.join(TRASH_DIR, trashId) };
       return true;
     });
     if (!ok) return res.status(404).json({ error: 'not_found' });
-    await safeRm(path.join(DATA_DIR, type, req.params.id), { recursive: true, force: true }).catch(() => {});
-    res.json({ ok: true });
+    if (move) await moveToTrash(move.from, move.to);
+    res.json({ ok: true, trashId });
   } catch (err) {
     res.status(500).json({ error: 'delete_failed', message: String(err.message || err) });
   }
@@ -579,14 +623,17 @@ app.patch('/api/galleries/:id', async (req, res) => {
 });
 
 app.delete('/api/galleries/:id', async (req, res) => {
+  const trashId = nanoid(10);
   const ok = await mutateDB((db) => {
     const idx = db.galleries.findIndex((g) => g.id === req.params.id);
     if (idx === -1) return false;
+    const gallery = db.galleries[idx];
     db.galleries.splice(idx, 1);
+    db.trash.unshift({ trashId, kind: 'gallery', deletedAt: Date.now(), data: gallery });
     return true;
   });
   if (!ok) return res.status(404).json({ error: 'not_found' });
-  res.json({ ok: true });
+  res.json({ ok: true, trashId });
 });
 
 // ---------------------------------------------------------------------------
@@ -732,15 +779,139 @@ app.delete('/api/plans/:id/moodboards/:mbId/images/:imgId', async (req, res) => 
 });
 
 app.delete('/api/plans/:id', async (req, res) => {
+  const trashId = nanoid(10);
+  let move = null;
   const ok = await mutateDB((db) => {
     const idx = db.plans.findIndex((p) => p.id === req.params.id);
     if (idx === -1) return false;
+    const plan = db.plans[idx];
     db.plans.splice(idx, 1);
+    db.trash.unshift({ trashId, kind: 'plan', deletedAt: Date.now(), data: plan });
+    move = { from: path.join(DATA_DIR, 'plan', plan.id), to: path.join(TRASH_DIR, trashId) };
     return true;
   });
   if (!ok) return res.status(404).json({ error: 'not_found' });
-  await safeRm(path.join(DATA_DIR, 'plan', req.params.id), { recursive: true, force: true }).catch(() => {});
+  if (move) await moveToTrash(move.from, move.to);
+  res.json({ ok: true, trashId });
+});
+
+// ---------------------------------------------------------------------------
+// Global search across projects, plans and galleries.
+// ---------------------------------------------------------------------------
+function scoreMatch(terms, title, hay) {
+  const t = title.toLowerCase();
+  let score = 0;
+  for (const term of terms) {
+    if (!hay.includes(term)) return 0; // every term must appear somewhere (AND)
+    score += t.includes(term) ? 10 : 1;
+    if (t.startsWith(term)) score += 5;
+  }
+  return score;
+}
+app.get('/api/search', async (req, res) => {
+  const q = String(req.query.q || '').trim().toLowerCase();
+  if (!q) return res.json({ results: [] });
+  const terms = q.split(/\s+/).filter(Boolean);
+  const db = await readDB();
+  const results = [];
+
+  for (const p of db.projects) {
+    const hay = [p.title, p.year, p.category, ...(p.tags || []), p.notes, p.url,
+      ...(p.colors || []).flatMap((c) => [c.hex, c.name])].filter(Boolean).join(' ').toLowerCase();
+    const score = scoreMatch(terms, p.title || '', hay);
+    if (score > 0) results.push({
+      kind: 'project', id: p.id, type: p.type, title: p.title || 'Untitled',
+      subtitle: p.category || TYPE_LABEL[p.type] || p.type,
+      thumb: p.thumb ? `/data/${p.type}/${p.id}/${p.thumb}` : null, score,
+    });
+  }
+  for (const pl of db.plans) {
+    const hay = [pl.name, pl.info, ...(pl.milestones || []).map((m) => m.title),
+      ...(pl.todos || []).map((t) => t.text)].filter(Boolean).join(' ').toLowerCase();
+    const score = scoreMatch(terms, pl.name || '', hay);
+    if (score > 0) results.push({
+      kind: 'plan', id: pl.id, title: pl.name || 'Untitled plan', subtitle: 'Plan',
+      thumb: pl.avatar ? `/data/plan/${pl.id}/${pl.avatar}` : null, score,
+    });
+  }
+  for (const g of db.galleries) {
+    const hay = [g.name, TYPE_LABEL[g.type], g.type].filter(Boolean).join(' ').toLowerCase();
+    const score = scoreMatch(terms, g.name || '', hay);
+    if (score > 0) results.push({
+      kind: 'gallery', id: g.id, type: g.type, title: g.name || 'Gallery',
+      subtitle: `Gallery · ${TYPE_LABEL[g.type] || g.type}`, score,
+    });
+  }
+  results.sort((a, b) => b.score - a.score || (a.title || '').localeCompare(b.title || ''));
+  res.json({ results: results.slice(0, 40) });
+});
+
+// ---------------------------------------------------------------------------
+// Trash (soft delete) — list, restore, permanently delete, empty.
+// ---------------------------------------------------------------------------
+app.get('/api/trash', async (_req, res) => {
+  await purgeExpiredTrash().catch(() => {});
+  const db = await readDB();
+  const items = (db.trash || []).map((t) => ({
+    trashId: t.trashId, kind: t.kind, deletedAt: t.deletedAt,
+    title: t.kind === 'plan' ? (t.data.name || 'Untitled plan')
+      : t.kind === 'gallery' ? (t.data.name || 'Gallery') : (t.data.title || 'Untitled'),
+    subtitle: t.kind === 'project' ? (TYPE_LABEL[t.data.type] || t.data.type)
+      : t.kind === 'gallery' ? `Gallery · ${TYPE_LABEL[t.data.type] || t.data.type}` : 'Plan',
+    thumb: trashThumb(t),
+  }));
+  res.json({ items, ttlDays: TRASH_TTL_DAYS });
+});
+
+app.post('/api/trash/:trashId/restore', async (req, res) => {
+  try {
+    let move = null;
+    const restored = await mutateDB((db) => {
+      const idx = (db.trash || []).findIndex((t) => t.trashId === req.params.trashId);
+      if (idx === -1) return null;
+      const entry = db.trash[idx];
+      if (entry.kind === 'project') {
+        db.projects.push(entry.data);
+        for (const gid of entry.galleryIds || []) {
+          const g = db.galleries.find((x) => x.id === gid);
+          if (g) { g.projectIds = g.projectIds || []; if (!g.projectIds.includes(entry.data.id)) g.projectIds.push(entry.data.id); }
+        }
+        move = { from: path.join(TRASH_DIR, entry.trashId), to: path.join(DATA_DIR, entry.data.type, entry.data.id) };
+      } else if (entry.kind === 'plan') {
+        db.plans.push(entry.data);
+        move = { from: path.join(TRASH_DIR, entry.trashId), to: path.join(DATA_DIR, 'plan', entry.data.id) };
+      } else if (entry.kind === 'gallery') {
+        db.galleries.push(entry.data);
+      }
+      db.trash.splice(idx, 1);
+      return entry;
+    });
+    if (!restored) return res.status(404).json({ error: 'not_found' });
+    if (move) await restoreFromTrash(move.from, move.to);
+    res.json({ ok: true, kind: restored.kind, id: restored.data.id, type: restored.data.type });
+  } catch (err) {
+    res.status(500).json({ error: 'restore_failed', message: String(err.message || err) });
+  }
+});
+
+app.delete('/api/trash/:trashId', async (req, res) => {
+  let dir = null;
+  const ok = await mutateDB((db) => {
+    const idx = (db.trash || []).findIndex((t) => t.trashId === req.params.trashId);
+    if (idx === -1) return false;
+    dir = path.join(TRASH_DIR, req.params.trashId);
+    db.trash.splice(idx, 1);
+    return true;
+  });
+  if (!ok) return res.status(404).json({ error: 'not_found' });
+  if (dir) await safeRm(dir, { recursive: true, force: true }).catch(() => {});
   res.json({ ok: true });
+});
+
+app.delete('/api/trash', async (_req, res) => {
+  const ids = await mutateDB((db) => { const list = (db.trash || []).map((t) => t.trashId); db.trash = []; return list; });
+  for (const tid of ids) await safeRm(path.join(TRASH_DIR, tid), { recursive: true, force: true }).catch(() => {});
+  res.json({ ok: true, removed: ids.length });
 });
 
 // ---------------------------------------------------------------------------
@@ -767,6 +938,7 @@ const EXPORT_SKIP = (rel) =>
   rel === 'db.json.bak'
   || rel.startsWith('backups/') || rel === 'backups'
   || rel.startsWith('tmp/') || rel === 'tmp'
+  || rel.startsWith('trash/') || rel === 'trash'
   || /^\.db-.*\.tmp$/.test(rel);
 
 app.get('/api/export', async (_req, res) => {
@@ -843,6 +1015,8 @@ function parseJSON(value, fallback) {
   if (typeof value !== 'string') return value;
   try { return JSON.parse(value); } catch { return fallback; }
 }
+
+purgeExpiredTrash().catch(() => {}); // clear items older than the TTL on boot
 
 const server = app.listen(PORT, () => {
   console.log(`\n  Design Reference API  →  http://localhost:${PORT}`);

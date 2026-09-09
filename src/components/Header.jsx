@@ -1,11 +1,11 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Plus, Menu as MenuIcon, Check } from 'lucide-react';
+import { Plus, Menu as MenuIcon, Check, Search } from 'lucide-react';
 import { TABS } from '../lib/types.js';
 import Menu from './Menu.jsx';
 import StorageMeter from './StorageMeter.jsx';
 import ModeToggle from './ModeToggle.jsx';
 
-export default function Header({ onAdd, storageKey }) {
+export default function Header({ onAdd, onSearch, storageKey }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const planMode = pathname.startsWith('/plan');
@@ -49,6 +49,9 @@ export default function Header({ onAdd, storageKey }) {
             </>
           )}
 
+          <button className="icon-btn header-search" title="Search (⌘K)" aria-label="Search" onClick={() => onSearch?.()}>
+            <Search size={18} />
+          </button>
           <button className="icon-btn header-plus" title={planMode ? 'New plan' : 'Add new work'} aria-label={planMode ? 'New plan' : 'Add new work'} onClick={() => onAdd(active)}>
             <Plus size={19} />
           </button>

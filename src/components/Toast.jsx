@@ -7,11 +7,15 @@ export const useToast = () => useContext(ToastCtx);
 export function ToastProvider({ children }) {
   const [toast, setToast] = useState(null);
 
-  const show = useCallback((message, kind = 'ok') => {
-    setToast({ message, kind });
+  // show(message, kind?, action?) — action = { label, onClick } renders a button
+  // (e.g. Undo) and keeps the toast up a little longer.
+  const show = useCallback((message, kind = 'ok', action = null) => {
+    setToast({ message, kind, action });
     clearTimeout(show._t);
-    show._t = setTimeout(() => setToast(null), 3200);
+    show._t = setTimeout(() => setToast(null), action ? 6000 : 3200);
   }, []);
+
+  const dismiss = () => { clearTimeout(show._t); setToast(null); };
 
   return (
     <ToastCtx.Provider value={show}>
@@ -21,7 +25,12 @@ export function ToastProvider({ children }) {
           {toast.kind === 'error'
             ? <AlertTriangle size={16} className="danger" />
             : <CheckCircle2 size={16} style={{ color: 'var(--accent)' }} />}
-          {toast.message}
+          <span>{toast.message}</span>
+          {toast.action && (
+            <button className="toast-action" onClick={() => { dismiss(); toast.action.onClick(); }}>
+              {toast.action.label}
+            </button>
+          )}
         </div>
       )}
     </ToastCtx.Provider>

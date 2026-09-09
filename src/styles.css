@@ -1368,3 +1368,60 @@ img { max-width: 100%; display: block; }
   color: var(--accent); text-decoration: none; word-break: break-all;
 }
 .font-link:hover { text-decoration: underline; }
+
+/* ------------------------------------------------------ Command palette */
+.header-search { margin-left: 2px; }
+.toast-action {
+  margin-left: 4px; background: transparent; border: 1px solid var(--border-strong);
+  color: var(--accent); font: inherit; font-weight: 600; font-size: 13px;
+  padding: 3px 10px; border-radius: 8px; cursor: pointer;
+}
+.toast-action:hover { background: var(--surface-2); }
+
+.cmd-overlay { padding-top: 12vh; }
+.cmd {
+  width: 100%; max-width: 620px;
+  background: var(--surface-2); border: 1px solid var(--border-strong);
+  border-radius: 16px; box-shadow: 0 24px 60px rgba(0, 0, 0, .55);
+  overflow: hidden;
+}
+.cmd-input { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--border); color: var(--text-muted); }
+.cmd-input input { flex: 1; background: transparent; border: 0; outline: none; color: var(--text); font: inherit; font-size: 16px; }
+.cmd-input input::placeholder { color: var(--text-faint); }
+.cmd-esc { font-size: 11px; color: var(--text-faint); border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; }
+.cmd-list { max-height: 56vh; overflow-y: auto; padding: 6px; }
+.cmd-empty { padding: 28px; text-align: center; color: var(--text-faint); }
+.cmd-item {
+  width: 100%; display: flex; align-items: center; gap: 12px;
+  padding: 9px 10px; border-radius: 10px; border: 0; background: transparent;
+  color: var(--text); cursor: pointer; text-align: left;
+}
+.cmd-item.on { background: var(--surface-3); }
+.cmd-icon {
+  width: 38px; height: 38px; flex-shrink: 0; border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--border);
+  display: grid; place-items: center; color: var(--text-muted); overflow: hidden;
+}
+.cmd-icon img { width: 100%; height: 100%; object-fit: cover; }
+.cmd-text { display: flex; flex-direction: column; min-width: 0; }
+.cmd-title { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cmd-sub { font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cmd-enter { margin-left: auto; color: var(--text-faint); flex-shrink: 0; }
+
+/* ------------------------------------------------------------- Trash */
+.trash-list { display: flex; flex-direction: column; gap: 8px; }
+.trash-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
+}
+.trash-thumb {
+  width: 52px; height: 40px; flex-shrink: 0; border-radius: 8px; overflow: hidden;
+  background: var(--surface-2); border: 1px solid var(--border);
+  display: grid; place-items: center; color: var(--text-muted);
+}
+.trash-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.trash-meta { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.trash-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trash-sub { font-size: 12px; color: var(--text-muted); }
+.trash-purge { color: var(--text-muted); }
+.trash-purge:hover { color: var(--danger); }
