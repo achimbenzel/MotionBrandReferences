@@ -206,6 +206,38 @@ async function restoreFromTrash(from, to) {
   });
   invalidateStorage();
 }
+// Move specific plan files (relative paths under data/plan/<planId>/) into a
+// trash folder, preserving their relative layout so restore is a plain move back.
+async function moveFilesToTrash(trashId, planId, rels) {
+  for (const rel of rels) {
+    if (!rel) continue;
+    const from = path.join(DATA_DIR, 'plan', planId, rel);
+    const to = path.join(TRASH_DIR, trashId, rel);
+    assertInside(from); assertInside(to);
+    if (!fs.existsSync(from)) continue;
+    await fsp.mkdir(path.dirname(to), { recursive: true });
+    await fsp.rename(from, to).catch(async (err) => {
+      if (err.code === 'EXDEV') { await fsp.cp(from, to, { recursive: true }); await fsp.rm(from, { recursive: true, force: true }); }
+      else if (err.code !== 'ENOENT') throw err;
+    });
+  }
+  invalidateStorage();
+}
+async function restoreFilesFromTrash(trashId, planId, rels) {
+  for (const rel of rels) {
+    if (!rel) continue;
+    const from = path.join(TRASH_DIR, trashId, rel);
+    const to = path.join(DATA_DIR, 'plan', planId, rel);
+    assertInside(from); assertInside(to);
+    if (!fs.existsSync(from)) continue;
+    await fsp.mkdir(path.dirname(to), { recursive: true });
+    await fsp.rename(from, to).catch(async (err) => {
+      if (err.code === 'EXDEV') { await fsp.cp(from, to, { recursive: true }); await fsp.rm(from, { recursive: true, force: true }); }
+      else throw err;
+    });
+  }
+  invalidateStorage();
+}
 async function purgeExpiredTrash() {
   const db = await readDB();
   const cutoff = Date.now() - TRASH_TTL_DAYS * 86400000;
@@ -215,7 +247,9 @@ async function purgeExpiredTrash() {
   for (const t of expired) await safeRm(path.join(TRASH_DIR, t.trashId), { recursive: true, force: true }).catch(() => {});
 }
 const trashThumb = (t) => {
-  const rel = t.kind === 'project' ? t.data.thumb : t.kind === 'plan' ? (t.data.avatar || t.data.banner) : null;
+  const rel = t.kind === 'project' ? t.data.thumb
+    : t.kind === 'plan' ? (t.data.avatar || t.data.banner)
+      : t.kind === 'file' ? (t.data.item?.example) : null;
   return rel ? `/data/trash/${t.trashId}/${rel}` : null;
 };
 function mutateDB(mutator) {
@@ -258,7 +292,7 @@ function normalizeBlock(b) {
     if (!Array.isArray(b.items)) b.items = [];
   } else if (b.type === 'files') {
     if (!Array.isArray(b.files)) b.files = [];
-    if (!('cover' in b)) b.cover = null;
+    delete b.cover; // legacy block-level cover — files now carry per-item example images
   } else if (b.type === 'links' || b.type === 'refs' || b.type === 'palette') {
     if (!Array.isArray(b.items)) b.items = [];
   } else if (b.type === 'heading') {
@@ -756,7 +790,7 @@ app.post('/api/plans/:id/blocks', async (req, res) => {
               : type === 'heading' ? { ...base, title: '', content: '' }
                 : type === 'divider' ? { ...base }
                   : type === 'table' ? { ...base, columns: [{ id: nanoid(6), name: '' }, { id: nanoid(6), name: '' }], rows: [] }
-                    : { ...base, cover: null, files: [] };
+                    : { ...base, files: [] };
   const updated = await mutateDB((db) => { const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null; p.blocks.push(block); return p; });
   if (!updated) return res.status(404).json({ error: 'not_found' });
   res.status(201).json({ plan: updated, block });
@@ -826,47 +860,54 @@ app.post('/api/plans/:id/blocks/:blockId/files', upload.array('files', 50), asyn
   } catch (err) { await cleanupTmp(req); res.status(500).json({ error: 'files_failed', message: String(err.message || err) }); }
 });
 
-app.delete('/api/plans/:id/blocks/:blockId/files/:fileId', async (req, res) => {
-  let removedFile = null;
-  const updated = await mutateDB((db) => {
-    const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null;
-    const b = findBlock(p, req.params.blockId); if (!b) return null;
-    const arr = b.type === 'moodboard' ? b.images : b.files; if (!Array.isArray(arr)) return null;
-    const idx = arr.findIndex((f) => f.id === req.params.fileId); if (idx === -1) return null;
-    removedFile = arr[idx].file;
-    arr.splice(idx, 1);
-    return p;
-  });
-  if (!updated) return res.status(404).json({ error: 'not_found' });
-  if (removedFile) await safeRm(path.join(DATA_DIR, 'plan', req.params.id, removedFile), { force: true }).catch(() => {});
-  res.json({ plan: updated });
-});
-
-// Example/preview image (cover) for a files block.
-app.post('/api/plans/:id/blocks/:blockId/cover', upload.single('cover'), async (req, res) => {
+// Add one file to a files block: the file itself, an optional example image
+// (shown as a square preview before it) and an optional title.
+app.post('/api/plans/:id/blocks/:blockId/file', upload.fields([{ name: 'file', maxCount: 1 }, { name: 'example', maxCount: 1 }]), async (req, res) => {
   try {
     const db = await readDB();
     const plan = db.plans.find((p) => p.id === req.params.id);
     const b0 = findBlock(plan, req.params.blockId);
+    const file = req.files?.file?.[0];
+    const example = req.files?.example?.[0];
     if (!plan || !b0 || b0.type !== 'files') { await cleanupTmp(req); return res.status(404).json({ error: 'not_found' }); }
-    if (!req.file) return res.status(400).json({ error: 'file_required' });
-    const stored = await moveInto(blockDir(plan.id, b0.id), req.file.path, `cover${extOf(req.file.originalname) || '.png'}`);
-    const updated = await mutateDB((d) => { findBlock(d.plans.find((x) => x.id === plan.id), b0.id).cover = `blocks/${b0.id}/${stored}`; return d.plans.find((x) => x.id === plan.id); });
+    if (!file) { await cleanupTmp(req); return res.status(400).json({ error: 'file_required' }); }
+    const dir = blockDir(plan.id, b0.id);
+    const fid = nanoid(8);
+    const storedFile = await moveInto(dir, file.path, `${fid}${extOf(file.originalname) || ''}`);
+    let exampleRel = null;
+    if (example) {
+      const storedEx = await moveInto(dir, example.path, `${fid}_ex${extOf(example.originalname) || '.png'}`);
+      exampleRel = `blocks/${b0.id}/${storedEx}`;
+    }
+    const item = { id: fid, file: `blocks/${b0.id}/${storedFile}`, name: file.originalname, size: file.size, title: String(req.body.title || '').trim(), example: exampleRel };
+    const updated = await mutateDB((d) => { const b = findBlock(d.plans.find((x) => x.id === plan.id), b0.id); b.files = [...(b.files || []), item]; return d.plans.find((x) => x.id === plan.id); });
     await cleanupTmp(req);
-    res.json({ plan: updated });
-  } catch (err) { await cleanupTmp(req); res.status(500).json({ error: 'cover_failed', message: String(err.message || err) }); }
+    res.status(201).json({ plan: updated });
+  } catch (err) { await cleanupTmp(req); res.status(500).json({ error: 'file_failed', message: String(err.message || err) }); }
 });
 
-app.delete('/api/plans/:id/blocks/:blockId/cover', async (req, res) => {
-  let removedFile = null;
+app.delete('/api/plans/:id/blocks/:blockId/files/:fileId', async (req, res) => {
+  const planId = req.params.id;
+  let removed = null; let blockType = null;
   const updated = await mutateDB((db) => {
-    const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null;
-    const b = findBlock(p, req.params.blockId); if (!b || b.type !== 'files') return null;
-    removedFile = b.cover; b.cover = null;
+    const p = db.plans.find((x) => x.id === planId); if (!p) return null;
+    const b = findBlock(p, req.params.blockId); if (!b) return null;
+    const arr = b.type === 'moodboard' ? b.images : b.files; if (!Array.isArray(arr)) return null;
+    const idx = arr.findIndex((f) => f.id === req.params.fileId); if (idx === -1) return null;
+    removed = arr[idx]; blockType = b.type;
+    arr.splice(idx, 1);
     return p;
   });
   if (!updated) return res.status(404).json({ error: 'not_found' });
-  if (removedFile) await safeRm(path.join(DATA_DIR, 'plan', req.params.id, removedFile), { force: true }).catch(() => {});
+  if (removed && blockType === 'files') {
+    // Soft delete → Trash (file + its example image), restorable later.
+    const trashId = nanoid(10);
+    const rels = [removed.file, removed.example].filter(Boolean);
+    await moveFilesToTrash(trashId, planId, rels);
+    await mutateDB((db) => { db.trash.unshift({ trashId, kind: 'file', deletedAt: Date.now(), data: { planId, blockId: req.params.blockId, item: removed, rels } }); });
+    return res.json({ plan: updated, trashId });
+  }
+  if (removed?.file) await safeRm(path.join(DATA_DIR, 'plan', planId, removed.file), { force: true }).catch(() => {});
   res.json({ plan: updated });
 });
 
@@ -954,9 +995,12 @@ app.get('/api/trash', async (_req, res) => {
   const items = (db.trash || []).map((t) => ({
     trashId: t.trashId, kind: t.kind, deletedAt: t.deletedAt,
     title: t.kind === 'plan' ? (t.data.name || 'Untitled plan')
-      : t.kind === 'gallery' ? (t.data.name || 'Gallery') : (t.data.title || 'Untitled'),
+      : t.kind === 'gallery' ? (t.data.name || 'Gallery')
+        : t.kind === 'file' ? (t.data.item?.title || t.data.item?.name || 'File')
+          : (t.data.title || 'Untitled'),
     subtitle: t.kind === 'project' ? (TYPE_LABEL[t.data.type] || t.data.type)
-      : t.kind === 'gallery' ? `Gallery · ${TYPE_LABEL[t.data.type] || t.data.type}` : 'Plan',
+      : t.kind === 'gallery' ? `Gallery · ${TYPE_LABEL[t.data.type] || t.data.type}`
+        : t.kind === 'file' ? 'File' : 'Plan',
     thumb: trashThumb(t),
   }));
   res.json({ items, ttlDays: TRASH_TTL_DAYS });
@@ -964,7 +1008,7 @@ app.get('/api/trash', async (_req, res) => {
 
 app.post('/api/trash/:trashId/restore', async (req, res) => {
   try {
-    let move = null;
+    let move = null; let fileRestore = null; let gone = false;
     const restored = await mutateDB((db) => {
       const idx = (db.trash || []).findIndex((t) => t.trashId === req.params.trashId);
       if (idx === -1) return null;
@@ -981,13 +1025,21 @@ app.post('/api/trash/:trashId/restore', async (req, res) => {
         move = { from: path.join(TRASH_DIR, entry.trashId), to: path.join(DATA_DIR, 'plan', entry.data.id) };
       } else if (entry.kind === 'gallery') {
         db.galleries.push(entry.data);
+      } else if (entry.kind === 'file') {
+        const p = db.plans.find((x) => x.id === entry.data.planId);
+        const b = p && p.blocks && p.blocks.find((x) => x.id === entry.data.blockId);
+        if (!b || b.type !== 'files') { gone = true; return null; } // its plan/block is gone — leave it in Trash
+        b.files = [...(b.files || []), entry.data.item];
+        fileRestore = entry.data;
       }
       db.trash.splice(idx, 1);
       return entry;
     });
+    if (gone) return res.status(409).json({ error: 'target_gone', message: 'The files block this file belonged to no longer exists.' });
     if (!restored) return res.status(404).json({ error: 'not_found' });
     if (move) await restoreFromTrash(move.from, move.to);
-    res.json({ ok: true, kind: restored.kind, id: restored.data.id, type: restored.data.type });
+    if (fileRestore) await restoreFilesFromTrash(req.params.trashId, fileRestore.planId, fileRestore.rels);
+    res.json({ ok: true, kind: restored.kind, id: restored.data?.id, type: restored.data?.type });
   } catch (err) {
     res.status(500).json({ error: 'restore_failed', message: String(err.message || err) });
   }

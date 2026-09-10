@@ -59,7 +59,7 @@ data/
 └── plan/<id>/                      # Plan-mode plans
     ├── banner.<ext>, avatar.<ext>  # Notion-style banner + profile image
     └── blocks/<blockId>/*          # one folder per content block
-                                    # (moodboard images, uploaded files, cover)
+                                    # (moodboard images, files + example images)
 ```
 
 `data/` is **git-ignored and lives outside the source code**, so you can pull
@@ -117,12 +117,13 @@ close.
 
 ### Trash (recoverable deletes)
 
-Deleting a **project, plan or gallery** now moves it to **Trash** instead of
-removing it immediately, and a toast offers a one-click **Undo**. Open Trash
-from the storage **⋯** menu (or the palette) to **restore** items — files and
-gallery membership come back intact — or delete them permanently. Trash
-auto-empties items older than **30 days**. (Trashed items live under
-`data/trash/` and are excluded from exports.)
+Deleting a **project, plan or gallery** — or a **file from a plan's Files
+block** — now moves it to **Trash** instead of removing it immediately, and a
+toast offers a one-click **Undo**. Open Trash from the storage **⋯** menu (or
+the palette) to **restore** items — files, example images and gallery
+membership come back intact — or delete them permanently. Trash auto-empties
+items older than **30 days**. (Trashed items live under `data/trash/` and are
+excluded from exports.)
 
 ---
 
@@ -153,13 +154,17 @@ Plan new projects. The **+** creates a new plan; plans are listed
       board.
     - **Text** — a free-text notes area, auto-saved.
     - **To-dos** — a checklist you add items to and tick off, auto-saved.
-    - **Files** — uploaded files shown as a downloadable list (name + size, open
-      in a new tab), plus an optional **example image** preview for the block.
+    - **Files** — a list of uploaded files. **Add file** opens a small dialog
+      where you pick an **example image**, write a **title** and choose the
+      **file**; each file is then listed with its example image as a **square
+      preview** before it. Deleting a file **moves it to Trash** first (with
+      Undo), so nothing is lost by accident.
     - **Links** — a list of **bookmarks** (label + URL), each opening in a new
       tab; handy for inspiration, references or client sites.
     - **References** — attach existing items from your **Reference library**
-      (projects and galleries) via a search picker; each shows as a card that
-      **jumps to that item**, so a plan can point back at the work it draws on.
+      (projects and galleries) via a search picker; they’re shown as the **same
+      cards as in the library** (three across) and **jump to that item**, so a
+      plan can point back at the work it draws on.
     - **Palette** — a set of colour **swatches** (hex + optional name); add them
       by hand or **extract a palette from an uploaded image**, and copy any hex
       with one click.
@@ -283,6 +288,10 @@ On **narrow / mobile** widths the sidebar gives way to the original floating
 **header**: the section tabs collapse into a **hamburger menu** (current one
 checked), with search, add and the storage pill alongside. In **Work** mode the
 tabs become **Plans** / **Logo Tester** and **Add** creates a new plan.
+
+A project's detail page has **Previous / Next** buttons at the foot (and the
+**← / →** arrow keys) to step through the other projects in the same section
+without going back to the grid; stepping past the last one wraps to the first.
 
 ### Covers & editing (all types)
 - **Crop & zoom the cover:** when you set a thumbnail — a Motion frame, a

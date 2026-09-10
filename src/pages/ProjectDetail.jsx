@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Trash2, Pencil, Image as ImageIcon, MoreHorizontal } from 'lucide-react';
+import { ArrowLeft, Trash2, Pencil, Image as ImageIcon, MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api, fileUrl } from '../lib/api.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
@@ -26,6 +26,7 @@ export default function ProjectDetail() {
   const [thumbing, setThumbing] = useState(false);
   const [thumbSaving, setThumbSaving] = useState(false);
   const [logoOptions, setLogoOptions] = useState(false);
+  const [siblings, setSiblings] = useState([]); // ids of same-type projects, in grid order
 
   useEffect(() => {
     let alive = true;
@@ -36,6 +37,32 @@ export default function ProjectDetail() {
       .catch((e) => { if (alive) setError(e.message); });
     return () => { alive = false; };
   }, [id]);
+
+  // Load same-type siblings so we can step Previous / Next through the section.
+  useEffect(() => {
+    if (!project?.type) return undefined;
+    let alive = true;
+    api.list(project.type).then((list) => { if (alive) setSiblings(list.map((p) => p.id)); }).catch(() => {});
+    return () => { alive = false; };
+  }, [project?.type]);
+
+  const sibIdx = siblings.indexOf(id);
+  const hasNav = sibIdx >= 0 && siblings.length > 1;
+  const prevId = hasNav ? siblings[(sibIdx - 1 + siblings.length) % siblings.length] : null;
+  const nextId = hasNav ? siblings[(sibIdx + 1) % siblings.length] : null;
+
+  // Arrow keys step through siblings (ignored while typing in a field).
+  useEffect(() => {
+    if (!hasNav) return undefined;
+    const onKey = (e) => {
+      const el = document.activeElement;
+      if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+      if (e.key === 'ArrowLeft' && prevId) navigate(`/project/${prevId}`);
+      else if (e.key === 'ArrowRight' && nextId) navigate(`/project/${nextId}`);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [hasNav, prevId, nextId, navigate]);
 
   const remove = async () => {
     const type = project.type;
@@ -106,6 +133,18 @@ export default function ProjectDetail() {
       </div>
 
       <Body project={project} setProject={setProject} />
+
+      {hasNav && (
+        <div className="detail-nav">
+          <button className="detail-nav-btn" onClick={() => navigate(`/project/${prevId}`)} title="Previous (←)">
+            <ChevronLeft size={17} /> Previous
+          </button>
+          <span className="detail-nav-count">{sibIdx + 1} / {siblings.length}</span>
+          <button className="detail-nav-btn" onClick={() => navigate(`/project/${nextId}`)} title="Next (→)">
+            Next <ChevronRight size={17} />
+          </button>
+        </div>
+      )}
 
       {editing && (
         <EditDetailsModal

@@ -5,7 +5,7 @@ import { fmtTime } from '../lib/media.js';
 import { cardSize, logoSource, logoScale, logoActive, hostOf } from '../lib/types.js';
 import LogoImage from './LogoImage.jsx';
 
-export default function ProjectCard({ project, onRemove }) {
+export default function ProjectCard({ project, onRemove, removeTitle = 'Remove from gallery' }) {
   const navigate = useNavigate();
   const thumb = project.thumb ? fileUrl(project, project.thumb) : null;
   const isImage = project.type === 'imagegallery';
@@ -24,7 +24,7 @@ export default function ProjectCard({ project, onRemove }) {
   return (
     <div className="card" onClick={open}>
       {onRemove && (
-        <button className="card-remove icon-btn" title="Remove from gallery"
+        <button className="card-remove icon-btn" title={removeTitle}
           onClick={(e) => { e.stopPropagation(); onRemove(); }}><X size={15} /></button>
       )}
 

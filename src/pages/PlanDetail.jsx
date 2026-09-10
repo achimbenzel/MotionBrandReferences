@@ -7,7 +7,7 @@ import {
   Link2, Library, FolderOpen, Palette as PaletteIcon, Heading as HeadingIcon,
   Minus, Table as TableIcon, Wand2, Copy,
 } from 'lucide-react';
-import { api, planFileUrl } from '../lib/api.js';
+import { api, planFileUrl, fileUrl } from '../lib/api.js';
 import { PLAN_GRADIENTS, gradientCss, normalizeUrl, hostOf } from '../lib/types.js';
 import { rgbToHex, hexToRgb } from '../lib/color.js';
 import { extractPalette } from '../lib/imaging.js';
@@ -16,6 +16,8 @@ import Menu from '../components/Menu.jsx';
 import Lightbox from '../components/Lightbox.jsx';
 import GalleryNameModal from '../components/GalleryNameModal.jsx';
 import RefPicker from '../components/RefPicker.jsx';
+import FileAddModal from '../components/FileAddModal.jsx';
+import ProjectCard from '../components/ProjectCard.jsx';
 
 const rid = () => Math.random().toString(36).slice(2, 8);
 
@@ -62,6 +64,8 @@ export default function PlanDetail() {
   const [renameBlock, setRenameBlock] = useState(null); // block being renamed
   const [addOpen, setAddOpen] = useState(false);
   const [refPickerBlock, setRefPickerBlock] = useState(null); // block id currently picking references
+  const [fileModalBlock, setFileModalBlock] = useState(null); // block id for the add-file modal
+  const [refCache, setRefCache] = useState({}); // `${refKind}:${refId}` -> { project?|gallery?+members?|gone? }
   const [bannerPicker, setBannerPicker] = useState(false);
   const [avatarPicker, setAvatarPicker] = useState(false);
   const [emojiInput, setEmojiInput] = useState('');
@@ -71,8 +75,8 @@ export default function PlanDetail() {
   const bannerRef = useRef(null);
   const avatarRef = useRef(null);
   const filesRef = useRef(null);
-  const coverRef = useRef(null);
   const paletteRef = useRef(null);
+  const refReq = useRef(new Set()); // referenced ids already fetched, so we load each once
   const pending = useRef(null);       // { blockId } for the files/cover inputs
   const lastMoodboard = useRef(null); // block id for paste target
   const timers = useRef({});
@@ -170,10 +174,23 @@ export default function PlanDetail() {
   };
   const addFilesTo = (bid) => { pending.current = bid; filesRef.current?.click(); };
   const onFiles = async (files) => { if (!files?.length || !pending.current) return; try { setPlan(await api.addBlockFiles(id, pending.current, files)); } catch (e) { toast(`Upload failed: ${e.message}`, 'error'); } };
-  const removeFile = async (bid, fid) => { try { setPlan(await api.removeBlockFile(id, bid, fid)); } catch (e) { toast(`Failed: ${e.message}`, 'error'); } };
-  const setCover = (bid) => { pending.current = bid; coverRef.current?.click(); };
-  const onCover = async (file) => { if (!file || !pending.current) return; try { setPlan(await api.setBlockCover(id, pending.current, file)); } catch (e) { toast(`Failed: ${e.message}`, 'error'); } };
-  const clearCover = async (bid) => { try { setPlan(await api.removeBlockCover(id, bid)); } catch (e) { toast(`Failed: ${e.message}`, 'error'); } };
+  // Add one file (with example image + title) to a files block via the modal.
+  const submitFile = async ({ file, example, title }) => {
+    if (!fileModalBlock) return;
+    try { setPlan(await api.addBlockFile(id, fileModalBlock, { file, example, title })); setFileModalBlock(null); }
+    catch (e) { toast(`Upload failed: ${e.message}`, 'error'); }
+  };
+  const removeFile = async (bid, fid) => {
+    try {
+      const res = await api.removeBlockFile(id, bid, fid);
+      if (res.plan) setPlan(res.plan);
+      if (res.trashId) {
+        toast('Moved to Trash', 'ok', { label: 'Undo', onClick: async () => {
+          try { await api.restoreTrash(res.trashId); setPlan(await api.getPlan(id)); } catch (e) { toast(`Undo failed: ${e.message}`, 'error'); }
+        } });
+      }
+    } catch (e) { toast(`Failed: ${e.message}`, 'error'); }
+  };
 
   // References block — attach existing library items (projects / galleries).
   const addRef = (bid, item) => {
@@ -187,6 +204,32 @@ export default function PlanDetail() {
     editBlock(bid, { items: (b.items || []).filter((r) => r.id !== itemId) }, true);
   };
   const openRef = (r) => navigate(r.refKind === 'gallery' ? `/gallery/${r.refId}` : `/project/${r.refId}`);
+
+  // Load full data for referenced library items so they render as real cards.
+  useEffect(() => {
+    const items = (plan?.blocks || []).filter((b) => b.type === 'refs').flatMap((b) => b.items || []);
+    items.forEach((r) => {
+      const key = `${r.refKind}:${r.refId}`;
+      if (refReq.current.has(key)) return;
+      refReq.current.add(key);
+      (async () => {
+        try {
+          if (r.refKind === 'gallery') {
+            const g = await api.getGallery(r.refId);
+            const members = [];
+            for (const mid of (g.projectIds || [])) {
+              try { members.push(await api.get(mid)); } catch { /* skip missing member */ }
+              if (members.filter((m) => m.thumb).length >= 4) break;
+            }
+            setRefCache((c) => ({ ...c, [key]: { gallery: g, members } }));
+          } else {
+            const project = await api.get(r.refId);
+            setRefCache((c) => ({ ...c, [key]: { project } }));
+          }
+        } catch { setRefCache((c) => ({ ...c, [key]: { gone: true } })); }
+      })();
+    });
+  }, [plan]);
 
   // Palette block — swatches (hex + optional name), or extract from an image.
   const extractInto = (bid) => { pending.current = bid; paletteRef.current?.click(); };
@@ -292,7 +335,6 @@ export default function PlanDetail() {
       <input ref={bannerRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { setImage('banner', e.target.files[0]); e.target.value = ''; }} />
       <input ref={avatarRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { setImage('avatar', e.target.files[0]); e.target.value = ''; }} />
       <input ref={filesRef} type="file" multiple className="visually-hidden-input" onChange={(e) => { onFiles(e.target.files); e.target.value = ''; }} />
-      <input ref={coverRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { onCover(e.target.files[0]); e.target.value = ''; }} />
       <input ref={paletteRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { onExtract(e.target.files[0]); e.target.value = ''; }} />
 
       {/* Timeframe + milestones (fixed) */}
@@ -442,20 +484,41 @@ export default function PlanDetail() {
                 </div>
               </div>
               {items.length ? (
-                <div className="reflist">
-                  {items.map((r) => (
-                    <div className="refcard" key={r.id} onClick={() => openRef(r)} title={r.title}>
-                      <span className="refcard-thumb">
-                        {r.thumb ? <img src={r.thumb} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
-                          : r.refKind === 'gallery' ? <FolderOpen size={20} /> : <FileIcon size={20} />}
-                      </span>
-                      <span className="refcard-text">
-                        <span className="refcard-title">{r.title}</span>
-                        <span className="refcard-sub">{r.subtitle}</span>
-                      </span>
-                      <button className="icon-btn refcard-del" onClick={(e) => { e.stopPropagation(); removeRef(b.id, r.id); }} title="Remove"><X size={14} /></button>
-                    </div>
-                  ))}
+                <div className="grid ref-grid">
+                  {items.map((r) => {
+                    const data = refCache[`${r.refKind}:${r.refId}`];
+                    if (data?.project) return <ProjectCard key={r.id} project={data.project} onRemove={() => removeRef(b.id, r.id)} removeTitle="Remove reference" />;
+                    if (data?.gallery) {
+                      const covers = (data.members || []).filter((m) => m.thumb).slice(0, 4);
+                      const count = (data.gallery.projectIds || []).length;
+                      return (
+                        <div className="card gallery-card" key={r.id} onClick={() => openRef(r)}>
+                          <button className="card-remove icon-btn" title="Remove reference" onClick={(e) => { e.stopPropagation(); removeRef(b.id, r.id); }}><X size={15} /></button>
+                          <div className="gallery-mosaic">
+                            {covers.length ? covers.map((m) => <img key={m.id} src={fileUrl(m, m.thumb)} alt="" loading="lazy" />)
+                              : <div className="card-thumb-empty"><FolderOpen size={26} /></div>}
+                          </div>
+                          <div className="card-meta"><span className="card-title">{data.gallery.name}</span></div>
+                          <div className="card-sub">{count} {count === 1 ? 'project' : 'projects'}</div>
+                        </div>
+                      );
+                    }
+                    if (data?.gone) return (
+                      <div className="card ref-gone" key={r.id}>
+                        <button className="card-remove icon-btn" title="Remove reference" onClick={() => removeRef(b.id, r.id)}><X size={15} /></button>
+                        <div className="card-thumb"><div className="card-thumb-empty"><FileIcon size={22} /></div></div>
+                        <div className="card-meta"><span className="card-title">{r.title || 'Missing item'}</span></div>
+                        <div className="card-sub">No longer in your library</div>
+                      </div>
+                    );
+                    return (
+                      <div className="card ref-loading" key={r.id}>
+                        <div className="card-thumb"><div className="spinner" /></div>
+                        <div className="card-meta"><span className="card-title">{r.title || '…'}</span></div>
+                        <div className="card-sub">{r.subtitle || 'Loading…'}</div>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="dropzone" onClick={() => setRefPickerBlock(b.id)}>
@@ -518,7 +581,7 @@ export default function PlanDetail() {
                 <div className="heading-fields">
                   <input className="heading-input" value={b.title} placeholder="Section heading"
                     onChange={(e) => editBlock(b.id, { title: e.target.value })} />
-                  <input className="heading-sub" value={b.content || ''} placeholder="Optional description…"
+                  <input className="heading-sub" value={b.content || ''} placeholder="Add a description…"
                     onChange={(e) => editBlock(b.id, { content: e.target.value })} />
                 </div>
                 {menu}
@@ -560,7 +623,7 @@ export default function PlanDetail() {
                       {columns.map((c) => (
                         <th key={c.id}>
                           <div className="th-inner">
-                            <input className="cell-input th-input" value={c.name} placeholder="Column"
+                            <input className="cell-input th-input" value={c.name} placeholder=""
                               onChange={(e) => saveTable(b, columns.map((x) => (x.id === c.id ? { ...x, name: e.target.value } : x)), rows)} />
                             <button className="icon-btn th-del" title="Remove column"
                               onClick={() => saveTable(b, columns.filter((x) => x.id !== c.id), rows.map((r) => { const cells = { ...r.cells }; delete cells[c.id]; return { ...r, cells }; }), true)}><X size={13} /></button>
@@ -598,8 +661,7 @@ export default function PlanDetail() {
           );
         }
 
-        // files
-        const cover = b.cover ? planFileUrl(plan, b.cover) : null;
+        // files — each file shows a square example image before it.
         return (
           <div className={`section block ${dragBlock === b.id ? 'dragover' : ''}`} key={b.id}
             onDragOver={(e) => { e.preventDefault(); setDragBlock(b.id); }}
@@ -608,39 +670,32 @@ export default function PlanDetail() {
             <div className="section-head">
               <h2><Meta.icon size={16} /> {b.title} {(b.files || []).length > 0 && <span className="count">{b.files.length}</span>}</h2>
               <div className="moodboard-actions">
-                <button className="btn btn-sm" onClick={() => addFilesTo(b.id)}><UploadCloud size={14} /> Add files</button>{menu}
+                <button className="btn btn-sm" onClick={() => setFileModalBlock(b.id)}><Plus size={14} /> Add file</button>{menu}
               </div>
-            </div>
-
-            <div className="files-cover">
-              {cover ? (
-                <figure className="media-frame" style={{ marginBottom: 12 }}>
-                  <img src={cover} alt="example" />
-                  <div className="files-cover-actions">
-                    <button className="btn btn-sm" onClick={() => setCover(b.id)}><ImageIcon size={14} /> Change</button>
-                    <button className="btn btn-sm btn-ghost" onClick={() => clearCover(b.id)}>Remove</button>
-                  </div>
-                </figure>
-              ) : (
-                <button className="btn btn-sm files-cover-add" onClick={() => setCover(b.id)}><ImageIcon size={14} /> Set example image</button>
-              )}
             </div>
 
             {(b.files || []).length ? (
               <div className="filelist">
-                {b.files.map((f) => (
-                  <div className="filerow" key={f.id}>
-                    <FileIcon size={18} className="filerow-icon" />
-                    <a className="filerow-name" href={planFileUrl(plan, f.file)} target="_blank" rel="noopener noreferrer" title={f.name}>{f.name}</a>
-                    <span className="filerow-size">{fmtBytes(f.size)}</span>
-                    <a className="icon-btn filerow-open" href={planFileUrl(plan, f.file)} target="_blank" rel="noopener noreferrer" title="Open"><ExternalLink size={15} /></a>
-                    <button className="icon-btn filerow-del" onClick={() => removeFile(b.id, f.id)} title="Remove"><X size={15} /></button>
-                  </div>
-                ))}
+                {b.files.map((f) => {
+                  const ex = f.example ? planFileUrl(plan, f.example) : null;
+                  return (
+                    <div className="filerow" key={f.id}>
+                      <a className="filerow-ex" href={planFileUrl(plan, f.file)} target="_blank" rel="noopener noreferrer" title={f.title || f.name}>
+                        {ex ? <img src={ex} alt="" loading="lazy" /> : <FileIcon size={20} />}
+                      </a>
+                      <div className="filerow-main">
+                        <a className="filerow-name" href={planFileUrl(plan, f.file)} target="_blank" rel="noopener noreferrer" title={f.title || f.name}>{f.title || f.name}</a>
+                        <span className="filerow-meta">{[f.title ? f.name : null, fmtBytes(f.size)].filter(Boolean).join(' · ')}</span>
+                      </div>
+                      <a className="icon-btn filerow-open" href={planFileUrl(plan, f.file)} target="_blank" rel="noopener noreferrer" title="Open"><ExternalLink size={15} /></a>
+                      <button className="icon-btn filerow-del" onClick={() => removeFile(b.id, f.id)} title="Move to Trash"><X size={15} /></button>
+                    </div>
+                  );
+                })}
               </div>
             ) : (
-              <div className="dropzone" onClick={() => addFilesTo(b.id)}>
-                <UploadCloud size={20} /><div>Drop or select files</div>
+              <div className="dropzone" onClick={() => setFileModalBlock(b.id)}>
+                <UploadCloud size={20} /><div>Add a file — with an optional example image</div>
               </div>
             )}
           </div>
@@ -673,6 +728,9 @@ export default function PlanDetail() {
           onPick={(item) => addRef(refPickerBlock, item)}
           onClose={() => setRefPickerBlock(null)}
         />
+      )}
+      {fileModalBlock && (
+        <FileAddModal onSubmit={submitFile} onClose={() => setFileModalBlock(null)} />
       )}
     </div>
   );

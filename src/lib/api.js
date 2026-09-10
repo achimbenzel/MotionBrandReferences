@@ -151,19 +151,17 @@ export const api = {
     const { plan } = await handle(await fetch(`/api/plans/${id}/blocks/${blockId}/files`, { method: 'POST', body: fd }));
     return plan;
   },
-  async removeBlockFile(id, blockId, fileId) {
-    const { plan } = await handle(await fetch(`/api/plans/${id}/blocks/${blockId}/files/${fileId}`, { method: 'DELETE' }));
-    return plan;
-  },
-  async setBlockCover(id, blockId, file) {
+  // Add one file to a files block, with an optional example image + title.
+  async addBlockFile(id, blockId, { file, example, title }) {
     const fd = new FormData();
-    fd.append('cover', file, 'cover.img');
-    const { plan } = await handle(await fetch(`/api/plans/${id}/blocks/${blockId}/cover`, { method: 'POST', body: fd }));
+    fd.append('file', file);
+    if (example) fd.append('example', example);
+    if (title) fd.append('title', title);
+    const { plan } = await handle(await fetch(`/api/plans/${id}/blocks/${blockId}/file`, { method: 'POST', body: fd }));
     return plan;
   },
-  async removeBlockCover(id, blockId) {
-    const { plan } = await handle(await fetch(`/api/plans/${id}/blocks/${blockId}/cover`, { method: 'DELETE' }));
-    return plan;
+  async removeBlockFile(id, blockId, fileId) {
+    return handle(await fetch(`/api/plans/${id}/blocks/${blockId}/files/${fileId}`, { method: 'DELETE' }));
   },
 
   // --- Search ---
