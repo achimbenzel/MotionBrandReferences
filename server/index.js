@@ -238,8 +238,11 @@ const extOf = (name) => {
   return e && e.length <= 6 ? e : '';
 };
 
-const BLOCK_TYPES = new Set(['moodboard', 'text', 'todos', 'files', 'links', 'refs']);
-const BLOCK_TITLES = { moodboard: 'Moodboard', text: 'Text', todos: 'To-dos', files: 'Files', links: 'Links', refs: 'References' };
+const BLOCK_TYPES = new Set(['moodboard', 'text', 'todos', 'files', 'links', 'refs', 'palette', 'heading', 'divider', 'table']);
+const BLOCK_TITLES = {
+  moodboard: 'Moodboard', text: 'Text', todos: 'To-dos', files: 'Files', links: 'Links',
+  refs: 'References', palette: 'Palette', heading: 'Heading', divider: 'Divider', table: 'Table',
+};
 
 function normalizeBlock(b) {
   if (!b || typeof b !== 'object') return null;
@@ -256,8 +259,13 @@ function normalizeBlock(b) {
   } else if (b.type === 'files') {
     if (!Array.isArray(b.files)) b.files = [];
     if (!('cover' in b)) b.cover = null;
-  } else if (b.type === 'links' || b.type === 'refs') {
+  } else if (b.type === 'links' || b.type === 'refs' || b.type === 'palette') {
     if (!Array.isArray(b.items)) b.items = [];
+  } else if (b.type === 'heading') {
+    if (typeof b.content !== 'string') b.content = '';
+  } else if (b.type === 'table') {
+    if (!Array.isArray(b.columns)) b.columns = [];
+    if (!Array.isArray(b.rows)) b.rows = [];
   }
   return b;
 }
@@ -744,14 +752,18 @@ app.post('/api/plans/:id/blocks', async (req, res) => {
       : type === 'todos' ? { ...base, items: [] }
         : type === 'links' ? { ...base, items: [] }
           : type === 'refs' ? { ...base, items: [] }
-            : { ...base, cover: null, files: [] };
+            : type === 'palette' ? { ...base, items: [] }
+              : type === 'heading' ? { ...base, title: '', content: '' }
+                : type === 'divider' ? { ...base }
+                  : type === 'table' ? { ...base, columns: [{ id: nanoid(6), name: '' }, { id: nanoid(6), name: '' }], rows: [] }
+                    : { ...base, cover: null, files: [] };
   const updated = await mutateDB((db) => { const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null; p.blocks.push(block); return p; });
   if (!updated) return res.status(404).json({ error: 'not_found' });
   res.status(201).json({ plan: updated, block });
 });
 
 // Update only the content/label fields — never the file arrays.
-const BLOCK_EDITABLE = ['title', 'collapsed', 'content', 'items'];
+const BLOCK_EDITABLE = ['title', 'collapsed', 'content', 'items', 'columns', 'rows'];
 app.patch('/api/plans/:id/blocks/:blockId', async (req, res) => {
   const updated = await mutateDB((db) => {
     const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null;
@@ -908,8 +920,10 @@ app.get('/api/search', async (req, res) => {
   for (const pl of db.plans) {
     const blockText = (pl.blocks || []).flatMap((b) => [
       b.title, b.content,
-      ...(b.items || []).flatMap((t) => [t.text, t.title, t.url]),
+      ...(b.items || []).flatMap((t) => [t.text, t.title, t.url, t.name, t.hex]),
       ...(b.files || []).map((f) => f.name),
+      ...(b.columns || []).map((c) => c.name),
+      ...(b.rows || []).flatMap((r) => Object.values(r.cells || {})),
     ]);
     const hay = [pl.name, ...(pl.milestones || []).map((m) => m.title), ...blockText]
       .filter(Boolean).join(' ').toLowerCase();

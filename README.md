@@ -160,6 +160,15 @@ Plan new projects. The **+** creates a new plan; plans are listed
     - **References** — attach existing items from your **Reference library**
       (projects and galleries) via a search picker; each shows as a card that
       **jumps to that item**, so a plan can point back at the work it draws on.
+    - **Palette** — a set of colour **swatches** (hex + optional name); add them
+      by hand or **extract a palette from an uploaded image**, and copy any hex
+      with one click.
+    - **Heading** and **Divider** — lightweight structural blocks (an inline
+      heading with an optional subtitle, and a horizontal rule) for organising
+      longer plans.
+    - **Table** — a small editable grid: rename columns, add/remove columns and
+      rows, and any column whose values are all numeric gets an automatic
+      **sum row** (handy for budget lines).
 
   Following the general rule below, a plan's title and each block's name are only
   editable via a **⋯** menu — there is no bare Delete button.

@@ -1424,6 +1424,55 @@ img { max-width: 100%; display: block; }
 .refcard:hover .refcard-del { opacity: 1; }
 .refcard-del:hover { color: var(--danger); }
 
+/* Palette block — colour swatches. */
+.swatchlist { display: flex; flex-wrap: wrap; gap: 10px; }
+.swatch { width: 132px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.swatch-chip { position: relative; display: block; height: 54px; cursor: pointer; }
+.swatch-chip input[type="color"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: 0; padding: 0; cursor: pointer; }
+.swatch-actions { position: absolute; top: 5px; right: 5px; display: flex; gap: 4px; opacity: 0; transition: opacity .15s; }
+.swatch:hover .swatch-actions { opacity: 1; }
+.swatch-actions .icon-btn { width: 24px; height: 24px; background: rgba(0, 0, 0, .5); color: #fff; }
+.swatch-actions .icon-btn:hover { background: rgba(0, 0, 0, .72); }
+.swatch-body { display: flex; flex-direction: column; gap: 2px; padding: 6px 6px 8px; }
+.swatch .input { background: transparent; border-color: transparent; padding: 4px 6px; font-size: 12px; }
+.swatch .input:focus { background: var(--surface-2); border-color: var(--accent); }
+.swatch-hex { text-transform: uppercase; font-weight: 600; letter-spacing: .02em; }
+.swatch-name { color: var(--text-muted); }
+
+/* Heading & Divider — lightweight structural blocks. */
+.heading-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.heading-fields { flex: 1; min-width: 0; }
+.heading-input, .heading-sub { width: 100%; background: transparent; border: 0; color: var(--text); font-family: inherit; padding: 2px 0; }
+.heading-input { font-size: 25px; font-weight: 700; }
+.heading-input:focus, .heading-sub:focus { outline: none; }
+.heading-sub { font-size: 14px; color: var(--text-muted); margin-top: 2px; }
+.heading-input::placeholder { color: var(--text-faint); }
+.heading-sub::placeholder { color: var(--text-faint); }
+.divider-row { display: flex; align-items: center; gap: 8px; }
+.block-hr { flex: 1; border: 0; border-top: 1px solid var(--border); margin: 6px 0; }
+.block-divider .icon-btn { opacity: .4; transition: opacity .15s; }
+.block-divider:hover .icon-btn { opacity: 1; }
+
+/* Table block — a small editable grid with an auto sum row. */
+.table-scroll { overflow-x: auto; }
+.plan-table { border-collapse: collapse; }
+.plan-table th, .plan-table td { border: 1px solid var(--border); padding: 0; vertical-align: middle; }
+.plan-table thead th, .plan-table tfoot td { background: var(--surface); }
+.cell-input { width: 100%; min-width: 130px; background: transparent; border: 0; color: var(--text); font: inherit; font-size: 14px; padding: 8px 10px; }
+.cell-input:focus { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--surface-2); }
+.th-inner { display: flex; align-items: center; }
+.th-input { font-weight: 600; }
+.th-del { flex-shrink: 0; margin-right: 4px; color: var(--text-faint); opacity: 0; transition: opacity .15s; }
+.plan-table th:hover .th-del { opacity: 1; }
+.th-del:hover { color: var(--danger); }
+.plan-table th.th-add, .plan-table td.row-del-cell { border: 0; width: 40px; text-align: center; background: transparent; }
+.th-add .icon-btn, .row-del { color: var(--text-muted); }
+.row-del { opacity: 0; transition: opacity .15s; }
+.plan-table tbody tr:hover .row-del { opacity: 1; }
+.row-del:hover { color: var(--danger); }
+.plan-table tfoot td { font-weight: 600; color: var(--text-muted); padding: 8px 10px; font-variant-numeric: tabular-nums; }
+.table-empty { color: var(--text-faint); font-size: 13px; margin-top: 10px; }
+
 /* Plan grid card (Notion-style) */
 .plan-card-head { position: relative; margin-bottom: 24px; }
 .plan-card-banner { aspect-ratio: 16 / 9; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface-2) center/cover no-repeat; }

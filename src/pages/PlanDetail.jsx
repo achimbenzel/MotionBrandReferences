@@ -4,10 +4,13 @@ import {
   ArrowLeft, Trash2, Pencil, MoreHorizontal, CalendarRange, Images, StickyNote,
   ListChecks, Paperclip, UploadCloud, X, Plus, Check, ChevronDown, ChevronRight,
   Image as ImageIcon, Camera, ArrowUp, ArrowDown, File as FileIcon, ExternalLink,
-  Link2, Library, FolderOpen,
+  Link2, Library, FolderOpen, Palette as PaletteIcon, Heading as HeadingIcon,
+  Minus, Table as TableIcon, Wand2, Copy,
 } from 'lucide-react';
 import { api, planFileUrl } from '../lib/api.js';
 import { PLAN_GRADIENTS, gradientCss, normalizeUrl, hostOf } from '../lib/types.js';
+import { rgbToHex, hexToRgb } from '../lib/color.js';
+import { extractPalette } from '../lib/imaging.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
 import Lightbox from '../components/Lightbox.jsx';
@@ -33,7 +36,13 @@ const BLOCK_META = {
   files: { label: 'Files', icon: Paperclip },
   links: { label: 'Links', icon: Link2 },
   refs: { label: 'References', icon: Library },
+  palette: { label: 'Palette', icon: PaletteIcon },
+  heading: { label: 'Heading', icon: HeadingIcon },
+  divider: { label: 'Divider', icon: Minus },
+  table: { label: 'Table', icon: TableIcon },
 };
+const fmtSum = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
+const toNum = (v) => Number(String(v ?? '').trim().replace(',', '.'));
 const fmtBytes = (n) => {
   if (n == null) return '';
   const u = ['B', 'KB', 'MB', 'GB']; let v = n; let i = 0;
@@ -63,9 +72,11 @@ export default function PlanDetail() {
   const avatarRef = useRef(null);
   const filesRef = useRef(null);
   const coverRef = useRef(null);
+  const paletteRef = useRef(null);
   const pending = useRef(null);       // { blockId } for the files/cover inputs
   const lastMoodboard = useRef(null); // block id for paste target
   const timers = useRef({});
+  const pendingPatch = useRef({});    // per-block accumulated patch awaiting a debounced save
   planRef.current = plan;
 
   useEffect(() => {
@@ -149,7 +160,12 @@ export default function PlanDetail() {
   const editBlock = (bid, p, immediate = false) => {
     setPlan((prev) => ({ ...prev, blocks: prev.blocks.map((b) => (b.id === bid ? { ...b, ...p } : b)) }));
     clearTimeout(timers.current[bid]);
-    const send = () => api.updateBlock(id, bid, p).catch((e) => toast(`Could not save: ${e.message}`, 'error'));
+    // Merge patches so a later edit to one field can't cancel a pending save of another.
+    pendingPatch.current[bid] = { ...(pendingPatch.current[bid] || {}), ...p };
+    const send = () => {
+      const patch = pendingPatch.current[bid]; delete pendingPatch.current[bid];
+      if (patch) api.updateBlock(id, bid, patch).catch((e) => toast(`Could not save: ${e.message}`, 'error'));
+    };
     if (immediate) send(); else timers.current[bid] = setTimeout(send, 500);
   };
   const addFilesTo = (bid) => { pending.current = bid; filesRef.current?.click(); };
@@ -172,6 +188,24 @@ export default function PlanDetail() {
   };
   const openRef = (r) => navigate(r.refKind === 'gallery' ? `/gallery/${r.refId}` : `/project/${r.refId}`);
 
+  // Palette block — swatches (hex + optional name), or extract from an image.
+  const extractInto = (bid) => { pending.current = bid; paletteRef.current?.click(); };
+  const onExtract = async (file) => {
+    if (!file || !pending.current) return;
+    const bid = pending.current;
+    try {
+      const rgbs = await extractPalette(file, 6);
+      const b = (planRef.current?.blocks || []).find((x) => x.id === bid); if (!b) return;
+      const add = rgbs.map((c) => ({ id: rid(), hex: rgbToHex(c), name: '' }));
+      editBlock(bid, { items: [...(b.items || []), ...add] }, true);
+      toast(`Added ${add.length} colour${add.length === 1 ? '' : 's'}`);
+    } catch (e) { toast(`Could not extract colours: ${e.message}`, 'error'); }
+  };
+  const copyHex = async (hex) => { try { await navigator.clipboard.writeText(hex); toast(`Copied ${hex}`); } catch { toast('Copy failed', 'error'); } };
+
+  // Table block — always persist columns + rows together so no edit is lost.
+  const saveTable = (b, columns, rows, immediate = false) => editBlock(b.id, { columns, rows }, immediate);
+
   if (error) return <div className="detail"><BackBtn /> <div className="center-msg">Couldn’t load: {error}</div></div>;
   if (!plan) return <div className="detail"><div className="spinner" /></div>;
 
@@ -183,7 +217,7 @@ export default function PlanDetail() {
   const avatarEmoji = !avatarUrl ? (plan.avatarEmoji || null) : null;
 
   const blockMenu = (b, i) => [
-    { label: 'Rename', icon: <Pencil size={15} />, onClick: () => setRenameBlock(b) },
+    ...(b.type === 'heading' || b.type === 'divider' ? [] : [{ label: 'Rename', icon: <Pencil size={15} />, onClick: () => setRenameBlock(b) }]),
     ...(i > 0 ? [{ label: 'Move up', icon: <ArrowUp size={15} />, onClick: () => moveBlock(b.id, 'up') }] : []),
     ...(i < plan.blocks.length - 1 ? [{ label: 'Move down', icon: <ArrowDown size={15} />, onClick: () => moveBlock(b.id, 'down') }] : []),
     { separator: true },
@@ -259,6 +293,7 @@ export default function PlanDetail() {
       <input ref={avatarRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { setImage('avatar', e.target.files[0]); e.target.value = ''; }} />
       <input ref={filesRef} type="file" multiple className="visually-hidden-input" onChange={(e) => { onFiles(e.target.files); e.target.value = ''; }} />
       <input ref={coverRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { onCover(e.target.files[0]); e.target.value = ''; }} />
+      <input ref={paletteRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { onExtract(e.target.files[0]); e.target.value = ''; }} />
 
       {/* Timeframe + milestones (fixed) */}
       <div className="section">
@@ -427,6 +462,138 @@ export default function PlanDetail() {
                   <Library size={20} /><div>Attach projects or galleries from your library</div>
                 </div>
               )}
+            </div>
+          );
+        }
+
+        if (b.type === 'palette') {
+          const items = b.items || [];
+          const setItems = (next) => editBlock(b.id, { items: next });
+          const patchSwatch = (sid, p) => setItems(items.map((s) => (s.id === sid ? { ...s, ...p } : s)));
+          return (
+            <div className="section block" key={b.id}>
+              <div className="section-head">
+                <h2><Meta.icon size={16} /> {b.title} {items.length > 0 && <span className="count">{items.length}</span>}</h2>
+                <div className="moodboard-actions">
+                  <button className="btn btn-sm" onClick={() => extractInto(b.id)}><Wand2 size={14} /> Extract from image</button>
+                  <button className="btn btn-sm" onClick={() => setItems([...items, { id: rid(), hex: '#5B8CFF', name: '' }])}><Plus size={14} /> Add color</button>
+                  {menu}
+                </div>
+              </div>
+              {items.length ? (
+                <div className="swatchlist">
+                  {items.map((sw) => {
+                    const rgb = hexToRgb(sw.hex);
+                    const colorVal = rgb ? rgbToHex(rgb).toLowerCase() : '#000000';
+                    return (
+                      <div className="swatch" key={sw.id}>
+                        <label className="swatch-chip" style={{ background: sw.hex || 'var(--surface-2)' }} title="Pick colour">
+                          <input type="color" value={colorVal} onChange={(e) => patchSwatch(sw.id, { hex: e.target.value.toUpperCase() })} />
+                          <span className="swatch-actions" onClick={(e) => e.preventDefault()}>
+                            <button className="icon-btn" title="Copy hex" onClick={() => copyHex(sw.hex)}><Copy size={13} /></button>
+                            <button className="icon-btn" title="Remove" onClick={() => setItems(items.filter((x) => x.id !== sw.id))}><X size={13} /></button>
+                          </span>
+                        </label>
+                        <div className="swatch-body">
+                          <input className="input swatch-hex" value={sw.hex} onChange={(e) => patchSwatch(sw.id, { hex: e.target.value })} spellCheck={false} />
+                          <input className="input swatch-name" value={sw.name} placeholder="Name…" onChange={(e) => patchSwatch(sw.id, { name: e.target.value })} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="dropzone" onClick={() => extractInto(b.id)}>
+                  <PaletteIcon size={20} /><div>Extract colours from an image · or add them by hand</div>
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        if (b.type === 'heading') {
+          return (
+            <div className="section block block-structural" key={b.id}>
+              <div className="heading-row">
+                <div className="heading-fields">
+                  <input className="heading-input" value={b.title} placeholder="Section heading"
+                    onChange={(e) => editBlock(b.id, { title: e.target.value })} />
+                  <input className="heading-sub" value={b.content || ''} placeholder="Optional description…"
+                    onChange={(e) => editBlock(b.id, { content: e.target.value })} />
+                </div>
+                {menu}
+              </div>
+            </div>
+          );
+        }
+
+        if (b.type === 'divider') {
+          return (
+            <div className="section block block-structural block-divider" key={b.id}>
+              <div className="divider-row"><hr className="block-hr" />{menu}</div>
+            </div>
+          );
+        }
+
+        if (b.type === 'table') {
+          const columns = b.columns || [];
+          const rows = b.rows || [];
+          const colSums = columns.map((c) => {
+            const vals = rows.map((r) => String(r.cells?.[c.id] ?? '').trim()).filter((v) => v !== '');
+            if (!vals.length || !vals.every((v) => isFinite(toNum(v)))) return null;
+            return vals.reduce((s, v) => s + toNum(v), 0);
+          });
+          const showSums = colSums.some((s) => s !== null);
+          return (
+            <div className="section block" key={b.id}>
+              <div className="section-head">
+                <h2><Meta.icon size={16} /> {b.title}</h2>
+                <div className="moodboard-actions">
+                  <button className="btn btn-sm" onClick={() => saveTable(b, columns, [...rows, { id: rid(), cells: {} }], true)}><Plus size={14} /> Add row</button>
+                  {menu}
+                </div>
+              </div>
+              <div className="table-scroll">
+                <table className="plan-table">
+                  <thead>
+                    <tr>
+                      {columns.map((c) => (
+                        <th key={c.id}>
+                          <div className="th-inner">
+                            <input className="cell-input th-input" value={c.name} placeholder="Column"
+                              onChange={(e) => saveTable(b, columns.map((x) => (x.id === c.id ? { ...x, name: e.target.value } : x)), rows)} />
+                            <button className="icon-btn th-del" title="Remove column"
+                              onClick={() => saveTable(b, columns.filter((x) => x.id !== c.id), rows.map((r) => { const cells = { ...r.cells }; delete cells[c.id]; return { ...r, cells }; }), true)}><X size={13} /></button>
+                          </div>
+                        </th>
+                      ))}
+                      <th className="th-add"><button className="icon-btn" title="Add column" onClick={() => saveTable(b, [...columns, { id: rid(), name: '' }], rows, true)}><Plus size={15} /></button></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) => (
+                      <tr key={r.id}>
+                        {columns.map((c) => (
+                          <td key={c.id}>
+                            <input className="cell-input" value={r.cells?.[c.id] || ''}
+                              onChange={(e) => saveTable(b, columns, rows.map((x) => (x.id === r.id ? { ...x, cells: { ...x.cells, [c.id]: e.target.value } } : x)))} />
+                          </td>
+                        ))}
+                        <td className="row-del-cell"><button className="icon-btn row-del" title="Remove row" onClick={() => saveTable(b, columns, rows.filter((x) => x.id !== r.id), true)}><X size={14} /></button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  {showSums && (
+                    <tfoot>
+                      <tr>
+                        {columns.map((c, ci) => <td key={c.id} className="sum-cell">{colSums[ci] === null ? '' : `Σ ${fmtSum(colSums[ci])}`}</td>)}
+                        <td className="row-del-cell" />
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+              {!rows.length && <div className="table-empty">No rows yet — “Add row” to start.</div>}
             </div>
           );
         }
