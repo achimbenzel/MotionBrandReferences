@@ -238,8 +238,8 @@ const extOf = (name) => {
   return e && e.length <= 6 ? e : '';
 };
 
-const BLOCK_TYPES = new Set(['moodboard', 'text', 'todos', 'files']);
-const BLOCK_TITLES = { moodboard: 'Moodboard', text: 'Text', todos: 'To-dos', files: 'Files' };
+const BLOCK_TYPES = new Set(['moodboard', 'text', 'todos', 'files', 'links', 'refs']);
+const BLOCK_TITLES = { moodboard: 'Moodboard', text: 'Text', todos: 'To-dos', files: 'Files', links: 'Links', refs: 'References' };
 
 function normalizeBlock(b) {
   if (!b || typeof b !== 'object') return null;
@@ -256,6 +256,8 @@ function normalizeBlock(b) {
   } else if (b.type === 'files') {
     if (!Array.isArray(b.files)) b.files = [];
     if (!('cover' in b)) b.cover = null;
+  } else if (b.type === 'links' || b.type === 'refs') {
+    if (!Array.isArray(b.items)) b.items = [];
   }
   return b;
 }
@@ -740,7 +742,9 @@ app.post('/api/plans/:id/blocks', async (req, res) => {
   const block = type === 'moodboard' ? { ...base, collapsed: false, images: [] }
     : type === 'text' ? { ...base, content: '' }
       : type === 'todos' ? { ...base, items: [] }
-        : { ...base, cover: null, files: [] };
+        : type === 'links' ? { ...base, items: [] }
+          : type === 'refs' ? { ...base, items: [] }
+            : { ...base, cover: null, files: [] };
   const updated = await mutateDB((db) => { const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null; p.blocks.push(block); return p; });
   if (!updated) return res.status(404).json({ error: 'not_found' });
   res.status(201).json({ plan: updated, block });
@@ -903,7 +907,9 @@ app.get('/api/search', async (req, res) => {
   }
   for (const pl of db.plans) {
     const blockText = (pl.blocks || []).flatMap((b) => [
-      b.title, b.content, ...(b.items || []).map((t) => t.text), ...(b.files || []).map((f) => f.name),
+      b.title, b.content,
+      ...(b.items || []).flatMap((t) => [t.text, t.title, t.url]),
+      ...(b.files || []).map((f) => f.name),
     ]);
     const hay = [pl.name, ...(pl.milestones || []).map((m) => m.title), ...blockText]
       .filter(Boolean).join(' ').toLowerCase();

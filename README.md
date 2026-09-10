@@ -155,6 +155,11 @@ Plan new projects. The **+** creates a new plan; plans are listed
     - **To-dos** — a checklist you add items to and tick off, auto-saved.
     - **Files** — uploaded files shown as a downloadable list (name + size, open
       in a new tab), plus an optional **example image** preview for the block.
+    - **Links** — a list of **bookmarks** (label + URL), each opening in a new
+      tab; handy for inspiration, references or client sites.
+    - **References** — attach existing items from your **Reference library**
+      (projects and galleries) via a search picker; each shows as a card that
+      **jumps to that item**, so a plan can point back at the work it draws on.
 
   Following the general rule below, a plan's title and each block's name are only
   editable via a **⋯** menu — there is no bare Delete button.

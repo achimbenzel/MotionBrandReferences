@@ -4,13 +4,15 @@ import {
   ArrowLeft, Trash2, Pencil, MoreHorizontal, CalendarRange, Images, StickyNote,
   ListChecks, Paperclip, UploadCloud, X, Plus, Check, ChevronDown, ChevronRight,
   Image as ImageIcon, Camera, ArrowUp, ArrowDown, File as FileIcon, ExternalLink,
+  Link2, Library, FolderOpen,
 } from 'lucide-react';
 import { api, planFileUrl } from '../lib/api.js';
-import { PLAN_GRADIENTS, gradientCss } from '../lib/types.js';
+import { PLAN_GRADIENTS, gradientCss, normalizeUrl, hostOf } from '../lib/types.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
 import Lightbox from '../components/Lightbox.jsx';
 import GalleryNameModal from '../components/GalleryNameModal.jsx';
+import RefPicker from '../components/RefPicker.jsx';
 
 const rid = () => Math.random().toString(36).slice(2, 8);
 
@@ -29,6 +31,8 @@ const BLOCK_META = {
   text: { label: 'Text', icon: StickyNote },
   todos: { label: 'To-dos', icon: ListChecks },
   files: { label: 'Files', icon: Paperclip },
+  links: { label: 'Links', icon: Link2 },
+  refs: { label: 'References', icon: Library },
 };
 const fmtBytes = (n) => {
   if (n == null) return '';
@@ -48,6 +52,7 @@ export default function PlanDetail() {
   const [renaming, setRenaming] = useState(false);
   const [renameBlock, setRenameBlock] = useState(null); // block being renamed
   const [addOpen, setAddOpen] = useState(false);
+  const [refPickerBlock, setRefPickerBlock] = useState(null); // block id currently picking references
   const [bannerPicker, setBannerPicker] = useState(false);
   const [avatarPicker, setAvatarPicker] = useState(false);
   const [emojiInput, setEmojiInput] = useState('');
@@ -153,6 +158,19 @@ export default function PlanDetail() {
   const setCover = (bid) => { pending.current = bid; coverRef.current?.click(); };
   const onCover = async (file) => { if (!file || !pending.current) return; try { setPlan(await api.setBlockCover(id, pending.current, file)); } catch (e) { toast(`Failed: ${e.message}`, 'error'); } };
   const clearCover = async (bid) => { try { setPlan(await api.removeBlockCover(id, bid)); } catch (e) { toast(`Failed: ${e.message}`, 'error'); } };
+
+  // References block — attach existing library items (projects / galleries).
+  const addRef = (bid, item) => {
+    const b = (planRef.current?.blocks || []).find((x) => x.id === bid); if (!b) return;
+    if ((b.items || []).some((r) => r.refKind === item.kind && r.refId === item.id)) return;
+    const next = [...(b.items || []), { id: rid(), refKind: item.kind, refId: item.id, refType: item.type || null, title: item.title, subtitle: item.subtitle || '', thumb: item.thumb || null }];
+    editBlock(bid, { items: next }, true);
+  };
+  const removeRef = (bid, itemId) => {
+    const b = (planRef.current?.blocks || []).find((x) => x.id === bid); if (!b) return;
+    editBlock(bid, { items: (b.items || []).filter((r) => r.id !== itemId) }, true);
+  };
+  const openRef = (r) => navigate(r.refKind === 'gallery' ? `/gallery/${r.refId}` : `/project/${r.refId}`);
 
   if (error) return <div className="detail"><BackBtn /> <div className="center-msg">Couldn’t load: {error}</div></div>;
   if (!plan) return <div className="detail"><div className="spinner" /></div>;
@@ -343,6 +361,76 @@ export default function PlanDetail() {
           );
         }
 
+        if (b.type === 'links') {
+          const items = b.items || [];
+          const setItems = (next) => editBlock(b.id, { items: next });
+          return (
+            <div className="section block" key={b.id}>
+              <div className="section-head">
+                <h2><Meta.icon size={16} /> {b.title} {items.length > 0 && <span className="count">{items.length}</span>}</h2>
+                <div className="moodboard-actions">
+                  <button className="btn btn-sm" onClick={() => setItems([...items, { id: rid(), url: '', title: '' }])}><Plus size={14} /> Add link</button>{menu}
+                </div>
+              </div>
+              {items.length ? (
+                <div className="linklist">
+                  {items.map((it) => (
+                    <div className="linkrow" key={it.id}>
+                      <Link2 size={17} className="linkrow-icon" />
+                      <input className="input linkrow-title" value={it.title} placeholder={hostOf(it.url) || 'Label…'}
+                        onChange={(e) => setItems(items.map((x) => (x.id === it.id ? { ...x, title: e.target.value } : x)))} />
+                      <input className="input linkrow-url" value={it.url} placeholder="https://…"
+                        onChange={(e) => setItems(items.map((x) => (x.id === it.id ? { ...x, url: e.target.value } : x)))} />
+                      <a className={`icon-btn linkrow-open ${it.url ? '' : 'is-disabled'}`} href={it.url ? normalizeUrl(it.url) : undefined}
+                        target="_blank" rel="noopener noreferrer" title="Open link"><ExternalLink size={15} /></a>
+                      <button className="icon-btn linkrow-del" onClick={() => setItems(items.filter((x) => x.id !== it.id))} title="Remove"><X size={15} /></button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="dropzone" onClick={() => setItems([{ id: rid(), url: '', title: '' }])}>
+                  <Link2 size={20} /><div>Add a link — inspiration, references, client sites…</div>
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        if (b.type === 'refs') {
+          const items = b.items || [];
+          return (
+            <div className="section block" key={b.id}>
+              <div className="section-head">
+                <h2><Meta.icon size={16} /> {b.title} {items.length > 0 && <span className="count">{items.length}</span>}</h2>
+                <div className="moodboard-actions">
+                  <button className="btn btn-sm" onClick={() => setRefPickerBlock(b.id)}><Plus size={14} /> Add reference</button>{menu}
+                </div>
+              </div>
+              {items.length ? (
+                <div className="reflist">
+                  {items.map((r) => (
+                    <div className="refcard" key={r.id} onClick={() => openRef(r)} title={r.title}>
+                      <span className="refcard-thumb">
+                        {r.thumb ? <img src={r.thumb} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
+                          : r.refKind === 'gallery' ? <FolderOpen size={20} /> : <FileIcon size={20} />}
+                      </span>
+                      <span className="refcard-text">
+                        <span className="refcard-title">{r.title}</span>
+                        <span className="refcard-sub">{r.subtitle}</span>
+                      </span>
+                      <button className="icon-btn refcard-del" onClick={(e) => { e.stopPropagation(); removeRef(b.id, r.id); }} title="Remove"><X size={14} /></button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="dropzone" onClick={() => setRefPickerBlock(b.id)}>
+                  <Library size={20} /><div>Attach projects or galleries from your library</div>
+                </div>
+              )}
+            </div>
+          );
+        }
+
         // files
         const cover = b.cover ? planFileUrl(plan, b.cover) : null;
         return (
@@ -411,6 +499,13 @@ export default function PlanDetail() {
       {renameBlock && (
         <GalleryNameModal title="Rename block" initialName={renameBlock.title} submitLabel="Save" placeholder="Block name"
           onSubmit={async (name) => { editBlock(renameBlock.id, { title: name }, true); setRenameBlock(null); }} onClose={() => setRenameBlock(null)} />
+      )}
+      {refPickerBlock && (
+        <RefPicker
+          addedIds={new Set(((plan.blocks.find((b) => b.id === refPickerBlock)?.items) || []).map((r) => r.refId))}
+          onPick={(item) => addRef(refPickerBlock, item)}
+          onClose={() => setRefPickerBlock(null)}
+        />
       )}
     </div>
   );
