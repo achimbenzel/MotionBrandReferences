@@ -164,6 +164,18 @@ export const api = {
     return handle(await fetch(`/api/plans/${id}/blocks/${blockId}/files/${fileId}`, { method: 'DELETE' }));
   },
 
+  // --- To-Do board (global Kanban planner) ---
+  async getBoard() {
+    const { board } = await handle(await fetch('/api/board'));
+    return board;
+  },
+  async saveBoard(columns) {
+    const { board } = await handle(await fetch('/api/board', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ columns }),
+    }));
+    return board;
+  },
+
   // --- Search ---
   async search(q) {
     const { results } = await handle(await fetch(`/api/search?q=${encodeURIComponent(q)}`));

@@ -13,8 +13,10 @@ import GalleryDetail from './pages/GalleryDetail.jsx';
 import PlansPage from './pages/PlansPage.jsx';
 import PlanDetail from './pages/PlanDetail.jsx';
 import LogoTester from './pages/LogoTester.jsx';
+import WorkDashboard from './pages/WorkDashboard.jsx';
+import TodoBoard from './pages/TodoBoard.jsx';
 import TrashPage from './pages/TrashPage.jsx';
-import { TABS, isWorkPath } from './lib/types.js';
+import { TABS, isWorkPath, WORK_HOME } from './lib/types.js';
 import { api } from './lib/api.js';
 
 function Shell() {
@@ -73,17 +75,19 @@ function Shell() {
         <div className="main-inner">
           <ErrorBoundary>
             <Routes>
-              <Route path="/" element={<Navigate to="/branding" replace />} />
+              <Route path="/" element={<Navigate to={WORK_HOME} replace />} />
               {TABS.map((t) => (
                 <Route key={t.key} path={`/${t.key}`} element={<GridPage type={t.key} reloadKey={reloadKey} onAdd={openModal} />} />
               ))}
               <Route path="/gallery/:id" element={<GalleryDetail />} />
               <Route path="/project/:id" element={<ProjectDetail />} />
+              <Route path="/work" element={<WorkDashboard reloadKey={reloadKey} onNewPlan={createPlan} />} />
               <Route path="/plan" element={<PlansPage reloadKey={reloadKey} onNewPlan={createPlan} />} />
               <Route path="/plan/:id" element={<PlanDetail />} />
+              <Route path="/board" element={<TodoBoard />} />
               <Route path="/logo-tester" element={<LogoTester />} />
               <Route path="/trash" element={<TrashPage />} />
-              <Route path="*" element={<Navigate to="/branding" replace />} />
+              <Route path="*" element={<Navigate to={WORK_HOME} replace />} />
             </Routes>
           </ErrorBoundary>
         </div>

@@ -127,14 +127,29 @@ excluded from exports.)
 
 ---
 
-## Modes: Reference & Work
+## Modes: Work & Reference
 
 A toggle switches between two modes:
 
-- **Reference** — the library described below (Branding, Motion Design, Logos,
-  Business Cards, Colors, Image Gallery, Fonts).
-- **Work** — your working area, with two tools: **Plans** and the **Logo
-  Tester** (see below).
+- **Work** — the **default** mode (left in the toggle), your working area. It
+  opens on a **Dashboard** and holds **Plans**, the **To-Do board** and the
+  **Logo Tester** (see below).
+- **Reference** — the library (Branding, Motion Design, Logos, Business Cards,
+  Colors, Image Gallery, Fonts).
+
+The app starts in Work, and switching from Reference back to Work always returns
+to the Dashboard.
+
+### Dashboard
+The Work landing page: a Notion-style **card view** of your tools — **Plans**
+(with the plan count), the **To-Do Board** (open cards / lists) and the **Logo
+Tester** — each opening its tool, plus a **Recent plans** row.
+
+### To-Do board
+A general **Kanban planner**. Lists (columns) hold **cards**; add lists and
+cards, rename them inline, give cards **coloured tags**, and **drag cards** (via
+the grip handle) within a list or across lists to track progress. Everything
+auto-saves to one global board.
 
 ### Plans
 Plan new projects. The **+** creates a new plan; plans are listed
@@ -278,16 +293,18 @@ changes so the meter never rescans the whole tree on every poll.
 ### Navigation: sidebar (desktop) & header (mobile)
 On **desktop** the app uses a **Notion-style left sidebar** that holds
 everything: the **logo** and a collapse button at the top, search (⌘K) below
-it, the Reference / Work toggle, the section list (with icons, current one
+it, the Work / Reference toggle, the section list (with icons, current one
 highlighted), an **Add** button, and a footer with **Trash** and the storage
-meter. In **Work** mode the section list becomes **Plans** and **Logo Tester**.
+meter. In **Work** mode the section list is **Dashboard**, **Plans**, **To-Dos**
+and **Logo Tester**.
 The collapse button **slides** the sidebar out for a full-width canvas; a small
 floating button slides it back in, and the collapsed state is remembered.
 
 On **narrow / mobile** widths the sidebar gives way to the original floating
 **header**: the section tabs collapse into a **hamburger menu** (current one
 checked), with search, add and the storage pill alongside. In **Work** mode the
-tabs become **Plans** / **Logo Tester** and **Add** creates a new plan.
+tabs become **Dashboard** / **Plans** / **To-Dos** / **Logo Tester** and **Add**
+creates a new plan.
 
 A project's detail page has **Previous / Next** buttons at the foot (and the
 **← / →** arrow keys) to step through the other projects in the same section

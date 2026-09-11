@@ -2,6 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Search, Plus, PanelLeftClose, Trash2,
   FileText, Film, Square, CreditCard, Palette, Images, Type, PencilRuler, FlaskConical,
+  LayoutDashboard, ListTodo,
 } from 'lucide-react';
 import { TABS, WORK_TABS, isWorkPath } from '../lib/types.js';
 import ModeToggle from './ModeToggle.jsx';
@@ -12,7 +13,7 @@ const ICON = {
   branding: FileText, motion: Film, logo: Square, businesscard: CreditCard,
   color: Palette, imagegallery: Images, font: Type,
 };
-const WORK_ICON = { plan: PencilRuler, logotester: FlaskConical };
+const WORK_ICON = { dashboard: LayoutDashboard, plan: PencilRuler, board: ListTodo, logotester: FlaskConical };
 
 /** Notion-style desktop sidebar holding everything the header carries. */
 export default function Sidebar({ onAdd, onSearch, onToggle, storageKey }) {

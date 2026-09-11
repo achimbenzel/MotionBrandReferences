@@ -1066,6 +1066,55 @@ app.delete('/api/trash', async (_req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// To-Do board (a single global Kanban planner: columns → cards → tags).
+// ---------------------------------------------------------------------------
+const TAG_KEYS = new Set(['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink', 'gray']);
+const str = (v, max = 2000) => String(v == null ? '' : v).slice(0, max);
+function normalizeBoard(board) {
+  const columns = Array.isArray(board?.columns) ? board.columns : [];
+  return {
+    columns: columns.slice(0, 40).map((c) => ({
+      id: c?.id || nanoid(8),
+      name: str(c?.name, 120),
+      cards: (Array.isArray(c?.cards) ? c.cards : []).slice(0, 500).map((card) => ({
+        id: card?.id || nanoid(8),
+        title: str(card?.title, 4000),
+        notes: str(card?.notes, 8000),
+        tags: (Array.isArray(card?.tags) ? card.tags : []).slice(0, 20).map((t) => ({
+          id: t?.id || nanoid(6),
+          label: str(t?.label, 60),
+          color: TAG_KEYS.has(t?.color) ? t.color : 'gray',
+        })),
+      })),
+    })),
+  };
+}
+const DEFAULT_BOARD = () => ({
+  columns: [
+    { id: nanoid(8), name: 'To do', cards: [] },
+    { id: nanoid(8), name: 'In progress', cards: [] },
+    { id: nanoid(8), name: 'Done', cards: [] },
+  ],
+});
+
+app.get('/api/board', async (_req, res) => {
+  const db = await readDB();
+  if (!db.board || !Array.isArray(db.board.columns) || !db.board.columns.length) {
+    const board = DEFAULT_BOARD();
+    await mutateDB((d) => { d.board = board; return d; });
+    return res.json({ board });
+  }
+  res.json({ board: normalizeBoard(db.board) });
+});
+
+app.put('/api/board', async (req, res) => {
+  if (!Array.isArray(req.body?.columns)) return res.status(400).json({ error: 'columns_required' });
+  const board = normalizeBoard({ columns: req.body.columns });
+  await mutateDB((d) => { d.board = board; return d; });
+  res.json({ board });
+});
+
+// ---------------------------------------------------------------------------
 // Storage usage + editable limit.
 // ---------------------------------------------------------------------------
 app.get('/api/storage', async (_req, res) => {

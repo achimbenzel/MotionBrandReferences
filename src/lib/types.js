@@ -14,14 +14,31 @@ export const TABS = [
 export const TYPE_KEYS = TABS.map((t) => t.key);
 export const isType = (t) => TYPE_KEYS.includes(t);
 
-// "Work" mode (the counterpart to Reference mode) groups working tools:
-// the Plans area and the Logo Tester.
+// "Work" mode (the counterpart to Reference mode) is the default mode. It opens
+// on the Dashboard and groups the working tools: Plans, the To-Do board and the
+// Logo Tester.
 export const WORK_TABS = [
+  { key: 'dashboard', label: 'Dashboard', path: '/work' },
   { key: 'plan', label: 'Plans', path: '/plan' },
+  { key: 'board', label: 'To-Dos', path: '/board' },
   { key: 'logotester', label: 'Logo Tester', path: '/logo-tester' },
 ];
+export const WORK_HOME = '/work';
 export const isWorkPath = (pathname) =>
   WORK_TABS.some((t) => pathname === t.path || pathname.startsWith(`${t.path}/`));
+
+// Tag colours for the To-Do board (dark chips with coloured text, Notion-style).
+export const TAG_COLORS = [
+  { key: 'red', bg: '#5b2b32', fg: '#ff9ba6' },
+  { key: 'orange', bg: '#5a3a24', fg: '#ffb37a' },
+  { key: 'yellow', bg: '#4f4a1f', fg: '#ffe07a' },
+  { key: 'green', bg: '#22483a', fg: '#7fe0b0' },
+  { key: 'blue', bg: '#24405f', fg: '#8ec5ff' },
+  { key: 'purple', bg: '#3f2f5f', fg: '#c4a6ff' },
+  { key: 'pink', bg: '#542a44', fg: '#ff9fd6' },
+  { key: 'gray', bg: '#3a3a42', fg: '#c8c8d0' },
+];
+export const tagColor = (key) => TAG_COLORS.find((c) => c.key === key) || TAG_COLORS[TAG_COLORS.length - 1];
 
 // Preset banner gradients for Plan mode (id is stored; css is rendered).
 export const PLAN_GRADIENTS = [
