@@ -15,6 +15,8 @@ import PlanDetail from './pages/PlanDetail.jsx';
 import LogoTester from './pages/LogoTester.jsx';
 import WorkDashboard from './pages/WorkDashboard.jsx';
 import TodoBoard from './pages/TodoBoard.jsx';
+import SoftwarePage from './pages/SoftwarePage.jsx';
+import SoftwareDetail from './pages/SoftwareDetail.jsx';
 import TrashPage from './pages/TrashPage.jsx';
 import { TABS, isWorkPath, WORK_HOME } from './lib/types.js';
 import { api } from './lib/api.js';
@@ -85,6 +87,8 @@ function Shell() {
               <Route path="/work" element={<WorkDashboard reloadKey={reloadKey} onNewPlan={createPlan} />} />
               <Route path="/plan" element={<PlansPage reloadKey={reloadKey} onNewPlan={createPlan} />} />
               <Route path="/plan/:id" element={<PlanDetail />} />
+              <Route path="/software" element={<SoftwarePage reloadKey={reloadKey} />} />
+              <Route path="/software/:id" element={<SoftwareDetail />} />
               <Route path="/board" element={<TodoBoard />} />
               <Route path="/logo-tester" element={<LogoTester />} />
               <Route path="/trash" element={<TrashPage />} />

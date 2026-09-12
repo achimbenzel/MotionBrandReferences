@@ -103,8 +103,10 @@ async function readDB() {
   if (!Array.isArray(db.projects)) db.projects = [];
   if (!Array.isArray(db.galleries)) db.galleries = [];
   if (!Array.isArray(db.plans)) db.plans = [];
+  if (!Array.isArray(db.software)) db.software = [];
   if (!Array.isArray(db.trash)) db.trash = [];
   for (const plan of db.plans) normalizePlan(plan);
+  for (const s of db.software) normalizeSoftware(s);
   if (!db.settings || typeof db.settings !== 'object') db.settings = {};
   if (db.settings.storageLimitBytes == null) db.settings.storageLimitBytes = DEFAULT_STORAGE_LIMIT;
   return db;
@@ -990,6 +992,15 @@ app.get('/api/search', async (req, res) => {
       subtitle: `Gallery · ${TYPE_LABEL[g.type] || g.type}`, score,
     });
   }
+  for (const s of (db.software || [])) {
+    const hay = [s.name,
+      ...(s.plugins || []).flatMap((p) => [p.name, p.category, p.version]),
+      ...(s.scripts || []).map((x) => x.name),
+      ...(s.expressions || []).flatMap((e) => [e.title, ...(e.tags || [])]),
+      ...(s.tutorials || []).flatMap((t) => [t.title, t.channel])].filter(Boolean).join(' ').toLowerCase();
+    const score = scoreMatch(terms, s.name || '', hay);
+    if (score > 0) results.push({ kind: 'software', id: s.id, title: s.name || 'Software', subtitle: 'Software', score });
+  }
   results.sort((a, b) => b.score - a.score || (a.title || '').localeCompare(b.title || ''));
   res.json({ results: results.slice(0, 40) });
 });
@@ -1004,11 +1015,13 @@ app.get('/api/trash', async (_req, res) => {
     trashId: t.trashId, kind: t.kind, deletedAt: t.deletedAt,
     title: t.kind === 'plan' ? (t.data.name || 'Untitled plan')
       : t.kind === 'gallery' ? (t.data.name || 'Gallery')
-        : t.kind === 'file' ? (t.data.item?.title || t.data.item?.name || 'File')
-          : (t.data.title || 'Untitled'),
+        : t.kind === 'software' ? (t.data.name || 'Software')
+          : t.kind === 'file' ? (t.data.item?.title || t.data.item?.name || 'File')
+            : (t.data.title || 'Untitled'),
     subtitle: t.kind === 'project' ? (TYPE_LABEL[t.data.type] || t.data.type)
       : t.kind === 'gallery' ? `Gallery · ${TYPE_LABEL[t.data.type] || t.data.type}`
-        : t.kind === 'file' ? 'File' : 'Plan',
+        : t.kind === 'software' ? 'Software'
+          : t.kind === 'file' ? 'File' : 'Plan',
     thumb: trashThumb(t),
   }));
   res.json({ items, ttlDays: TRASH_TTL_DAYS });
@@ -1033,6 +1046,10 @@ app.post('/api/trash/:trashId/restore', async (req, res) => {
         move = { from: path.join(TRASH_DIR, entry.trashId), to: path.join(DATA_DIR, 'plan', entry.data.id) };
       } else if (entry.kind === 'gallery') {
         db.galleries.push(entry.data);
+      } else if (entry.kind === 'software') {
+        if (!Array.isArray(db.software)) db.software = [];
+        db.software.push(entry.data);
+        move = { from: path.join(TRASH_DIR, entry.trashId), to: softDir(entry.data.id) };
       } else if (entry.kind === 'file') {
         const p = db.plans.find((x) => x.id === entry.data.planId);
         const b = p && p.blocks && p.blocks.find((x) => x.id === entry.data.blockId);
@@ -1121,6 +1138,164 @@ app.put('/api/board', async (req, res) => {
   const board = normalizeBoard({ columns: req.body.columns });
   await mutateDB((d) => { d.board = board; return d; });
   res.json({ board });
+});
+
+// ---------------------------------------------------------------------------
+// Software — a topic per app (After Effects, …) with a plugin database,
+// your own scripts (files), expressions and tutorial links.
+// ---------------------------------------------------------------------------
+const CURRENCIES = new Set(['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD']);
+const softDir = (id) => path.join(DATA_DIR, 'software', id);
+function normalizePlugin(p) {
+  return {
+    id: p?.id || nanoid(8),
+    name: str(p?.name, 160), category: str(p?.category, 80),
+    url: str(p?.url, 500), account: str(p?.account, 200), key: str(p?.key, 400),
+    price: str(p?.price, 40), currency: CURRENCIES.has(p?.currency) ? p.currency : 'EUR',
+    version: str(p?.version, 60), purchasedAt: str(p?.purchasedAt, 20), notes: str(p?.notes, 4000),
+    file: p?.file ? str(p.file, 300) : null, fileName: p?.fileName ? str(p.fileName, 200) : null,
+  };
+}
+const normalizeScript = (s) => ({
+  id: s?.id || nanoid(8), name: str(s?.name, 200), notes: str(s?.notes, 4000),
+  file: s?.file ? str(s.file, 300) : null, fileName: s?.fileName ? str(s.fileName, 200) : null,
+  size: Number.isFinite(s?.size) ? s.size : 0,
+});
+const normTags = (t) => (Array.isArray(t) ? t : []).slice(0, 24).map((x) => str(x, 40)).filter(Boolean);
+const normalizeExpr = (e) => ({ id: e?.id || nanoid(8), title: str(e?.title, 200), code: str(e?.code, 20000), notes: str(e?.notes, 4000), tags: normTags(e?.tags) });
+const normalizeTut = (t) => ({ id: t?.id || nanoid(8), title: str(t?.title, 200), url: str(t?.url, 500), channel: str(t?.channel, 120), tags: normTags(t?.tags) });
+function normalizeSoftware(s) {
+  if (!s || typeof s !== 'object') return s;
+  if (!s.id) s.id = nanoid(10);
+  s.name = str(s.name, 120) || 'Untitled software';
+  if (typeof s.icon !== 'string') s.icon = '';
+  if (!Number.isFinite(s.createdAt)) s.createdAt = Date.now();
+  s.plugins = (Array.isArray(s.plugins) ? s.plugins : []).map(normalizePlugin);
+  s.scripts = (Array.isArray(s.scripts) ? s.scripts : []).map(normalizeScript);
+  s.expressions = (Array.isArray(s.expressions) ? s.expressions : []).map(normalizeExpr);
+  s.tutorials = (Array.isArray(s.tutorials) ? s.tutorials : []).map(normalizeTut);
+  return s;
+}
+const findSoft = (db, id) => (db.software || []).find((x) => x.id === id);
+
+app.get('/api/software', async (_req, res) => {
+  const db = await readDB();
+  res.json({ software: (db.software || []).map(normalizeSoftware) });
+});
+app.get('/api/software/:id', async (req, res) => {
+  const db = await readDB();
+  const s = findSoft(db, req.params.id);
+  if (!s) return res.status(404).json({ error: 'not_found' });
+  res.json({ software: normalizeSoftware(s) });
+});
+app.post('/api/software', async (req, res) => {
+  const s = { id: nanoid(10), name: str(req.body?.name, 120) || 'Untitled software', icon: str(req.body?.icon, 40), createdAt: Date.now(), plugins: [], scripts: [], expressions: [], tutorials: [] };
+  await mutateDB((db) => { if (!Array.isArray(db.software)) db.software = []; db.software.push(s); return db; });
+  res.status(201).json({ software: s });
+});
+
+// Wholesale edit of the JSON parts (name/icon + plugins/expressions/tutorials);
+// files (plugin installers, scripts) have their own endpoints below.
+app.patch('/api/software/:id', async (req, res) => {
+  const removedFiles = [];
+  const updated = await mutateDB((db) => {
+    const s = findSoft(db, req.params.id); if (!s) return null;
+    if ('name' in req.body) s.name = str(req.body.name, 120);
+    if ('icon' in req.body) s.icon = str(req.body.icon, 40);
+    if (Array.isArray(req.body.plugins)) {
+      const next = req.body.plugins.map(normalizePlugin);
+      const keep = new Set(next.map((p) => p.file).filter(Boolean));
+      for (const f of (s.plugins || []).map((p) => p.file).filter(Boolean)) if (!keep.has(f)) removedFiles.push(f);
+      s.plugins = next;
+    }
+    if (Array.isArray(req.body.expressions)) s.expressions = req.body.expressions.map(normalizeExpr);
+    if (Array.isArray(req.body.tutorials)) s.tutorials = req.body.tutorials.map(normalizeTut);
+    return s;
+  });
+  if (!updated) return res.status(404).json({ error: 'not_found' });
+  for (const f of removedFiles) await safeRm(path.join(softDir(req.params.id), path.basename(f)), { force: true }).catch(() => {});
+  res.json({ software: updated });
+});
+
+app.delete('/api/software/:id', async (req, res) => {
+  const trashId = nanoid(10);
+  let move = null;
+  const ok = await mutateDB((db) => {
+    const i = (db.software || []).findIndex((x) => x.id === req.params.id); if (i === -1) return null;
+    const s = db.software[i];
+    db.trash.unshift({ trashId, kind: 'software', deletedAt: Date.now(), data: s });
+    db.software.splice(i, 1);
+    move = { from: softDir(s.id), to: path.join(TRASH_DIR, trashId) };
+    return true;
+  });
+  if (!ok) return res.status(404).json({ error: 'not_found' });
+  if (move) await moveToTrash(move.from, move.to);
+  res.json({ ok: true, trashId });
+});
+
+// Plugin installer file (one per plugin).
+app.post('/api/software/:id/plugins/:pluginId/file', upload.single('file'), async (req, res) => {
+  try {
+    const db = await readDB();
+    const s = findSoft(db, req.params.id);
+    const p = s && (s.plugins || []).find((x) => x.id === req.params.pluginId);
+    if (!s || !p) { await cleanupTmp(req); return res.status(404).json({ error: 'not_found' }); }
+    if (!req.file) return res.status(400).json({ error: 'file_required' });
+    if (p.file) await safeRm(path.join(softDir(s.id), path.basename(p.file)), { force: true }).catch(() => {});
+    const stored = await moveInto(softDir(s.id), req.file.path, `${p.id}${extOf(req.file.originalname) || ''}`);
+    const updated = await mutateDB((d) => { const pp = findSoft(d, s.id).plugins.find((x) => x.id === p.id); pp.file = stored; pp.fileName = req.file.originalname; return findSoft(d, s.id); });
+    await cleanupTmp(req);
+    res.json({ software: updated });
+  } catch (e) { await cleanupTmp(req); res.status(500).json({ error: 'file_failed', message: String(e.message || e) }); }
+});
+app.delete('/api/software/:id/plugins/:pluginId/file', async (req, res) => {
+  let removed = null;
+  const updated = await mutateDB((db) => {
+    const s = findSoft(db, req.params.id); if (!s) return null;
+    const p = (s.plugins || []).find((x) => x.id === req.params.pluginId); if (!p) return null;
+    removed = p.file; p.file = null; p.fileName = null; return s;
+  });
+  if (!updated) return res.status(404).json({ error: 'not_found' });
+  if (removed) await safeRm(path.join(softDir(req.params.id), path.basename(removed)), { force: true }).catch(() => {});
+  res.json({ software: updated });
+});
+
+// Scripts (your own scripts/plugins — file-centric).
+app.post('/api/software/:id/scripts', upload.single('file'), async (req, res) => {
+  try {
+    const db = await readDB();
+    const s = findSoft(db, req.params.id);
+    if (!s) { await cleanupTmp(req); return res.status(404).json({ error: 'not_found' }); }
+    if (!req.file) return res.status(400).json({ error: 'file_required' });
+    const sid = nanoid(8);
+    const stored = await moveInto(softDir(s.id), req.file.path, `s_${sid}${extOf(req.file.originalname) || ''}`);
+    const item = { id: sid, name: str(req.body?.name, 200) || req.file.originalname, notes: str(req.body?.notes, 4000), file: stored, fileName: req.file.originalname, size: req.file.size };
+    const updated = await mutateDB((d) => { const ss = findSoft(d, s.id); ss.scripts = [...(ss.scripts || []), item]; return ss; });
+    await cleanupTmp(req);
+    res.status(201).json({ software: updated });
+  } catch (e) { await cleanupTmp(req); res.status(500).json({ error: 'script_failed', message: String(e.message || e) }); }
+});
+app.patch('/api/software/:id/scripts/:scriptId', async (req, res) => {
+  const updated = await mutateDB((db) => {
+    const s = findSoft(db, req.params.id); if (!s) return null;
+    const sc = (s.scripts || []).find((x) => x.id === req.params.scriptId); if (!sc) return null;
+    if ('name' in req.body) sc.name = str(req.body.name, 200);
+    if ('notes' in req.body) sc.notes = str(req.body.notes, 4000);
+    return s;
+  });
+  if (!updated) return res.status(404).json({ error: 'not_found' });
+  res.json({ software: updated });
+});
+app.delete('/api/software/:id/scripts/:scriptId', async (req, res) => {
+  let removed = null;
+  const updated = await mutateDB((db) => {
+    const s = findSoft(db, req.params.id); if (!s) return null;
+    const i = (s.scripts || []).findIndex((x) => x.id === req.params.scriptId); if (i === -1) return null;
+    removed = s.scripts[i].file; s.scripts.splice(i, 1); return s;
+  });
+  if (!updated) return res.status(404).json({ error: 'not_found' });
+  if (removed) await safeRm(path.join(softDir(req.params.id), path.basename(removed)), { force: true }).catch(() => {});
+  res.json({ software: updated });
 });
 
 // ---------------------------------------------------------------------------

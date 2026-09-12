@@ -21,10 +21,18 @@ export const isType = (t) => TYPE_KEYS.includes(t);
 export const WORK_TABS = [
   { key: 'dashboard', label: 'Dashboard', path: '/work' },
   { key: 'plan', label: 'Plans', path: '/plan' },
+  { key: 'software', label: 'Software', path: '/software' },
   { key: 'board', label: 'To-Dos', path: '/board' },
   { key: 'logotester', label: 'Logo Tester', path: '/logo-tester' },
 ];
 export const WORK_HOME = '/work';
+
+// Currencies for the software plugin database (symbol used for the spend sum).
+export const CURRENCIES = [
+  { key: 'EUR', symbol: '€' }, { key: 'USD', symbol: '$' }, { key: 'GBP', symbol: '£' },
+  { key: 'CHF', symbol: 'CHF' }, { key: 'JPY', symbol: '¥' }, { key: 'CAD', symbol: 'CA$' }, { key: 'AUD', symbol: 'A$' },
+];
+export const currencySymbol = (key) => CURRENCIES.find((c) => c.key === key)?.symbol || key || '€';
 export const isWorkPath = (pathname) =>
   WORK_TABS.some((t) => pathname === t.path || pathname.startsWith(`${t.path}/`));
 

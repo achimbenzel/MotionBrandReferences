@@ -565,6 +565,109 @@ img { max-width: 100%; display: block; }
 .media-fs { position: absolute; top: 12px; right: 12px; opacity: 0; transition: opacity .15s; background: rgba(0,0,0,.55); }
 .media-frame:hover .media-fs { opacity: 1; }
 
+/* ------------------------------------------------------------ Software */
+.soft-card { display: flex; flex-direction: column; align-items: flex-start; text-align: left; }
+.soft-card-icon {
+  width: 48px; height: 48px; border-radius: 12px; margin-bottom: 12px;
+  background: var(--surface-3); border: 1px solid var(--border);
+  display: grid; place-items: center; color: var(--text-muted); font-size: 24px;
+}
+.soft-card-sub { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.soft-card-sub > span { display: inline-flex; align-items: center; gap: 5px; }
+.soft-card-spend { color: var(--accent); font-weight: 600; }
+
+.soft-head { display: flex; align-items: center; gap: 14px; margin: 6px 0 20px; }
+.soft-icon-input {
+  width: 56px; height: 56px; flex-shrink: 0; border-radius: 14px; text-align: center;
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+  font-size: 26px; padding: 0;
+}
+.soft-icon-input:focus { outline: none; border-color: var(--accent); }
+.soft-head-main { min-width: 0; flex: 1; }
+.soft-name { width: 100%; background: transparent; border: 0; color: var(--text); font: inherit; font-size: 26px; font-weight: 700; padding: 0; }
+.soft-name:focus { outline: none; }
+.soft-stats { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+.soft-stats strong { color: var(--accent); }
+
+.soft-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; overflow-x: auto; }
+.soft-tab {
+  display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+  background: transparent; border: 0; border-bottom: 2px solid transparent; color: var(--text-muted);
+  font: inherit; font-weight: 600; font-size: 14px; padding: 9px 12px; cursor: pointer; margin-bottom: -1px;
+}
+.soft-tab:hover { color: var(--text); }
+.soft-tab.on { color: var(--text); border-bottom-color: var(--accent); }
+.soft-tab .count { font-size: 12px; color: var(--text-faint); font-weight: 400; }
+.soft-tab.on .count { color: var(--accent); }
+
+.soft-toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+.soft-search { flex: 1; min-width: 180px; }
+
+/* Plugin cards */
+.plugin-list { display: flex; flex-direction: column; gap: 10px; }
+.plugin-card { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.plugin-top { display: flex; align-items: center; gap: 8px; padding: 8px 10px; }
+.plugin-toggle { background: transparent; border: 0; color: var(--text-muted); cursor: pointer; display: grid; place-items: center; padding: 2px; }
+.plugin-name { flex: 1 1 180px; min-width: 0; background: transparent; border: 0; color: var(--text); font: inherit; font-weight: 600; font-size: 15px; padding: 4px 2px; }
+.plugin-name:focus { outline: none; }
+.plugin-cat { flex: 0 1 140px; min-width: 0; background: transparent; border: 0; color: var(--text-muted); font: inherit; font-size: 13px; padding: 4px 2px; }
+.plugin-cat:focus { outline: none; color: var(--text); }
+.plugin-price { font-size: 13px; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.plugin-body { padding: 4px 14px 16px; display: flex; flex-direction: column; gap: 12px; border-top: 1px solid var(--border); }
+.plugin-field { display: flex; flex-direction: column; gap: 5px; }
+.plugin-field > span { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+.plugin-field .textarea { min-height: 60px; }
+.plugin-row3 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }
+@media (max-width: 620px) { .plugin-row3 { grid-template-columns: 1fr 1fr; } }
+.secret { display: flex; gap: 6px; align-items: center; }
+.secret .input { flex: 1; min-width: 0; letter-spacing: .04em; }
+.secret .icon-btn { width: 36px; height: 36px; flex-shrink: 0; }
+.plugin-file { display: flex; align-items: center; gap: 8px; color: var(--text-muted); }
+.plugin-file-name { color: var(--accent); text-decoration: none; word-break: break-all; }
+.plugin-file-name:hover { text-decoration: underline; }
+
+/* Scripts (reuse .filelist/.filerow) */
+.script-name { background: transparent; border: 0; color: var(--text); font: inherit; font-weight: 600; padding: 0; }
+.script-name:focus { outline: none; }
+.script-notes { background: transparent; border: 0; color: var(--text-muted); font: inherit; font-size: 12px; padding: 2px 0 0; }
+.script-notes:focus { outline: none; color: var(--text); }
+
+/* Expressions */
+.expr-list { display: flex; flex-direction: column; gap: 12px; }
+.expr-card { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 10px 12px; }
+.expr-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.expr-title { flex: 1; min-width: 0; background: transparent; border: 0; color: var(--text); font: inherit; font-weight: 600; padding: 2px; }
+.expr-title:focus { outline: none; }
+.expr-del:hover { color: var(--danger); }
+.expr-code {
+  width: 100%; min-height: 84px; resize: vertical; border-radius: 8px; padding: 10px 12px;
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.5;
+}
+.expr-code:focus { outline: none; border-color: var(--accent); }
+
+/* Tutorials */
+.tut-list { display: flex; flex-direction: column; gap: 8px; }
+.tut-row { display: flex; align-items: flex-start; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.tut-icon { flex-shrink: 0; color: #ff4d4d; margin-top: 4px; }
+.tut-main { flex: 1; min-width: 0; }
+.tut-title { width: 100%; background: transparent; border: 0; color: var(--text); font: inherit; font-weight: 600; padding: 2px 0; }
+.tut-title:focus { outline: none; }
+.tut-fields { display: flex; gap: 8px; margin: 4px 0; flex-wrap: wrap; }
+.tut-url { flex: 2 1 220px; min-width: 0; font-size: 13px; }
+.tut-channel { flex: 1 1 140px; min-width: 0; font-size: 13px; }
+.tut-open { flex-shrink: 0; color: var(--text-muted); margin-top: 4px; }
+.tut-open:hover { color: var(--accent); }
+.tut-open.is-disabled { opacity: .35; pointer-events: none; }
+
+/* Tag row (expressions / tutorials) */
+.tagrow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tagchip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; background: var(--surface-3); color: var(--text-muted); font-size: 12px; font-weight: 600; }
+.tagchip button { background: transparent; border: 0; color: inherit; cursor: pointer; display: inline-grid; place-items: center; padding: 0; opacity: .6; }
+.tagchip button:hover { opacity: 1; color: var(--danger); }
+.tagrow-input { background: transparent; border: 0; color: var(--text); font: inherit; font-size: 12px; padding: 3px 4px; min-width: 70px; }
+.tagrow-input:focus { outline: none; }
+
 /* Logo No Go — a warning banner above the image on the detail page. */
 .nogo-banner {
   display: inline-flex; align-items: center; gap: 8px; margin-bottom: 14px;
@@ -1545,8 +1648,8 @@ img { max-width: 100%; display: block; }
 .detail-nav-count { font-size: 13px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
 
 /* ---------------------------------------------------------- Work dashboard */
-.dash-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 6px; }
-@media (max-width: 900px) { .dash-grid { grid-template-columns: 1fr; } }
+.dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; margin-top: 6px; }
+@media (max-width: 620px) { .dash-grid { grid-template-columns: 1fr; } }
 .dash-card {
   display: flex; align-items: center; gap: 14px; text-align: left; width: 100%;
   padding: 16px; border: 1px solid var(--border); border-radius: var(--radius);

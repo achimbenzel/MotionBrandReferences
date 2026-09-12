@@ -164,6 +164,57 @@ export const api = {
     return handle(await fetch(`/api/plans/${id}/blocks/${blockId}/files/${fileId}`, { method: 'DELETE' }));
   },
 
+  // --- Software (plugin DB / scripts / expressions / tutorials) ---
+  async listSoftware() {
+    const { software } = await handle(await fetch('/api/software'));
+    return software;
+  },
+  async getSoftware(id) {
+    const { software } = await handle(await fetch(`/api/software/${id}`));
+    return software;
+  },
+  async createSoftware(name, icon) {
+    const { software } = await handle(await fetch('/api/software', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, icon }),
+    }));
+    return software;
+  },
+  async updateSoftware(id, patch) {
+    const { software } = await handle(await fetch(`/api/software/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
+    }));
+    return software;
+  },
+  async removeSoftware(id) {
+    return handle(await fetch(`/api/software/${id}`, { method: 'DELETE' }));
+  },
+  async setPluginFile(id, pluginId, file) {
+    const fd = new FormData(); fd.append('file', file);
+    const { software } = await handle(await fetch(`/api/software/${id}/plugins/${pluginId}/file`, { method: 'POST', body: fd }));
+    return software;
+  },
+  async removePluginFile(id, pluginId) {
+    const { software } = await handle(await fetch(`/api/software/${id}/plugins/${pluginId}/file`, { method: 'DELETE' }));
+    return software;
+  },
+  async addScript(id, file, name, notes) {
+    const fd = new FormData(); fd.append('file', file);
+    if (name) fd.append('name', name);
+    if (notes) fd.append('notes', notes);
+    const { software } = await handle(await fetch(`/api/software/${id}/scripts`, { method: 'POST', body: fd }));
+    return software;
+  },
+  async updateScript(id, scriptId, patch) {
+    const { software } = await handle(await fetch(`/api/software/${id}/scripts/${scriptId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
+    }));
+    return software;
+  },
+  async removeScript(id, scriptId) {
+    const { software } = await handle(await fetch(`/api/software/${id}/scripts/${scriptId}`, { method: 'DELETE' }));
+    return software;
+  },
+
   // --- To-Do board (global Kanban planner) ---
   async getBoard() {
     const { board } = await handle(await fetch('/api/board'));
@@ -225,4 +276,10 @@ export function fileUrl(project, relPath) {
 export function planFileUrl(plan, relPath) {
   if (!relPath) return null;
   return `/data/plan/${plan.id}/${relPath}`;
+}
+
+// Software files (plugin installers, scripts) live under data/software/<id>/…
+export function softwareFileUrl(softwareId, fileName) {
+  if (!fileName) return null;
+  return `/data/software/${softwareId}/${fileName}`;
 }

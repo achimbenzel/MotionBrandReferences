@@ -3,7 +3,7 @@
 A personal, **local-only** design reference library with eight sections —
 **Branding**, **Motion Design**, **Logos**, **Business Cards**, **Colors**,
 **Image Gallery**, **Fonts** and **Logo No Go** — plus a **Work** area (a
-Dashboard, Plans, a To-Do board and the Logo Tester). Cards with thumbnails and text below, styled after
+Dashboard, Plans, Software, a To-Do board and the Logo Tester). Cards with thumbnails and text below, styled after
 [achimbenzel.com/de/work](https://achimbenzel.com/de/work). Each section can be
 viewed as **All** (all projects) or **Galleries** (named collections you create,
 e.g. "Green Tech Companies"). A storage meter in the header sums the `data/`
@@ -57,10 +57,11 @@ data/
 ├── imagegallery/<id>/image.<ext>   # one image per item
 ├── font/<id>/shot.<ext>            # optional screenshot of a free-font site
 ├── logonogo/<id>/image.<ext>       # a logo/symbol to avoid resembling
-└── plan/<id>/                      # Plan-mode plans
+├── plan/<id>/                      # Plan-mode plans
     ├── banner.<ext>, avatar.<ext>  # Notion-style banner + profile image
     └── blocks/<blockId>/*          # one folder per content block
                                     # (moodboard images, files + example images)
+└── software/<id>/*                 # plugin installers + your own script files
 ```
 
 `data/` is **git-ignored and lives outside the source code**, so you can pull
@@ -133,8 +134,8 @@ excluded from exports.)
 A toggle switches between two modes:
 
 - **Work** — the **default** mode (left in the toggle), your working area. It
-  opens on a **Dashboard** and holds **Plans**, the **To-Do board** and the
-  **Logo Tester** (see below).
+  opens on a **Dashboard** and holds **Plans**, **Software**, the **To-Do
+  board** and the **Logo Tester** (see below).
 - **Reference** — the library (Branding, Motion Design, Logos, Business Cards,
   Colors, Image Gallery, Fonts, Logo No Go).
 
@@ -195,6 +196,26 @@ Plan new projects. The **+** creates a new plan; plans are listed
 
   Following the general rule below, a plan's title and each block's name are only
   editable via a **⋯** menu — there is no bare Delete button.
+
+### Software
+A **topic per app** (After Effects, Premiere, Blender…). Add a software, give it
+an emoji, and it opens a page with four tabs, each searchable:
+- **Plugins** — a small **database**: name, category, **website/source**,
+  **account**, **license key / serial**, **price + currency**, version,
+  purchase date, notes and an optional **installer file**. The key is **masked**
+  by default with show / **copy**; the header sums your **total spend** per
+  currency.
+- **Scripts** — upload your **own scripts / plugins** (`.jsx`, `.ffx`, `.zip`…)
+  with a name and note, and download them again.
+- **Expressions** — a snippet library: title + code (monospace) + tags, with a
+  **one-click copy**.
+- **Tutorials** — link useful **YouTube** videos / articles (title, URL,
+  channel, tags).
+
+Everything auto-saves. Deleting a software moves it (and its files) to **Trash**.
+Note: license keys and account details are stored **in plain text** in
+`data/db.json` — fine for a local-only tool behind your VPN, but keep that in
+mind before syncing the folder anywhere.
 
 ### Logo Tester
 A sandbox (nothing is saved) to stress-test a logo. Upload a **PNG or SVG**,
@@ -306,15 +327,15 @@ On **desktop** the app uses a **Notion-style left sidebar** that holds
 everything: the **logo** and a collapse button at the top, search (⌘K) below
 it, the Work / Reference toggle, the section list (with icons, current one
 highlighted), an **Add** button, and a footer with **Trash** and the storage
-meter. In **Work** mode the section list is **Dashboard**, **Plans**, **To-Dos**
-and **Logo Tester**.
+meter. In **Work** mode the section list is **Dashboard**, **Plans**,
+**Software**, **To-Dos** and **Logo Tester**.
 The collapse button **slides** the sidebar out for a full-width canvas; a small
 floating button slides it back in, and the collapsed state is remembered.
 
 On **narrow / mobile** widths the sidebar gives way to the original floating
 **header**: the section tabs collapse into a **hamburger menu** (current one
 checked), with search, add and the storage pill alongside. In **Work** mode the
-tabs become **Dashboard** / **Plans** / **To-Dos** / **Logo Tester** and **Add**
+tabs become **Dashboard** / **Plans** / **Software** / **To-Dos** / **Logo Tester** and **Add**
 creates a new plan.
 
 A project's detail page has **Previous / Next** buttons at the foot (and the
