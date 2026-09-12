@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Trash2, Pencil, MoreHorizontal, Plus, X, ChevronDown, ChevronRight,
@@ -188,7 +188,7 @@ export default function SoftwareDetail() {
                   <button className="icon-btn" title="Copy code" onClick={() => copy(e.code)}><Copy size={15} /></button>
                   <button className="icon-btn expr-del" title="Delete" onClick={() => delItem('expressions', e.id)}><X size={15} /></button>
                 </div>
-                <textarea className="expr-code" value={e.code} spellCheck={false} placeholder="// paste the expression here" onChange={(ev) => editItem('expressions', e.id, { code: ev.target.value })} />
+                <CodeArea className="expr-code" value={e.code} spellCheck={false} placeholder="// paste the expression here" onChange={(ev) => editItem('expressions', e.id, { code: ev.target.value })} />
                 <TagRow tags={e.tags} onChange={(tags) => editItem('expressions', e.id, { tags })} />
               </div>
             ))}
@@ -286,6 +286,20 @@ function PluginCard({ soft, plugin: p, onEdit, onDelete, onAttach, onRemoveFile,
 
 function Field({ label, children }) {
   return <label className="plugin-field"><span>{label}</span>{children}</label>;
+}
+
+// A textarea that grows to fit its content (no inner scrollbar). With
+// box-sizing: border-box, scrollHeight excludes the border, so add it back.
+function CodeArea({ value, onChange, ...rest }) {
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    const el = ref.current; if (!el) return;
+    el.style.height = 'auto';
+    const cs = getComputedStyle(el);
+    const border = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+    el.style.height = `${el.scrollHeight + border}px`;
+  }, [value]);
+  return <textarea ref={ref} value={value} onChange={onChange} {...rest} />;
 }
 
 function TagRow({ tags = [], onChange }) {

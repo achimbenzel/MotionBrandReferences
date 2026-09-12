@@ -52,7 +52,9 @@ export default function SoftwarePage({ reloadKey }) {
               const spend = spendLabel(s.plugins);
               return (
                 <button key={s.id} className="card soft-card" onClick={() => navigate(`/software/${s.id}`)}>
-                  <div className="soft-card-icon">{s.icon ? <span>{s.icon}</span> : <AppWindow size={24} />}</div>
+                  <div className="soft-card-cover">
+                    {s.icon ? <span className="soft-card-emoji">{s.icon}</span> : <AppWindow size={30} />}
+                  </div>
                   <div className="card-meta"><span className="card-title">{s.name}</span></div>
                   <div className="card-sub soft-card-sub">
                     <span><Puzzle size={13} /> {(s.plugins || []).length} plugin{(s.plugins || []).length === 1 ? '' : 's'}</span>
