@@ -9,6 +9,7 @@ export const TABS = [
   { key: 'color', label: 'Colors' },
   { key: 'imagegallery', label: 'Image Gallery' },
   { key: 'font', label: 'Fonts' },
+  { key: 'logonogo', label: 'Logo No Go' },
 ];
 
 export const TYPE_KEYS = TABS.map((t) => t.key);

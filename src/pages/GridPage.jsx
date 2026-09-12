@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Filter, X, Film, Palette, FileText, Square, CreditCard, FolderPlus, Images, Type, UploadCloud } from 'lucide-react';
+import { Plus, Filter, X, Film, Palette, FileText, Square, CreditCard, FolderPlus, Images, Type, UploadCloud, Ban } from 'lucide-react';
 import { api, fileUrl } from '../lib/api.js';
 import { lengthTag } from '../lib/media.js';
 import { hexToRgb, readableText } from '../lib/color.js';
@@ -17,6 +17,7 @@ const HEAD = {
   color: { title: 'Colors', desc: 'Palettes with automatic hex / rgb / cmyk / pantone.', icon: Palette },
   imagegallery: { title: 'Image Gallery', desc: 'Images only — listed like a moodboard. Paste (⌘V) or drop images to add.', icon: Images },
   font: { title: 'Fonts', desc: 'Websites & sources for free fonts.', icon: Type },
+  logonogo: { title: 'Logo No Go', desc: 'Logos & symbols with a bad reputation — so you can avoid resembling them.', icon: Ban },
 };
 
 /** Effective, filterable tag list for a project (adds the auto length tag). */

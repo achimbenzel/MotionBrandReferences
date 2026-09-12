@@ -2,7 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Search, Plus, PanelLeftClose, Trash2,
   FileText, Film, Square, CreditCard, Palette, Images, Type, PencilRuler, FlaskConical,
-  LayoutDashboard, ListTodo,
+  LayoutDashboard, ListTodo, Ban,
 } from 'lucide-react';
 import { TABS, WORK_TABS, isWorkPath } from '../lib/types.js';
 import ModeToggle from './ModeToggle.jsx';
@@ -11,7 +11,7 @@ import logoWide from '../../logo_wide_dark.svg';
 
 const ICON = {
   branding: FileText, motion: Film, logo: Square, businesscard: CreditCard,
-  color: Palette, imagegallery: Images, font: Type,
+  color: Palette, imagegallery: Images, font: Type, logonogo: Ban,
 };
 const WORK_ICON = { dashboard: LayoutDashboard, plan: PencilRuler, board: ListTodo, logotester: FlaskConical };
 

@@ -36,10 +36,10 @@ const MAX_SNAPSHOTS = 10;                             // how many db snapshots t
 const SNAPSHOT_INTERVAL_MS = 3 * 60 * 1000;          // at most one snapshot per 3 min
 const TRASH_TTL_DAYS = 30;                           // auto-purge trashed items after this
 
-const TYPES = new Set(['motion', 'color', 'branding', 'logo', 'businesscard', 'imagegallery', 'font']);
+const TYPES = new Set(['motion', 'color', 'branding', 'logo', 'businesscard', 'imagegallery', 'font', 'logonogo']);
 const TYPE_LABEL = {
   motion: 'Motion Design', color: 'Colors', branding: 'Branding', logo: 'Logos',
-  businesscard: 'Business Cards', imagegallery: 'Image Gallery', font: 'Fonts',
+  businesscard: 'Business Cards', imagegallery: 'Image Gallery', font: 'Fonts', logonogo: 'Logo No Go',
 };
 const DEFAULT_STORAGE_LIMIT = 80 * 1024 * 1024 * 1024; // 80 GB
 
@@ -466,6 +466,14 @@ app.post('/api/projects', upload.any(), async (req, res) => {
 
     if (type === 'imagegallery') {
       // One image per project, shown name-less in a masonry ("Alle") view.
+      const image = byField('image');
+      if (image) project.image = await moveInto(dir, image.path, `image${extOf(image.originalname) || '.png'}`);
+      project.thumb = project.image;
+    }
+
+    if (type === 'logonogo') {
+      // A "Logo No-Go": an image of a logo/symbol with a bad reputation, plus a
+      // note (added later) on why to avoid resembling it. The image is the cover.
       const image = byField('image');
       if (image) project.image = await moveInto(dir, image.path, `image${extOf(image.originalname) || '.png'}`);
       project.thumb = project.image;

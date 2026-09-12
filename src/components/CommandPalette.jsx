@@ -2,14 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, CornerDownLeft, FileText, Film, Square, CreditCard, Palette, Images, Type,
-  PencilRuler, FolderOpen, Trash2, LayoutGrid, FlaskConical,
+  PencilRuler, FolderOpen, Trash2, LayoutGrid, FlaskConical, Ban,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { TABS } from '../lib/types.js';
 
 const TYPE_ICON = {
   branding: FileText, motion: Film, logo: Square, businesscard: CreditCard,
-  color: Palette, imagegallery: Images, font: Type,
+  color: Palette, imagegallery: Images, font: Type, logonogo: Ban,
 };
 
 const NAV = [

@@ -14,6 +14,7 @@ import LogoDetail from './LogoDetail.jsx';
 import BusinessCardDetail from './BusinessCardDetail.jsx';
 import ImageGalleryItemDetail from './ImageGalleryItemDetail.jsx';
 import FontDetail from './FontDetail.jsx';
+import LogoNoGoDetail from './LogoNoGoDetail.jsx';
 import { coverAspect } from '../lib/types.js';
 
 export default function ProjectDetail() {
@@ -97,7 +98,7 @@ export default function ProjectDetail() {
   const Body = {
     motion: MotionDetail, color: ColorDetail, branding: BrandingDetail,
     logo: LogoDetail, businesscard: BusinessCardDetail, imagegallery: ImageGalleryItemDetail,
-    font: FontDetail,
+    font: FontDetail, logonogo: LogoNoGoDetail,
   }[project.type];
 
   const isImage = project.type === 'imagegallery';

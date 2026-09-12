@@ -1,9 +1,9 @@
-# Design Reference
+# Confinium Dashboard
 
-A personal, **local-only** design reference library with seven sections —
+A personal, **local-only** design reference library with eight sections —
 **Branding**, **Motion Design**, **Logos**, **Business Cards**, **Colors**,
-**Image Gallery** and **Fonts** — plus a **Plan** mode for planning new
-projects. Cards with thumbnails and text below, styled after
+**Image Gallery**, **Fonts** and **Logo No Go** — plus a **Work** area (a
+Dashboard, Plans, a To-Do board and the Logo Tester). Cards with thumbnails and text below, styled after
 [achimbenzel.com/de/work](https://achimbenzel.com/de/work). Each section can be
 viewed as **All** (all projects) or **Galleries** (named collections you create,
 e.g. "Green Tech Companies"). A storage meter in the header sums the `data/`
@@ -56,6 +56,7 @@ data/
 ├── businesscard/<id>/front.webp, back.webp
 ├── imagegallery/<id>/image.<ext>   # one image per item
 ├── font/<id>/shot.<ext>            # optional screenshot of a free-font site
+├── logonogo/<id>/image.<ext>       # a logo/symbol to avoid resembling
 └── plan/<id>/                      # Plan-mode plans
     ├── banner.<ext>, avatar.<ext>  # Notion-style banner + profile image
     └── blocks/<blockId>/*          # one folder per content block
@@ -135,7 +136,7 @@ A toggle switches between two modes:
   opens on a **Dashboard** and holds **Plans**, the **To-Do board** and the
   **Logo Tester** (see below).
 - **Reference** — the library (Branding, Motion Design, Logos, Business Cards,
-  Colors, Image Gallery, Fonts).
+  Colors, Image Gallery, Fonts, Logo No Go).
 
 The app starts in Work, and switching from Reference back to Work always returns
 to the Dashboard.
@@ -221,7 +222,8 @@ project you get:
 - a **player** with notes (auto-saved) and **tags** (used for filtering),
 - an automatic **length tag** — `≤ 30s`, `30–60s`, `60–90s`, `> 90s`,
 - a **“Add current frame”** button: pause anywhere and save that frame; frames
-  are stored as **WebP** in the project folder,
+  are stored as **WebP** in the project folder. While paused, step **frame by
+  frame** with **`,`** (back) and **`.`** (forward), YouTube-style,
 - a **big frame preview** with prev/next arrows (fixed position; wrapping past
   the last frame returns to the first), click-to-**fullscreen** with arrow
   navigation, and the thumbnail strip below. Each frame has a **⋯ menu** to
@@ -275,6 +277,13 @@ the site's domain — plus the domain as subtitle. Opening an entry shows the
 screenshot as a big **“Visit site”** button, the link, tags and a notes field;
 the URL is edited from the **Edit ⋯** menu. Like every section it has the All /
 Galleries toggle.
+
+### Logo No Go
+A reference of **logos and symbols with a bad reputation** — so when you design
+a new logo you can check you're not accidentally resembling one. Upload an
+**image** (PNG or SVG) and give it a name; the detail page shows the image with
+an **“Avoid designs that resemble this”** banner and a **“Why it's a no-go”**
+notes field for its history / what to steer clear of.
 
 ### Galleries (All / Galleries)
 Every section has an **All / Galleries** toggle. Under **Galleries** you create

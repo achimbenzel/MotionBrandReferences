@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Film, Palette, FileText, UploadCloud, Trash2, Scissors, Crop, Square, CreditCard, Images, Type, Wand2 } from 'lucide-react';
+import { X, Film, Palette, FileText, UploadCloud, Trash2, Scissors, Crop, Square, CreditCard, Images, Type, Wand2, Ban } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { captureFrame, lengthTag, fmtTime } from '../lib/media.js';
 import { renderPdfPage, cropToBlob, centerCover, extractPalette } from '../lib/imaging.js';
@@ -25,6 +25,7 @@ const TYPES = [
   { key: 'color', label: 'Colors', sub: 'Palette', icon: Palette },
   { key: 'imagegallery', label: 'Image Gallery', sub: 'Images only', icon: Images },
   { key: 'font', label: 'Fonts', sub: 'Website link', icon: Type },
+  { key: 'logonogo', label: 'Logo No Go', sub: 'Logo to avoid', icon: Ban },
 ];
 
 const BRANDING_SUGGESTIONS = ['Tech', 'Restaurant', 'Fashion', 'Sport', 'Finance', 'Food', 'Retail', 'Minimal', 'Colorful', 'Monochrome', 'Warm', 'Cool'];
@@ -73,6 +74,9 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
   const [fontUrl, setFontUrl] = useState('');
   const [fontShot, setFontShot] = useState(null); // { file, url }
 
+  // logo no-go — one image of a logo/symbol to avoid resembling
+  const [nogoImage, setNogoImage] = useState(null); // { file, url }
+
   // cover
   const [coverBlob, setCoverBlob] = useState(null);
   const [coverMeta, setCoverMeta] = useState(null);
@@ -87,6 +91,7 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
   useEffect(() => () => { if (bcFront?.preview) URL.revokeObjectURL(bcFront.preview); }, [bcFront]);
   useEffect(() => () => { if (bcBack?.preview) URL.revokeObjectURL(bcBack.preview); }, [bcBack]);
   useEffect(() => () => { if (fontShot?.url) URL.revokeObjectURL(fontShot.url); }, [fontShot]);
+  useEffect(() => () => { if (nogoImage?.url) URL.revokeObjectURL(nogoImage.url); }, [nogoImage]);
 
   const clearCover = () => {
     setCoverBlob(null); setCoverMeta(null);
@@ -141,6 +146,10 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
     } catch (e) { toast(`Could not read image: ${e.message}`, 'error'); }
     finally { setExtracting(false); }
   };
+  const pickNogo = (file) => {
+    if (!file) return;
+    setNogoImage((prev) => { if (prev?.url) URL.revokeObjectURL(prev.url); return { file, url: URL.createObjectURL(file) }; });
+  };
   const pickLogo = (file) => {
     if (!file) return;
     setLogoImage((prev) => { if (prev?.url) URL.revokeObjectURL(prev.url); return { file, url: URL.createObjectURL(file) }; });
@@ -180,7 +189,8 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
     (type === 'logo' && logoImage) ||
     (type === 'businesscard' && bcFront) ||
     (type === 'imagegallery' && galleryItems.length > 0) ||
-    (type === 'font' && fontUrl.trim())
+    (type === 'font' && fontUrl.trim()) ||
+    (type === 'logonogo' && nogoImage)
   );
 
   const coverAvailable = (type === 'motion' && !!videoSrc)
@@ -234,6 +244,7 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
         fd.append('url', fontUrl.trim());
         if (fontShot) fd.append('shot', fontShot.file);
       }
+      if (type === 'logonogo') { fd.append('image', nogoImage.file); }
 
       // Cover thumbnail (types that use a cropped cover).
       const out = { w: 900, h: Math.round(900 / ASPECT) };
@@ -461,6 +472,22 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
                 )}
               </div>
             </>
+          )}
+
+          {/* ---- Logo No Go ---- */}
+          {type === 'logonogo' && (
+            <div className="field">
+              <label>Logo / symbol image <span className="hint">a logo or symbol to avoid resembling</span></label>
+              {nogoImage ? (
+                <div className="logo-slot-preview checker">
+                  <img src={nogoImage.url} alt="logo to avoid" />
+                  <button type="button" className="icon-btn" style={{ position: 'absolute', top: 6, right: 6 }} onClick={() => setNogoImage(null)}><Trash2 size={15} /></button>
+                </div>
+              ) : (
+                <FilePick accept={IMG_ACCEPT} onPick={(f) => pickNogo(f[0])}><UploadCloud size={22} /><div>Upload</div></FilePick>
+              )}
+              <div className="hint" style={{ marginTop: 8 }}>Add a note on why it's a no-go from its detail page after saving.</div>
+            </div>
           )}
 
           {/* Cover (types that use a cropped cover) */}

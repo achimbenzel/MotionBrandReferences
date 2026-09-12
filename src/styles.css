@@ -565,6 +565,13 @@ img { max-width: 100%; display: block; }
 .media-fs { position: absolute; top: 12px; right: 12px; opacity: 0; transition: opacity .15s; background: rgba(0,0,0,.55); }
 .media-frame:hover .media-fs { opacity: 1; }
 
+/* Logo No Go — a warning banner above the image on the detail page. */
+.nogo-banner {
+  display: inline-flex; align-items: center; gap: 8px; margin-bottom: 14px;
+  padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 600;
+  color: #ff9ba6; background: rgba(200, 60, 70, .14); border: 1px solid rgba(200, 60, 70, .3);
+}
+
 /* --------------------------------------------------------- Color builder */
 .color-builder { display: grid; grid-template-columns: 120px 1fr; gap: 12px; align-items: start; }
 .color-preview {

@@ -24,6 +24,26 @@ export default function MotionDetail({ project, setProject }) {
   // Keep selection valid as frames change.
   useEffect(() => { if (sel > frames.length - 1) setSel(Math.max(0, frames.length - 1)); }, [frames.length, sel]);
 
+  // YouTube-style frame stepping: when the video is paused, "," and "." step
+  // one frame back / forward. (No universal way to read a file's fps from the
+  // browser, so a frame is 1/30s — fine for grabbing an exact-ish frame.)
+  useEffect(() => {
+    const FRAME = 1 / 30;
+    const onKey = (e) => {
+      if (e.key !== ',' && e.key !== '.') return;
+      const v = videoRef.current;
+      if (!v) return;
+      const el = document.activeElement;
+      if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+      if (!v.paused) return; // only step while paused
+      e.preventDefault();
+      if (e.key === ',') v.currentTime = Math.max(0, v.currentTime - FRAME);
+      else v.currentTime = Math.min(v.duration || Infinity, v.currentTime + FRAME);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const saveTags = async (tags) => {
     try { setProject(await api.update(project.id, { tags })); }
     catch (e) { toast(`Could not save tags: ${e.message}`, 'error'); }
@@ -76,7 +96,7 @@ export default function MotionDetail({ project, setProject }) {
         </button>
         <span className="hint" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           <Clock size={13} /> {fmtTime(current)} / {fmtTime(project.duration)}
-          {!paused && ' · pause to grab the exact frame'}
+          {paused ? ' · , / . step frames' : ' · pause to grab the exact frame'}
         </span>
       </div>
 

@@ -7,7 +7,7 @@ import { useToast } from './Toast.jsx';
  * Notes for any project type. Debounced autosave to project.notes.
  * Shown with a larger type size for comfortable reading/writing.
  */
-export default function NotesField({ project, setProject }) {
+export default function NotesField({ project, setProject, label = 'Notes', placeholder = 'Ideas, feedback, references, what worked…' }) {
   const toast = useToast();
   const [notes, setNotes] = useState(project.notes || '');
   const [state, setState] = useState('idle');
@@ -36,13 +36,13 @@ export default function NotesField({ project, setProject }) {
 
   return (
     <div className="section">
-      <div className="section-head"><h2><StickyNote size={16} /> Notes</h2></div>
+      <div className="section-head"><h2><StickyNote size={16} /> {label}</h2></div>
       <div className="notes-area">
         <textarea
           className="textarea notes-textarea"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Ideas, feedback, references, what worked…"
+          placeholder={placeholder}
         />
         <span className="notes-status">{state === 'saving' ? 'Saving…' : state === 'saved' ? 'Saved' : ''}</span>
       </div>
