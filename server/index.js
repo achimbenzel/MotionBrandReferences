@@ -1080,6 +1080,7 @@ function normalizeBoard(board) {
         id: card?.id || nanoid(8),
         title: str(card?.title, 4000),
         notes: str(card?.notes, 8000),
+        color: TAG_KEYS.has(card?.color) ? card.color : null,
         tags: (Array.isArray(card?.tags) ? card.tags : []).slice(0, 20).map((t) => ({
           id: t?.id || nanoid(6),
           label: str(t?.label, 60),

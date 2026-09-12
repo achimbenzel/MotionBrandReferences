@@ -23,6 +23,7 @@ export default function LogoTester() {
   const [custom, setCustom] = useState('#2ec5d3');
   const [scale, setScale] = useState(0.6);
   const [blur, setBlur] = useState(0);
+  const [pixel, setPixel] = useState(0);
   const [grayscale, setGrayscale] = useState(false);
   const [invert, setInvert] = useState(false);
   const fileRef = useRef(null);
@@ -73,11 +74,16 @@ export default function LogoTester() {
             <label className="lt-slider">Blur <span>{blur}px</span>
               <input type="range" min="0" max="24" step="1" value={blur} onChange={(e) => setBlur(+e.target.value)} />
             </label>
+            <label className="lt-slider">Pixelate <span>{pixel ? `${pixel}px` : 'off'}</span>
+              <input type="range" min="0" max="24" step="1" value={pixel} onChange={(e) => setPixel(+e.target.value)} />
+            </label>
           </div>
 
           {/* Main stage */}
           <div className="lt-stage" style={bgStyle}>
-            <Logo style={{ width: `${scale * 100}%`, maxHeight: '100%', objectFit: 'contain', filter: stageFilter }} />
+            {pixel > 0
+              ? <PixelStage url={logo.url} scalePct={scale * 100} filter={stageFilter} pixel={pixel} />
+              : <Logo style={{ width: `${scale * 100}%`, maxHeight: '100%', objectFit: 'contain', filter: stageFilter }} />}
           </div>
 
           {/* Real-world previews */}
@@ -132,6 +138,42 @@ export default function LogoTester() {
       )}
     </div>
   );
+}
+
+/** Draws the logo pixelated: downscale to 1/pixel, then scale back up with
+ *  smoothing off. Works for PNG and SVG (rasterised via the loaded image). */
+function PixelStage({ url, scalePct, filter, pixel }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return undefined;
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (cancelled) return;
+      const iw = img.naturalWidth || 512;
+      const ih = img.naturalHeight || 512;
+      const base = 1024;
+      const W = iw >= ih ? base : Math.max(1, Math.round(base * iw / ih));
+      const H = iw >= ih ? Math.max(1, Math.round(base * ih / iw)) : base;
+      canvas.width = W; canvas.height = H;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, W, H);
+      const p = Math.max(1, pixel);
+      const sw = Math.max(1, Math.round(W / p));
+      const sh = Math.max(1, Math.round(H / p));
+      const tmp = document.createElement('canvas');
+      tmp.width = sw; tmp.height = sh;
+      const tctx = tmp.getContext('2d');
+      tctx.imageSmoothingEnabled = true;
+      tctx.drawImage(img, 0, 0, sw, sh);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(tmp, 0, 0, sw, sh, 0, 0, W, H);
+    };
+    img.src = url;
+    return () => { cancelled = true; };
+  }, [url, pixel]);
+  return <canvas ref={ref} style={{ width: `${scalePct}%`, maxHeight: '100%', objectFit: 'contain', filter, imageRendering: 'pixelated' }} />;
 }
 
 function Dropzone({ onPick, inputRef }) {

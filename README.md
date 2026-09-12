@@ -147,9 +147,11 @@ Tester** — each opening its tool, plus a **Recent plans** row.
 
 ### To-Do board
 A general **Kanban planner**. Lists (columns) hold **cards**; add lists and
-cards, rename them inline, give cards **coloured tags**, and **drag cards** (via
-the grip handle) within a list or across lists to track progress. Everything
-auto-saves to one global board.
+cards, rename them inline, give cards **coloured tags**, tint a whole card in
+one of the same colours, and **drag cards** (via the grip handle) within a list
+or across lists to track progress. On desktop the board uses the **full width**,
+so extra lists run past the usual content margins. Everything auto-saves to one
+global board.
 
 ### Plans
 Plan new projects. The **+** creates a new plan; plans are listed
@@ -197,8 +199,8 @@ Plan new projects. The **+** creates a new plan; plans are listed
 A sandbox (nothing is saved) to stress-test a logo. Upload a **PNG or SVG**,
 then preview it live:
 - a big **stage** with adjustable **background** (light / dark / transparent
-  checker / custom colour), **scale** and **blur** sliders, plus **grayscale**
-  and **invert** toggles;
+  checker / custom colour), **scale**, **blur** and **pixelate** sliders, plus
+  **grayscale** and **invert** toggles;
 - real-world previews: a **browser tab** favicon, **app icons** (rounded
   128 / 64 px tiles), exact **favicon sizes** (16 / 32 / 48 px) and a **small
   sizes** row (24–96 px) to check legibility when tiny.
@@ -311,6 +313,10 @@ A project's detail page has **Previous / Next** buttons at the foot (and the
 without going back to the grid; stepping past the last one wraps to the first.
 
 ### Covers & editing (all types)
+- **Zoom any image:** the fullscreen viewer (Motion frames, Branding images,
+  Logos, moodboards, galleries, …) zooms with the **mouse wheel** toward the
+  cursor, **drag** to pan, and **double-click** to toggle; a reset badge shows
+  the current level.
 - **Crop & zoom the cover:** when you set a thumbnail — a Motion frame, a
   Branding PDF page or image, a Color image, or a Font screenshot — drag to
   reposition and use the zoom slider to frame exactly what shows on the card.

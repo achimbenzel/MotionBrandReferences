@@ -63,6 +63,7 @@ function Shell() {
   }, [navigate, toast]);
 
   const onAdd = workMode ? createPlan : openModal;
+  const wide = location.pathname === '/board'; // the board uses the full desktop width
 
   return (
     <div className="app" data-sidebar={collapsed ? 'collapsed' : 'open'}>
@@ -72,7 +73,7 @@ function Shell() {
       </button>
       <Header onAdd={onAdd} onSearch={() => setPaletteOpen(true)} storageKey={reloadKey} />
       <main className="main">
-        <div className="main-inner">
+        <div className={`main-inner${wide ? ' wide' : ''}`}>
           <ErrorBoundary>
             <Routes>
               <Route path="/" element={<Navigate to={WORK_HOME} replace />} />

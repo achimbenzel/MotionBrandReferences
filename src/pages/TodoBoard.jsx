@@ -16,6 +16,7 @@ export default function TodoBoard() {
   const [dragOverCol, setDragOverCol] = useState(null);
   const [focusCard, setFocusCard] = useState(null); // card id to autofocus after adding
   const [tagEditFor, setTagEditFor] = useState(null); // card id whose tag composer is open
+  const [colorEditFor, setColorEditFor] = useState(null); // card id whose colour picker is open
   const [dragCard, setDragCard] = useState(null); // card id made draggable via its grip
   const dragRef = useRef(null); // { fromCol, cardId }
   const timer = useRef(null);
@@ -59,6 +60,7 @@ export default function TodoBoard() {
     commit(mapCard(colId, cardId, (k) => ({ ...k, tags: [...(k.tags || []), { id: rid(), label: l || 'Tag', color }] })), true);
   };
   const removeTag = (colId, cardId, tagId) => commit(mapCard(colId, cardId, (k) => ({ ...k, tags: (k.tags || []).filter((t) => t.id !== tagId) })), true);
+  const setCardColor = (colId, cardId, color) => { commit(mapCard(colId, cardId, (k) => ({ ...k, color })), true); setColorEditFor(null); };
 
   // Drag & drop
   const onCardDragStart = (e, colId, cardId) => {
@@ -128,10 +130,13 @@ export default function TodoBoard() {
             </div>
 
             <div className="kb-cards">
-              {col.cards.map((card) => (
+              {col.cards.map((card) => {
+                const cc = card.color ? tagColor(card.color) : null;
+                return (
                 <div
                   key={card.id}
-                  className={`kb-card ${dragCard === card.id ? 'dragging' : ''}`}
+                  className={`kb-card ${dragCard === card.id ? 'dragging' : ''} ${cc ? 'tinted' : ''}`}
+                  style={cc ? { background: cc.bg, borderColor: 'transparent', boxShadow: `inset 3px 0 0 ${cc.fg}` } : undefined}
                   draggable={dragCard === card.id}
                   onDragStart={(e) => onCardDragStart(e, col.id, card.id)}
                   onDragEnd={() => { dragRef.current = null; setDragCard(null); setDragOverCol(null); }}
@@ -140,7 +145,22 @@ export default function TodoBoard() {
                 >
                   <span className="kb-card-grip" title="Drag to move"
                     onMouseDown={() => setDragCard(card.id)} onMouseUp={() => setDragCard(null)}><GripVertical size={15} /></span>
-                  <button className="kb-card-del icon-btn" title="Delete card" onClick={() => removeCard(col.id, card.id)}><X size={13} /></button>
+                  <div className="kb-card-tools">
+                    <button className="kb-card-color icon-btn" title="Card colour"
+                      onClick={() => setColorEditFor((v) => (v === card.id ? null : card.id))}>
+                      <span className="kb-color-dot" style={{ background: cc ? cc.fg : 'transparent', borderColor: cc ? cc.fg : 'var(--text-faint)' }} />
+                    </button>
+                    <button className="kb-card-del icon-btn" title="Delete card" onClick={() => removeCard(col.id, card.id)}><X size={14} /></button>
+                  </div>
+                  {colorEditFor === card.id && (
+                    <div className="kb-colorpop">
+                      <button className="kb-swatch kb-swatch-none" title="No colour" onClick={() => setCardColor(col.id, card.id, null)}><X size={12} /></button>
+                      {TAG_COLORS.map((c) => (
+                        <button key={c.key} className={`kb-swatch ${card.color === c.key ? 'on' : ''}`} style={{ background: c.bg }} title={c.key}
+                          onClick={() => setCardColor(col.id, card.id, c.key)} />
+                      ))}
+                    </div>
+                  )}
                   <textarea
                     className="kb-card-title" value={card.title} rows={1} placeholder="Write a to-do…"
                     autoFocus={focusCard === card.id}
@@ -167,7 +187,8 @@ export default function TodoBoard() {
                     <button className="kb-tag-add" onClick={() => setTagEditFor(card.id)}><TagIcon size={12} /> Add tag</button>
                   )}
                 </div>
-              ))}
+                );
+              })}
 
               <button className="kb-add-card" onClick={() => addCard(col.id)}><Plus size={15} /> New card</button>
             </div>
@@ -196,11 +217,11 @@ function TagComposer({ onAdd, onClose }) {
       />
       <div className="kb-swatches">
         {TAG_COLORS.map((c) => (
-          <button key={c.key} className="kb-swatch" style={{ background: c.bg, color: c.fg }} title={c.key}
-            onClick={() => { onAdd(label, c.key); setLabel(''); }}>A</button>
+          <button key={c.key} className="kb-swatch" style={{ background: c.bg }} title={c.key}
+            onClick={() => { onAdd(label, c.key); setLabel(''); }} />
         ))}
       </div>
-      <button className="kb-tag-done icon-btn" title="Done" onClick={onClose}><X size={14} /></button>
+      <button className="kb-tag-done icon-btn" title="Done" onClick={onClose}><X size={15} /></button>
     </div>
   );
 }
