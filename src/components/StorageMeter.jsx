@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { HardDrive, MoreVertical, X, Download, Upload, Trash2 } from 'lucide-react';
+import { HardDrive, MoreVertical, X, Download, Upload, Trash2, Settings } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useToast } from './Toast.jsx';
 import Menu from './Menu.jsx';
@@ -86,6 +86,7 @@ export default function StorageMeter({ refreshKey, menuUp = false }) {
             { label: 'Export library (.zip)', icon: <Download size={15} />, onClick: exportLibrary },
             { label: 'Import library (.zip)…', icon: <Upload size={15} />, onClick: () => fileRef.current?.click() },
             { separator: true },
+            { label: 'Settings', icon: <Settings size={15} />, onClick: () => navigate('/settings') },
             { label: 'Trash', icon: <Trash2 size={15} />, onClick: () => navigate('/trash') },
             { label: 'Refresh', onClick: load },
           ]}

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, CornerDownLeft, FileText, Film, Square, CreditCard, Palette, Images, Type,
-  PencilRuler, FolderOpen, Trash2, LayoutGrid, FlaskConical, Ban,
+  PencilRuler, FolderOpen, Trash2, LayoutGrid, FlaskConical, Ban, Settings,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { TABS } from '../lib/types.js';
@@ -17,6 +17,7 @@ const NAV = [
   { kind: 'nav', title: 'Plans', subtitle: 'Work mode', to: '/plan', icon: PencilRuler },
   { kind: 'nav', title: 'Logo Tester', subtitle: 'Work mode', to: '/logo-tester', icon: FlaskConical },
   { kind: 'nav', title: 'Trash', subtitle: 'Deleted items', to: '/trash', icon: Trash2 },
+  { kind: 'nav', title: 'Settings', subtitle: 'Shortcuts & preferences', to: '/settings', icon: Settings },
 ];
 
 /** ⌘/Ctrl-K palette: search all content + jump to any section. */

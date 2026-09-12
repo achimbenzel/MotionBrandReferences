@@ -24,6 +24,19 @@ export default function MotionDetail({ project, setProject }) {
   // Keep selection valid as frames change.
   useEffect(() => { if (sel > frames.length - 1) setSel(Math.max(0, frames.length - 1)); }, [frames.length, sel]);
 
+  // Remember the player volume across reloads (a global per-viewer preference).
+  useEffect(() => {
+    const v = videoRef.current; if (!v) return;
+    try {
+      const vol = parseFloat(localStorage.getItem('videoVolume'));
+      if (Number.isFinite(vol)) v.volume = Math.min(1, Math.max(0, vol));
+      v.muted = localStorage.getItem('videoMuted') === '1';
+    } catch { /* ignore */ }
+  }, [project.id]);
+  const saveVolume = (e) => {
+    try { localStorage.setItem('videoVolume', String(e.target.volume)); localStorage.setItem('videoMuted', e.target.muted ? '1' : '0'); } catch { /* ignore */ }
+  };
+
   // YouTube-style frame stepping: when the video is paused, "," and "." step
   // one frame back / forward. (No universal way to read a file's fps from the
   // browser, so a frame is 1/30s — fine for grabbing an exact-ish frame.)
@@ -86,6 +99,7 @@ export default function MotionDetail({ project, setProject }) {
           controls
           onPlay={() => setPaused(false)}
           onPause={() => setPaused(true)}
+          onVolumeChange={saveVolume}
           onTimeUpdate={(e) => setCurrent(e.target.currentTime)}
         />
       </div>

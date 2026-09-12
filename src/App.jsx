@@ -18,6 +18,7 @@ import TodoBoard from './pages/TodoBoard.jsx';
 import SoftwarePage from './pages/SoftwarePage.jsx';
 import SoftwareDetail from './pages/SoftwareDetail.jsx';
 import TrashPage from './pages/TrashPage.jsx';
+import SettingsPage from './pages/SettingsPage.jsx';
 import { TABS, isWorkPath, WORK_HOME } from './lib/types.js';
 import { api } from './lib/api.js';
 
@@ -92,6 +93,7 @@ function Shell() {
               <Route path="/board" element={<TodoBoard />} />
               <Route path="/logo-tester" element={<LogoTester />} />
               <Route path="/trash" element={<TrashPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to={WORK_HOME} replace />} />
             </Routes>
           </ErrorBoundary>

@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  Search, Plus, PanelLeftClose, Trash2,
+  Search, Plus, PanelLeftClose, Trash2, Settings,
   FileText, Film, Square, CreditCard, Palette, Images, Type, PencilRuler, FlaskConical,
   LayoutDashboard, ListTodo, Ban, AppWindow,
 } from 'lucide-react';
@@ -22,6 +22,7 @@ export default function Sidebar({ onAdd, onSearch, onToggle, storageKey }) {
   const workMode = isWorkPath(pathname);
   const onPlan = pathname === '/plan' || pathname.startsWith('/plan/');
   const onTrash = pathname === '/trash';
+  const onSettings = pathname === '/settings';
   const active = TABS.find((t) => pathname.startsWith(`/${t.key}`))?.key
     || sessionStorage.getItem('lastTab') || 'branding';
 
@@ -76,6 +77,9 @@ export default function Sidebar({ onAdd, onSearch, onToggle, storageKey }) {
         <div className="sb-grow" />
 
         <div className="sb-footer">
+          <button className={`sb-item ${onSettings ? 'active' : ''}`} onClick={() => navigate('/settings')}>
+            <Settings size={17} /> <span>Settings</span>
+          </button>
           <button className={`sb-item ${onTrash ? 'active' : ''}`} onClick={() => navigate('/trash')}>
             <Trash2 size={17} /> <span>Trash</span>
           </button>

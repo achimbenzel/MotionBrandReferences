@@ -127,6 +127,15 @@ membership come back intact — or delete them permanently. Trash auto-empties
 items older than **30 days**. (Trashed items live under `data/trash/` and are
 excluded from exports.)
 
+### Settings
+
+A **Settings** page (in the sidebar footer above Trash, the storage **⋯** menu,
+or the palette) lists every **keyboard shortcut** — ⌘K search, the fullscreen
+viewer's scroll-zoom / drag / arrows, Motion's `,` `.` frame stepping, project
+`←`/`→` navigation — plus per-browser **preferences**. The **video player
+volume** (and mute) is remembered across reloads in this browser, and can be
+reset from here.
+
 ---
 
 ## Modes: Work & Reference
@@ -240,7 +249,8 @@ restaurant, …) and filter the grid by those tags.
 ### Motion Design
 Upload a **video**; scrub to the frame you want and it becomes the cover. On a
 project you get:
-- a **player** with notes (auto-saved) and **tags** (used for filtering),
+- a **player** (its **volume / mute is remembered** across reloads) with notes
+  (auto-saved) and **tags** (used for filtering),
 - an automatic **length tag** — `≤ 30s`, `30–60s`, `60–90s`, `> 90s`,
 - a **“Add current frame”** button: pause anywhere and save that frame; frames
   are stored as **WebP** in the project folder. While paused, step **frame by
@@ -326,9 +336,9 @@ changes so the meter never rescans the whole tree on every poll.
 On **desktop** the app uses a **Notion-style left sidebar** that holds
 everything: the **logo** and a collapse button at the top, search (⌘K) below
 it, the Work / Reference toggle, the section list (with icons, current one
-highlighted), an **Add** button, and a footer with **Trash** and the storage
-meter. In **Work** mode the section list is **Dashboard**, **Plans**,
-**Software**, **To-Dos** and **Logo Tester**.
+highlighted), an **Add** button, and a footer with **Settings**, **Trash** and
+the storage meter. In **Work** mode the section list is **Dashboard**,
+**Plans**, **Software**, **To-Dos** and **Logo Tester**.
 The collapse button **slides** the sidebar out for a full-width canvas; a small
 floating button slides it back in, and the collapsed state is remembered.
 

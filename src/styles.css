@@ -673,6 +673,30 @@ img { max-width: 100%; display: block; }
 .tagrow-input { background: transparent; border: 0; color: var(--text); font: inherit; font-size: 12px; padding: 3px 4px; min-width: 70px; }
 .tagrow-input:focus { outline: none; }
 
+/* --------------------------------------------------------------- Settings */
+.shortcuts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+@media (max-width: 720px) { .shortcuts { grid-template-columns: 1fr; } }
+.sc-group { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 12px 14px; }
+.sc-group-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-faint); margin-bottom: 8px; }
+.sc-row { display: flex; align-items: center; gap: 12px; padding: 6px 0; }
+.sc-row + .sc-row { border-top: 1px solid var(--border); }
+.sc-keys { flex: 0 0 130px; display: flex; align-items: center; flex-wrap: wrap; gap: 3px; }
+.sc-key {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px;
+  padding: 0 6px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--surface-2);
+  color: var(--text); font: inherit; font-size: 12px; font-weight: 600; line-height: 1;
+}
+.sc-plus, .sc-or { color: var(--text-faint); font-size: 11px; padding: 0 2px; }
+.sc-desc { flex: 1; min-width: 0; color: var(--text-muted); font-size: 14px; }
+
+.pref-list { display: flex; flex-direction: column; gap: 8px; }
+.pref-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
+}
+.pref-title { font-weight: 600; }
+.pref-sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+
 /* Logo No Go — a warning banner above the image on the detail page. */
 .nogo-banner {
   display: inline-flex; align-items: center; gap: 8px; margin-bottom: 14px;
