@@ -33,6 +33,28 @@ npm run serve      # builds the frontend and serves everything from :4300
 # open http://localhost:4300
 ```
 
+### Hosting it (VPS / Tailscale)
+
+The app is deliberately dependency-light and does its own caching, but it does
+**not** gzip/brotli responses itself. On a real host, put a reverse proxy in
+front of `:4300` for compression + TLS — this is where the biggest mobile win
+is (the initial JS is ~286 KB raw but only ~89 KB gzipped). A minimal Caddy
+config does both with no extra app dependencies:
+
+```
+your-host.example {
+    encode zstd gzip
+    reverse_proxy localhost:4300
+}
+```
+
+Caching is already handled by the app: content-hashed build assets
+(`/assets/*`) and immutable library files (moodboard / plan-block uploads) are
+sent with a one-year `immutable` cache; `index.html` and re-uploadable files
+(banner / avatar / cover) use a short cache so a redeploy or re-upload shows up
+right away. Heavy code (pdf.js, the Logo Tester, the thumbnail studio, each
+detail page) is split into its own chunk and fetched only when first needed.
+
 ---
 
 ## Your library never breaks on updates

@@ -1489,9 +1489,18 @@ app.post('/api/import', uploadArchive.single('archive'), async (req, res) => {
 // In production (npm start) serve the built frontend from the same origin.
 // ---------------------------------------------------------------------------
 if (IS_PROD && fs.existsSync(DIST_DIR)) {
-  app.use(express.static(DIST_DIR));
+  // Vite emits content-hashed files under /assets (index-<hash>.js …) — those
+  // can be cached forever; index.html and other root files must stay fresh so a
+  // redeploy is picked up.
+  app.use(express.static(DIST_DIR, {
+    setHeaders: (res, filePath) => {
+      if (/[\\/]assets[\\/]/.test(filePath)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      else res.setHeader('Cache-Control', 'no-cache');
+    },
+  }));
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api') || req.path.startsWith('/data')) return next();
+    res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(DIST_DIR, 'index.html'));
   });
 }

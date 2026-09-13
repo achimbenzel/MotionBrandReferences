@@ -1,21 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Trash2, Pencil, Image as ImageIcon, MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api, fileUrl } from '../lib/api.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
 import EditDetailsModal from '../components/EditDetailsModal.jsx';
-import ThumbnailStudio from '../components/ThumbnailStudio.jsx';
 import LogoOptionsModal from '../components/LogoOptionsModal.jsx';
-import MotionDetail from './MotionDetail.jsx';
-import ColorDetail from './ColorDetail.jsx';
-import BrandingDetail from './BrandingDetail.jsx';
-import LogoDetail from './LogoDetail.jsx';
-import BusinessCardDetail from './BusinessCardDetail.jsx';
-import ImageGalleryItemDetail from './ImageGalleryItemDetail.jsx';
-import FontDetail from './FontDetail.jsx';
-import LogoNoGoDetail from './LogoNoGoDetail.jsx';
 import { coverAspect } from '../lib/types.js';
+
+// Per-type bodies + the (heavy, imaging-backed) thumbnail studio are split into
+// their own chunks — opening a colour project doesn't pull the branding/logo
+// code, and the studio only loads when you actually change a cover.
+const ThumbnailStudio = lazy(() => import('../components/ThumbnailStudio.jsx'));
+const MotionDetail = lazy(() => import('./MotionDetail.jsx'));
+const ColorDetail = lazy(() => import('./ColorDetail.jsx'));
+const BrandingDetail = lazy(() => import('./BrandingDetail.jsx'));
+const LogoDetail = lazy(() => import('./LogoDetail.jsx'));
+const BusinessCardDetail = lazy(() => import('./BusinessCardDetail.jsx'));
+const ImageGalleryItemDetail = lazy(() => import('./ImageGalleryItemDetail.jsx'));
+const FontDetail = lazy(() => import('./FontDetail.jsx'));
+const LogoNoGoDetail = lazy(() => import('./LogoNoGoDetail.jsx'));
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -133,7 +137,9 @@ export default function ProjectDetail() {
         </div>
       </div>
 
-      <Body project={project} setProject={setProject} />
+      <Suspense fallback={<div className="spinner" />}>
+        {Body && <Body project={project} setProject={setProject} />}
+      </Suspense>
 
       {hasNav && (
         <div className="detail-nav">
@@ -156,6 +162,7 @@ export default function ProjectDetail() {
       )}
 
       {thumbing && (
+        <Suspense fallback={null}>
         <ThumbnailStudio
           type={project.type}
           aspect={coverAspect(project.type, project)}
@@ -170,6 +177,7 @@ export default function ProjectDetail() {
           onDone={saveThumb}
           onClose={() => setThumbing(false)}
         />
+        </Suspense>
       )}
 
       {logoOptions && (
