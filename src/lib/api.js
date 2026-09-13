@@ -164,7 +164,7 @@ export const api = {
     return handle(await fetch(`/api/plans/${id}/blocks/${blockId}/files/${fileId}`, { method: 'DELETE' }));
   },
 
-  // --- Software (plugin DB / scripts / expressions / tutorials) ---
+  // --- Software (plugin DB / expressions / tutorials) ---
   async listSoftware() {
     const { software } = await handle(await fetch('/api/software'));
     return software;
@@ -173,9 +173,9 @@ export const api = {
     const { software } = await handle(await fetch(`/api/software/${id}`));
     return software;
   },
-  async createSoftware(name, icon) {
+  async createSoftware(name, avatarEmoji) {
     const { software } = await handle(await fetch('/api/software', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, icon }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, avatarEmoji }),
     }));
     return software;
   },
@@ -188,6 +188,17 @@ export const api = {
   async removeSoftware(id) {
     return handle(await fetch(`/api/software/${id}`, { method: 'DELETE' }));
   },
+  // Software banner / avatar images (like plans). kind: 'banner' | 'avatar'
+  async setSoftwareImage(id, kind, file) {
+    const fd = new FormData(); fd.append(kind, file, `${kind}.img`);
+    const { software } = await handle(await fetch(`/api/software/${id}/${kind}`, { method: 'POST', body: fd }));
+    return software;
+  },
+  async removeSoftwareImage(id, kind) {
+    const { software } = await handle(await fetch(`/api/software/${id}/${kind}`, { method: 'DELETE' }));
+    return software;
+  },
+  // Plugin installer file
   async setPluginFile(id, pluginId, file) {
     const fd = new FormData(); fd.append('file', file);
     const { software } = await handle(await fetch(`/api/software/${id}/plugins/${pluginId}/file`, { method: 'POST', body: fd }));
@@ -197,21 +208,24 @@ export const api = {
     const { software } = await handle(await fetch(`/api/software/${id}/plugins/${pluginId}/file`, { method: 'DELETE' }));
     return software;
   },
-  async addScript(id, file, name, notes) {
-    const fd = new FormData(); fd.append('file', file);
-    if (name) fd.append('name', name);
-    if (notes) fd.append('notes', notes);
-    const { software } = await handle(await fetch(`/api/software/${id}/scripts`, { method: 'POST', body: fd }));
+  // Plugin preview image (shown in the card view)
+  async setPluginImage(id, pluginId, file) {
+    const fd = new FormData(); fd.append('image', file);
+    const { software } = await handle(await fetch(`/api/software/${id}/plugins/${pluginId}/image`, { method: 'POST', body: fd }));
     return software;
   },
-  async updateScript(id, scriptId, patch) {
-    const { software } = await handle(await fetch(`/api/software/${id}/scripts/${scriptId}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
-    }));
+  async removePluginImage(id, pluginId) {
+    const { software } = await handle(await fetch(`/api/software/${id}/plugins/${pluginId}/image`, { method: 'DELETE' }));
     return software;
   },
-  async removeScript(id, scriptId) {
-    const { software } = await handle(await fetch(`/api/software/${id}/scripts/${scriptId}`, { method: 'DELETE' }));
+  // Expression-group preview image
+  async setGroupImage(id, groupId, file) {
+    const fd = new FormData(); fd.append('image', file);
+    const { software } = await handle(await fetch(`/api/software/${id}/groups/${groupId}/image`, { method: 'POST', body: fd }));
+    return software;
+  },
+  async removeGroupImage(id, groupId) {
+    const { software } = await handle(await fetch(`/api/software/${id}/groups/${groupId}/image`, { method: 'DELETE' }));
     return software;
   },
 

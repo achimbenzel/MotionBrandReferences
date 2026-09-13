@@ -251,7 +251,8 @@ async function purgeExpiredTrash() {
 const trashThumb = (t) => {
   const rel = t.kind === 'project' ? t.data.thumb
     : t.kind === 'plan' ? (t.data.avatar || t.data.banner)
-      : t.kind === 'file' ? (t.data.item?.example) : null;
+      : t.kind === 'software' ? (t.data.avatar || t.data.banner)
+        : t.kind === 'file' ? (t.data.item?.example) : null;
   return rel ? `/data/trash/${t.trashId}/${rel}` : null;
 };
 function mutateDB(mutator) {
@@ -995,8 +996,7 @@ app.get('/api/search', async (req, res) => {
   for (const s of (db.software || [])) {
     const hay = [s.name,
       ...(s.plugins || []).flatMap((p) => [p.name, p.category, p.version]),
-      ...(s.scripts || []).map((x) => x.name),
-      ...(s.expressions || []).flatMap((e) => [e.title, ...(e.tags || [])]),
+      ...(s.expressionGroups || []).flatMap((g) => [g.name, ...(g.items || []).flatMap((e) => [e.title, ...(e.tags || [])])]),
       ...(s.tutorials || []).flatMap((t) => [t.title, t.channel])].filter(Boolean).join(' ').toLowerCase();
     const score = scoreMatch(terms, s.name || '', hay);
     if (score > 0) results.push({ kind: 'software', id: s.id, title: s.name || 'Software', subtitle: 'Software', score });
@@ -1154,25 +1154,43 @@ function normalizePlugin(p) {
     price: str(p?.price, 40), currency: CURRENCIES.has(p?.currency) ? p.currency : 'EUR',
     version: str(p?.version, 60), purchasedAt: str(p?.purchasedAt, 20), notes: str(p?.notes, 4000),
     file: p?.file ? str(p.file, 300) : null, fileName: p?.fileName ? str(p.fileName, 200) : null,
+    size: Number.isFinite(p?.size) ? p.size : 0,
+    image: p?.image ? str(p.image, 300) : null, imageName: p?.imageName ? str(p.imageName, 200) : null,
   };
 }
-const normalizeScript = (s) => ({
-  id: s?.id || nanoid(8), name: str(s?.name, 200), notes: str(s?.notes, 4000),
-  file: s?.file ? str(s.file, 300) : null, fileName: s?.fileName ? str(s.fileName, 200) : null,
-  size: Number.isFinite(s?.size) ? s.size : 0,
-});
 const normTags = (t) => (Array.isArray(t) ? t : []).slice(0, 24).map((x) => str(x, 40)).filter(Boolean);
-const normalizeExpr = (e) => ({ id: e?.id || nanoid(8), title: str(e?.title, 200), code: str(e?.code, 20000), notes: str(e?.notes, 4000), tags: normTags(e?.tags) });
+const normalizeExpr = (e) => ({ id: e?.id || nanoid(8), title: str(e?.title, 200), code: str(e?.code, 20000), notes: str(e?.notes, 4000), color: TAG_KEYS.has(e?.color) ? e.color : null, tags: normTags(e?.tags) });
+const normalizeExprGroup = (g) => ({
+  id: g?.id || nanoid(8), name: str(g?.name, 160),
+  image: g?.image ? str(g.image, 300) : null, imageName: g?.imageName ? str(g.imageName, 200) : null,
+  items: (Array.isArray(g?.items) ? g.items : []).slice(0, 500).map(normalizeExpr),
+});
 const normalizeTut = (t) => ({ id: t?.id || nanoid(8), title: str(t?.title, 200), url: str(t?.url, 500), channel: str(t?.channel, 120), tags: normTags(t?.tags) });
 function normalizeSoftware(s) {
   if (!s || typeof s !== 'object') return s;
   if (!s.id) s.id = nanoid(10);
   s.name = str(s.name, 120) || 'Untitled software';
-  if (typeof s.icon !== 'string') s.icon = '';
+  // Banner + avatar (like plans). `icon` is the legacy emoji → avatarEmoji.
+  if (typeof s.avatarEmoji !== 'string') s.avatarEmoji = typeof s.icon === 'string' ? s.icon : '';
+  delete s.icon;
+  if (!('banner' in s)) s.banner = null;
+  s.bannerGradient = s.bannerGradient != null ? str(s.bannerGradient, 40) : null;
+  if (!('avatar' in s)) s.avatar = null;
   if (!Number.isFinite(s.createdAt)) s.createdAt = Date.now();
-  s.plugins = (Array.isArray(s.plugins) ? s.plugins : []).map(normalizePlugin);
-  s.scripts = (Array.isArray(s.scripts) ? s.scripts : []).map(normalizeScript);
-  s.expressions = (Array.isArray(s.expressions) ? s.expressions : []).map(normalizeExpr);
+  // Legacy `scripts` fold into `plugins` (one combined list now).
+  let plugins = Array.isArray(s.plugins) ? s.plugins : [];
+  if (Array.isArray(s.scripts) && s.scripts.length) {
+    plugins = [...plugins, ...s.scripts.map((sc) => ({ id: sc?.id || nanoid(8), name: sc?.name || sc?.fileName || 'Script', category: 'Script', notes: sc?.notes || '', file: sc?.file || null, fileName: sc?.fileName || null, size: sc?.size || 0 }))];
+  }
+  delete s.scripts;
+  s.plugins = plugins.map(normalizePlugin);
+  // Legacy flat `expressions` fold into a single default group.
+  if (!Array.isArray(s.expressionGroups)) {
+    const flat = Array.isArray(s.expressions) ? s.expressions : [];
+    s.expressionGroups = flat.length ? [{ id: nanoid(8), name: '', image: null, imageName: null, items: flat }] : [];
+  }
+  delete s.expressions;
+  s.expressionGroups = s.expressionGroups.map(normalizeExprGroup);
   s.tutorials = (Array.isArray(s.tutorials) ? s.tutorials : []).map(normalizeTut);
   return s;
 }
@@ -1189,26 +1207,39 @@ app.get('/api/software/:id', async (req, res) => {
   res.json({ software: normalizeSoftware(s) });
 });
 app.post('/api/software', async (req, res) => {
-  const s = { id: nanoid(10), name: str(req.body?.name, 120) || 'Untitled software', icon: str(req.body?.icon, 40), createdAt: Date.now(), plugins: [], scripts: [], expressions: [], tutorials: [] };
+  const s = { id: nanoid(10), name: str(req.body?.name, 120) || 'Untitled software', avatarEmoji: str(req.body?.avatarEmoji ?? req.body?.icon, 40), banner: null, bannerGradient: null, avatar: null, createdAt: Date.now(), plugins: [], expressionGroups: [], tutorials: [] };
   await mutateDB((db) => { if (!Array.isArray(db.software)) db.software = []; db.software.push(s); return db; });
   res.status(201).json({ software: s });
 });
 
-// Wholesale edit of the JSON parts (name/icon + plugins/expressions/tutorials);
-// files (plugin installers, scripts) have their own endpoints below.
+// Wholesale edit of the JSON parts. File fields (plugin installer/image, group
+// image) are server-authoritative and preserved by id — only the upload/delete
+// endpoints below change them, so a text edit can never clobber a file.
 app.patch('/api/software/:id', async (req, res) => {
   const removedFiles = [];
   const updated = await mutateDB((db) => {
     const s = findSoft(db, req.params.id); if (!s) return null;
     if ('name' in req.body) s.name = str(req.body.name, 120);
-    if ('icon' in req.body) s.icon = str(req.body.icon, 40);
+    if ('avatarEmoji' in req.body) s.avatarEmoji = str(req.body.avatarEmoji, 40);
+    if ('bannerGradient' in req.body) s.bannerGradient = req.body.bannerGradient == null ? null : str(req.body.bannerGradient, 40);
     if (Array.isArray(req.body.plugins)) {
-      const next = req.body.plugins.map(normalizePlugin);
-      const keep = new Set(next.map((p) => p.file).filter(Boolean));
-      for (const f of (s.plugins || []).map((p) => p.file).filter(Boolean)) if (!keep.has(f)) removedFiles.push(f);
+      const oldById = new Map((s.plugins || []).map((p) => [p.id, p]));
+      const next = req.body.plugins.map((p) => {
+        const old = oldById.get(p?.id); const n = normalizePlugin(p);
+        n.file = old?.file ?? null; n.fileName = old?.fileName ?? null; n.size = old?.size ?? 0;
+        n.image = old?.image ?? null; n.imageName = old?.imageName ?? null; return n;
+      });
+      const keep = new Set(next.map((p) => p.id));
+      for (const p of (s.plugins || [])) if (!keep.has(p.id)) { if (p.file) removedFiles.push(p.file); if (p.image) removedFiles.push(p.image); }
       s.plugins = next;
     }
-    if (Array.isArray(req.body.expressions)) s.expressions = req.body.expressions.map(normalizeExpr);
+    if (Array.isArray(req.body.expressionGroups)) {
+      const oldById = new Map((s.expressionGroups || []).map((g) => [g.id, g]));
+      const next = req.body.expressionGroups.map((g) => { const old = oldById.get(g?.id); const n = normalizeExprGroup(g); n.image = old?.image ?? null; n.imageName = old?.imageName ?? null; return n; });
+      const keep = new Set(next.map((g) => g.id));
+      for (const g of (s.expressionGroups || [])) if (!keep.has(g.id) && g.image) removedFiles.push(g.image);
+      s.expressionGroups = next;
+    }
     if (Array.isArray(req.body.tutorials)) s.tutorials = req.body.tutorials.map(normalizeTut);
     return s;
   });
@@ -1233,65 +1264,92 @@ app.delete('/api/software/:id', async (req, res) => {
   res.json({ ok: true, trashId });
 });
 
-// Plugin installer file (one per plugin).
-app.post('/api/software/:id/plugins/:pluginId/file', upload.single('file'), async (req, res) => {
+// Software banner / avatar images (like plans).
+const softImage = (kind) => async (req, res) => {
+  try {
+    const db = await readDB();
+    const s = findSoft(db, req.params.id);
+    if (!s) { await cleanupTmp(req); return res.status(404).json({ error: 'not_found' }); }
+    if (!req.file) return res.status(400).json({ error: 'file_required' });
+    if (s[kind]) await safeRm(path.join(softDir(s.id), path.basename(s[kind])), { force: true }).catch(() => {});
+    const stored = await moveInto(softDir(s.id), req.file.path, `${kind}${extOf(req.file.originalname) || '.png'}`);
+    const updated = await mutateDB((d) => { const ss = findSoft(d, s.id); ss[kind] = stored; if (kind === 'banner') ss.bannerGradient = null; return ss; });
+    await cleanupTmp(req);
+    res.json({ software: updated });
+  } catch (e) { await cleanupTmp(req); res.status(500).json({ error: 'image_failed', message: String(e.message || e) }); }
+};
+const softImageDelete = (kind) => async (req, res) => {
+  let removed = null;
+  const updated = await mutateDB((db) => { const s = findSoft(db, req.params.id); if (!s) return null; removed = s[kind]; s[kind] = null; return s; });
+  if (!updated) return res.status(404).json({ error: 'not_found' });
+  if (removed) await safeRm(path.join(softDir(req.params.id), path.basename(removed)), { force: true }).catch(() => {});
+  res.json({ software: updated });
+};
+app.post('/api/software/:id/banner', upload.single('banner'), softImage('banner'));
+app.delete('/api/software/:id/banner', softImageDelete('banner'));
+app.post('/api/software/:id/avatar', upload.single('avatar'), softImage('avatar'));
+app.delete('/api/software/:id/avatar', softImageDelete('avatar'));
+
+// Plugin installer file + preview image (one each per plugin).
+const pluginFileEndpoint = (field, kind, prefix) => async (req, res) => {
   try {
     const db = await readDB();
     const s = findSoft(db, req.params.id);
     const p = s && (s.plugins || []).find((x) => x.id === req.params.pluginId);
     if (!s || !p) { await cleanupTmp(req); return res.status(404).json({ error: 'not_found' }); }
     if (!req.file) return res.status(400).json({ error: 'file_required' });
-    if (p.file) await safeRm(path.join(softDir(s.id), path.basename(p.file)), { force: true }).catch(() => {});
-    const stored = await moveInto(softDir(s.id), req.file.path, `${p.id}${extOf(req.file.originalname) || ''}`);
-    const updated = await mutateDB((d) => { const pp = findSoft(d, s.id).plugins.find((x) => x.id === p.id); pp.file = stored; pp.fileName = req.file.originalname; return findSoft(d, s.id); });
+    if (p[kind]) await safeRm(path.join(softDir(s.id), path.basename(p[kind])), { force: true }).catch(() => {});
+    const stored = await moveInto(softDir(s.id), req.file.path, `${prefix}${p.id}${extOf(req.file.originalname) || ''}`);
+    const size = req.file.size;
+    const updated = await mutateDB((d) => {
+      const pp = findSoft(d, s.id).plugins.find((x) => x.id === p.id);
+      if (kind === 'file') { pp.file = stored; pp.fileName = req.file.originalname; pp.size = size; }
+      else { pp.image = stored; pp.imageName = req.file.originalname; }
+      return findSoft(d, s.id);
+    });
     await cleanupTmp(req);
     res.json({ software: updated });
-  } catch (e) { await cleanupTmp(req); res.status(500).json({ error: 'file_failed', message: String(e.message || e) }); }
-});
-app.delete('/api/software/:id/plugins/:pluginId/file', async (req, res) => {
+  } catch (e) { await cleanupTmp(req); res.status(500).json({ error: `${kind}_failed`, message: String(e.message || e) }); }
+};
+const pluginFileDelete = (kind) => async (req, res) => {
   let removed = null;
   const updated = await mutateDB((db) => {
     const s = findSoft(db, req.params.id); if (!s) return null;
     const p = (s.plugins || []).find((x) => x.id === req.params.pluginId); if (!p) return null;
-    removed = p.file; p.file = null; p.fileName = null; return s;
+    removed = p[kind];
+    if (kind === 'file') { p.file = null; p.fileName = null; p.size = 0; } else { p.image = null; p.imageName = null; }
+    return s;
   });
   if (!updated) return res.status(404).json({ error: 'not_found' });
   if (removed) await safeRm(path.join(softDir(req.params.id), path.basename(removed)), { force: true }).catch(() => {});
   res.json({ software: updated });
-});
+};
+app.post('/api/software/:id/plugins/:pluginId/file', upload.single('file'), pluginFileEndpoint('file', 'file', ''));
+app.delete('/api/software/:id/plugins/:pluginId/file', pluginFileDelete('file'));
+app.post('/api/software/:id/plugins/:pluginId/image', upload.single('image'), pluginFileEndpoint('image', 'image', 'img_'));
+app.delete('/api/software/:id/plugins/:pluginId/image', pluginFileDelete('image'));
 
-// Scripts (your own scripts/plugins — file-centric).
-app.post('/api/software/:id/scripts', upload.single('file'), async (req, res) => {
+// Expression-group preview image.
+app.post('/api/software/:id/groups/:groupId/image', upload.single('image'), async (req, res) => {
   try {
     const db = await readDB();
     const s = findSoft(db, req.params.id);
-    if (!s) { await cleanupTmp(req); return res.status(404).json({ error: 'not_found' }); }
+    const g = s && (s.expressionGroups || []).find((x) => x.id === req.params.groupId);
+    if (!s || !g) { await cleanupTmp(req); return res.status(404).json({ error: 'not_found' }); }
     if (!req.file) return res.status(400).json({ error: 'file_required' });
-    const sid = nanoid(8);
-    const stored = await moveInto(softDir(s.id), req.file.path, `s_${sid}${extOf(req.file.originalname) || ''}`);
-    const item = { id: sid, name: str(req.body?.name, 200) || req.file.originalname, notes: str(req.body?.notes, 4000), file: stored, fileName: req.file.originalname, size: req.file.size };
-    const updated = await mutateDB((d) => { const ss = findSoft(d, s.id); ss.scripts = [...(ss.scripts || []), item]; return ss; });
+    if (g.image) await safeRm(path.join(softDir(s.id), path.basename(g.image)), { force: true }).catch(() => {});
+    const stored = await moveInto(softDir(s.id), req.file.path, `grp_${g.id}${extOf(req.file.originalname) || ''}`);
+    const updated = await mutateDB((d) => { const gg = findSoft(d, s.id).expressionGroups.find((x) => x.id === g.id); gg.image = stored; gg.imageName = req.file.originalname; return findSoft(d, s.id); });
     await cleanupTmp(req);
-    res.status(201).json({ software: updated });
-  } catch (e) { await cleanupTmp(req); res.status(500).json({ error: 'script_failed', message: String(e.message || e) }); }
+    res.json({ software: updated });
+  } catch (e) { await cleanupTmp(req); res.status(500).json({ error: 'image_failed', message: String(e.message || e) }); }
 });
-app.patch('/api/software/:id/scripts/:scriptId', async (req, res) => {
-  const updated = await mutateDB((db) => {
-    const s = findSoft(db, req.params.id); if (!s) return null;
-    const sc = (s.scripts || []).find((x) => x.id === req.params.scriptId); if (!sc) return null;
-    if ('name' in req.body) sc.name = str(req.body.name, 200);
-    if ('notes' in req.body) sc.notes = str(req.body.notes, 4000);
-    return s;
-  });
-  if (!updated) return res.status(404).json({ error: 'not_found' });
-  res.json({ software: updated });
-});
-app.delete('/api/software/:id/scripts/:scriptId', async (req, res) => {
+app.delete('/api/software/:id/groups/:groupId/image', async (req, res) => {
   let removed = null;
   const updated = await mutateDB((db) => {
     const s = findSoft(db, req.params.id); if (!s) return null;
-    const i = (s.scripts || []).findIndex((x) => x.id === req.params.scriptId); if (i === -1) return null;
-    removed = s.scripts[i].file; s.scripts.splice(i, 1); return s;
+    const g = (s.expressionGroups || []).find((x) => x.id === req.params.groupId); if (!g) return null;
+    removed = g.image; g.image = null; g.imageName = null; return s;
   });
   if (!updated) return res.status(404).json({ error: 'not_found' });
   if (removed) await safeRm(path.join(softDir(req.params.id), path.basename(removed)), { force: true }).catch(() => {});

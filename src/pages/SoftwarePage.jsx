@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, AppWindow, Puzzle } from 'lucide-react';
-import { api } from '../lib/api.js';
-import { currencySymbol } from '../lib/types.js';
+import { api, softwareFileUrl } from '../lib/api.js';
+import { currencySymbol, gradientCss } from '../lib/types.js';
 import GalleryNameModal from '../components/GalleryNameModal.jsx';
 
 // Sum plugin prices per currency → e.g. "€ 129.99 · $ 40".
@@ -39,7 +39,7 @@ export default function SoftwarePage({ reloadKey }) {
     <div>
       <div className="page-head">
         <h1>Software</h1>
-        <p>Your apps and their plugin databases, scripts, expressions and tutorials.</p>
+        <p>Your apps and their plugins, expressions and tutorials.</p>
       </div>
 
       {error && <div className="center-msg">Couldn’t load: {error}</div>}
@@ -50,17 +50,26 @@ export default function SoftwarePage({ reloadKey }) {
           <div className="grid">
             {list.map((s) => {
               const spend = spendLabel(s.plugins);
+              const banner = s.banner ? softwareFileUrl(s.id, s.banner) : null;
+              const grad = !banner ? gradientCss(s.bannerGradient) : null;
+              const bannerBg = banner ? `url("${banner}")` : grad || null;
+              const avatar = s.avatar ? softwareFileUrl(s.id, s.avatar) : null;
               return (
-                <button key={s.id} className="card soft-card" onClick={() => navigate(`/software/${s.id}`)}>
-                  <div className="soft-card-cover">
-                    {s.icon ? <span className="soft-card-emoji">{s.icon}</span> : <AppWindow size={30} />}
+                <div key={s.id} className="card plan-card" onClick={() => navigate(`/software/${s.id}`)}>
+                  <div className="plan-card-head">
+                    <div className={`plan-card-banner ${bannerBg ? '' : 'empty'}`} style={bannerBg ? { backgroundImage: bannerBg } : undefined} />
+                    <div className="plan-card-avatar">
+                      {avatar ? <img src={avatar} alt="" loading="lazy" />
+                        : s.avatarEmoji ? <span className="plan-card-emoji">{s.avatarEmoji}</span>
+                          : <AppWindow size={22} />}
+                    </div>
                   </div>
                   <div className="card-meta"><span className="card-title">{s.name}</span></div>
                   <div className="card-sub soft-card-sub">
                     <span><Puzzle size={13} /> {(s.plugins || []).length} plugin{(s.plugins || []).length === 1 ? '' : 's'}</span>
                     {spend && <span className="soft-card-spend">{spend}</span>}
                   </div>
-                </button>
+                </div>
               );
             })}
             <button className="gallery-new" onClick={() => setCreating(true)}>
