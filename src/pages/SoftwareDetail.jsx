@@ -4,6 +4,7 @@ import {
   ArrowLeft, Trash2, Pencil, MoreHorizontal, Plus, X, Check, Play,
   Puzzle, Braces, Youtube, ExternalLink, Copy, Eye, EyeOff, UploadCloud,
   Paperclip, Download, Image as ImageIcon, Camera, Circle, ChevronDown, ChevronRight,
+  ArrowUp, ArrowDown,
 } from 'lucide-react';
 import { api, softwareFileUrl } from '../lib/api.js';
 import { CURRENCIES, currencySymbol, normalizeUrl, TAG_COLORS, tagColor, PLAN_GRADIENTS, gradientCss, youtubeThumb } from '../lib/types.js';
@@ -96,7 +97,8 @@ export default function SoftwareDetail() {
   const delGroup = (g) => ask({ title: 'Delete expression group?', message: `“${g.name || 'Untitled group'}” and its ${(g.items || []).length} expression(s) will be removed.`, confirmLabel: 'Delete', danger: true, onConfirm: () => save({ expressionGroups: arr('expressionGroups').filter((x) => x.id !== g.id) }, true) });
   const addExpr = (gid) => editGroup(gid, { items: [...(arr('expressionGroups').find((g) => g.id === gid)?.items || []), { id: rid(), title: '', code: '', notes: '', color: null, tags: [] }] });
   const editExpr = (gid, eid, patch) => { const g = arr('expressionGroups').find((x) => x.id === gid); if (!g) return; editGroup(gid, { items: (g.items || []).map((e) => (e.id === eid ? { ...e, ...patch } : e)) }); };
-  const delExpr = (gid, e) => ask({ title: 'Delete expression?', message: `“${e.title || 'Untitled expression'}” will be removed.`, confirmLabel: 'Delete', danger: true, onConfirm: () => { const g = arr('expressionGroups').find((x) => x.id === gid); if (!g) return; editGroup(gid, { items: (g.items || []).filter((x) => x.id !== e.id) }); } });
+  const moveExpr = (gid, eid, dir) => { const g = arr('expressionGroups').find((x) => x.id === gid); if (!g) return; const items = [...(g.items || [])]; const i = items.findIndex((e) => e.id === eid); const j = i + dir; if (i < 0 || j < 0 || j >= items.length) return; [items[i], items[j]] = [items[j], items[i]]; editGroup(gid, { items }, true); };
+  const delExpr = (gid, e) => ask({ title: 'Delete expression?', message: `“${e.title || 'Untitled expression'}” will be removed.`, confirmLabel: 'Delete', danger: true, onConfirm: () => { const g = arr('expressionGroups').find((x) => x.id === gid); if (!g) return; editGroup(gid, { items: (g.items || []).filter((x) => x.id !== e.id) }, true); } });
 
   // Tutorials
   const addTutorial = () => { const nt = { id: rid(), title: '', url: '', channel: '', tags: [] }; save({ tutorials: [...arr('tutorials'), nt] }, true); setTab('tutorials'); setEditingTut(nt.id); };
@@ -309,13 +311,21 @@ export default function SoftwareDetail() {
                     <div className="expr-list">
                       {items.map((e) => {
                         const col = e.color ? tagColor(e.color) : null;
+                        const gi = (g.items || []).findIndex((x) => x.id === e.id);
+                        const glen = (g.items || []).length;
                         return (
                           <div className="expr-card" key={e.id} style={col ? { borderLeft: `3px solid ${col.fg}` } : undefined}>
                             <div className="expr-head">
                               <ColorDot value={e.color} onChange={(c) => editExpr(g.id, e.id, { color: c })} />
                               <input className="expr-title" value={e.title} placeholder="Expression name" onChange={(ev) => editExpr(g.id, e.id, { title: ev.target.value })} />
                               <button className="icon-btn" title="Copy code" onClick={() => copy(e.code)}><Copy size={15} /></button>
-                              <button className="icon-btn expr-del" title="Delete" onClick={() => delExpr(g.id, e)}><X size={15} /></button>
+                              <Menu align="right" trigger={<button className="icon-btn" title="More"><MoreHorizontal size={16} /></button>}
+                                items={[
+                                  ...(gi > 0 ? [{ label: 'Move up', icon: <ArrowUp size={15} />, onClick: () => moveExpr(g.id, e.id, -1) }] : []),
+                                  ...(gi < glen - 1 ? [{ label: 'Move down', icon: <ArrowDown size={15} />, onClick: () => moveExpr(g.id, e.id, 1) }] : []),
+                                  { separator: true },
+                                  { label: 'Delete', icon: <Trash2 size={15} />, danger: true, onClick: () => delExpr(g.id, e) },
+                                ]} />
                             </div>
                             <CodeArea className="expr-code" value={e.code} spellCheck={false} placeholder="// paste the expression here" onChange={(ev) => editExpr(g.id, e.id, { code: ev.target.value })} />
                             <TagRow tags={e.tags} onChange={(tags) => editExpr(g.id, e.id, { tags })} />

@@ -1534,7 +1534,11 @@ img { max-width: 100%; display: block; }
 .ms-title { flex: 1; }
 .ms-date { width: 160px; flex-shrink: 0; color-scheme: dark; }
 .ms-del { width: 34px; height: 34px; flex-shrink: 0; color: var(--text-muted); }
+.ms-urgent { width: 34px; height: 34px; flex-shrink: 0; color: var(--text-faint); }
+.ms-urgent:hover { color: var(--danger); }
+.ms-urgent.on { color: var(--danger); }
 .milestone.done .ms-title { text-decoration: line-through; color: var(--text-faint); }
+.milestone.urgent .ms-title { box-shadow: inset 3px 0 0 var(--danger); }
 .ms-add { align-self: flex-start; margin-top: 4px; }
 
 /* Moodboards */
@@ -1765,6 +1769,35 @@ img { max-width: 100%; display: block; }
 .dash-plan-name { font-weight: 600; padding: 0 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dash-plan-range { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-muted); padding: 3px 12px 0; }
 
+/* Dashboard banner */
+.dash-banner {
+  position: relative; border-radius: var(--radius); padding: 26px 24px; margin-bottom: 22px;
+  min-height: 132px; display: flex; align-items: flex-end;
+  background-size: cover; background-position: center;
+  border: 1px solid var(--border); overflow: visible;
+}
+.dash-banner::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.45)); pointer-events: none; }
+.dash-banner-title { position: relative; z-index: 1; }
+.dash-banner-title h1 { margin: 0; color: #fff; font-size: 30px; letter-spacing: -0.02em; text-shadow: 0 1px 12px rgba(0,0,0,.35); }
+.dash-banner-title p { margin: 4px 0 0; color: rgba(255,255,255,.85); text-shadow: 0 1px 8px rgba(0,0,0,.4); }
+.dash-banner .plan-banner-actions { position: absolute; top: 12px; right: 12px; z-index: 2; opacity: 0; transition: opacity .15s; }
+.dash-banner:hover .plan-banner-actions { opacity: 1; }
+.dash-banner .plan-banner-actions .btn { background: rgba(0,0,0,.55); color: #fff; border-color: transparent; backdrop-filter: blur(6px); }
+.dash-banner .plan-banner-actions .btn:hover { background: rgba(0,0,0,.75); }
+
+/* Urgent to-dos on the dashboard */
+.dash-urgent-head-ico { color: var(--danger); vertical-align: -3px; }
+.dash-urgent { display: flex; flex-direction: column; gap: 8px; }
+.dash-urgent-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); box-shadow: inset 3px 0 0 var(--danger); }
+.dash-urgent-ico { color: var(--danger); flex-shrink: 0; }
+.dash-urgent-label { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-urgent-ctx { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-muted); flex-shrink: 0; }
+.dash-urgent-go { flex-shrink: 0; }
+
+/* Plan PDF block */
+.plan-pdf-bar { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.plan-pdf-name { flex: 1; min-width: 0; font-size: 13px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* --------------------------------------------------------- To-Do board (Kanban) */
 .kanban { display: flex; gap: 14px; align-items: flex-start; overflow-x: auto; padding: 4px 2px 16px; }
 .kb-col {
@@ -1790,9 +1823,13 @@ img { max-width: 100%; display: block; }
 .kb-card-grip:active { cursor: grabbing; }
 .kb-card-tools { position: absolute; top: 5px; right: 5px; display: flex; gap: 2px; opacity: 0; transition: opacity .12s; }
 .kb-card:hover .kb-card-tools, .kb-card:focus-within .kb-card-tools { opacity: 1; }
-.kb-card-color, .kb-card-del { width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border: 0; background: transparent; color: var(--text-faint); border-radius: 6px; }
-.kb-card-color:hover, .kb-card-del:hover { background: rgba(255, 255, 255, .08); }
-.kb-card-del:hover { color: var(--danger); }
+.kb-card-color, .kb-card-del, .kb-card-urgent { width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border: 0; background: transparent; color: var(--text-faint); border-radius: 6px; }
+.kb-card-color:hover, .kb-card-del:hover, .kb-card-urgent:hover { background: rgba(255, 255, 255, .08); }
+.kb-card-del:hover, .kb-card-urgent:hover { color: var(--danger); }
+.kb-card-urgent.on { color: var(--danger); opacity: 1; }
+.kb-card.urgent { box-shadow: inset 3px 0 0 var(--danger); }
+.kb-card.urgent.tinted { box-shadow: inset 3px 0 0 var(--danger); }
+.kb-urgent-badge { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; padding: 1px 7px; border-radius: 999px; background: rgba(242, 85, 90, .16); color: var(--danger); font-size: 11px; font-weight: 700; margin-bottom: 2px; }
 .kb-color-dot { width: 12px; height: 12px; border-radius: 999px; border: 2px solid var(--text-faint); box-sizing: border-box; }
 .kb-colorpop {
   display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; padding: 7px;

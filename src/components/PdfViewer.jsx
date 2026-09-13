@@ -1,10 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Loader2, Maximize2, Minimize2 } from 'lucide-react';
-import * as pdfjsLib from 'pdfjs-dist';
-import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-
-// Self-hosted worker (bundled by Vite — no external CDN).
-pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+import { loadPdfjs } from '../lib/imaging.js';
 
 export default function PdfViewer({ url }) {
   const stageRef = useRef(null);
@@ -22,13 +18,17 @@ export default function PdfViewer({ url }) {
 
   useEffect(() => {
     let cancelled = false;
+    let task = null;
     setLoading(true); setError(null); setPage(1);
-    const task = pdfjsLib.getDocument(url);
-    task.promise.then((pdf) => {
-      if (cancelled) { pdf.destroy(); return; }
-      pdfRef.current = pdf;
-      setNumPages(pdf.numPages);
-      setLoading(false);
+    loadPdfjs().then((pdfjsLib) => {
+      if (cancelled) return;
+      task = pdfjsLib.getDocument(url);
+      task.promise.then((pdf) => {
+        if (cancelled) { pdf.destroy(); return; }
+        pdfRef.current = pdf;
+        setNumPages(pdf.numPages);
+        setLoading(false);
+      }).catch((e) => { if (!cancelled) { setError(e.message); setLoading(false); } });
     }).catch((e) => { if (!cancelled) { setError(e.message); setLoading(false); } });
     return () => {
       cancelled = true;

@@ -5,7 +5,7 @@ import {
   ListChecks, Paperclip, UploadCloud, X, Plus, Check, ChevronDown, ChevronRight,
   Image as ImageIcon, Camera, ArrowUp, ArrowDown, File as FileIcon, ExternalLink,
   Link2, Library, FolderOpen, Palette as PaletteIcon, Heading as HeadingIcon,
-  Minus, Table as TableIcon, Wand2, Copy,
+  Minus, Table as TableIcon, Wand2, Copy, FileText, AlertTriangle,
 } from 'lucide-react';
 import { api, planFileUrl, fileUrl } from '../lib/api.js';
 import { PLAN_GRADIENTS, gradientCss, normalizeUrl, hostOf } from '../lib/types.js';
@@ -13,6 +13,7 @@ import { rgbToHex, hexToRgb } from '../lib/color.js';
 import { extractPalette } from '../lib/imaging.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
+import PdfViewer from '../components/PdfViewer.jsx';
 import Lightbox from '../components/Lightbox.jsx';
 import GalleryNameModal from '../components/GalleryNameModal.jsx';
 import RefPicker from '../components/RefPicker.jsx';
@@ -36,6 +37,7 @@ const BLOCK_META = {
   text: { label: 'Text', icon: StickyNote },
   todos: { label: 'To-dos', icon: ListChecks },
   files: { label: 'Files', icon: Paperclip },
+  pdf: { label: 'PDF', icon: FileText },
   links: { label: 'Links', icon: Link2 },
   refs: { label: 'References', icon: Library },
   palette: { label: 'Palette', icon: PaletteIcon },
@@ -75,6 +77,7 @@ export default function PlanDetail() {
   const bannerRef = useRef(null);
   const avatarRef = useRef(null);
   const filesRef = useRef(null);
+  const pdfRef = useRef(null);
   const paletteRef = useRef(null);
   const refReq = useRef(new Set()); // referenced ids already fetched, so we load each once
   const pending = useRef(null);       // { blockId } for the files/cover inputs
@@ -173,6 +176,7 @@ export default function PlanDetail() {
     if (immediate) send(); else timers.current[bid] = setTimeout(send, 500);
   };
   const addFilesTo = (bid) => { pending.current = bid; filesRef.current?.click(); };
+  const addPdfTo = (bid) => { pending.current = bid; pdfRef.current?.click(); };
   const onFiles = async (files) => { if (!files?.length || !pending.current) return; try { setPlan(await api.addBlockFiles(id, pending.current, files)); } catch (e) { toast(`Upload failed: ${e.message}`, 'error'); } };
   // Add one file (with example image + title) to a files block via the modal.
   const submitFile = async ({ file, example, title }) => {
@@ -335,6 +339,7 @@ export default function PlanDetail() {
       <input ref={bannerRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { setImage('banner', e.target.files[0]); e.target.value = ''; }} />
       <input ref={avatarRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { setImage('avatar', e.target.files[0]); e.target.value = ''; }} />
       <input ref={filesRef} type="file" multiple className="visually-hidden-input" onChange={(e) => { onFiles(e.target.files); e.target.value = ''; }} />
+      <input ref={pdfRef} type="file" accept="application/pdf,.pdf" multiple className="visually-hidden-input" onChange={(e) => { onFiles(e.target.files); e.target.value = ''; }} />
       <input ref={paletteRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { onExtract(e.target.files[0]); e.target.value = ''; }} />
 
       {/* Timeframe + milestones (fixed) */}
@@ -426,9 +431,10 @@ export default function PlanDetail() {
               </div>
               <div className="milestones">
                 {items.map((t) => (
-                  <div className={`milestone ${t.done ? 'done' : ''}`} key={t.id}>
+                  <div className={`milestone ${t.done ? 'done' : ''} ${t.urgent ? 'urgent' : ''}`} key={t.id}>
                     <button className={`ms-check ${t.done ? 'on' : ''}`} onClick={() => setItems(items.map((x) => (x.id === t.id ? { ...x, done: !x.done } : x)))}>{t.done && <Check size={13} />}</button>
                     <input className="ms-title input" value={t.text} placeholder="To-do…" onChange={(e) => setItems(items.map((x) => (x.id === t.id ? { ...x, text: e.target.value } : x)))} />
+                    <button className={`ms-urgent icon-btn ${t.urgent ? 'on' : ''}`} title={t.urgent ? 'Unmark urgent' : 'Mark urgent'} onClick={() => setItems(items.map((x) => (x.id === t.id ? { ...x, urgent: !x.urgent } : x)))}><AlertTriangle size={13} /></button>
                     <button className="ms-del icon-btn" onClick={() => setItems(items.filter((x) => x.id !== t.id))}><X size={14} /></button>
                   </div>
                 ))}
@@ -661,6 +667,29 @@ export default function PlanDetail() {
           );
         }
 
+        if (b.type === 'pdf') {
+          return (
+            <div className={`section block ${dragBlock === b.id ? 'dragover' : ''}`} key={b.id}
+              onDragOver={(e) => { e.preventDefault(); setDragBlock(b.id); }}
+              onDragLeave={(e) => { if (e.target === e.currentTarget) setDragBlock(null); }}
+              onDrop={(e) => { e.preventDefault(); setDragBlock(null); pending.current = b.id; onFiles(e.dataTransfer.files); }}>
+              <div className="section-head">
+                <h2><Meta.icon size={16} /> {b.title} {(b.files || []).length > 0 && <span className="count">{b.files.length}</span>}</h2>
+                <div className="moodboard-actions">
+                  <button className="btn btn-sm" onClick={() => addPdfTo(b.id)}><Plus size={14} /> Add PDF</button>{menu}
+                </div>
+              </div>
+              {(b.files || []).length ? (
+                <PlanPdfBlock plan={plan} files={b.files} onRemove={(fid) => removeFile(b.id, fid)} />
+              ) : (
+                <div className="dropzone" onClick={() => addPdfTo(b.id)}>
+                  <FileText size={20} /><div>Add a PDF — it renders inline, page by page (like Branding)</div>
+                </div>
+              )}
+            </div>
+          );
+        }
+
         // files — each file shows a square example image before it.
         return (
           <div className={`section block ${dragBlock === b.id ? 'dragover' : ''}`} key={b.id}
@@ -742,5 +771,36 @@ function BackBtn({ to, label = 'Back' }) {
     <button className="detail-back" style={{ margin: 0 }} onClick={() => (to ? navigate(to) : navigate(-1))}>
       <ArrowLeft size={16} /> {label}
     </button>
+  );
+}
+
+// A PDF block: renders the active PDF inline (like Branding), with tabs when
+// there is more than one, an "Open" link and a Remove button.
+function PlanPdfBlock({ plan, files, onRemove }) {
+  const [activeId, setActiveId] = useState(files[0]?.id);
+  const active = files.find((f) => f.id === activeId) || files[0];
+  const shorten = (n) => (n && n.length > 22 ? `${n.slice(0, 20)}…` : n);
+  return (
+    <div>
+      {files.length > 1 && (
+        <div className="asset-tabs">
+          {files.map((f, i) => (
+            <button key={f.id} className={`asset-tab ${active?.id === f.id ? 'on' : ''}`} onClick={() => setActiveId(f.id)}>
+              <FileText size={14} /> {shorten(f.title || f.name) || `PDF ${i + 1}`}
+            </button>
+          ))}
+        </div>
+      )}
+      {active && (
+        <>
+          <PdfViewer key={active.id} url={planFileUrl(plan, active.file)} />
+          <div className="plan-pdf-bar">
+            <span className="plan-pdf-name" title={active.name}>{active.name}</span>
+            <a className="btn btn-sm" href={planFileUrl(plan, active.file)} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} /> Open</a>
+            <button className="btn btn-sm btn-danger" onClick={() => onRemove(active.id)}><Trash2 size={14} /> Remove</button>
+          </div>
+        </>
+      )}
+    </div>
   );
 }

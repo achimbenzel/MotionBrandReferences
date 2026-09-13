@@ -109,6 +109,8 @@ async function readDB() {
   for (const s of db.software) normalizeSoftware(s);
   if (!db.settings || typeof db.settings !== 'object') db.settings = {};
   if (db.settings.storageLimitBytes == null) db.settings.storageLimitBytes = DEFAULT_STORAGE_LIMIT;
+  if (!('dashboardBanner' in db.settings)) db.settings.dashboardBanner = null;
+  if (!('dashboardBannerGradient' in db.settings)) db.settings.dashboardBannerGradient = null;
   return db;
 }
 
@@ -275,9 +277,9 @@ const extOf = (name) => {
   return e && e.length <= 6 ? e : '';
 };
 
-const BLOCK_TYPES = new Set(['moodboard', 'text', 'todos', 'files', 'links', 'refs', 'palette', 'heading', 'divider', 'table']);
+const BLOCK_TYPES = new Set(['moodboard', 'text', 'todos', 'files', 'pdf', 'links', 'refs', 'palette', 'heading', 'divider', 'table']);
 const BLOCK_TITLES = {
-  moodboard: 'Moodboard', text: 'Text', todos: 'To-dos', files: 'Files', links: 'Links',
+  moodboard: 'Moodboard', text: 'Text', todos: 'To-dos', files: 'Files', pdf: 'PDF', links: 'Links',
   refs: 'References', palette: 'Palette', heading: 'Heading', divider: 'Divider', table: 'Table',
 };
 
@@ -293,7 +295,7 @@ function normalizeBlock(b) {
     if (typeof b.content !== 'string') b.content = '';
   } else if (b.type === 'todos') {
     if (!Array.isArray(b.items)) b.items = [];
-  } else if (b.type === 'files') {
+  } else if (b.type === 'files' || b.type === 'pdf') {
     if (!Array.isArray(b.files)) b.files = [];
     delete b.cover; // legacy block-level cover — files now carry per-item example images
   } else if (b.type === 'links' || b.type === 'refs' || b.type === 'palette') {
@@ -374,9 +376,17 @@ app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 
 // Serve the content library. express.static supports HTTP range requests,
-// which the video player needs for seeking.
+// which the video player needs for seeking. Caching is split by path: plan
+// block files (moodboard/files/pdf) carry unique nanoid names and never change
+// under a URL, so they get a long immutable cache; fixed-name, overwriteable
+// files (banner/avatar/thumb, reused plugin images) plus everything else get a
+// short cache — enough to skip per-navigation revalidation round-trips over a
+// VPN, but short enough that a re-upload shows up quickly.
 app.use('/data', express.static(DATA_DIR, {
-  setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache'),
+  setHeaders: (res, filePath) => {
+    if (/[\\/]blocks[\\/]/.test(filePath)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    else res.setHeader('Cache-Control', 'public, max-age=300');
+  },
 }));
 
 // ---- Read -----------------------------------------------------------------
@@ -801,7 +811,7 @@ app.post('/api/plans/:id/blocks', async (req, res) => {
               : type === 'heading' ? { ...base, title: '', content: '' }
                 : type === 'divider' ? { ...base }
                   : type === 'table' ? { ...base, columns: [{ id: nanoid(6), name: '' }, { id: nanoid(6), name: '' }], rows: [] }
-                    : { ...base, files: [] };
+                    : { ...base, files: [] }; // files + pdf
   const updated = await mutateDB((db) => { const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null; p.blocks.push(block); return p; });
   if (!updated) return res.status(404).json({ error: 'not_found' });
   res.status(201).json({ plan: updated, block });
@@ -852,7 +862,7 @@ app.post('/api/plans/:id/blocks/:blockId/files', upload.array('files', 50), asyn
     const db = await readDB();
     const plan = db.plans.find((p) => p.id === req.params.id);
     const b0 = findBlock(plan, req.params.blockId);
-    if (!plan || !b0 || (b0.type !== 'moodboard' && b0.type !== 'files')) { await cleanupTmp(req); return res.status(404).json({ error: 'not_found' }); }
+    if (!plan || !b0 || (b0.type !== 'moodboard' && b0.type !== 'files' && b0.type !== 'pdf')) { await cleanupTmp(req); return res.status(404).json({ error: 'not_found' }); }
     const dir = blockDir(plan.id, b0.id);
     const added = [];
     for (const f of (req.files || [])) {
@@ -910,7 +920,7 @@ app.delete('/api/plans/:id/blocks/:blockId/files/:fileId', async (req, res) => {
     return p;
   });
   if (!updated) return res.status(404).json({ error: 'not_found' });
-  if (removed && blockType === 'files') {
+  if (removed && (blockType === 'files' || blockType === 'pdf')) {
     // Soft delete → Trash (file + its example image), restorable later.
     const trashId = nanoid(10);
     const rels = [removed.file, removed.example].filter(Boolean);
@@ -1053,7 +1063,7 @@ app.post('/api/trash/:trashId/restore', async (req, res) => {
       } else if (entry.kind === 'file') {
         const p = db.plans.find((x) => x.id === entry.data.planId);
         const b = p && p.blocks && p.blocks.find((x) => x.id === entry.data.blockId);
-        if (!b || b.type !== 'files') { gone = true; return null; } // its plan/block is gone — leave it in Trash
+        if (!b || (b.type !== 'files' && b.type !== 'pdf')) { gone = true; return null; } // its plan/block is gone — leave it in Trash
         b.files = [...(b.files || []), entry.data.item];
         fileRestore = entry.data;
       }
@@ -1106,6 +1116,7 @@ function normalizeBoard(board) {
         title: str(card?.title, 4000),
         notes: str(card?.notes, 8000),
         color: TAG_KEYS.has(card?.color) ? card.color : null,
+        urgent: !!card?.urgent,
         tags: (Array.isArray(card?.tags) ? card.tags : []).slice(0, 20).map((t) => ({
           id: t?.id || nanoid(6),
           label: str(t?.label, 60),
@@ -1370,6 +1381,39 @@ app.patch('/api/storage', async (req, res) => {
   if (!Number.isFinite(limitBytes) || limitBytes <= 0) return res.status(400).json({ error: 'invalid_limit' });
   const settings = await mutateDB((db) => { db.settings.storageLimitBytes = Math.round(limitBytes); return db.settings; });
   res.json({ limitBytes: settings.storageLimitBytes });
+});
+
+// ---------------------------------------------------------------------------
+// App settings (dashboard banner, …).
+// ---------------------------------------------------------------------------
+const dashboardDir = () => path.join(DATA_DIR, 'dashboard');
+app.get('/api/settings', async (_req, res) => {
+  const db = await readDB();
+  res.json({ settings: db.settings });
+});
+app.patch('/api/settings', async (req, res) => {
+  const settings = await mutateDB((db) => {
+    if ('dashboardBannerGradient' in req.body) db.settings.dashboardBannerGradient = req.body.dashboardBannerGradient == null ? null : str(req.body.dashboardBannerGradient, 40);
+    return db.settings;
+  });
+  res.json({ settings });
+});
+app.post('/api/settings/dashboard-banner', upload.single('banner'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'file_required' });
+    const db = await readDB();
+    if (db.settings.dashboardBanner) await safeRm(path.join(dashboardDir(), path.basename(db.settings.dashboardBanner)), { force: true }).catch(() => {});
+    const stored = await moveInto(dashboardDir(), req.file.path, `banner${extOf(req.file.originalname) || '.png'}`);
+    const settings = await mutateDB((d) => { d.settings.dashboardBanner = stored; d.settings.dashboardBannerGradient = null; return d.settings; });
+    await cleanupTmp(req);
+    res.json({ settings });
+  } catch (err) { await cleanupTmp(req); res.status(500).json({ error: 'banner_failed', message: String(err.message || err) }); }
+});
+app.delete('/api/settings/dashboard-banner', async (_req, res) => {
+  let file = null;
+  const settings = await mutateDB((db) => { file = db.settings.dashboardBanner; db.settings.dashboardBanner = null; return db.settings; });
+  if (file) await safeRm(path.join(dashboardDir(), path.basename(file)), { force: true }).catch(() => {});
+  res.json({ settings });
 });
 
 // ---------------------------------------------------------------------------

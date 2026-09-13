@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Plus, X, MoreHorizontal, Trash2, Tag as TagIcon, GripVertical } from 'lucide-react';
+import { Plus, X, MoreHorizontal, Trash2, Tag as TagIcon, GripVertical, AlertTriangle } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { TAG_COLORS, tagColor } from '../lib/types.js';
 import { useToast } from '../components/Toast.jsx';
@@ -61,6 +61,7 @@ export default function TodoBoard() {
   };
   const removeTag = (colId, cardId, tagId) => commit(mapCard(colId, cardId, (k) => ({ ...k, tags: (k.tags || []).filter((t) => t.id !== tagId) })), true);
   const setCardColor = (colId, cardId, color) => { commit(mapCard(colId, cardId, (k) => ({ ...k, color })), true); setColorEditFor(null); };
+  const toggleUrgent = (colId, cardId) => commit(mapCard(colId, cardId, (k) => ({ ...k, urgent: !k.urgent })), true);
 
   // Drag & drop
   const onCardDragStart = (e, colId, cardId) => {
@@ -135,7 +136,7 @@ export default function TodoBoard() {
                 return (
                 <div
                   key={card.id}
-                  className={`kb-card ${dragCard === card.id ? 'dragging' : ''} ${cc ? 'tinted' : ''}`}
+                  className={`kb-card ${dragCard === card.id ? 'dragging' : ''} ${cc ? 'tinted' : ''} ${card.urgent ? 'urgent' : ''}`}
                   style={cc ? { background: cc.bg, borderColor: 'transparent', boxShadow: `inset 3px 0 0 ${cc.fg}` } : undefined}
                   draggable={dragCard === card.id}
                   onDragStart={(e) => onCardDragStart(e, col.id, card.id)}
@@ -146,12 +147,15 @@ export default function TodoBoard() {
                   <span className="kb-card-grip" title="Drag to move"
                     onMouseDown={() => setDragCard(card.id)} onMouseUp={() => setDragCard(null)}><GripVertical size={15} /></span>
                   <div className="kb-card-tools">
+                    <button className={`kb-card-urgent icon-btn ${card.urgent ? 'on' : ''}`} title={card.urgent ? 'Unmark urgent' : 'Mark urgent'}
+                      onClick={() => toggleUrgent(col.id, card.id)}><AlertTriangle size={14} /></button>
                     <button className="kb-card-color icon-btn" title="Card colour"
                       onClick={() => setColorEditFor((v) => (v === card.id ? null : card.id))}>
                       <span className="kb-color-dot" style={{ background: cc ? cc.fg : 'transparent', borderColor: cc ? cc.fg : 'var(--text-faint)' }} />
                     </button>
                     <button className="kb-card-del icon-btn" title="Delete card" onClick={() => removeCard(col.id, card.id)}><X size={14} /></button>
                   </div>
+                  {card.urgent && <span className="kb-urgent-badge"><AlertTriangle size={11} /> Urgent</span>}
                   {colorEditFor === card.id && (
                     <div className="kb-colorpop">
                       <button className="kb-swatch kb-swatch-none" title="No colour" onClick={() => setCardColor(col.id, card.id, null)}><X size={12} /></button>

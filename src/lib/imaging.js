@@ -1,10 +1,21 @@
 // Imaging helpers for the thumbnail crop/zoom editor.
 // Uses the same pdf.js that powers the branding viewer (no extra dependency).
-import * as pdfjsLib from 'pdfjs-dist';
+// pdf.js is heavy (~1 MB) and only needed to render a PDF, so it is imported
+// lazily — this keeps it out of the initial bundle for everyone who never
+// opens a PDF.
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { rgbToLab, deltaE } from './color.js';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+let pdfjsPromise = null;
+export function loadPdfjs() {
+  if (!pdfjsPromise) {
+    pdfjsPromise = import('pdfjs-dist').then((lib) => {
+      lib.GlobalWorkerOptions.workerSrc = workerUrl;
+      return lib;
+    });
+  }
+  return pdfjsPromise;
+}
 
 /**
  * Load an image from a File or a URL string into a decoded HTMLImageElement.
@@ -27,6 +38,7 @@ export function loadImage(src) {
  * Returns { canvas, numPages }.
  */
 export async function renderPdfPage(src, pageNum = 1, maxW = 1400) {
+  const pdfjsLib = await loadPdfjs();
   const params = typeof src === 'string' ? { url: src } : { data: await src.arrayBuffer() };
   const pdf = await pdfjsLib.getDocument(params).promise;
   try {

@@ -269,6 +269,27 @@ export const api = {
     return handle(await fetch('/api/import', { method: 'POST', body: fd }));
   },
 
+  // --- App settings (dashboard banner, …) ---
+  async getSettings() {
+    const { settings } = await handle(await fetch('/api/settings'));
+    return settings;
+  },
+  async updateSettings(patch) {
+    const { settings } = await handle(await fetch('/api/settings', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
+    }));
+    return settings;
+  },
+  async setDashboardBanner(file) {
+    const fd = new FormData(); fd.append('banner', file, 'banner.img');
+    const { settings } = await handle(await fetch('/api/settings/dashboard-banner', { method: 'POST', body: fd }));
+    return settings;
+  },
+  async removeDashboardBanner() {
+    const { settings } = await handle(await fetch('/api/settings/dashboard-banner', { method: 'DELETE' }));
+    return settings;
+  },
+
   // --- Storage ---
   async storage() {
     return handle(await fetch('/api/storage'));
@@ -296,4 +317,10 @@ export function planFileUrl(plan, relPath) {
 export function softwareFileUrl(softwareId, fileName) {
   if (!fileName) return null;
   return `/data/software/${softwareId}/${fileName}`;
+}
+
+// Dashboard banner lives under data/dashboard/…
+export function dashboardFileUrl(fileName) {
+  if (!fileName) return null;
+  return `/data/dashboard/${fileName}`;
 }
