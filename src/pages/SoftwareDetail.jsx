@@ -248,9 +248,9 @@ export default function SoftwareDetail() {
           key={editingPlugin.id} soft={soft} plugin={editingPlugin} copy={copy}
           onEdit={(patch) => editPlugin(editingPlugin.id, patch)}
           onSetImage={(f) => { if (f) fileOp(() => api.setPluginImage(id, editingPlugin.id, f)); }}
-          onRemoveImage={() => fileOp(() => api.removePluginImage(id, editingPlugin.id))}
+          onRemoveImage={() => ask({ title: 'Remove image?', message: 'Remove the preview image from this plugin?', confirmLabel: 'Remove', danger: true, onConfirm: () => fileOp(() => api.removePluginImage(id, editingPlugin.id)) })}
           onSetFile={(f) => { if (f) fileOp(() => api.setPluginFile(id, editingPlugin.id, f)); }}
-          onRemoveFile={() => fileOp(() => api.removePluginFile(id, editingPlugin.id))}
+          onRemoveFile={() => ask({ title: 'Remove file?', message: `Remove the installer “${editingPlugin.fileName}” from this plugin?`, confirmLabel: 'Remove', danger: true, onConfirm: () => fileOp(() => api.removePluginFile(id, editingPlugin.id)) })}
           onDelete={() => delPlugin(editingPlugin)}
           onDone={() => setEditingId(null)}
         />
