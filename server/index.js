@@ -1161,7 +1161,7 @@ function normalizePlugin(p) {
 const normTags = (t) => (Array.isArray(t) ? t : []).slice(0, 24).map((x) => str(x, 40)).filter(Boolean);
 const normalizeExpr = (e) => ({ id: e?.id || nanoid(8), title: str(e?.title, 200), code: str(e?.code, 20000), notes: str(e?.notes, 4000), color: TAG_KEYS.has(e?.color) ? e.color : null, tags: normTags(e?.tags) });
 const normalizeExprGroup = (g) => ({
-  id: g?.id || nanoid(8), name: str(g?.name, 160),
+  id: g?.id || nanoid(8), name: str(g?.name, 160), collapsed: !!g?.collapsed,
   image: g?.image ? str(g.image, 300) : null, imageName: g?.imageName ? str(g.imageName, 200) : null,
   items: (Array.isArray(g?.items) ? g.items : []).slice(0, 500).map(normalizeExpr),
 });

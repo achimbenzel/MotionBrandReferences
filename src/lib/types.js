@@ -78,6 +78,25 @@ export function hostOf(raw) {
   catch { return String(raw || '').trim(); }
 }
 
+// Pull the 11-char video id out of any common YouTube URL shape.
+export function youtubeId(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return null;
+  const patterns = [
+    /(?:youtu\.be\/)([\w-]{11})/,
+    /[?&]v=([\w-]{11})/,
+    /youtube\.com\/(?:embed|shorts|live|v)\/([\w-]{11})/,
+  ];
+  for (const p of patterns) { const m = s.match(p); if (m) return m[1]; }
+  return /^[\w-]{11}$/.test(s) ? s : null;
+}
+// Thumbnail URL for a YouTube link (hqdefault always exists; crop the letterbox
+// with object-fit: cover). Returns null for non-YouTube URLs.
+export function youtubeThumb(raw) {
+  const id = youtubeId(raw);
+  return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : null;
+}
+
 // The two most common business-card sizes (mm), landscape.
 export const CARD_SIZES = [
   { key: '85x55', label: '85 × 55 mm', w: 85, h: 55 },

@@ -1,12 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Trash2, Pencil, MoreHorizontal, Plus, X, Check,
+  ArrowLeft, Trash2, Pencil, MoreHorizontal, Plus, X, Check, Play,
   Puzzle, Braces, Youtube, ExternalLink, Copy, Eye, EyeOff, UploadCloud,
-  Paperclip, Download, Image as ImageIcon, Camera, Circle,
+  Paperclip, Download, Image as ImageIcon, Camera, Circle, ChevronDown, ChevronRight,
 } from 'lucide-react';
 import { api, softwareFileUrl } from '../lib/api.js';
-import { CURRENCIES, currencySymbol, normalizeUrl, TAG_COLORS, tagColor, PLAN_GRADIENTS, gradientCss } from '../lib/types.js';
+import { CURRENCIES, currencySymbol, normalizeUrl, TAG_COLORS, tagColor, PLAN_GRADIENTS, gradientCss, youtubeThumb } from '../lib/types.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
@@ -47,6 +47,7 @@ export default function SoftwareDetail() {
   const [tab, setTab] = useState('plugins');
   const [q, setQ] = useState('');
   const [editingId, setEditingId] = useState(null); // plugin currently in the edit form
+  const [editingTut, setEditingTut] = useState(null); // tutorial currently in the edit form
   const [bannerPicker, setBannerPicker] = useState(false);
   const [avatarPicker, setAvatarPicker] = useState(false);
   const [emojiInput, setEmojiInput] = useState('');
@@ -61,7 +62,7 @@ export default function SoftwareDetail() {
 
   useEffect(() => {
     let alive = true;
-    setSoft(null); setError(null); setEditingId(null);
+    setSoft(null); setError(null); setEditingId(null); setEditingTut(null);
     api.getSoftware(id).then((s) => { if (alive) setSoft(s); }).catch((e) => { if (alive) setError(e.message); });
     return () => { alive = false; };
   }, [id]);
@@ -90,7 +91,7 @@ export default function SoftwareDetail() {
   const delPlugin = (p) => ask({ title: 'Delete plugin?', message: `“${p.name || 'Untitled plugin'}” and its file will be removed.`, confirmLabel: 'Delete', danger: true, onConfirm: () => { if (editingId === p.id) setEditingId(null); save({ plugins: arr('plugins').filter((x) => x.id !== p.id) }, true); } });
 
   // Expression groups + expressions
-  const editGroup = (gid, patch) => save({ expressionGroups: arr('expressionGroups').map((g) => (g.id === gid ? { ...g, ...patch } : g)) });
+  const editGroup = (gid, patch, immediate = false) => save({ expressionGroups: arr('expressionGroups').map((g) => (g.id === gid ? { ...g, ...patch } : g)) }, immediate);
   const addGroup = () => { setTab('expressions'); save({ expressionGroups: [...arr('expressionGroups'), { id: rid(), name: '', image: null, imageName: null, items: [] }] }, true); };
   const delGroup = (g) => ask({ title: 'Delete expression group?', message: `“${g.name || 'Untitled group'}” and its ${(g.items || []).length} expression(s) will be removed.`, confirmLabel: 'Delete', danger: true, onConfirm: () => save({ expressionGroups: arr('expressionGroups').filter((x) => x.id !== g.id) }, true) });
   const addExpr = (gid) => editGroup(gid, { items: [...(arr('expressionGroups').find((g) => g.id === gid)?.items || []), { id: rid(), title: '', code: '', notes: '', color: null, tags: [] }] });
@@ -98,9 +99,9 @@ export default function SoftwareDetail() {
   const delExpr = (gid, e) => ask({ title: 'Delete expression?', message: `“${e.title || 'Untitled expression'}” will be removed.`, confirmLabel: 'Delete', danger: true, onConfirm: () => { const g = arr('expressionGroups').find((x) => x.id === gid); if (!g) return; editGroup(gid, { items: (g.items || []).filter((x) => x.id !== e.id) }); } });
 
   // Tutorials
-  const addTutorial = () => { setTab('tutorials'); save({ tutorials: [...arr('tutorials'), { id: rid(), title: '', url: '', channel: '', tags: [] }] }, true); };
+  const addTutorial = () => { const nt = { id: rid(), title: '', url: '', channel: '', tags: [] }; save({ tutorials: [...arr('tutorials'), nt] }, true); setTab('tutorials'); setEditingTut(nt.id); };
   const editTutorial = (tid, patch) => save({ tutorials: arr('tutorials').map((t) => (t.id === tid ? { ...t, ...patch } : t)) });
-  const delTutorial = (t) => ask({ title: 'Delete tutorial?', message: `“${t.title || 'Untitled tutorial'}” will be removed.`, confirmLabel: 'Delete', danger: true, onConfirm: () => save({ tutorials: arr('tutorials').filter((x) => x.id !== t.id) }, true) });
+  const delTutorial = (t) => ask({ title: 'Delete tutorial?', message: `“${t.title || 'Untitled tutorial'}” will be removed.`, confirmLabel: 'Delete', danger: true, onConfirm: () => { if (editingTut === t.id) setEditingTut(null); save({ tutorials: arr('tutorials').filter((x) => x.id !== t.id) }, true); } });
 
   const ask = (opts) => setConfirm(opts);
   const copy = async (text) => { if (!text) return; try { await navigator.clipboard.writeText(text); toast('Copied'); } catch { toast('Copy failed', 'error'); } };
@@ -153,6 +154,7 @@ export default function SoftwareDetail() {
   const avatarUrl = soft.avatar ? softwareFileUrl(id, soft.avatar) : null;
   const avatarEmoji = !avatarUrl ? (soft.avatarEmoji || null) : null;
   const editingPlugin = editingId ? (soft.plugins || []).find((p) => p.id === editingId) : null;
+  const editingTutorial = editingTut ? (soft.tutorials || []).find((t) => t.id === editingTut) : null;
 
   return (
     <div className="detail software-detail">
@@ -227,13 +229,13 @@ export default function SoftwareDetail() {
 
       <div className="soft-tabs">
         {TABS.map((t) => (
-          <button key={t.key} className={`soft-tab ${tab === t.key ? 'on' : ''}`} onClick={() => { setTab(t.key); setEditingId(null); }}>
+          <button key={t.key} className={`soft-tab ${tab === t.key ? 'on' : ''}`} onClick={() => { setTab(t.key); setEditingId(null); setEditingTut(null); }}>
             <t.icon size={15} /> {t.label} <span className="count">{counts[t.key]}</span>
           </button>
         ))}
       </div>
 
-      {!editingPlugin && (
+      {!editingPlugin && !editingTutorial && (
         <div className="soft-toolbar">
           <input className="input soft-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${tab === 'plugins' ? 'plugins' : tab}…`} />
           {tab === 'plugins' && <button className="btn btn-sm btn-primary" onClick={addPlugin}><Plus size={15} /> Add plugin</button>}
@@ -252,7 +254,7 @@ export default function SoftwareDetail() {
           onSetFile={(f) => { if (f) fileOp(() => api.setPluginFile(id, editingPlugin.id, f)); }}
           onRemoveFile={() => ask({ title: 'Remove file?', message: `Remove the installer “${editingPlugin.fileName}” from this plugin?`, confirmLabel: 'Remove', danger: true, onConfirm: () => fileOp(() => api.removePluginFile(id, editingPlugin.id)) })}
           onDelete={() => delPlugin(editingPlugin)}
-          onDone={() => setEditingId(null)}
+          onDone={() => { flush(); setEditingId(null); }}
         />
       ) : (
         plugins.length ? (
@@ -273,12 +275,16 @@ export default function SoftwareDetail() {
             {groups.map((g) => {
               const items = (g.items || []).filter((e) => match(e.title, e.code, (e.tags || []).join(' ')) || match(g.name));
               const imgUrl = g.image ? softwareFileUrl(id, g.image) : null;
+              const collapsed = !!g.collapsed;
               return (
-                <div className="expr-group" key={g.id}>
+                <div className={`expr-group ${collapsed ? 'collapsed' : ''}`} key={g.id}>
                   <div className="expr-group-head">
+                    <button className="expr-group-collapse" title={collapsed ? 'Expand' : 'Collapse'} onClick={() => editGroup(g.id, { collapsed: !collapsed }, true)}>
+                      {collapsed ? <ChevronRight size={17} /> : <ChevronDown size={17} />}
+                    </button>
                     <input className="expr-group-name" value={g.name} placeholder="Group name (e.g. Wiggle & bounce)" onChange={(e) => editGroup(g.id, { name: e.target.value })} />
                     <span className="count">{(g.items || []).length}</span>
-                    <button className="btn btn-sm" onClick={() => addExpr(g.id)}><Plus size={14} /> Expression</button>
+                    {!collapsed && <button className="btn btn-sm" onClick={() => addExpr(g.id)}><Plus size={14} /> Expression</button>}
                     <Menu align="right" trigger={<button className="icon-btn" title="More"><MoreHorizontal size={16} /></button>}
                       items={[{ label: 'Delete group', icon: <Trash2 size={15} />, danger: true, onClick: () => delGroup(g) }]} />
                   </div>
@@ -286,18 +292,20 @@ export default function SoftwareDetail() {
                   {imgUrl ? (
                     <div className="expr-group-img">
                       <img src={imgUrl} alt={g.imageName || ''} loading="lazy" />
-                      <div className="expr-group-img-actions">
-                        <button className="btn btn-sm" onClick={() => pickGroupImage(g.id)}><ImageIcon size={13} /> Change</button>
-                        <button className="btn btn-sm btn-ghost" onClick={() => removeGroupImage(g.id)}>Remove</button>
-                      </div>
+                      {!collapsed && (
+                        <div className="expr-group-img-actions">
+                          <button className="btn btn-sm" onClick={() => pickGroupImage(g.id)}><ImageIcon size={13} /> Change</button>
+                          <button className="btn btn-sm btn-ghost" onClick={() => removeGroupImage(g.id)}>Remove</button>
+                        </div>
+                      )}
                     </div>
-                  ) : (
+                  ) : (!collapsed && (
                     <button className="expr-group-addimg" onClick={() => pickGroupImage(g.id)}>
                       <ImageIcon size={16} /> Add a preview image (show what these expressions do)
                     </button>
-                  )}
+                  ))}
 
-                  {items.length ? (
+                  {!collapsed && (items.length ? (
                     <div className="expr-list">
                       {items.map((e) => {
                         const col = e.color ? tagColor(e.color) : null;
@@ -317,7 +325,7 @@ export default function SoftwareDetail() {
                     </div>
                   ) : (
                     <button className="expr-empty-add" onClick={() => addExpr(g.id)}><Plus size={15} /> Add the first expression</button>
-                  )}
+                  ))}
                 </div>
               );
             })}
@@ -326,27 +334,23 @@ export default function SoftwareDetail() {
       )}
 
       {/* ---- Tutorials ---- */}
-      {tab === 'tutorials' && (
+      {tab === 'tutorials' && (editingTutorial ? (
+        <TutorialEditor
+          key={editingTutorial.id} tut={editingTutorial}
+          onEdit={(patch) => editTutorial(editingTutorial.id, patch)}
+          onDelete={() => delTutorial(editingTutorial)}
+          onDone={() => { flush(); setEditingTut(null); }}
+        />
+      ) : (
         tutorials.length ? (
-          <div className="tut-list">
+          <div className="pcard-grid">
             {tutorials.map((t) => (
-              <div className="tut-row" key={t.id}>
-                <Youtube size={18} className="tut-icon" />
-                <div className="tut-main">
-                  <input className="tut-title" value={t.title} placeholder="Tutorial title" onChange={(e) => editTutorial(t.id, { title: e.target.value })} />
-                  <div className="tut-fields">
-                    <input className="input tut-url" value={t.url} placeholder="https://youtube.com/…" onChange={(e) => editTutorial(t.id, { url: e.target.value })} />
-                    <input className="input tut-channel" value={t.channel} placeholder="Channel / author" onChange={(e) => editTutorial(t.id, { channel: e.target.value })} />
-                  </div>
-                  <TagRow tags={t.tags} onChange={(tags) => editTutorial(t.id, { tags })} />
-                </div>
-                <a className={`icon-btn tut-open ${t.url ? '' : 'is-disabled'}`} href={t.url ? normalizeUrl(t.url) : undefined} target="_blank" rel="noopener noreferrer" title="Open"><ExternalLink size={15} /></a>
-                <button className="icon-btn filerow-del" onClick={() => delTutorial(t)} title="Delete"><X size={15} /></button>
-              </div>
+              <TutorialCard key={t.id} tut={t} onOpen={() => setEditingTut(t.id)} onDelete={() => delTutorial(t)} />
             ))}
+            <button className="pcard-add" onClick={addTutorial}><Plus size={22} /><span>Add tutorial</span></button>
           </div>
-        ) : <Empty icon={Youtube} text={ql ? 'No tutorials match your search.' : 'Link useful YouTube tutorials and articles.'} />
-      )}
+        ) : <Empty icon={Youtube} text={ql ? 'No tutorials match your search.' : 'Link useful YouTube tutorials — they show up as cards with the thumbnail.'} />
+      ))}
 
       {confirm && (
         <ConfirmDialog {...confirm} onConfirm={confirm.onConfirm} onClose={() => setConfirm(null)} />
@@ -463,6 +467,74 @@ function PluginEditor({ soft, plugin: p, onEdit, onSetImage, onRemoveImage, onSe
             )}
             <input ref={fileRef} type="file" className="visually-hidden-input" onChange={(e) => { onSetFile(e.target.files?.[0]); e.target.value = ''; }} />
           </Field>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Compact tutorial card with the YouTube thumbnail. */
+function TutorialCard({ tut: t, onOpen, onDelete }) {
+  const thumb = youtubeThumb(t.url);
+  const [broken, setBroken] = useState(false);
+  const showThumb = thumb && !broken;
+  return (
+    <div className="pcard tcard">
+      <button className="pcard-cover tcard-cover" onClick={onOpen} title="Edit">
+        {showThumb ? <img src={thumb} alt="" loading="lazy" onError={() => setBroken(true)} /> : <Youtube size={30} />}
+        {showThumb && <span className="tcard-play"><Play size={18} /></span>}
+      </button>
+      <div className="pcard-menu" onClick={(e) => e.stopPropagation()}>
+        <Menu align="right" trigger={<button className="icon-btn pcard-menu-btn" title="More"><MoreHorizontal size={16} /></button>}
+          items={[
+            { label: 'Edit', icon: <Pencil size={15} />, onClick: onOpen },
+            ...(t.url ? [{ label: 'Open', icon: <ExternalLink size={15} />, onClick: () => window.open(normalizeUrl(t.url), '_blank', 'noopener') }] : []),
+            { separator: true },
+            { label: 'Delete', icon: <Trash2 size={15} />, danger: true, onClick: onDelete },
+          ]} />
+      </div>
+      <div className="pcard-body" onClick={onOpen}>
+        <div className="pcard-title">{t.title || 'Untitled tutorial'}</div>
+        {t.channel && <div className="pcard-channel">{t.channel}</div>}
+      </div>
+      {t.url && (
+        <a className="btn btn-sm pcard-dl" href={normalizeUrl(t.url)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+          <Youtube size={14} /> Watch
+        </a>
+      )}
+    </div>
+  );
+}
+
+/** Add / edit form for a tutorial, with a live YouTube thumbnail preview. */
+function TutorialEditor({ tut: t, onEdit, onDelete, onDone }) {
+  const set = (k) => (e) => onEdit({ [k]: e.target.value });
+  const thumb = youtubeThumb(t.url);
+  return (
+    <div className="plugin-editor">
+      <div className="plugin-editor-head">
+        <button className="btn btn-sm" onClick={onDone}><ArrowLeft size={15} /> Back to cards</button>
+        <div className="plugin-editor-head-r">
+          <button className="btn btn-sm btn-primary" onClick={onDone}><Check size={15} /> Confirm</button>
+          <button className="btn btn-sm btn-danger" onClick={onDelete}><Trash2 size={15} /> Delete</button>
+        </div>
+      </div>
+
+      <div className="plugin-editor-grid">
+        <div className="plugin-editor-image">
+          {thumb ? (
+            <div className="pe-img"><img src={thumb} alt="" /></div>
+          ) : (
+            <div className="pe-img-add" style={{ cursor: 'default' }}>
+              <Youtube size={22} /><span>YouTube preview</span><small>Paste a link to see the thumbnail</small>
+            </div>
+          )}
+        </div>
+        <div className="plugin-editor-fields">
+          <Field label="Title"><input className="input" value={t.title} placeholder="Tutorial title" onChange={set('title')} /></Field>
+          <Field label="YouTube / video URL"><input className="input" value={t.url} placeholder="https://youtube.com/watch?v=…" onChange={set('url')} /></Field>
+          <Field label="Channel / author"><input className="input" value={t.channel} placeholder="e.g. ECAbrams" onChange={set('channel')} /></Field>
+          <Field label="Tags"><TagRow tags={t.tags} onChange={(tags) => onEdit({ tags })} /></Field>
         </div>
       </div>
     </div>
