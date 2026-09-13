@@ -363,6 +363,19 @@ async function moveInto(dir, tmpPath, finalName) {
   invalidateStorage();
   return finalName;
 }
+// Store a single-slot image (banner, avatar, thumbnail, plugin/group preview…)
+// under a UNIQUE filename and delete the previous one. Unique names are the key
+// bit: the file's URL changes on every re-upload, so a browser (or CDN) can
+// never serve a stale cached copy of the old image — while the old file is
+// removed so nothing leaks on disk. `stem` is a readable prefix, e.g. 'avatar'.
+async function replaceImage(dir, tmpPath, stem, originalName, oldStored, defaultExt = '') {
+  const ext = extOf(originalName) || defaultExt;
+  const stored = await moveInto(dir, tmpPath, `${stem}-${nanoid(8)}${ext}`);
+  if (oldStored && path.basename(oldStored) !== stored) {
+    await safeRm(path.join(dir, path.basename(oldStored)), { force: true }).catch(() => {});
+  }
+  return stored;
+}
 async function cleanupTmp(req) {
   if (req.tmpDir) await safeRm(req.tmpDir, { recursive: true, force: true }).catch(() => {});
 }
@@ -568,12 +581,13 @@ app.post('/api/projects/:id/thumb', upload.single('thumb'), async (req, res) => 
     if (!req.file) return res.status(400).json({ error: 'thumb_required' });
 
     const dir = path.join(DATA_DIR, project.type, project.id);
-    // Always store the custom cover under a stable name so it overwrites cleanly.
-    await moveInto(dir, req.file.path, 'thumb.webp');
+    // Store the cover under a unique name (and drop the old file) so its URL
+    // changes on every re-crop — no stale cached cover in the grid.
+    const stored = await replaceImage(dir, req.file.path, 'thumb', req.file.originalname, project.thumb, '.webp');
     const meta = parseJSON(req.body.thumbMeta, null);
     const updated = await mutateDB((d) => {
       const p = d.projects.find((x) => x.id === project.id);
-      p.thumb = 'thumb.webp';
+      p.thumb = stored;
       if (meta) p.thumbMeta = meta; else delete p.thumbMeta;
       return p;
     });
@@ -779,7 +793,7 @@ for (const kind of ['banner', 'avatar']) {
       if (!plan) { await cleanupTmp(req); return res.status(404).json({ error: 'not_found' }); }
       if (!req.file) return res.status(400).json({ error: 'file_required' });
       const dir = path.join(DATA_DIR, 'plan', plan.id);
-      const stored = await moveInto(dir, req.file.path, `${kind}${extOf(req.file.originalname) || '.png'}`);
+      const stored = await replaceImage(dir, req.file.path, kind, req.file.originalname, plan[kind], '.png');
       const updated = await mutateDB((d) => { const p = d.plans.find((x) => x.id === plan.id); p[kind] = stored; if (kind === 'banner') p.bannerGradient = null; if (kind === 'avatar') p.avatarEmoji = null; return p; });
       await cleanupTmp(req);
       res.json({ plan: updated });
@@ -1282,8 +1296,7 @@ const softImage = (kind) => async (req, res) => {
     const s = findSoft(db, req.params.id);
     if (!s) { await cleanupTmp(req); return res.status(404).json({ error: 'not_found' }); }
     if (!req.file) return res.status(400).json({ error: 'file_required' });
-    if (s[kind]) await safeRm(path.join(softDir(s.id), path.basename(s[kind])), { force: true }).catch(() => {});
-    const stored = await moveInto(softDir(s.id), req.file.path, `${kind}${extOf(req.file.originalname) || '.png'}`);
+    const stored = await replaceImage(softDir(s.id), req.file.path, kind, req.file.originalname, s[kind], '.png');
     const updated = await mutateDB((d) => { const ss = findSoft(d, s.id); ss[kind] = stored; if (kind === 'banner') ss.bannerGradient = null; return ss; });
     await cleanupTmp(req);
     res.json({ software: updated });
@@ -1309,8 +1322,7 @@ const pluginFileEndpoint = (field, kind, prefix) => async (req, res) => {
     const p = s && (s.plugins || []).find((x) => x.id === req.params.pluginId);
     if (!s || !p) { await cleanupTmp(req); return res.status(404).json({ error: 'not_found' }); }
     if (!req.file) return res.status(400).json({ error: 'file_required' });
-    if (p[kind]) await safeRm(path.join(softDir(s.id), path.basename(p[kind])), { force: true }).catch(() => {});
-    const stored = await moveInto(softDir(s.id), req.file.path, `${prefix}${p.id}${extOf(req.file.originalname) || ''}`);
+    const stored = await replaceImage(softDir(s.id), req.file.path, `${prefix}${p.id}`, req.file.originalname, p[kind], '');
     const size = req.file.size;
     const updated = await mutateDB((d) => {
       const pp = findSoft(d, s.id).plugins.find((x) => x.id === p.id);
@@ -1348,8 +1360,7 @@ app.post('/api/software/:id/groups/:groupId/image', upload.single('image'), asyn
     const g = s && (s.expressionGroups || []).find((x) => x.id === req.params.groupId);
     if (!s || !g) { await cleanupTmp(req); return res.status(404).json({ error: 'not_found' }); }
     if (!req.file) return res.status(400).json({ error: 'file_required' });
-    if (g.image) await safeRm(path.join(softDir(s.id), path.basename(g.image)), { force: true }).catch(() => {});
-    const stored = await moveInto(softDir(s.id), req.file.path, `grp_${g.id}${extOf(req.file.originalname) || ''}`);
+    const stored = await replaceImage(softDir(s.id), req.file.path, `grp_${g.id}`, req.file.originalname, g.image, '');
     const updated = await mutateDB((d) => { const gg = findSoft(d, s.id).expressionGroups.find((x) => x.id === g.id); gg.image = stored; gg.imageName = req.file.originalname; return findSoft(d, s.id); });
     await cleanupTmp(req);
     res.json({ software: updated });
@@ -1402,8 +1413,7 @@ app.post('/api/settings/dashboard-banner', upload.single('banner'), async (req, 
   try {
     if (!req.file) return res.status(400).json({ error: 'file_required' });
     const db = await readDB();
-    if (db.settings.dashboardBanner) await safeRm(path.join(dashboardDir(), path.basename(db.settings.dashboardBanner)), { force: true }).catch(() => {});
-    const stored = await moveInto(dashboardDir(), req.file.path, `banner${extOf(req.file.originalname) || '.png'}`);
+    const stored = await replaceImage(dashboardDir(), req.file.path, 'banner', req.file.originalname, db.settings.dashboardBanner, '.png');
     const settings = await mutateDB((d) => { d.settings.dashboardBanner = stored; d.settings.dashboardBannerGradient = null; return d.settings; });
     await cleanupTmp(req);
     res.json({ settings });

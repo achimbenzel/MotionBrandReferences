@@ -1480,7 +1480,7 @@ img { max-width: 100%; display: block; }
   border-radius: 12px; padding: 12px; box-shadow: 0 16px 40px rgba(0, 0, 0, .5);
 }
 .banner-picker-head { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
-.banner-picker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+.banner-picker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; max-height: 232px; overflow-y: auto; padding-right: 2px; }
 .banner-swatch {
   aspect-ratio: 16 / 10; border-radius: 8px; border: 2px solid transparent;
   background-size: cover; background-position: center; cursor: pointer; padding: 0;

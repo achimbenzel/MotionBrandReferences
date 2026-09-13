@@ -49,8 +49,11 @@ export const TAG_COLORS = [
 ];
 export const tagColor = (key) => TAG_COLORS.find((c) => c.key === key) || TAG_COLORS[TAG_COLORS.length - 1];
 
-// Preset banner gradients for Plan mode (id is stored; css is rendered).
+// Preset banner gradients (id is stored; css is rendered). Used by plan,
+// software and dashboard banners. A mix of bright, pastel, neutral/beige and
+// muted/dark tones so a banner can be calm as well as punchy.
 export const PLAN_GRADIENTS = [
+  // Bright
   { id: 'dusk', css: 'linear-gradient(120deg, #6a11cb, #2575fc)' },
   { id: 'sunset', css: 'linear-gradient(120deg, #ff6a88, #ff9a44)' },
   { id: 'aurora', css: 'linear-gradient(120deg, #00c6a7, #1e4fd6)' },
@@ -60,9 +63,33 @@ export const PLAN_GRADIENTS = [
   { id: 'ember', css: 'linear-gradient(120deg, #f83600, #f9d423)' },
   { id: 'forest', css: 'linear-gradient(120deg, #134e5e, #71b280)' },
   { id: 'berry', css: 'linear-gradient(120deg, #c31432, #240b36)' },
-  { id: 'slate', css: 'linear-gradient(120deg, #434343, #000000)' },
   { id: 'mint', css: 'linear-gradient(120deg, #43e97b, #38f9d7)' },
   { id: 'candy', css: 'linear-gradient(120deg, #ff5f6d, #ffc371)' },
+  // Pastel
+  { id: 'blush', css: 'linear-gradient(120deg, #f4c6d0, #f9e4e9)' },
+  { id: 'lavender', css: 'linear-gradient(120deg, #cabfe6, #ebe5f8)' },
+  { id: 'powder', css: 'linear-gradient(120deg, #bcd6e8, #e6f0f7)' },
+  { id: 'sage', css: 'linear-gradient(120deg, #bdd0ab, #e3ecd6)' },
+  { id: 'butter', css: 'linear-gradient(120deg, #f5e6a8, #fbf3d3)' },
+  { id: 'seafoam', css: 'linear-gradient(120deg, #b6e3d4, #e2f4ee)' },
+  // Neutral / beige
+  { id: 'sand', css: 'linear-gradient(120deg, #d8c9a3, #efe6ce)' },
+  { id: 'cream', css: 'linear-gradient(120deg, #ece3cf, #f8f3e7)' },
+  { id: 'fog', css: 'linear-gradient(120deg, #c4cad2, #e8ebef)' },
+  { id: 'greige', css: 'linear-gradient(120deg, #cabfb0, #e6ddd1)' },
+  { id: 'stone', css: 'linear-gradient(120deg, #a7a196, #cfcabf)' },
+  // Muted / earthy
+  { id: 'rose', css: 'linear-gradient(120deg, #c98b96, #e6c1c7)' },
+  { id: 'clay', css: 'linear-gradient(120deg, #c58a6b, #e4b499)' },
+  { id: 'olive', css: 'linear-gradient(120deg, #7c8054, #a9ae7c)' },
+  { id: 'teal', css: 'linear-gradient(120deg, #40706e, #77a6a2)' },
+  { id: 'plum', css: 'linear-gradient(120deg, #6d5a78, #a48fb0)' },
+  { id: 'mocha', css: 'linear-gradient(120deg, #6a5140, #a3856a)' },
+  // Dark
+  { id: 'slate', css: 'linear-gradient(120deg, #434343, #000000)' },
+  { id: 'charcoal', css: 'linear-gradient(120deg, #2b2b33, #4c4c58)' },
+  { id: 'midnight', css: 'linear-gradient(120deg, #1c2a48, #35507c)' },
+  { id: 'steel', css: 'linear-gradient(120deg, #6b7b8c, #aab7c2)' },
 ];
 export const gradientCss = (id) => PLAN_GRADIENTS.find((g) => g.id === id)?.css || null;
 
