@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Camera, Images, Tag as TagIcon, Trash2, Clock, ChevronLeft, ChevronRight, Maximize2, MoreVertical } from 'lucide-react';
+import { Camera, Film, Images, Tag as TagIcon, Trash2, Clock, ChevronLeft, ChevronRight, Maximize2, MoreVertical } from 'lucide-react';
 import { api, fileUrl } from '../lib/api.js';
 import { captureFrame, lengthTag, fmtTime } from '../lib/media.js';
 import { useToast } from '../components/Toast.jsx';
@@ -12,6 +12,7 @@ export default function MotionDetail({ project, setProject }) {
   const toast = useToast();
   const videoRef = useRef(null);
   const [capturing, setCapturing] = useState(false);
+  const [bulk, setBulk] = useState(null); // { done, total } while capturing one frame per second
   const [paused, setPaused] = useState(true);
   const [current, setCurrent] = useState(0);
   const [sel, setSel] = useState(0);
@@ -82,6 +83,67 @@ export default function MotionDetail({ project, setProject }) {
     }
   };
 
+  // Seek the <video> to a time and resolve once the new frame is painted.
+  // Guards against the cases that would otherwise hang the loop: seeking to the
+  // time it's already at (no 'seeked' fires) and a seek that never completes.
+  const seekTo = (v, t) => new Promise((resolve) => {
+    let settled = false;
+    const paint = () => {
+      if (typeof v.requestVideoFrameCallback === 'function') v.requestVideoFrameCallback(() => finish());
+      else setTimeout(finish, 40);
+    };
+    const finish = () => { if (settled) return; settled = true; clearTimeout(guard); v.removeEventListener('seeked', onSeeked); resolve(); };
+    const onSeeked = () => paint();
+    const guard = setTimeout(finish, 1500); // never hang on a stuck/ignored seek
+    if (Math.abs(v.currentTime - t) < 0.02) { paint(); return; }
+    v.addEventListener('seeked', onSeeked, { once: true });
+    v.currentTime = t;
+  });
+
+  // Grab one frame per whole second across the whole clip, in a single upload.
+  const addPerSecond = async () => {
+    const v = videoRef.current;
+    if (!v || capturing || bulk) return;
+    const dur = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : Number(project.duration) || 0;
+    if (!dur) { toast('Video length not ready yet — press play once, then try again.', 'error'); return; }
+    if (v.readyState < 2 || !v.videoWidth) {
+      await new Promise((res) => { v.addEventListener('loadeddata', res, { once: true }); try { v.load(); } catch { /* ignore */ } });
+    }
+    const wasPlaying = !v.paused;
+    const originalTime = v.currentTime;
+    v.pause();
+
+    // One target per whole second (the last nudged just inside the end), skipping
+    // seconds that already have a frame so repeat clicks don't pile up duplicates.
+    const existing = (project.frames || []).map((f) => f.t);
+    const targets = [];
+    for (let s = 0; s <= Math.floor(dur); s += 1) {
+      const t = Number(Math.min(s, dur - 0.05).toFixed(3));
+      if (t < 0) continue;
+      if (existing.some((e) => Math.abs(e - t) < 0.4) || targets.some((e) => Math.abs(e - t) < 0.4)) continue;
+      targets.push(t);
+    }
+    if (!targets.length) { toast('A frame for each second is already there.'); return; }
+
+    setBulk({ done: 0, total: targets.length });
+    try {
+      const items = [];
+      for (let i = 0; i < targets.length; i += 1) {
+        await seekTo(v, targets[i]);
+        items.push({ blob: await captureFrame(v, 0.9), t: targets[i] });
+        setBulk({ done: i + 1, total: targets.length });
+      }
+      const updated = await api.addFrames(project.id, items);
+      setProject(updated);
+      toast(`Added ${items.length} frame${items.length === 1 ? '' : 's'}`);
+    } catch (e) {
+      toast(`Capture failed: ${e.message}`, 'error');
+    } finally {
+      setBulk(null);
+      try { v.currentTime = originalTime; if (wasPlaying) await v.play(); } catch { /* ignore */ }
+    }
+  };
+
   const deleteFrame = async (frameId) => {
     try { setProject(await api.removeFrame(project.id, frameId)); }
     catch (e) { toast(`Could not delete frame: ${e.message}`, 'error'); }
@@ -105,8 +167,11 @@ export default function MotionDetail({ project, setProject }) {
       </div>
 
       <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-        <button className="btn btn-primary" onClick={addFrame} disabled={capturing}>
+        <button className="btn btn-primary" onClick={addFrame} disabled={capturing || !!bulk}>
           <Camera size={16} /> {capturing ? 'Capturing…' : 'Add current frame'}
+        </button>
+        <button className="btn" onClick={addPerSecond} disabled={capturing || !!bulk} title="Capture one frame at every second of the clip">
+          <Film size={16} /> {bulk ? `Capturing ${bulk.done}/${bulk.total}…` : 'Add a frame for each second'}
         </button>
         <span className="hint" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           <Clock size={13} /> {fmtTime(current)} / {fmtTime(project.duration)}

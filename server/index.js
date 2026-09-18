@@ -630,6 +630,39 @@ app.post('/api/projects/:id/frames', upload.single('frame'), async (req, res) =>
   }
 });
 
+// ---- Add many frames at once (the "a frame for each second" capture) -------
+// The client seeks + captures each frame, then uploads them together so the
+// whole batch is one round trip and one DB write. `times` is a JSON array of
+// timestamps parallel to the uploaded `frames`.
+app.post('/api/projects/:id/frames/batch', upload.array('frames', 1200), async (req, res) => {
+  try {
+    const db = await readDB();
+    const project = db.projects.find((p) => p.id === req.params.id);
+    if (!project || project.type !== 'motion') { await cleanupTmp(req); return res.status(404).json({ error: 'not_found' }); }
+    const files = req.files || [];
+    if (!files.length) { await cleanupTmp(req); return res.status(400).json({ error: 'frames_required' }); }
+    const times = parseJSON(req.body.times, []);
+    const dir = path.join(DATA_DIR, 'motion', project.id, 'frames');
+    const added = [];
+    for (let i = 0; i < files.length; i += 1) {
+      const frameId = nanoid(8);
+      const stored = await moveInto(dir, files[i].path, `${frameId}.webp`);
+      added.push({ id: frameId, file: `frames/${stored}`, t: Number(times[i]) || 0, createdAt: Date.now() });
+    }
+    const updated = await mutateDB((d) => {
+      const p = d.projects.find((x) => x.id === project.id);
+      p.frames = p.frames || [];
+      p.frames.push(...added);
+      return p;
+    });
+    await cleanupTmp(req);
+    res.status(201).json({ frames: added, project: updated });
+  } catch (err) {
+    await cleanupTmp(req);
+    res.status(500).json({ error: 'frames_failed', message: String(err.message || err) });
+  }
+});
+
 // ---- Delete a frame -------------------------------------------------------
 app.delete('/api/projects/:id/frames/:frameId', async (req, res) => {
   try {

@@ -49,6 +49,15 @@ export const api = {
     return project;
   },
 
+  // Add many captured frames in one request. `items` = [{ blob, t }, …].
+  async addFrames(id, items) {
+    const fd = new FormData();
+    items.forEach((it, i) => fd.append('frames', it.blob, `frame${i}.webp`));
+    fd.append('times', JSON.stringify(items.map((it) => it.t)));
+    const { project } = await handle(await fetch(`/api/projects/${id}/frames/batch`, { method: 'POST', body: fd }));
+    return project;
+  },
+
   async removeFrame(id, frameId) {
     const { project } = await handle(await fetch(`/api/projects/${id}/frames/${frameId}`, { method: 'DELETE' }));
     return project;
