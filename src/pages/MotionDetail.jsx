@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Camera, Film, Images, Tag as TagIcon, Trash2, Clock, ChevronLeft, ChevronRight, Maximize2, MoreVertical } from 'lucide-react';
+import { Camera, Film, Images, Tag as TagIcon, Trash2, Clock, ChevronLeft, ChevronRight, Maximize2, MoreVertical, Scissors, X } from 'lucide-react';
 import { api, fileUrl } from '../lib/api.js';
 import { captureFrame, lengthTag, fmtTime } from '../lib/media.js';
 import { useToast } from '../components/Toast.jsx';
@@ -7,6 +7,8 @@ import TagInput from '../components/TagInput.jsx';
 import Menu from '../components/Menu.jsx';
 import Lightbox from '../components/Lightbox.jsx';
 import NotesField from '../components/NotesField.jsx';
+
+const rid = () => Math.random().toString(36).slice(2, 8);
 
 export default function MotionDetail({ project, setProject }) {
   const toast = useToast();
@@ -17,6 +19,8 @@ export default function MotionDetail({ project, setProject }) {
   const [current, setCurrent] = useState(0);
   const [sel, setSel] = useState(0);
   const [lightbox, setLightbox] = useState(false);
+  const [segments, setSegments] = useState(project.segments || []);
+  const segTimer = useRef(null);
 
   const frames = [...(project.frames || [])].sort((a, b) => a.t - b.t);
   const autoLen = project.duration ? lengthTag(project.duration) : null;
@@ -62,6 +66,44 @@ export default function MotionDetail({ project, setProject }) {
     try { setProject(await api.update(project.id, { tags })); }
     catch (e) { toast(`Could not save tags: ${e.message}`, 'error'); }
   };
+
+  // ---- Segments: label the video's sections (Hook / Demo / Outro …) --------
+  // Seed once per project; the timeline's local state is the source of truth so
+  // an addFrame/tag save (which re-sets `project`) can't wipe an unsaved label.
+  useEffect(() => { setSegments(project.segments || []); }, [project.id]);
+  const segDur = Number(project.duration) || (videoRef.current && Number.isFinite(videoRef.current.duration) ? videoRef.current.duration : 0);
+  const saveSegments = (next, immediate = false) => {
+    setSegments(next);
+    clearTimeout(segTimer.current);
+    const send = () => api.update(project.id, { segments: next }).catch((e) => toast(`Could not save: ${e.message}`, 'error'));
+    if (immediate) send(); else segTimer.current = setTimeout(send, 500);
+  };
+  // Each segment runs from its start to the next one's start (last → end).
+  const segList = [...segments].sort((a, b) => a.start - b.start)
+    .map((s, i, arr) => ({ ...s, end: i < arr.length - 1 ? arr[i + 1].start : (segDur || s.start) }));
+  const activeSeg = segList.findIndex((s, i) => current >= s.start && (i === segList.length - 1 ? true : current < s.end));
+  const splitAtPlayhead = () => {
+    if (!segDur) { toast('Video length not ready yet — press play once, then try again.', 'error'); return; }
+    const t = Number((videoRef.current?.currentTime ?? current).toFixed(2));
+    if (!segments.length) {
+      const base = [{ id: rid(), start: 0, label: '' }];
+      if (t > 0.2 && t < segDur - 0.2) base.push({ id: rid(), start: t, label: '' });
+      saveSegments(base, true);
+      return;
+    }
+    if (t <= 0.1 || t >= segDur - 0.1 || segments.some((s) => Math.abs(s.start - t) < 0.15)) {
+      toast('Move the playhead into the clip (away from an existing boundary), then split.');
+      return;
+    }
+    saveSegments([...segments, { id: rid(), start: t, label: '' }].sort((a, b) => a.start - b.start), true);
+  };
+  const editSegLabel = (id, label) => saveSegments(segments.map((s) => (s.id === id ? { ...s, label } : s)));
+  const deleteSeg = (id) => {
+    let next = segments.filter((s) => s.id !== id).sort((a, b) => a.start - b.start);
+    if (next.length) next = next.map((s, i) => (i === 0 ? { ...s, start: 0 } : s));
+    saveSegments(next, true);
+  };
+  const seekSeg = (start) => { const v = videoRef.current; if (v) { v.currentTime = start; setCurrent(start); } };
 
   const addFrame = async () => {
     const v = videoRef.current;
@@ -164,6 +206,40 @@ export default function MotionDetail({ project, setProject }) {
           onVolumeChange={saveVolume}
           onTimeUpdate={(e) => setCurrent(e.target.currentTime)}
         />
+      </div>
+
+      {/* Segment timeline — label the video's sections (Hook / Demo / Outro …) */}
+      <div className="seg-timeline">
+        <div className="seg-head">
+          <span className="seg-title"><Scissors size={14} /> Segments</span>
+          <div className="seg-actions">
+            <button className="btn btn-sm" onClick={splitAtPlayhead} disabled={!segDur}><Scissors size={14} /> Split at playhead</button>
+            {segList.length > 0 && <button className="btn btn-sm btn-ghost" onClick={() => saveSegments([], true)}>Clear</button>}
+          </div>
+        </div>
+        {segList.length ? (
+          <div className="seg-bar">
+            {segList.map((s, i) => {
+              const span = Math.max(0.0001, s.end - s.start);
+              const frac = i === activeSeg && s.end > s.start ? Math.min(1, Math.max(0, (current - s.start) / (s.end - s.start))) : 0;
+              return (
+                <div key={s.id} className={`seg ${i === activeSeg ? 'active' : ''}`} style={{ flexGrow: span }}
+                  onClick={() => seekSeg(s.start)} title={`${fmtTime(s.start)} – ${fmtTime(s.end)} · click to jump here`}>
+                  {i === activeSeg && <span className="seg-playhead" style={{ left: `${frac * 100}%` }} />}
+                  <input className="seg-label" value={s.label} placeholder={`Section ${i + 1}`}
+                    onClick={(e) => e.stopPropagation()} onChange={(e) => editSegLabel(s.id, e.target.value)} />
+                  <span className="seg-time">{fmtTime(s.start)}</span>
+                  <button className="seg-del icon-btn" title="Remove section" onClick={(e) => { e.stopPropagation(); deleteSeg(s.id); }}><X size={12} /></button>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <button className="seg-empty" onClick={splitAtPlayhead} disabled={!segDur}>
+            <Scissors size={15} /> Split the video into labeled sections (Hook, Demo, Outro…)
+          </button>
+        )}
+        <div className="hint seg-hint">Seek the player, then “Split at playhead” to add a boundary. Click a section to jump to it; type to name it.</div>
       </div>
 
       <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap', alignItems: 'center' }}>

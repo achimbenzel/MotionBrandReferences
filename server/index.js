@@ -543,7 +543,7 @@ app.post('/api/projects', upload.any(), async (req, res) => {
 });
 
 // ---- Update (notes / tags / colors / meta) --------------------------------
-const EDITABLE = ['title', 'year', 'category', 'notes', 'tags', 'colors', 'bg', 'scale', 'variant', 'renditions', 'original', 'rendition', 'url'];
+const EDITABLE = ['title', 'year', 'category', 'notes', 'tags', 'colors', 'bg', 'scale', 'variant', 'renditions', 'original', 'rendition', 'url', 'segments'];
 app.patch('/api/projects/:id', async (req, res) => {
   try {
     const updated = await mutateDB((db) => {
@@ -558,6 +558,17 @@ app.patch('/api/projects/:id', async (req, res) => {
             if (Number.isFinite(s)) project.scale = Math.min(1, Math.max(0.2, s));
           } else if (key === 'variant') {
             if (req.body.variant === 'light' || req.body.variant === 'dark') project.variant = req.body.variant;
+          } else if (key === 'segments') {
+            // Labeled video sections (Hook / Demo / Outro …). Each carries a
+            // start time; the first is pinned to 0 and the rest sorted.
+            const arr = Array.isArray(req.body.segments) ? req.body.segments : [];
+            const segs = arr.slice(0, 200).map((s) => ({
+              id: s?.id ? str(s.id, 40) : nanoid(6),
+              start: Math.max(0, Number(s?.start) || 0),
+              label: str(s?.label, 80),
+            })).sort((a, b) => a.start - b.start);
+            if (segs.length) segs[0].start = 0;
+            project.segments = segs;
           } else {
             project[key] = req.body[key];
           }
