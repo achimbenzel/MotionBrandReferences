@@ -5,6 +5,7 @@ import { useToast } from '../components/Toast.jsx';
 import TagInput from '../components/TagInput.jsx';
 import Lightbox from '../components/Lightbox.jsx';
 import NotesField from '../components/NotesField.jsx';
+import DetailLayout from '../components/DetailLayout.jsx';
 import { cardSize } from '../lib/types.js';
 
 export default function BusinessCardDetail({ project, setProject }) {
@@ -26,7 +27,18 @@ export default function BusinessCardDetail({ project, setProject }) {
   ].filter(Boolean);
 
   return (
-    <div>
+    <DetailLayout
+      side={(
+        <>
+          <div className="section">
+            <div className="section-head"><h2><Tag size={16} /> Tags</h2></div>
+            <TagInput tags={project.tags || []} onChange={saveTags} placeholder="color scheme, type…" />
+          </div>
+
+          <NotesField project={project} setProject={setProject} />
+        </>
+      )}
+    >
       <div className="hint" style={{ marginBottom: 14 }}><CreditCard size={13} /> Size: <b>{size.label}</b></div>
 
       <div className="bc-detail">
@@ -44,17 +56,11 @@ export default function BusinessCardDetail({ project, setProject }) {
         <BusinessCard3D front={front} back={back} size={size} />
       </div>
 
-      <div className="section">
-        <div className="section-head"><h2><Tag size={16} /> Tags</h2></div>
-        <TagInput tags={project.tags || []} onChange={saveTags} placeholder="color scheme, type…" />
-      </div>
-
-      <NotesField project={project} setProject={setProject} />
 
       {lightbox >= 0 && sides.length > 0 && (
         <Lightbox items={sides.map((s) => ({ src: s.src, caption: s.label }))} index={lightbox} onIndex={setLightbox} onClose={() => setLightbox(-1)} />
       )}
-    </div>
+    </DetailLayout>
   );
 }
 

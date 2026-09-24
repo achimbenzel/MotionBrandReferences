@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Play, Palette, Square, X, Type } from 'lucide-react';
 import { fileUrl } from '../lib/api.js';
 import { fmtTime } from '../lib/media.js';
-import { cardSize, logoSource, logoScale, logoActive, hostOf } from '../lib/types.js';
+import { cardSize, logoSource, logoScale, logoActive, hostOf, setLastTab } from '../lib/types.js';
 import LogoImage from './LogoImage.jsx';
 
 export default function ProjectCard({ project, onRemove, removeTitle = 'Remove from gallery' }) {
@@ -11,7 +11,7 @@ export default function ProjectCard({ project, onRemove, removeTitle = 'Remove f
   const isImage = project.type === 'imagegallery';
 
   const open = () => {
-    try { sessionStorage.setItem('lastTab', project.type); } catch { /* ignore */ }
+    setLastTab(project.type);
     navigate(`/project/${project.id}`);
   };
 

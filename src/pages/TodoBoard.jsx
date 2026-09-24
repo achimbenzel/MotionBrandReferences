@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Plus, X, MoreHorizontal, Trash2, Tag as TagIcon, GripVertical, AlertTriangle } from 'lucide-react';
+import { Plus, X, MoreHorizontal, Trash2, Tag as TagIcon, GripVertical, AlertTriangle, Palette, ArrowRight, ArrowUp, ArrowDown } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { TAG_COLORS, tagColor } from '../lib/types.js';
 import { useToast } from '../components/Toast.jsx';
@@ -25,6 +25,8 @@ export default function TodoBoard() {
   const [dialog, ask] = useConfirm();
   const columnsRef = useRef(columns);
   columnsRef.current = columns;
+  const kanbanRef = useRef(null);
+  const [activeCol, setActiveCol] = useState(0); // phone: which list is in view
 
   useEffect(() => {
     let alive = true;
@@ -74,7 +76,49 @@ export default function TodoBoard() {
   const setCardColor = (colId, cardId, color) => { commit(mapCard(colId, cardId, (k) => ({ ...k, color })), true); setColorEditFor(null); };
   const toggleUrgent = (colId, cardId) => commit(mapCard(colId, cardId, (k) => ({ ...k, urgent: !k.urgent })), true);
 
-  // Drag & drop
+  // Move without dragging (touch screens, keyboard): to another list, or up/down.
+  const moveTo = (fromColId, cardId, toColId) => {
+    const card = columns.find((c) => c.id === fromColId)?.cards.find((k) => k.id === cardId);
+    if (!card) return;
+    commit(columns.map((c) => {
+      if (c.id === fromColId) return { ...c, cards: c.cards.filter((k) => k.id !== cardId) };
+      if (c.id === toColId) return { ...c, cards: [...c.cards, card] };
+      return c;
+    }), true);
+    const target = columns.find((c) => c.id === toColId);
+    toast(`Moved to “${target?.name || 'Untitled'}”`);
+  };
+  const shift = (colId, cardId, d) => commit(mapCol(colId, (c) => {
+    const i = c.cards.findIndex((k) => k.id === cardId); const j = i + d;
+    if (i === -1 || j < 0 || j >= c.cards.length) return c;
+    const cards = [...c.cards]; [cards[i], cards[j]] = [cards[j], cards[i]];
+    return { ...c, cards };
+  }), true);
+  const cardMenu = (col, card, idx) => [
+    { label: card.urgent ? 'Unmark urgent' : 'Mark urgent', icon: <AlertTriangle size={15} />, onClick: () => toggleUrgent(col.id, card.id) },
+    { label: 'Colour…', icon: <Palette size={15} />, onClick: () => setColorEditFor(card.id) },
+    { label: 'Add tag', icon: <TagIcon size={15} />, onClick: () => setTagEditFor(card.id) },
+    { separator: true },
+    ...columns.filter((c) => c.id !== col.id).map((c) => ({
+      label: `Move to “${c.name || 'Untitled'}”`, icon: <ArrowRight size={15} />, onClick: () => moveTo(col.id, card.id, c.id),
+    })),
+    ...(idx > 0 ? [{ label: 'Move up', icon: <ArrowUp size={15} />, onClick: () => shift(col.id, card.id, -1) }] : []),
+    ...(idx < col.cards.length - 1 ? [{ label: 'Move down', icon: <ArrowDown size={15} />, onClick: () => shift(col.id, card.id, 1) }] : []),
+    { separator: true },
+    { label: 'Delete card', icon: <Trash2 size={15} />, danger: true, onClick: () => removeCard(col.id, card.id) },
+  ];
+
+  // Phone: lists are swipeable full-width pages; the tabs above jump between them.
+  const onKanbanScroll = (e) => {
+    const el = e.currentTarget;
+    const first = el.children[0];
+    if (!first) return;
+    const step = first.getBoundingClientRect().width + 12;
+    setActiveCol(Math.round(el.scrollLeft / step));
+  };
+  const showCol = (i) => kanbanRef.current?.children[i]?.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+
+  // Drag & drop (mouse)
   const onCardDragStart = (e, colId, cardId) => {
     dragRef.current = { fromCol: colId, cardId };
     e.dataTransfer.effectAllowed = 'move';
@@ -112,12 +156,20 @@ export default function TodoBoard() {
       <div className="page-head-row">
         <div className="page-head">
           <h1>To-Dos</h1>
-          <p>A general planner — add cards and drag them across your lists.</p>
+          <p>A general planner — add cards and move them across your lists.</p>
         </div>
-        <button className="btn btn-sm" onClick={addColumn}><Plus size={15} /> Add list</button>
       </div>
 
-      <div className="kanban">
+      <div className="kb-tabs" role="tablist" aria-label="Lists">
+        {columns.map((c, i) => (
+          <button key={c.id} role="tab" aria-selected={i === activeCol} className={`kb-tab ${i === activeCol ? 'on' : ''}`} onClick={() => showCol(i)}>
+            {c.name || 'Untitled'} <span>{c.cards.length}</span>
+          </button>
+        ))}
+        <button className="kb-tab kb-tab-add" onClick={() => { addColumn(); setTimeout(() => showCol(columns.length), 60); }} aria-label="Add list"><Plus size={15} /></button>
+      </div>
+
+      <div className="kanban" ref={kanbanRef} onScroll={onKanbanScroll}>
         {columns.map((col) => (
           <div
             key={col.id}
@@ -142,7 +194,7 @@ export default function TodoBoard() {
             </div>
 
             <div className="kb-cards">
-              {col.cards.map((card) => {
+              {col.cards.map((card, idx) => {
                 const cc = card.color ? tagColor(card.color) : null;
                 return (
                 <div
@@ -158,13 +210,12 @@ export default function TodoBoard() {
                   <span className="kb-card-grip" title="Drag to move"
                     onMouseDown={() => setDragCard(card.id)} onMouseUp={() => setDragCard(null)}><GripVertical size={15} /></span>
                   <div className="kb-card-tools">
-                    <button className={`kb-card-urgent icon-btn ${card.urgent ? 'on' : ''}`} title={card.urgent ? 'Unmark urgent' : 'Mark urgent'}
-                      onClick={() => toggleUrgent(col.id, card.id)}><AlertTriangle size={14} /></button>
-                    <button className="kb-card-color icon-btn" title="Card colour"
-                      onClick={() => setColorEditFor((v) => (v === card.id ? null : card.id))}>
-                      <span className="kb-color-dot" style={{ background: cc ? cc.fg : 'transparent', borderColor: cc ? cc.fg : 'var(--text-faint)' }} />
-                    </button>
-                    <button className="kb-card-del icon-btn" title="Delete card" onClick={() => removeCard(col.id, card.id)}><X size={14} /></button>
+                    <Menu
+                      align="right"
+                      title={card.title || 'Card'}
+                      trigger={<button className="icon-btn kb-card-menu" title="Card options" aria-label="Card options"><MoreHorizontal size={16} /></button>}
+                      items={cardMenu(col, card, idx)}
+                    />
                   </div>
                   {card.urgent && <span className="kb-urgent-badge"><AlertTriangle size={11} /> Urgent</span>}
                   {colorEditFor === card.id && (
@@ -196,10 +247,8 @@ export default function TodoBoard() {
                       })}
                     </div>
                   )}
-                  {tagEditFor === card.id ? (
+                  {tagEditFor === card.id && (
                     <TagComposer onAdd={(label, color) => addTag(col.id, card.id, label, color)} onClose={() => setTagEditFor(null)} />
-                  ) : (
-                    <button className="kb-tag-add" onClick={() => setTagEditFor(card.id)}><TagIcon size={12} /> Add tag</button>
                   )}
                 </div>
                 );
@@ -213,7 +262,7 @@ export default function TodoBoard() {
         <button className="kb-add-col" onClick={addColumn}><Plus size={16} /> Add list</button>
       </div>
 
-      {total === 0 && <div className="hint" style={{ marginTop: 16 }}>Add a card to a list, then drag it across lists to track progress.</div>}
+      {total === 0 && <div className="hint" style={{ marginTop: 16 }}>Add a card to a list, then drag it (or use its ⋯ menu) to move it across lists.</div>}
       {dialog}
     </div>
   );

@@ -6,7 +6,7 @@ import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
 import EditDetailsModal from '../components/EditDetailsModal.jsx';
 import LogoOptionsModal from '../components/LogoOptionsModal.jsx';
-import { coverAspect } from '../lib/types.js';
+import { coverAspect, setLastTab } from '../lib/types.js';
 
 // Per-type bodies + the (heavy, imaging-backed) thumbnail studio are split into
 // their own chunks — opening a colour project doesn't pull the branding/logo
@@ -38,7 +38,7 @@ export default function ProjectDetail() {
     setProject(null);
     setError(null);
     api.get(id)
-      .then((p) => { if (alive) setProject(p); })
+      .then((p) => { if (alive) { setProject(p); setLastTab(p.type); } })
       .catch((e) => { if (alive) setError(e.message); });
     return () => { alive = false; };
   }, [id]);

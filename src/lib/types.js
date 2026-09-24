@@ -13,6 +13,28 @@ export const TABS = [
 ];
 
 export const TYPE_KEYS = TABS.map((t) => t.key);
+
+// The Reference section a path belongs to — matched by whole path segment, so
+// "/logonogo" is Logo No Go, not Logos. Detail pages (/project/…, /gallery/…)
+// fall back to the section you last opened.
+// Remember the Reference section the user is in (detail pages report theirs
+// once loaded) and tell the sidebar / top bar to re-render.
+export function setLastTab(key) {
+  if (!TABS.some((t) => t.key === key)) return;
+  try {
+    if (sessionStorage.getItem('lastTab') === key) return;
+    sessionStorage.setItem('lastTab', key);
+  } catch { return; }
+  window.dispatchEvent(new Event('lasttab'));
+}
+
+export function activeTab(pathname) {
+  const hit = TABS.find((t) => pathname === `/${t.key}` || pathname.startsWith(`/${t.key}/`));
+  if (hit) return hit.key;
+  let last = null;
+  try { last = sessionStorage.getItem('lastTab'); } catch { /* storage blocked */ }
+  return TABS.some((t) => t.key === last) ? last : 'branding';
+}
 export const isType = (t) => TYPE_KEYS.includes(t);
 
 // "Work" mode (the counterpart to Reference mode) is the default mode. It opens

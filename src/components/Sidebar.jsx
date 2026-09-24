@@ -1,10 +1,11 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  Search, Plus, PanelLeftClose, Trash2, Settings,
+  Search, Plus, PanelLeftClose, Trash2, Settings, X,
   FileText, Film, Square, CreditCard, Palette, Images, Type, PencilRuler, FlaskConical,
   LayoutDashboard, ListTodo, Ban, AppWindow,
 } from 'lucide-react';
-import { TABS, WORK_TABS, isWorkPath } from '../lib/types.js';
+import { TABS, WORK_TABS, isWorkPath, setLastTab } from '../lib/types.js';
+import { useActiveTab } from '../lib/useActiveTab.js';
 import ModeToggle from './ModeToggle.jsx';
 import StorageMeter from './StorageMeter.jsx';
 import logoWide from '../../logo_wide_dark.svg';
@@ -15,27 +16,31 @@ const ICON = {
 };
 const WORK_ICON = { dashboard: LayoutDashboard, plan: PencilRuler, software: AppWindow, board: ListTodo, logotester: FlaskConical };
 
-/** Notion-style desktop sidebar holding everything the header carries. */
-export default function Sidebar({ onAdd, onSearch, onToggle }) {
+/**
+ * Notion-style sidebar holding all navigation. Docked on desktop (collapsible);
+ * below the desktop breakpoint the same sidebar slides in as a drawer
+ * (`drawer`), opened from the top bar's menu button.
+ */
+export default function Sidebar({ onAdd, onSearch, onToggle, drawer = false, open = false }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const workMode = isWorkPath(pathname);
   const onPlan = pathname === '/plan' || pathname.startsWith('/plan/');
   const onTrash = pathname === '/trash';
   const onSettings = pathname === '/settings';
-  const active = TABS.find((t) => pathname.startsWith(`/${t.key}`))?.key
-    || sessionStorage.getItem('lastTab') || 'branding';
+  const active = useActiveTab(pathname);
 
-  const go = (key) => { sessionStorage.setItem('lastTab', key); navigate(`/${key}`); };
+  const go = (key) => { setLastTab(key); navigate(`/${key}`); };
   const showAdd = !onTrash && (!workMode || onPlan); // nothing to "add" on the Logo Tester
 
   return (
-    <aside className="sidebar">
+    // A closed drawer is off-screen; `inert` keeps it out of tab order too.
+    <aside className={`sidebar ${drawer ? 'is-drawer' : ''}`} {...(drawer && !open ? { inert: '' } : {})} aria-label="Navigation">
       <div className="sb-inner">
         <div className="sb-brand">
           <img className="sb-logo" src={logoWide} alt="Design Reference" />
-          <button className="sb-collapse icon-btn" onClick={onToggle} title="Collapse sidebar" aria-label="Collapse sidebar">
-            <PanelLeftClose size={17} />
+          <button className="sb-collapse icon-btn" onClick={onToggle} title={drawer ? 'Close menu' : 'Collapse sidebar'} aria-label={drawer ? 'Close menu' : 'Collapse sidebar'}>
+            {drawer ? <X size={18} /> : <PanelLeftClose size={17} />}
           </button>
         </div>
 
@@ -70,7 +75,7 @@ export default function Sidebar({ onAdd, onSearch, onToggle }) {
 
         {showAdd && (
           <button className="sb-add" onClick={() => onAdd(active)}>
-            <Plus size={16} /> <span>{workMode ? 'New plan' : 'Add Work'}</span>
+            <Plus size={16} /> <span>{workMode ? 'New plan' : 'Add project'}</span>
           </button>
         )}
 

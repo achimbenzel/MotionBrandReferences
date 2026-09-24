@@ -7,7 +7,7 @@ import Menu from '../components/Menu.jsx';
 import ProjectCard from '../components/ProjectCard.jsx';
 import GalleryPicker from '../components/GalleryPicker.jsx';
 import GalleryNameModal from '../components/GalleryNameModal.jsx';
-import { TABS } from '../lib/types.js';
+import { TABS, setLastTab } from '../lib/types.js';
 
 export default function GalleryDetail() {
   const { id } = useParams();
@@ -25,7 +25,7 @@ export default function GalleryDetail() {
     api.getGallery(id)
       .then(async (g) => {
         if (!alive) return;
-        setGallery(g);
+        setGallery(g); setLastTab(g.type);
         const p = await api.list(g.type);
         if (alive) setProjects(p);
       })

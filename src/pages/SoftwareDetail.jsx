@@ -4,10 +4,11 @@ import {
   ArrowLeft, Trash2, Pencil, MoreHorizontal, Plus, X, Check, Play,
   Puzzle, Braces, Youtube, ExternalLink, Copy, Eye, EyeOff, UploadCloud,
   Paperclip, Download, Image as ImageIcon, Camera, Circle, ChevronDown, ChevronRight,
-  ArrowUp, ArrowDown,
+  ArrowUp, ArrowDown, LayoutGrid, List as ListIcon, KeyRound,
 } from 'lucide-react';
 import { api, softwareFileUrl } from '../lib/api.js';
 import { useSaver, useRefreshOnReturn } from '../lib/autosave.js';
+import { PHONE } from '../lib/useMedia.js';
 import { CURRENCIES, currencySymbol, normalizeUrl, TAG_COLORS, tagColor, PLAN_GRADIENTS, gradientCss, youtubeThumb } from '../lib/types.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
@@ -55,6 +56,13 @@ export default function SoftwareDetail() {
   const [emojiInput, setEmojiInput] = useState('');
   const [confirm, setConfirm] = useState(null); // { title, message, confirmLabel, danger, onConfirm }
   const softRef = useRef(null); softRef.current = soft;
+  // Plugins as cards (with preview images) or as a compact list — remembered
+  // per browser; phones default to the list.
+  const [pluginView, setPluginViewState] = useState(() => {
+    try { const v = localStorage.getItem('pluginView'); if (v === 'list' || v === 'cards') return v; } catch { /* ignore */ }
+    return window.matchMedia?.(PHONE).matches ? 'list' : 'cards';
+  });
+  const setPluginView = (v) => { setPluginViewState(v); try { localStorage.setItem('pluginView', v); } catch { /* ignore */ } };
   const pending = useRef({});
   const saver = useSaver();
   const bannerRef = useRef(null);
@@ -246,6 +254,12 @@ export default function SoftwareDetail() {
       {!editingPlugin && !editingTutorial && (
         <div className="soft-toolbar">
           <input className="input soft-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${tab === 'plugins' ? 'plugins' : tab}…`} />
+          {tab === 'plugins' && (
+            <div className="seg-toggle" role="group" aria-label="View">
+              <button className={pluginView === 'cards' ? 'on' : ''} onClick={() => setPluginView('cards')} title="Cards" aria-label="Show as cards"><LayoutGrid size={15} /></button>
+              <button className={pluginView === 'list' ? 'on' : ''} onClick={() => setPluginView('list')} title="List" aria-label="Show as list"><ListIcon size={15} /></button>
+            </div>
+          )}
           {tab === 'plugins' && <button className="btn btn-sm btn-primary" onClick={addPlugin}><Plus size={15} /> Add plugin</button>}
           {tab === 'expressions' && <button className="btn btn-sm btn-primary" onClick={addGroup}><Plus size={15} /> Add group</button>}
           {tab === 'tutorials' && <button className="btn btn-sm btn-primary" onClick={addTutorial}><Plus size={15} /> Add tutorial</button>}
@@ -265,7 +279,17 @@ export default function SoftwareDetail() {
           onDone={() => { flush(); setEditingId(null); }}
         />
       ) : (
-        plugins.length ? (
+        plugins.length ? (pluginView === 'list' ? (
+          <div className="prow-list">
+            <div className="prow prow-head" aria-hidden="true">
+              <span /><span>Name</span><span className="prow-cat-col">Category</span><span className="prow-price">Price</span><span />
+            </div>
+            {plugins.map((p) => (
+              <PluginRow key={p.id} soft={soft} plugin={p}
+                onOpen={() => setEditingId(p.id)} onDelete={() => delPlugin(p)} onDownload={() => askDownload(p)} />
+            ))}
+          </div>
+        ) : (
           <div className="pcard-grid">
             {plugins.map((p) => (
               <PluginCard key={p.id} soft={soft} plugin={p}
@@ -273,7 +297,7 @@ export default function SoftwareDetail() {
             ))}
             <button className="pcard-add" onClick={addPlugin}><Plus size={22} /><span>Add plugin</span></button>
           </div>
-        ) : <Empty icon={Puzzle} text={ql ? 'No plugins match your search.' : 'No plugins yet. Add one — a bought plugin or your own script.'} />
+        )) : <Empty icon={Puzzle} text={ql ? 'No plugins match your search.' : 'No plugins yet. Add one — a bought plugin or your own script.'} />
       ))}
 
       {/* ---- Expressions (grouped, colour-markable) ---- */}
@@ -405,6 +429,43 @@ function PluginCard({ soft, plugin: p, onOpen, onDelete, onDownload }) {
       {p.file && (
         <button className="btn btn-sm pcard-dl" onClick={onDownload}><Download size={14} /> Download</button>
       )}
+    </div>
+  );
+}
+
+/** One plugin as a compact list row (name, category, price, key/file markers). */
+function PluginRow({ soft, plugin: p, onOpen, onDelete, onDownload }) {
+  const imgUrl = p.image ? softwareFileUrl(soft.id, p.image) : null;
+  const col = catColor(p.category);
+  const price = parseFloat(String(p.price || '').replace(',', '.'));
+  const sub = [p.version && `v${p.version}`, p.size ? fmtBytes(p.size) : null].filter(Boolean).join(' · ');
+  return (
+    <div className="prow" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(); }}>
+      <span className="prow-thumb">{imgUrl ? <img src={imgUrl} alt="" loading="lazy" /> : <Puzzle size={16} />}</span>
+      <span className="prow-main">
+        <span className="prow-name">
+          {p.name || 'Untitled plugin'}
+          {p.key && <KeyRound size={12} className="prow-flag" aria-label="Has a license key" />}
+          {p.file && <Download size={12} className="prow-flag" aria-label="Has a file" />}
+        </span>
+        {(sub || p.category) && (
+          <span className="prow-sub">
+            {p.category && <span className="pcard-cat prow-cat-inline" style={{ background: col.bg, color: col.fg }}>{p.category}</span>}
+            {sub}
+          </span>
+        )}
+      </span>
+      <span className="prow-cat-col">{p.category && <span className="pcard-cat" style={{ background: col.bg, color: col.fg }}>{p.category}</span>}</span>
+      <span className="prow-price">{Number.isFinite(price) && price > 0 ? `${currencySymbol(p.currency)} ${p.price}` : '—'}</span>
+      <span className="prow-menu" onClick={(e) => e.stopPropagation()}>
+        <Menu align="right" title={p.name || 'Plugin'} trigger={<button className="icon-btn prow-menu-btn" title="More" aria-label="More"><MoreHorizontal size={16} /></button>}
+          items={[
+            { label: 'Edit', icon: <Pencil size={15} />, onClick: onOpen },
+            ...(p.file ? [{ label: 'Download', icon: <Download size={15} />, onClick: onDownload }] : []),
+            { separator: true },
+            { label: 'Delete', icon: <Trash2 size={15} />, danger: true, onClick: onDelete },
+          ]} />
+      </span>
     </div>
   );
 }

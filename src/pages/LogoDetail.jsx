@@ -5,6 +5,7 @@ import { useToast } from '../components/Toast.jsx';
 import TagInput from '../components/TagInput.jsx';
 import Lightbox from '../components/Lightbox.jsx';
 import NotesField from '../components/NotesField.jsx';
+import DetailLayout from '../components/DetailLayout.jsx';
 import LogoImage from '../components/LogoImage.jsx';
 import LogoSwitcher from '../components/LogoSwitcher.jsx';
 import { logoSource, logoRenditionList, logoActive, logoScale } from '../lib/types.js';
@@ -31,7 +32,18 @@ export default function LogoDetail({ project, setProject }) {
   };
 
   return (
-    <div>
+    <DetailLayout
+      side={(
+        <>
+          <div className="section">
+            <div className="section-head"><h2><Tag size={16} /> Tags</h2></div>
+            <TagInput tags={project.tags || []} onChange={saveTags} placeholder="Add a tag…" />
+          </div>
+
+          <NotesField project={project} setProject={setProject} />
+        </>
+      )}
+    >
       <figure className={`logo-stage ${transparent ? 'checker' : ''}`} style={{ ...(transparent ? {} : { background: active?.bg || '#FFFFFF' }), maxWidth: 640, margin: '0 auto' }}
         onClick={() => url && setLightbox(true)} title="Fullscreen">
         {url ? <LogoImage url={url} rendition={active?.color || 'original'} scalePct={scale * 100} alt={project.title} />
@@ -44,16 +56,10 @@ export default function LogoDetail({ project, setProject }) {
         <LogoSwitcher url={url} renditions={renditions} selected={active} onSelect={choose} />
       )}
 
-      <div className="section">
-        <div className="section-head"><h2><Tag size={16} /> Tags</h2></div>
-        <TagInput tags={project.tags || []} onChange={saveTags} placeholder="Add a tag…" />
-      </div>
-
-      <NotesField project={project} setProject={setProject} />
 
       {lightbox && url && (
         <Lightbox items={[{ src: url, caption: project.title }]} index={0} onIndex={() => {}} onClose={() => setLightbox(false)} />
       )}
-    </div>
+    </DetailLayout>
   );
 }

@@ -5,6 +5,7 @@ import { normalizeUrl, hostOf } from '../lib/types.js';
 import { useToast } from '../components/Toast.jsx';
 import TagInput from '../components/TagInput.jsx';
 import NotesField from '../components/NotesField.jsx';
+import DetailLayout from '../components/DetailLayout.jsx';
 
 /** Detail for a "Fonts" entry — a link to a website for free fonts. */
 export default function FontDetail({ project, setProject }) {
@@ -18,7 +19,18 @@ export default function FontDetail({ project, setProject }) {
   };
 
   return (
-    <div>
+    <DetailLayout
+      side={(
+        <>
+          <div className="section">
+            <div className="section-head"><h2><Tag size={16} /> Tags</h2></div>
+            <TagInput tags={project.tags || []} onChange={saveTags} placeholder="Add a tag…" />
+          </div>
+
+          <NotesField project={project} setProject={setProject} />
+        </>
+      )}
+    >
       {href ? (
         <a className="font-visit" href={href} target="_blank" rel="noopener noreferrer">
           {shot ? (
@@ -49,12 +61,6 @@ export default function FontDetail({ project, setProject }) {
         </div>
       )}
 
-      <div className="section">
-        <div className="section-head"><h2><Tag size={16} /> Tags</h2></div>
-        <TagInput tags={project.tags || []} onChange={saveTags} placeholder="Add a tag…" />
-      </div>
-
-      <NotesField project={project} setProject={setProject} />
-    </div>
+    </DetailLayout>
   );
 }

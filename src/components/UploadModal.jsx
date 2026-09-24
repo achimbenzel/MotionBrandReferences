@@ -5,6 +5,7 @@ import { captureFrame, lengthTag, fmtTime } from '../lib/media.js';
 import { renderPdfPage, cropToBlob, centerCover, extractPalette } from '../lib/imaging.js';
 import { expandColor } from '../lib/color.js';
 import { CARD_SIZES, cardSizeAspect, coverAspect, DEFAULT_RENDITIONS } from '../lib/types.js';
+import { isTouch } from '../lib/useMedia.js';
 import { useToast } from './Toast.jsx';
 import TagInput from './TagInput.jsx';
 import ColorBuilder from './ColorBuilder.jsx';
@@ -277,7 +278,7 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget && !saving) onClose(); }}>
       <div className="modal" role="dialog" aria-modal="true">
         <div className="modal-head">
-          <h2>Add new work</h2>
+          <h2>Add project</h2>
           <button className="icon-btn" onClick={onClose} disabled={saving} aria-label="Close"><X size={18} /></button>
         </div>
 
@@ -300,7 +301,7 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
             <>
               <div className="field">
                 <label>Title</label>
-                <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Project name" autoFocus />
+                <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Project name" autoFocus={!isTouch()} />
               </div>
               <div className="row-2">
                 <div className="field">

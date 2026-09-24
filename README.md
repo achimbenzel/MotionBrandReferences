@@ -71,7 +71,9 @@ sudo tailscale serve --bg 4300               # → https://<machine>.<tailnet>.t
 ```
 
 Then open `https://<machine>.<tailnet>.ts.net` from any device logged into your
-Tailscale account. The app doesn't gzip its responses itself; if you want
+Tailscale account. On a phone, use **Share → Add to Home Screen** (iOS) or
+**Install app** (Android/Chrome): the app then starts full-screen from its own
+icon, like a native app. The app doesn't gzip its responses itself; if you want
 smaller mobile payloads (the initial JS is ~290 KB raw, ~90 KB gzipped), put
 Caddy in between (`encode zstd gzip` + `reverse_proxy 127.0.0.1:4300`) and point
 `tailscale serve` at Caddy instead.
@@ -257,9 +259,12 @@ Tester** — each opening its tool, plus a **Recent plans** row.
 A general **Kanban planner**. Lists (columns) hold **cards**; add lists and
 cards, rename them inline, give cards **coloured tags**, tint a whole card in
 one of the same colours, and **drag cards** (via the grip handle) within a list
-or across lists to track progress. On desktop the board uses the **full width**,
-so extra lists run past the usual content margins. Everything auto-saves to one
-global board.
+or across lists to track progress. Each card's **⋯ menu** does the same without
+dragging — **Move to “…”** any list, move up / down, mark urgent, colour, add a
+tag, delete — which is how cards move on touch screens. On desktop the board
+uses the **full width**, so extra lists run past the usual content margins; on
+a phone every list is a full-width, swipeable page with **list tabs** above to
+jump between them. Everything auto-saves to one global board.
 
 ### Plans
 Plan new projects. The **+** creates a new plan; plans are listed
@@ -310,7 +315,9 @@ an emoji, and it opens a page with four tabs, each searchable:
   **account**, **license key / serial**, **price + currency**, version,
   purchase date, notes and an optional **installer file**. The key is **masked**
   by default with show / **copy**; the header sums your **total spend** per
-  currency.
+  currency. Switch between **cards** (with preview images) and a compact
+  **list** (name, category, price — a little database table); the choice is
+  remembered, and phones start with the list.
 - **Scripts** — upload your **own scripts / plugins** (`.jsx`, `.ffx`, `.zip`…)
   with a name and note, and download them again.
 - **Expressions** — a snippet library: title + code (monospace) + tags, with a
@@ -429,7 +436,7 @@ export / import the library or open the Trash; usage is the real summed size of
 everything under `data/`, cached briefly and recomputed whenever the library
 changes so the meter never rescans the whole tree on every poll.
 
-### Navigation: sidebar (desktop) & header (mobile)
+### Navigation: sidebar (desktop) & drawer (phone / tablet)
 On **desktop** the app uses a **Notion-style left sidebar** that holds
 everything: the **logo** and a collapse button at the top, search (⌘K) below
 it, the Work / Reference toggle, the section list (with icons, current one
@@ -439,11 +446,22 @@ the storage meter. In **Work** mode the section list is **Dashboard**,
 The collapse button **slides** the sidebar out for a full-width canvas; a small
 floating button slides it back in, and the collapsed state is remembered.
 
-On **narrow / mobile** widths the sidebar gives way to the original floating
-**header**: the section tabs collapse into a **hamburger menu** (current one
-checked), with search, add and the storage pill alongside. In **Work** mode the
-tabs become **Dashboard** / **Plans** / **Software** / **To-Dos** / **Logo Tester** and **Add**
-creates a new plan.
+Below 900 px (phones, tablets) the **same sidebar** becomes a **drawer**: a
+slim top bar shows **☰**, the page title, search and add; ☰ slides the sidebar
+in with everything above (both modes, Settings, Trash, storage). The top bar
+hides while you scroll down and returns when you scroll up.
+
+On **touch screens**:
+- menus (⋯, Edit, Export…) open as **bottom sheets** with big rows, and
+  dialogs (Add project, Edit details…) slide up from the bottom with **Save**
+  always in reach;
+- every control that appears on mouse-hover on desktop (block menus, Add block,
+  banner / avatar change, image ⋯ menus, delete buttons) is always visible;
+- input fields use 16 px text so iPhones don't zoom in when you tap them;
+- grids show **two columns**, filter chips are one swipeable row.
+
+On desktop, block menus and “Add block” stay faintly visible instead of
+appearing only on hover, and **Tab** shows a clear focus ring for keyboard use.
 
 A project's detail page has **Previous / Next** buttons at the foot (and the
 **← / →** arrow keys) to step through the other projects in the same section
@@ -453,7 +471,11 @@ without going back to the grid; stepping past the last one wraps to the first.
 - **Zoom any image:** the fullscreen viewer (Motion frames, Branding images,
   Logos, moodboards, galleries, …) zooms with the **mouse wheel** toward the
   cursor, **drag** to pan, and **double-click** to toggle; a reset badge shows
-  the current level.
+  the current level. On touch screens: **swipe** left / right to browse,
+  **pinch** to zoom, **double-tap** to toggle zoom, **swipe down** to close.
+  PDFs turn pages with a swipe, too.
+- **Wide screens** (≥ 1280 px) show a project's **tags and notes beside** the
+  work (sticky) instead of below it.
 - **Crop & zoom the cover:** when you set a thumbnail — a Motion frame, a
   Branding PDF page or image, a Color image, or a Font screenshot — drag to
   reposition and use the zoom slider to frame exactly what shows on the card.

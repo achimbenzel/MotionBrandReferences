@@ -8,6 +8,7 @@ import ContrastChecker from '../components/ContrastChecker.jsx';
 import TagInput from '../components/TagInput.jsx';
 import Lightbox from '../components/Lightbox.jsx';
 import NotesField from '../components/NotesField.jsx';
+import DetailLayout from '../components/DetailLayout.jsx';
 import Menu from '../components/Menu.jsx';
 import { extractPalette } from '../lib/imaging.js';
 import { expandColor, paletteToCss, paletteToJson, paletteToTailwind } from '../lib/color.js';
@@ -76,7 +77,18 @@ export default function ColorDetail({ project, setProject }) {
   };
 
   return (
-    <div>
+    <DetailLayout
+      side={(
+        <>
+          <div className="section">
+            <div className="section-head"><h2><Tag size={16} /> Tags</h2></div>
+            <TagInput tags={project.tags || []} onChange={saveTags} placeholder="Add a tag…" />
+          </div>
+
+          <NotesField project={project} setProject={setProject} />
+        </>
+      )}
+    >
       {project.example && (
         <figure className="media-frame" onClick={() => setLightbox(true)} title="Click to view fullscreen">
           <img src={fileUrl(project, project.example)} alt="example" />
@@ -138,12 +150,6 @@ export default function ColorDetail({ project, setProject }) {
         />
       </div>
 
-      <div className="section">
-        <div className="section-head"><h2><Tag size={16} /> Tags</h2></div>
-        <TagInput tags={project.tags || []} onChange={saveTags} placeholder="Add a tag…" />
-      </div>
-
-      <NotesField project={project} setProject={setProject} />
 
       {lightbox && project.example && (
         <Lightbox
@@ -153,6 +159,6 @@ export default function ColorDetail({ project, setProject }) {
           onClose={() => setLightbox(false)}
         />
       )}
-    </div>
+    </DetailLayout>
   );
 }

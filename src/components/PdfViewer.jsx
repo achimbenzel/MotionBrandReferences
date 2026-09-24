@@ -12,6 +12,8 @@ export default function PdfViewer({ url }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isFs, setIsFs] = useState(false);
+  const [aspect, setAspect] = useState(null); // first page's width / height — sizes the stage
+  const swipeRef = useRef(null);
 
   // Wrap-around page navigation (last → first, first → last).
   const goPage = useCallback((d) => setPage((p) => (numPages ? ((p - 1 + d + numPages) % numPages) + 1 : 1)), [numPages]);
@@ -26,8 +28,15 @@ export default function PdfViewer({ url }) {
       task.promise.then((pdf) => {
         if (cancelled) { pdf.destroy(); return; }
         pdfRef.current = pdf;
-        setNumPages(pdf.numPages);
-        setLoading(false);
+        pdf.getPage(1).then((p) => {
+          if (cancelled) return;
+          const v = p.getViewport({ scale: 1 });
+          setAspect(v.width / v.height);
+        }).catch(() => {}).finally(() => {
+          if (cancelled) return;
+          setNumPages(pdf.numPages);
+          setLoading(false);
+        });
       }).catch((e) => { if (!cancelled) { setError(e.message); setLoading(false); } });
     }).catch((e) => { if (!cancelled) { setError(e.message); setLoading(false); } });
     return () => {
@@ -48,10 +57,12 @@ export default function PdfViewer({ url }) {
       const pdfPage = await pdf.getPage(num);
       const unscaled = pdfPage.getViewport({ scale: 1 });
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      // Fit the page inside the fixed-size stage (both width and height) so the
-      // stage never changes size — the side arrows stay put.
-      const availW = stage.clientWidth - (pdf.numPages > 1 ? 108 : 32);
-      const availH = stage.clientHeight - 24;
+      // Fit the page inside the stage (both width and height); the stage keeps
+      // the first page's proportions, so the side arrows stay put. On narrow
+      // stages the arrows float over the page instead of taking room beside it.
+      const narrow = stage.clientWidth < 600;
+      const availW = stage.clientWidth - (narrow ? 16 : (pdf.numPages > 1 ? 108 : 32));
+      const availH = stage.clientHeight - (narrow ? 16 : 24);
       const cssScale = Math.min(availW / unscaled.width, availH / unscaled.height);
       const scale = Math.max(0.15, cssScale) * dpr;
       const viewport = pdfPage.getViewport({ scale });
@@ -89,6 +100,15 @@ export default function PdfViewer({ url }) {
     return () => document.removeEventListener('fullscreenchange', onFs);
   }, [page, numPages, loading, renderPage]);
 
+  // Touch: swipe the page left / right to turn it.
+  const onPointerDown = (e) => { if (e.pointerType !== 'mouse') swipeRef.current = { x: e.clientX, y: e.clientY }; };
+  const onPointerUp = (e) => {
+    const s0 = swipeRef.current; swipeRef.current = null;
+    if (!s0 || numPages < 2) return;
+    const dx = e.clientX - s0.x; const dy = e.clientY - s0.y;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) goPage(dx < 0 ? 1 : -1);
+  };
+
   // Arrow-key navigation (also wraps).
   useEffect(() => {
     const onKey = (e) => {
@@ -101,7 +121,9 @@ export default function PdfViewer({ url }) {
 
   return (
     <div className="pdf-viewer">
-      <div className={`pdf-stage ${isFs ? 'is-fs' : ''}`} ref={stageRef}>
+      <div className={`pdf-stage ${isFs ? 'is-fs' : ''}`} ref={stageRef}
+        style={aspect && !isFs ? { '--pdf-aspect': aspect } : undefined}
+        onPointerDown={onPointerDown} onPointerUp={onPointerUp} onPointerCancel={() => { swipeRef.current = null; }}>
         {loading && <Loader2 size={26} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-faint)' }} />}
         {error && <div className="center-msg">Couldn’t render PDF: {error}</div>}
         <canvas ref={canvasRef} style={{ display: loading || error ? 'none' : 'block' }} />

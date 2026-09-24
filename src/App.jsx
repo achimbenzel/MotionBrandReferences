@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 import { ToastProvider, useToast } from './components/Toast.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { PanelLeft } from 'lucide-react';
-import Header from './components/Header.jsx';
+import MobileBar from './components/MobileBar.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import UploadModal from './components/UploadModal.jsx';
 import CommandPalette from './components/CommandPalette.jsx';
@@ -25,6 +25,7 @@ const TrashPage = lazy(() => import('./pages/TrashPage.jsx'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage.jsx'));
 import { TABS, isWorkPath, WORK_HOME } from './lib/types.js';
 import { api } from './lib/api.js';
+import { useMediaQuery, DESKTOP } from './lib/useMedia.js';
 
 function Shell() {
   const [modalType, setModalType] = useState(null); // null = closed
@@ -37,6 +38,20 @@ function Shell() {
   const location = useLocation();
   const toast = useToast();
   const workMode = isWorkPath(location.pathname);
+  const isDesktop = useMediaQuery(DESKTOP);
+  const [drawer, setDrawer] = useState(false); // phone / tablet: sidebar slid in
+
+  // The drawer closes on navigation and when switching to the desktop layout;
+  // while open, the page behind it doesn't scroll and Esc closes it.
+  useEffect(() => { setDrawer(false); }, [location.pathname, isDesktop]);
+  useEffect(() => {
+    if (!drawer) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e) => { if (e.key === 'Escape') setDrawer(false); };
+    window.addEventListener('keydown', onKey);
+    return () => { document.body.style.overflow = prev; window.removeEventListener('keydown', onKey); };
+  }, [drawer]);
 
   const openModal = useCallback((type) => setModalType(type || 'branding'), []);
   const closeModal = useCallback(() => setModalType(null), []);
@@ -69,17 +84,25 @@ function Shell() {
     } catch (e) { toast(`Could not create plan: ${e.message}`, 'error'); }
   }, [navigate, toast]);
 
-  const onAdd = workMode ? createPlan : openModal;
+  const onAdd = (key) => { setDrawer(false); (workMode ? createPlan : openModal)(key); };
+  const openSearch = () => { setDrawer(false); setPaletteOpen(true); };
   const wide = location.pathname === '/board'; // the board uses the full desktop width
 
   return (
     <StorageProvider refreshKey={reloadKey}>
-    <div className="app" data-sidebar={collapsed ? 'collapsed' : 'open'}>
-      <Sidebar onAdd={onAdd} onSearch={() => setPaletteOpen(true)} onToggle={() => setCollapsed((c) => !c)} />
+    <div className="app" data-sidebar={collapsed ? 'collapsed' : 'open'} data-drawer={drawer ? 'open' : 'closed'}>
+      <Sidebar
+        onAdd={onAdd}
+        onSearch={openSearch}
+        onToggle={isDesktop ? () => setCollapsed((c) => !c) : () => setDrawer(false)}
+        drawer={!isDesktop}
+        open={drawer}
+      />
+      {!isDesktop && <div className="drawer-backdrop" onClick={() => setDrawer(false)} aria-hidden="true" />}
       <button className="sb-reopen icon-btn" onClick={() => setCollapsed(false)} title="Open sidebar" aria-label="Open sidebar">
         <PanelLeft size={17} />
       </button>
-      <Header onAdd={onAdd} onSearch={() => setPaletteOpen(true)} />
+      <MobileBar onMenu={() => setDrawer(true)} onSearch={openSearch} onAdd={onAdd} />
       <main className="main">
         <div className={`main-inner${wide ? ' wide' : ''}`}>
           <ErrorBoundary>

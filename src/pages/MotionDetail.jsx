@@ -8,6 +8,7 @@ import TagInput from '../components/TagInput.jsx';
 import Menu from '../components/Menu.jsx';
 import Lightbox from '../components/Lightbox.jsx';
 import NotesField from '../components/NotesField.jsx';
+import DetailLayout from '../components/DetailLayout.jsx';
 
 const rid = () => Math.random().toString(36).slice(2, 8);
 
@@ -195,7 +196,21 @@ export default function MotionDetail({ project, setProject }) {
   const lightboxItems = frames.map((f) => ({ src: fileUrl(project, f.file), caption: fmtTime(f.t) }));
 
   return (
-    <div>
+    <DetailLayout
+      side={(
+        <>
+          {/* Tags */}
+          <div className="section">
+            <div className="section-head"><h2><TagIcon size={16} /> Tags</h2></div>
+            <TagInput tags={project.tags || []} onChange={saveTags} autoTags={autoLen ? [autoLen] : []} placeholder="Add a tag…" />
+            <div className="hint" style={{ marginTop: 8 }}>The length tag <b>{autoLen}</b> is added automatically and used for filtering.</div>
+          </div>
+
+          {/* Notes */}
+          <NotesField project={project} setProject={setProject} />
+        </>
+      )}
+    >
       <div className="player-wrap">
         <video
           ref={videoRef}
@@ -255,15 +270,6 @@ export default function MotionDetail({ project, setProject }) {
         </span>
       </div>
 
-      {/* Tags */}
-      <div className="section">
-        <div className="section-head"><h2><TagIcon size={16} /> Tags</h2></div>
-        <TagInput tags={project.tags || []} onChange={saveTags} autoTags={autoLen ? [autoLen] : []} placeholder="Add a tag…" />
-        <div className="hint" style={{ marginTop: 8 }}>The length tag <b>{autoLen}</b> is added automatically and used for filtering.</div>
-      </div>
-
-      {/* Notes */}
-      <NotesField project={project} setProject={setProject} />
 
       {/* Frames */}
       <div className="section">
@@ -327,6 +333,6 @@ export default function MotionDetail({ project, setProject }) {
       {lightbox && (
         <Lightbox items={lightboxItems} index={selClamped} onIndex={setSel} onClose={() => setLightbox(false)} />
       )}
-    </div>
+    </DetailLayout>
   );
 }
