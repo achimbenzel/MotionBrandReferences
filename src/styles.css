@@ -781,8 +781,49 @@ img { max-width: 100%; display: block; }
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
   padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
 }
-.pref-title { font-weight: 600; }
-.pref-sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+.pref-title { font-weight: 600; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pref-sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; line-height: 1.45; }
+.pref-sub code { font-size: 12px; background: var(--surface-3); padding: 1px 5px; border-radius: 5px; }
+.pref-row-top { align-items: flex-start; }
+/* Dashboard: one-line notice (e.g. a data-format update is available). */
+.dash-notice {
+  display: flex; align-items: center; gap: 10px; width: 100%; margin: 0 0 18px; padding: 11px 14px;
+  border: 1px solid rgba(255, 207, 110, 0.25); border-radius: 12px; background: rgba(255, 207, 110, 0.07);
+  color: var(--text-muted); font: inherit; font-size: 14px; text-align: left; cursor: pointer;
+}
+.dash-notice:hover { border-color: rgba(255, 207, 110, 0.45); }
+.dash-notice > svg:first-child { color: #ffcf6e; flex-shrink: 0; }
+.dash-notice > svg:last-child { margin-left: auto; flex-shrink: 0; }
+.dash-notice b { color: var(--text); font-weight: 600; }
+
+.pref-main { min-width: 0; flex: 1; }
+.pref-actions { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+.pref-badge {
+  display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700;
+  padding: 2px 8px; border-radius: 999px; letter-spacing: .02em;
+}
+.pref-badge.ok { color: var(--accent); background: var(--accent-dim); }
+.pref-badge.warn { color: #ffcf6e; background: rgba(255, 207, 110, 0.12); }
+.pref-result { display: flex; align-items: center; gap: 6px; margin-top: 8px; color: var(--accent); }
+.maint-changes { margin: 8px 0 0; padding-left: 18px; font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+.maint-changes b { color: var(--text); }
+.maint-toggle {
+  display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; padding: 0;
+  background: none; border: 0; color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.maint-files {
+  list-style: none; margin: 8px 0 0; padding: 8px 10px; max-height: 220px; overflow: auto;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--text-muted);
+}
+.maint-files li { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; }
+.maint-files li span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.maint-files li span:last-child { flex-shrink: 0; color: var(--text-faint); }
+.maint-files li.more { color: var(--text-faint); }
+@media (max-width: 560px) {
+  .pref-row { flex-direction: column; align-items: stretch; }
+  .pref-actions { justify-content: flex-start; }
+}
 
 /* Logo No Go — a warning banner above the image on the detail page. */
 .nogo-banner {

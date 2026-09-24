@@ -8,6 +8,7 @@ import {
   Minus, Table as TableIcon, Wand2, Copy, FileText, AlertTriangle,
 } from 'lucide-react';
 import { api, planFileUrl, fileUrl } from '../lib/api.js';
+import { useSaver, useRefreshOnReturn } from '../lib/autosave.js';
 import { PLAN_GRADIENTS, gradientCss, normalizeUrl, hostOf } from '../lib/types.js';
 import { rgbToHex, hexToRgb } from '../lib/color.js';
 import { extractPalette } from '../lib/imaging.js';
@@ -64,7 +65,6 @@ export default function PlanDetail() {
   const [lightbox, setLightbox] = useState(null); // { items, index }
   const [renaming, setRenaming] = useState(false);
   const [renameBlock, setRenameBlock] = useState(null); // block being renamed
-  const [addOpen, setAddOpen] = useState(false);
   const [refPickerBlock, setRefPickerBlock] = useState(null); // block id currently picking references
   const [fileModalBlock, setFileModalBlock] = useState(null); // block id for the add-file modal
   const [refCache, setRefCache] = useState({}); // `${refKind}:${refId}` -> { project?|gallery?+members?|gone? }
@@ -72,7 +72,7 @@ export default function PlanDetail() {
   const [avatarPicker, setAvatarPicker] = useState(false);
   const [emojiInput, setEmojiInput] = useState('');
   const [dragBlock, setDragBlock] = useState(null);
-  const skipMs = useRef(true);
+  const saver = useSaver();
   const planRef = useRef(null);
   const bannerRef = useRef(null);
   const avatarRef = useRef(null);
@@ -82,26 +82,24 @@ export default function PlanDetail() {
   const refReq = useRef(new Set()); // referenced ids already fetched, so we load each once
   const pending = useRef(null);       // { blockId } for the files/cover inputs
   const lastMoodboard = useRef(null); // block id for paste target
-  const timers = useRef({});
   const pendingPatch = useRef({});    // per-block accumulated patch awaiting a debounced save
+  const milestonesRef = useRef([]);
+  milestonesRef.current = milestones;
   planRef.current = plan;
 
   useEffect(() => {
     let alive = true;
-    setPlan(null); setError(null); skipMs.current = true;
+    saver.flush(); // another plan's pending edits go out before we switch
+    setPlan(null); setError(null);
     api.getPlan(id).then((p) => {
       if (!alive) return;
       setPlan(p); setMilestones(p.milestones || []);
     }).catch((e) => { if (alive) setError(e.message); });
     return () => { alive = false; };
-  }, [id]);
+  }, [id, saver]);
 
-  useEffect(() => {
-    if (skipMs.current) { skipMs.current = false; return; }
-    const t = setTimeout(() => api.updatePlan(id, { milestones }).then(setPlan).catch((e) => toast(`Could not save: ${e.message}`, 'error')), 500);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [milestones]);
+  // Back on this tab after a while: pick up changes made on another device.
+  useRefreshOnReturn(() => api.getPlan(id), (p) => { setPlan(p); setMilestones(p.milestones || []); }, saver);
 
   // Paste images into the last-used (or first) moodboard block.
   useEffect(() => {
@@ -151,29 +149,42 @@ export default function PlanDetail() {
     } catch (e) { toast(`Delete failed: ${e.message}`, 'error'); }
   };
 
-  // Milestones
-  const addMilestone = () => setMilestones((m) => [...m, { id: rid(), title: '', date: '', done: false }]);
-  const editMilestone = (mid, p) => setMilestones((m) => m.map((x) => (x.id === mid ? { ...x, ...p } : x)));
-  const removeMilestone = (mid) => setMilestones((m) => m.filter((x) => x.id !== mid));
+  // Milestones — edited locally, saved debounced (the response is ignored so
+  // it can't overwrite a block edit that's still waiting to be saved).
+  const saveMilestones = (next) => {
+    milestonesRef.current = next;
+    setMilestones(next);
+    const planId = id;
+    saver.schedule('milestones', () => api.updatePlan(planId, { milestones: next })
+      .catch((e) => toast(`Could not save: ${e.message}`, 'error')));
+  };
+  const addMilestone = () => saveMilestones([...milestonesRef.current, { id: rid(), title: '', date: '', done: false }]);
+  const editMilestone = (mid, p) => saveMilestones(milestonesRef.current.map((x) => (x.id === mid ? { ...x, ...p } : x)));
+  const removeMilestone = (mid) => saveMilestones(milestonesRef.current.filter((x) => x.id !== mid));
 
   // Blocks
-  const addBlock = async (type) => { setAddOpen(false); try { setPlan(await api.addBlock(id, type)); } catch (e) { toast(`Could not add block: ${e.message}`, 'error'); } };
+  const addBlock = async (type) => { try { setPlan(await api.addBlock(id, type)); } catch (e) { toast(`Could not add block: ${e.message}`, 'error'); } };
   const moveBlock = async (bid, dir) => { try { setPlan(await api.moveBlock(id, bid, dir)); } catch (e) { toast(`Failed: ${e.message}`, 'error'); } };
+  // Deleting a block moves it (and its files) to Trash, with Undo.
   const deleteBlock = async (b) => {
-    const heavy = (b.images && b.images.length) || (b.files && b.files.length);
-    if (heavy && !window.confirm(`Delete the “${b.title}” block and its files?`)) return;
-    try { setPlan(await api.removeBlock(id, b.id)); } catch (e) { toast(`Failed: ${e.message}`, 'error'); }
+    try {
+      await saver.flush(`block:${b.id}`);
+      const res = await api.removeBlock(id, b.id);
+      setPlan(res.plan);
+      toast(`“${b.title || BLOCK_META[b.type]?.label || 'Block'}” moved to Trash`, 'ok', { label: 'Undo', onClick: async () => {
+        try { await api.restoreTrash(res.trashId); setPlan(await api.getPlan(id)); } catch (e) { toast(`Undo failed: ${e.message}`, 'error'); }
+      } });
+    } catch (e) { toast(`Failed: ${e.message}`, 'error'); }
   };
   const editBlock = (bid, p, immediate = false) => {
     setPlan((prev) => ({ ...prev, blocks: prev.blocks.map((b) => (b.id === bid ? { ...b, ...p } : b)) }));
-    clearTimeout(timers.current[bid]);
     // Merge patches so a later edit to one field can't cancel a pending save of another.
     pendingPatch.current[bid] = { ...(pendingPatch.current[bid] || {}), ...p };
-    const send = () => {
+    saver.schedule(`block:${bid}`, () => {
       const patch = pendingPatch.current[bid]; delete pendingPatch.current[bid];
-      if (patch) api.updateBlock(id, bid, patch).catch((e) => toast(`Could not save: ${e.message}`, 'error'));
-    };
-    if (immediate) send(); else timers.current[bid] = setTimeout(send, 500);
+      if (patch) return api.updateBlock(id, bid, patch).catch((e) => toast(`Could not save: ${e.message}`, 'error'));
+      return null;
+    }, { immediate });
   };
   const addFilesTo = (bid) => { pending.current = bid; filesRef.current?.click(); };
   const addPdfTo = (bid) => { pending.current = bid; pdfRef.current?.click(); };
@@ -735,7 +746,7 @@ export default function PlanDetail() {
       <div className="add-block">
         <Menu
           align="left"
-          trigger={<button className="add-block-btn" onClick={() => setAddOpen((v) => !v)}><Plus size={16} /> Add block</button>}
+          trigger={<button className="add-block-btn"><Plus size={16} /> Add block</button>}
           items={Object.entries(BLOCK_META).map(([type, m]) => ({ label: m.label, icon: <m.icon size={15} />, onClick: () => addBlock(type) }))}
         />
       </div>

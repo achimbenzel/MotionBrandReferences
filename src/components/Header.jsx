@@ -5,7 +5,7 @@ import Menu from './Menu.jsx';
 import StorageMeter from './StorageMeter.jsx';
 import ModeToggle from './ModeToggle.jsx';
 
-export default function Header({ onAdd, onSearch, storageKey }) {
+export default function Header({ onAdd, onSearch }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const workMode = isWorkPath(pathname);
@@ -70,7 +70,7 @@ export default function Header({ onAdd, onSearch, storageKey }) {
           )}
         </div>
 
-        <StorageMeter refreshKey={storageKey} />
+        <StorageMeter />
       </div>
     </header>
   );

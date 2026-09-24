@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { HardDrive, MoreVertical, X, Download, Upload, Trash2, Settings } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useToast } from './Toast.jsx';
 import Menu from './Menu.jsx';
+import { useConfirm } from './ConfirmDialog.jsx';
 
 const GB = 1024 * 1024 * 1024;
 const fmt = (bytes) => {
@@ -13,19 +14,28 @@ const fmt = (bytes) => {
   return `${Math.max(0, Math.round(bytes / 1024))} KB`;
 };
 
-export default function StorageMeter({ refreshKey, menuUp = false }) {
-  const toast = useToast();
-  const navigate = useNavigate();
+// The sidebar (desktop) and the header (mobile) both show a meter; they
+// share one fetch through this provider instead of polling twice.
+const StorageCtx = createContext({ data: null, load: () => {} });
+
+export function StorageProvider({ refreshKey, children }) {
   const { pathname } = useLocation();
   const [data, setData] = useState(null);
+  const load = useCallback(() => api.storage().then(setData).catch(() => setData(null)), []);
+  // Refetch on navigation (covers create/delete) and when the parent bumps the key.
+  useEffect(() => { load(); }, [pathname, refreshKey, load]);
+  return <StorageCtx.Provider value={{ data, load }}>{children}</StorageCtx.Provider>;
+}
+
+export default function StorageMeter({ menuUp = false }) {
+  const toast = useToast();
+  const navigate = useNavigate();
+  const { data, load } = useContext(StorageCtx);
   const [editing, setEditing] = useState(false);
   const [gb, setGb] = useState('80');
   const [importing, setImporting] = useState(false);
+  const [dialog, ask] = useConfirm();
   const fileRef = useRef(null);
-
-  const load = () => api.storage().then(setData).catch(() => setData(null));
-  // Refetch on navigation (covers create/delete) and when the parent bumps the key.
-  useEffect(() => { load(); }, [pathname, refreshKey]);
 
   const openEdit = () => {
     if (data) setGb(String(+(data.limitBytes / GB).toFixed(2)).replace(/\.00$/, ''));
@@ -45,14 +55,16 @@ export default function StorageMeter({ refreshKey, menuUp = false }) {
 
   const exportLibrary = () => { window.location.href = api.exportUrl; };
 
-  const onPickImport = async (file) => {
+  const onPickImport = (file) => {
     if (!file) return;
-    const ok = window.confirm(
-      'Import library from this .zip?\n\n'
-      + 'This REPLACES your current library — all projects, galleries and plans. '
-      + 'A safety backup of your current library is saved to data/backups/ first.\n\nContinue?'
-    );
-    if (!ok) return;
+    ask({
+      title: 'Import library?', danger: true, confirmLabel: 'Replace library',
+      message: `This REPLACES your current library — all projects, galleries, plans and software — with “${file.name}”. `
+        + 'A safety backup of your current library is saved to data/backups/ first.',
+      onConfirm: () => { runImport(file); }, // close the dialog; the import shows its own overlay
+    });
+  };
+  const runImport = async (file) => {
     setImporting(true);
     try {
       await api.importLibrary(file);
@@ -105,6 +117,8 @@ export default function StorageMeter({ refreshKey, menuUp = false }) {
           </div>
         </div>
       )}
+
+      {dialog}
 
       {editing && (
         <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setEditing(false); }}>

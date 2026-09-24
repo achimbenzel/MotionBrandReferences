@@ -4,6 +4,8 @@ import { api } from '../lib/api.js';
 import { TAG_COLORS, tagColor } from '../lib/types.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
+import { useConfirm } from '../components/ConfirmDialog.jsx';
+import { useSaver, useRefreshOnReturn } from '../lib/autosave.js';
 
 const rid = () => Math.random().toString(36).slice(2, 10);
 
@@ -19,7 +21,10 @@ export default function TodoBoard() {
   const [colorEditFor, setColorEditFor] = useState(null); // card id whose colour picker is open
   const [dragCard, setDragCard] = useState(null); // card id made draggable via its grip
   const dragRef = useRef(null); // { fromCol, cardId }
-  const timer = useRef(null);
+  const saver = useSaver();
+  const [dialog, ask] = useConfirm();
+  const columnsRef = useRef(columns);
+  columnsRef.current = columns;
 
   useEffect(() => {
     let alive = true;
@@ -27,12 +32,13 @@ export default function TodoBoard() {
     return () => { alive = false; };
   }, []);
 
+  // Back on this tab after a while: pick up changes made on another device.
+  useRefreshOnReturn(() => api.getBoard(), (b) => setColumns(b.columns), saver);
+
   // Persist the whole board; text edits debounced, structural changes immediate.
   const commit = (next, immediate = false) => {
     setColumns(next);
-    clearTimeout(timer.current);
-    const send = () => api.saveBoard(next).catch((e) => toast(`Could not save: ${e.message}`, 'error'));
-    if (immediate) send(); else timer.current = setTimeout(send, 500);
+    saver.schedule('board', () => api.saveBoard(next).catch((e) => toast(`Could not save: ${e.message}`, 'error')), { immediate });
   };
   const mapCol = (colId, fn) => columns.map((c) => (c.id === colId ? fn(c) : c));
   const mapCard = (colId, cardId, fn) => mapCol(colId, (c) => ({ ...c, cards: c.cards.map((k) => (k.id === cardId ? fn(k) : k)) }));
@@ -41,8 +47,13 @@ export default function TodoBoard() {
   const addColumn = () => commit([...columns, { id: rid(), name: '', cards: [] }], true);
   const renameColumn = (colId, name) => commit(mapCol(colId, (c) => ({ ...c, name })));
   const removeColumn = (col) => {
-    if (col.cards.length && !window.confirm(`Delete the “${col.name || 'Untitled'}” list and its ${col.cards.length} card(s)?`)) return;
-    commit(columns.filter((c) => c.id !== col.id), true);
+    const drop = () => commit(columnsRef.current.filter((c) => c.id !== col.id), true);
+    if (!col.cards.length) { drop(); return; }
+    ask({
+      title: 'Delete list?', danger: true, confirmLabel: 'Delete',
+      message: `“${col.name || 'Untitled'}” and its ${col.cards.length} card${col.cards.length === 1 ? '' : 's'} will be deleted.`,
+      onConfirm: drop,
+    });
   };
 
   // Cards
@@ -203,6 +214,7 @@ export default function TodoBoard() {
       </div>
 
       {total === 0 && <div className="hint" style={{ marginTop: 16 }}>Add a card to a list, then drag it across lists to track progress.</div>}
+      {dialog}
     </div>
   );
 }

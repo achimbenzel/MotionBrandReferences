@@ -95,7 +95,7 @@ export async function createZipToStream(srcDir, stream, { skip = () => false } =
     const crc = await crc32File(full);
     const { time, date } = dosDateTime(st.mtime);
     const nameBuf = Buffer.from(rel, 'utf8');
-    const utf8 = /[^\x00-\x7F]/.test(rel);
+    const utf8 = Buffer.byteLength(rel, 'utf8') !== rel.length; // any non-ASCII character
     const flags = utf8 ? 0x0800 : 0;
     const localOffset = offset;
     const sizeBig = size >= ZIP64_THRESHOLD;

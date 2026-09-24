@@ -1,5 +1,5 @@
 import { Trash2 } from 'lucide-react';
-import { rgbString, cmykString, readableText, hexToRgb } from '../lib/color.js';
+import { rgbString, cmykString, readableText, hexToRgb, rgbToCmyk } from '../lib/color.js';
 import { useToast } from './Toast.jsx';
 
 export default function ColorCard({ color, onRemove }) {
@@ -17,7 +17,7 @@ export default function ColorCard({ color, onRemove }) {
   const lines = [
     { k: 'HEX', v: color.hex, approx: false },
     { k: 'RGB', v: rgbString(rgb), approx: false },
-    { k: 'CMYK', v: cmykString(color.cmyk), approx: true, note: true },
+    { k: 'CMYK', v: cmykString(color.cmyk || rgbToCmyk(rgb)), approx: true, note: true },
     { k: 'Pantone', v: color.pantone || '—', approx: !!color.pantoneApprox },
   ];
 

@@ -7,6 +7,7 @@ import {
   ArrowUp, ArrowDown,
 } from 'lucide-react';
 import { api, softwareFileUrl } from '../lib/api.js';
+import { useSaver, useRefreshOnReturn } from '../lib/autosave.js';
 import { CURRENCIES, currencySymbol, normalizeUrl, TAG_COLORS, tagColor, PLAN_GRADIENTS, gradientCss, youtubeThumb } from '../lib/types.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
@@ -55,7 +56,7 @@ export default function SoftwareDetail() {
   const [confirm, setConfirm] = useState(null); // { title, message, confirmLabel, danger, onConfirm }
   const softRef = useRef(null); softRef.current = soft;
   const pending = useRef({});
-  const timer = useRef(null);
+  const saver = useSaver();
   const bannerRef = useRef(null);
   const avatarRef = useRef(null);
   const groupImgRef = useRef(null);
@@ -63,25 +64,30 @@ export default function SoftwareDetail() {
 
   useEffect(() => {
     let alive = true;
+    saver.flush(); // another software's pending edits go out before we switch
     setSoft(null); setError(null); setEditingId(null); setEditingTut(null);
     api.getSoftware(id).then((s) => { if (alive) setSoft(s); }).catch((e) => { if (alive) setError(e.message); });
     return () => { alive = false; };
-  }, [id]);
+  }, [id, saver]);
 
-  // Flush any pending text edit to the server (file ops call this first so a
-  // debounced save can't land after the upload response and lose the file).
-  const flush = async () => {
-    clearTimeout(timer.current);
-    const p = pending.current; pending.current = {};
-    if (Object.keys(p).length) { try { await api.updateSoftware(id, p); } catch (e) { toast(`Could not save: ${e.message}`, 'error'); } }
-  };
+  // Back on this tab after a while: pick up changes made on another device.
+  useRefreshOnReturn(() => api.getSoftware(id), setSoft, saver);
+
+  // Send any pending text edit now; resolves when it has landed (file ops
+  // await this first so a debounced save can't arrive after the upload
+  // response and lose the file).
+  const flush = () => saver.flush('soft');
   // Optimistic + merged-patch save (server response ignored so fast typing is
   // never clobbered); file fields are server-authoritative and preserved by id.
   const save = (patch, immediate = false) => {
     setSoft((prev) => ({ ...prev, ...patch }));
     pending.current = { ...pending.current, ...patch };
-    clearTimeout(timer.current);
-    if (immediate) flush(); else timer.current = setTimeout(flush, 500);
+    const softId = id;
+    saver.schedule('soft', async () => {
+      const p = pending.current; pending.current = {};
+      if (!Object.keys(p).length) return;
+      try { await api.updateSoftware(softId, p); } catch (e) { toast(`Could not save: ${e.message}`, 'error'); }
+    }, { immediate });
   };
   const fileOp = async (fn) => { await flush(); try { setSoft(await fn()); } catch (e) { toast(`Failed: ${e.message}`, 'error'); } };
   const arr = (field) => softRef.current[field] || [];

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   PencilRuler, ListTodo, FlaskConical, Plus, ArrowRight, CalendarRange, AppWindow,
-  AlertTriangle, Image as ImageIcon, UploadCloud,
+  AlertTriangle, Image as ImageIcon, UploadCloud, Database,
 } from 'lucide-react';
 import { api, planFileUrl, dashboardFileUrl } from '../lib/api.js';
 import { gradientCss, PLAN_GRADIENTS } from '../lib/types.js';
@@ -19,6 +19,7 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
   const [board, setBoard] = useState(null);
   const [software, setSoftware] = useState(null);
   const [settings, setSettings] = useState(null);
+  const [needsMigration, setNeedsMigration] = useState(false);
   const [bannerPicker, setBannerPicker] = useState(false);
   const bannerRef = useRef(null);
 
@@ -28,6 +29,7 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
     api.getBoard().then((b) => { if (alive) setBoard(b); }).catch(() => { if (alive) setBoard({ columns: [] }); });
     api.listSoftware().then((s) => { if (alive) setSoftware(s); }).catch(() => { if (alive) setSoftware([]); });
     api.getSettings().then((s) => { if (alive) setSettings(s); }).catch(() => { if (alive) setSettings({}); });
+    api.maintenanceStatus().then((m) => { if (alive) setNeedsMigration(!!m.needsMigration); }).catch(() => {});
     return () => { alive = false; };
   }, [reloadKey]);
 
@@ -89,6 +91,14 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
         )}
       </div>
       <input ref={bannerRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { setBannerImage(e.target.files?.[0]); e.target.value = ''; }} />
+
+      {needsMigration && (
+        <button className="dash-notice" onClick={() => navigate('/settings')}>
+          <Database size={16} />
+          <span><b>Your library uses an older data format.</b> Everything works as it is — review the one-click update in Settings.</span>
+          <ArrowRight size={16} />
+        </button>
+      )}
 
       <div className="dash-grid">
         {tools.map((t) => (

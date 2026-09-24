@@ -19,8 +19,6 @@ export default function ThumbnailStudio({ type, video, assets = [], image, initi
   const cleanupRef = useRef(null);
 
   // Branding PDF pager.
-  const imageAssets = assets.filter((a) => a.kind === 'image');
-  const pdfAssets = assets.filter((a) => a.kind === 'pdf');
   const [activeAsset, setActiveAsset] = useState(assets[0]?.id);
   const [pdfPage, setPdfPage] = useState(1);
   const [pdfInfo, setPdfInfo] = useState({ numPages: 0 });
@@ -29,7 +27,7 @@ export default function ThumbnailStudio({ type, video, assets = [], image, initi
 
   useEffect(() => () => cleanupRef.current?.(), []);
 
-  const useSource = (src, cleanup) => {
+  const applySource = (src, cleanup) => {
     cleanupRef.current?.();
     cleanupRef.current = cleanup || null;
     setSource(src);
@@ -38,7 +36,7 @@ export default function ThumbnailStudio({ type, video, assets = [], image, initi
 
   const fromImage = async (src) => {
     setBusy(true); setError(null);
-    try { const { img, cleanup } = await loadImage(src); useSource(img, cleanup); }
+    try { const { img, cleanup } = await loadImage(src); applySource(img, cleanup); }
     catch (e) { setError(e.message); }
     finally { setBusy(false); }
   };
@@ -86,7 +84,7 @@ export default function ThumbnailStudio({ type, video, assets = [], image, initi
           {step === 'pick' && (
             <div>
               {type === 'motion' && video && (
-                <MotionPicker src={video} onUse={(canvas) => useSource(canvas)} busy={busy} />
+                <MotionPicker src={video} onUse={(canvas) => applySource(canvas)} busy={busy} />
               )}
 
               {(type === 'branding' || type === 'logo') && assets.length > 0 && (
@@ -114,7 +112,7 @@ export default function ThumbnailStudio({ type, video, assets = [], image, initi
                         <span className="page-num">{pdfPage} / {pdfInfo.numPages || '…'}</span>
                         <button className="icon-btn" disabled={pdfPage >= pdfInfo.numPages} onClick={() => setPdfPage((p) => p + 1)}><ChevronRight size={18} /></button>
                       </div>
-                      <button className="btn btn-primary" disabled={!pdfPreview || busy} onClick={() => useSource(pdfPreview.canvas)}>
+                      <button className="btn btn-primary" disabled={!pdfPreview || busy} onClick={() => applySource(pdfPreview.canvas)}>
                         <Check size={16} /> Use this page
                       </button>
                     </div>

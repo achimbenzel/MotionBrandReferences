@@ -97,7 +97,7 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
     setCoverBlob(null); setCoverMeta(null);
     setCoverPreview((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
   };
-  useEffect(() => { clearCover(); /* eslint-disable-next-line */ }, [type]);
+  useEffect(() => { clearCover(); }, [type]);
 
   const acceptCover = (blob, meta) => {
     setCoverBlob(blob); setCoverMeta(meta);

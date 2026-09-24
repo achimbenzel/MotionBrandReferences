@@ -7,6 +7,7 @@ import Header from './components/Header.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import UploadModal from './components/UploadModal.jsx';
 import CommandPalette from './components/CommandPalette.jsx';
+import { StorageProvider } from './components/StorageMeter.jsx';
 // The two landing pages load eagerly (shown first); everything else is split
 // into its own chunk so, e.g., the Logo Tester isn't downloaded just to browse
 // the Reference grid.
@@ -72,12 +73,13 @@ function Shell() {
   const wide = location.pathname === '/board'; // the board uses the full desktop width
 
   return (
+    <StorageProvider refreshKey={reloadKey}>
     <div className="app" data-sidebar={collapsed ? 'collapsed' : 'open'}>
-      <Sidebar onAdd={onAdd} onSearch={() => setPaletteOpen(true)} onToggle={() => setCollapsed((c) => !c)} storageKey={reloadKey} />
+      <Sidebar onAdd={onAdd} onSearch={() => setPaletteOpen(true)} onToggle={() => setCollapsed((c) => !c)} />
       <button className="sb-reopen icon-btn" onClick={() => setCollapsed(false)} title="Open sidebar" aria-label="Open sidebar">
         <PanelLeft size={17} />
       </button>
-      <Header onAdd={onAdd} onSearch={() => setPaletteOpen(true)} storageKey={reloadKey} />
+      <Header onAdd={onAdd} onSearch={() => setPaletteOpen(true)} />
       <main className="main">
         <div className={`main-inner${wide ? ' wide' : ''}`}>
           <ErrorBoundary>
@@ -110,6 +112,7 @@ function Shell() {
       )}
       {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
     </div>
+    </StorageProvider>
   );
 }
 

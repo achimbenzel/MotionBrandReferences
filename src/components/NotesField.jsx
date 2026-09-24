@@ -1,38 +1,56 @@
 import { useEffect, useRef, useState } from 'react';
 import { StickyNote } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useSaver } from '../lib/autosave.js';
 import { useToast } from './Toast.jsx';
 
 /**
- * Notes for any project type. Debounced autosave to project.notes.
+ * Notes for any project type. Debounced autosave to project.notes — pending
+ * text is still saved if you navigate away or close the tab right after typing.
  * Shown with a larger type size for comfortable reading/writing.
  */
 export default function NotesField({ project, setProject, label = 'Notes', placeholder = 'Ideas, feedback, references, what worked…' }) {
   const toast = useToast();
+  const saver = useSaver(700);
   const [notes, setNotes] = useState(project.notes || '');
   const [state, setState] = useState('idle');
-  const skip = useRef(true);
+  const idleTimer = useRef(null);
+  const currentId = useRef(project.id);
+  currentId.current = project.id;
 
-  // Reset when switching to a different project.
-  useEffect(() => { setNotes(project.notes || ''); skip.current = true; }, [project.id]);
-
+  // Switching to a different project: save the previous one's pending text
+  // first, then show the new project's notes.
   useEffect(() => {
-    if (skip.current) { skip.current = false; return; }
+    saver.flush();
+    setNotes(project.notes || '');
+    setState('idle');
+  }, [project.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A newer copy of this project arrived (e.g. reloaded after coming back to
+  // the tab) — show its notes unless you're mid-edit.
+  useEffect(() => {
+    if (saver.idle()) setNotes(project.notes || '');
+  }, [project.notes]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => () => clearTimeout(idleTimer.current), []);
+
+  const onChange = (value) => {
+    setNotes(value);
     setState('saving');
-    const t = setTimeout(async () => {
+    const projectId = project.id;
+    saver.schedule('notes', async () => {
       try {
-        const updated = await api.update(project.id, { notes });
-        setProject(updated);
+        const updated = await api.update(projectId, { notes: value });
+        if (currentId.current === projectId) setProject(updated); // still on this project
         setState('saved');
-        setTimeout(() => setState('idle'), 1500);
+        clearTimeout(idleTimer.current);
+        idleTimer.current = setTimeout(() => setState('idle'), 1500);
       } catch {
         setState('idle');
         toast('Could not save notes', 'error');
       }
-    }, 700);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notes]);
+    });
+  };
 
   return (
     <div className="section">
@@ -41,7 +59,7 @@ export default function NotesField({ project, setProject, label = 'Notes', place
         <textarea
           className="textarea notes-textarea"
           value={notes}
-          onChange={(e) => setNotes(e.target.value)}
+          onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
         />
         <span className="notes-status">{state === 'saving' ? 'Saving…' : state === 'saved' ? 'Saved' : ''}</span>

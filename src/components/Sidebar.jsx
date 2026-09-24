@@ -16,7 +16,7 @@ const ICON = {
 const WORK_ICON = { dashboard: LayoutDashboard, plan: PencilRuler, software: AppWindow, board: ListTodo, logotester: FlaskConical };
 
 /** Notion-style desktop sidebar holding everything the header carries. */
-export default function Sidebar({ onAdd, onSearch, onToggle, storageKey }) {
+export default function Sidebar({ onAdd, onSearch, onToggle }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const workMode = isWorkPath(pathname);
@@ -83,7 +83,7 @@ export default function Sidebar({ onAdd, onSearch, onToggle, storageKey }) {
           <button className={`sb-item ${onTrash ? 'active' : ''}`} onClick={() => navigate('/trash')}>
             <Trash2 size={17} /> <span>Trash</span>
           </button>
-          <StorageMeter refreshKey={storageKey} menuUp />
+          <StorageMeter menuUp />
         </div>
       </div>
     </aside>

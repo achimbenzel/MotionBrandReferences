@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Camera, Film, Images, Tag as TagIcon, Trash2, Clock, ChevronLeft, ChevronRight, Maximize2, MoreVertical, Scissors, X } from 'lucide-react';
 import { api, fileUrl } from '../lib/api.js';
+import { useSaver } from '../lib/autosave.js';
 import { captureFrame, lengthTag, fmtTime } from '../lib/media.js';
 import { useToast } from '../components/Toast.jsx';
 import TagInput from '../components/TagInput.jsx';
@@ -20,7 +21,7 @@ export default function MotionDetail({ project, setProject }) {
   const [sel, setSel] = useState(0);
   const [lightbox, setLightbox] = useState(false);
   const [segments, setSegments] = useState(project.segments || []);
-  const segTimer = useRef(null);
+  const saver = useSaver();
 
   const frames = [...(project.frames || [])].sort((a, b) => a.t - b.t);
   const autoLen = project.duration ? lengthTag(project.duration) : null;
@@ -70,13 +71,12 @@ export default function MotionDetail({ project, setProject }) {
   // ---- Segments: label the video's sections (Hook / Demo / Outro …) --------
   // Seed once per project; the timeline's local state is the source of truth so
   // an addFrame/tag save (which re-sets `project`) can't wipe an unsaved label.
-  useEffect(() => { setSegments(project.segments || []); }, [project.id]);
+  useEffect(() => { saver.flush(); setSegments(project.segments || []); }, [project.id, saver]); // eslint-disable-line react-hooks/exhaustive-deps
   const segDur = Number(project.duration) || (videoRef.current && Number.isFinite(videoRef.current.duration) ? videoRef.current.duration : 0);
   const saveSegments = (next, immediate = false) => {
     setSegments(next);
-    clearTimeout(segTimer.current);
-    const send = () => api.update(project.id, { segments: next }).catch((e) => toast(`Could not save: ${e.message}`, 'error'));
-    if (immediate) send(); else segTimer.current = setTimeout(send, 500);
+    const projectId = project.id;
+    saver.schedule('segments', () => api.update(projectId, { segments: next }).catch((e) => toast(`Could not save: ${e.message}`, 'error')), { immediate });
   };
   // Each segment runs from its start to the next one's start (last → end).
   const segList = [...segments].sort((a, b) => a.start - b.start)
@@ -191,7 +191,7 @@ export default function MotionDetail({ project, setProject }) {
     catch (e) { toast(`Could not delete frame: ${e.message}`, 'error'); }
   };
 
-  const step = (d) => setSel((i) => (selClamped + d + frames.length) % frames.length);
+  const step = (d) => setSel(() => (selClamped + d + frames.length) % frames.length);
   const lightboxItems = frames.map((f) => ({ src: fileUrl(project, f.file), caption: fmtTime(f.t) }));
 
   return (

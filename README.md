@@ -10,7 +10,8 @@ e.g. "Green Tech Companies"). A storage meter in the header sums the `data/`
 folder against an editable limit (default 80 GB).
 
 It runs on its own ports (**4200** frontend / **4300** API) so it never clashes
-with your usual dev ports (5173, 3000, 3333, 8000).
+with your usual dev ports (5173, 3000, 3333, 8000). Requires **Node.js 18.18+**
+(20 or 22 recommended).
 
 ---
 
@@ -33,20 +34,61 @@ npm run serve      # builds the frontend and serves everything from :4300
 # open http://localhost:4300
 ```
 
-### Hosting it (VPS / Tailscale)
+### Updating the app
 
-The app is deliberately dependency-light and does its own caching, but it does
-**not** gzip/brotli responses itself. On a real host, put a reverse proxy in
-front of `:4300` for compression + TLS — this is where the biggest mobile win
-is (the initial JS is ~286 KB raw but only ~89 KB gzipped). A minimal Caddy
-config does both with no extra app dependencies:
+```bash
+git pull
+npm install        # picks up new/removed packages — your data/ folder is never touched
+npm run dev        # or: npm run serve
+```
 
+After an update, **Settings → Library** tells you if your library is stored in
+an older data format and offers a one-click **Migrate** (see
+[Data format & migration](#data-format--migration)). Until you click it,
+everything keeps working exactly as before.
+
+### Hosting it (VPS + Tailscale)
+
+The app has **no login** — whoever can reach it can see and change the whole
+library (including the plugin license keys). So it is built to be reachable
+only by you:
+
+- The server listens on **`127.0.0.1` only** by default, so it is never exposed
+  to your LAN or the internet by accident.
+- Other websites can't use it behind your back: there is no CORS, every
+  state-changing API call needs a custom header (CSRF protection), and requests
+  for unknown host names are refused (protection against DNS rebinding).
+- `db.json`, its backups and temp files are never served over HTTP.
+
+**Recommended on a VPS: `tailscale serve`.** It forwards only to devices in your
+tailnet and gives you HTTPS for free (needed for clipboard copy/paste in the
+browser):
+
+```bash
+npm install && npm run build
+NODE_ENV=production node server/index.js     # or: npm start (e.g. via pm2 / systemd)
+sudo tailscale serve --bg 4300               # → https://<machine>.<tailnet>.ts.net
 ```
-your-host.example {
-    encode zstd gzip
-    reverse_proxy localhost:4300
-}
-```
+
+Then open `https://<machine>.<tailnet>.ts.net` from any device logged into your
+Tailscale account. The app doesn't gzip its responses itself; if you want
+smaller mobile payloads (the initial JS is ~290 KB raw, ~90 KB gzipped), put
+Caddy in between (`encode zstd gzip` + `reverse_proxy 127.0.0.1:4300`) and point
+`tailscale serve` at Caddy instead.
+
+**Alternative:** listen directly on the Tailscale interface with
+`HOST=100.x.y.z npm start` (your machine's Tailscale IP) and open
+`http://100.x.y.z:4300` — works, but without HTTPS the browser blocks
+clipboard features. Never use `HOST=0.0.0.0` on a VPS with a public IP unless a
+firewall blocks port 4300.
+
+| Environment variable | Default | What it does |
+| --- | --- | --- |
+| `HOST` | `127.0.0.1` | Interface to listen on |
+| `API_PORT` | `4300` | Port of the API / production server |
+| `DATA_DIR` | `./data` | Where the library lives (e.g. a mounted volume) |
+| `ALLOWED_HOSTS` | – | Extra host names to accept, comma-separated (e.g. your own domain). IPs, `localhost`, Tailscale names (`*.ts.net`, MagicDNS short names) and `*.local` / `*.lan` / `*.fritz.box` always work; `*` disables the check |
+| `MAX_UPLOAD_MB` | `1024` | Per-file upload limit (raise it for long 4K videos) |
 
 Caching is already handled by the app: content-hashed build assets
 (`/assets/*`) and immutable library files (moodboard / plan-block uploads) are
@@ -111,6 +153,38 @@ never touched. To back up or move your library, just copy the `data/` folder.
   atomic-write temp files from an earlier crash are swept on boot.
 - **Path containment** — every file delete/move is checked to stay inside
   `data/`, as a defensive guard against path traversal.
+- **Never starts over by accident** — if `db.json` and every backup of it are
+  unreadable, the server answers with an error instead of treating the library
+  as empty (which would overwrite it on the next save).
+- **Errors don't take the server down** — a failed save (e.g. a full disk)
+  returns a clear error message to the page; the server keeps running.
+- **Edits are never dropped** — autosaves still go out when you navigate away
+  or close the tab right after typing, and a tab you come back to after a while
+  reloads its data first, so a stale tab on another device can't overwrite
+  newer changes.
+
+### Data format & migration
+
+`db.json` carries a `schemaVersion`. Libraries created with older versions of
+the app (no version = v1) contain records in older shapes — e.g. plans from
+before content blocks, logos with light/dark variants or plain hex colour lists,
+Software entries with separate scripts. The app reads all of these as-is, so
+nothing changes after an update.
+
+**Settings → Library → Migrate** rewrites them once into the current format
+(v2). It is non-destructive: a copy of the current `db.json` is saved as
+`data/backups/pre-migrate-v1-<time>.json` first, no files are moved or deleted,
+and every file reference is kept. To undo, stop the app and copy that backup
+over `data/db.json`.
+
+### Unused files cleanup
+
+**Settings → Library → Unused files → Scan** lists files in the library folders
+that nothing in `db.json` points to any more — e.g. images older versions left
+behind when a banner or avatar was re-uploaded, or the folder of an upload that
+failed halfway. The check is conservative (hidden files and anything changed in
+the last 10 minutes are never listed). **Move to Trash** moves them as one
+restorable item, so nothing is lost for 30 days.
 
 ### Export & import your whole library
 
@@ -141,9 +215,9 @@ close.
 
 ### Trash (recoverable deletes)
 
-Deleting a **project, plan or gallery** — or a **file from a plan's Files
-block** — now moves it to **Trash** instead of removing it immediately, and a
-toast offers a one-click **Undo**. Open Trash from the storage **⋯** menu (or
+Deleting a **project, plan, gallery, software, plan block** — or a **file from
+a plan's Files block** — moves it to **Trash** instead of removing it
+immediately, and a toast offers a one-click **Undo**. Open Trash from the storage **⋯** menu (or
 the palette) to **restore** items — files, example images and gallery
 membership come back intact — or delete them permanently. Trash auto-empties
 items older than **30 days**. (Trashed items live under `data/trash/` and are
@@ -152,7 +226,8 @@ excluded from exports.)
 ### Settings
 
 A **Settings** page (in the sidebar footer above Trash, the storage **⋯** menu,
-or the palette) lists every **keyboard shortcut** — ⌘K search, the fullscreen
+or the palette) has a **Library** section — data-format migration, unused-file
+cleanup and backups (see above) — and lists every **keyboard shortcut** — ⌘K search, the fullscreen
 viewer's scroll-zoom / drag / arrows, Motion's `,` `.` frame stepping, project
 `←`/`→` navigation — plus per-browser **preferences**. The **video player
 volume** (and mute) is remembered across reloads in this browser, and can be
@@ -245,8 +320,8 @@ an emoji, and it opens a page with four tabs, each searchable:
 
 Everything auto-saves. Deleting a software moves it (and its files) to **Trash**.
 Note: license keys and account details are stored **in plain text** in
-`data/db.json` — fine for a local-only tool behind your VPN, but keep that in
-mind before syncing the folder anywhere.
+`data/db.json`. The file is never served over HTTP, but keep that in mind before
+syncing or backing up the folder anywhere.
 
 ### Logo Tester
 A sandbox (nothing is saved) to stress-test a logo. Upload a **PNG or SVG**,
@@ -410,7 +485,25 @@ Nothing is fetched from a third-party CDN at runtime.
 
 - **Frontend:** React 18 + Vite + React Router.
 - **Backend:** a small Express server that stores files on disk and metadata in
-  `data/db.json` (writes are serialized so nothing clobbers).
+  `data/db.json` (writes are serialized so nothing clobbers). Layout:
+
+  ```
+  server/
+  ├── index.js        # entry: start, listen, graceful shutdown
+  ├── app.js          # middleware + routes
+  ├── config.js       # paths, ports, env vars
+  ├── db.js           # atomic writes, self-healing reads, snapshots, write queue
+  ├── schema.js       # record shapes, read-time normalizing, the v1→v2 migration
+  ├── files.js        # fs helpers (path containment, moves, trash, storage size)
+  ├── http.js         # async-safe routers, JSON errors, host/CSRF/data guards
+  ├── upload.js       # multer (per-request tmp folder, always cleaned up)
+  ├── unused.js       # unused-file scan
+  ├── zip.js          # dependency-free ZIP64 export/import
+  └── routes/         # projects, plans, software, board, trash, search, settings, library, maintenance
+  ```
+- **Tests:** `npm test` starts the real server against throwaway data folders —
+  including a library with every data shape older versions wrote — and checks
+  the API, the security guards, crash handling, export/import and the migration.
 
 ### Scripts
 
@@ -420,11 +513,14 @@ Nothing is fetched from a third-party CDN at runtime.
 | `npm run build` | build the frontend into `dist/` |
 | `npm run serve` | build, then serve app + API from a single port (4300) |
 | `npm start` | serve a pre-built `dist/` + API from 4300 |
+| `npm test` | API / migration / security tests (Node's built-in test runner) |
+| `npm run lint` | ESLint (incl. React hook rules) |
+| `npm run check` | lint + tests + build — the same as CI on every push |
 
 ### A note on `npm audit`
 
-Remaining advisories are all in **dev tooling** (Vite/esbuild dev server,
-React Router link handling) and only matter if you browse a malicious website
-while the dev server is running. For a localhost-only personal tool the
-practical risk is negligible; the fixes require breaking major upgrades, so
-they’re intentionally not applied.
+The server-side advisories (Express's `qs`) are fixed. What remains is in
+**dev tooling** — the Vite/esbuild dev server, which only runs during
+`npm run dev` — and in React Router (an SSR-only issue and an open redirect via
+untrusted link targets; the app uses neither). The fixes need breaking major
+upgrades (Vite 8, React Router 7), so they're left for a dedicated upgrade.

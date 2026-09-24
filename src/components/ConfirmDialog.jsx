@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 
 /**
@@ -41,4 +41,16 @@ export default function ConfirmDialog({
       </div>
     </div>
   );
+}
+
+/**
+ * Hook form: `const [dialog, ask] = useConfirm();` then render `{dialog}` and
+ * call `ask({ title, message, confirmLabel, danger, onConfirm })`.
+ */
+export function useConfirm() {
+  const [opts, setOpts] = useState(null);
+  const ask = useCallback((o) => setOpts(o), []);
+  const close = useCallback(() => setOpts(null), []);
+  const dialog = opts ? <ConfirmDialog {...opts} onClose={close} /> : null;
+  return [dialog, ask];
 }
