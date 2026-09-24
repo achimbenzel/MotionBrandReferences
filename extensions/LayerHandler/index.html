@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LayerHandler</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ====================================================== header -->
+<header id="header">
+  <div class="brand">
+    <svg class="logo-mark" viewBox="0 0 100 100" aria-hidden="true">
+      <polygon class="top" points="50,8 92,29 50,50 8,29"/>
+      <polyline class="band" points="8,50 50,71 92,50"/>
+      <polyline class="band far" points="8,71 50,92 92,71"/>
+    </svg>
+    <div class="brand-text">
+      <h1>LayerHandler</h1>
+      <div id="stats" class="mono">no layers loaded</div>
+    </div>
+  </div>
+  <button id="btn-refresh" class="icon-btn" title="Load the layers selected in the Layers panel">
+    <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+  </button>
+</header>
+
+<div id="status" class="status" hidden></div>
+
+<main id="main">
+
+  <!-- ================================================ layer color -->
+  <section class="section">
+    <h2>
+      <svg viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
+      Layer Color
+    </h2>
+
+    <div class="lc-grid" id="lc-primary"></div>
+    <div class="lc-grid" id="lc-more"></div>
+
+    <div class="row lc-foot">
+      <button id="btn-custom" class="btn ghost sm" title="Pick any color">
+        <span class="dot" id="custom-dot"></span>
+        Custom&hellip;
+      </button>
+      <span class="spacer"></span>
+      <div class="readout mono swatch keep" id="colorReadout"><span class="rt">keep color</span></div>
+    </div>
+  </section>
+
+  <!-- ===================================================== rename -->
+  <section class="section">
+    <h2>
+      <svg viewBox="0 0 24 24"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></svg>
+      Rename
+    </h2>
+
+    <div class="row">
+      <input type="text" id="name" class="txt" placeholder="New layer name"
+             spellcheck="false" autocomplete="off">
+    </div>
+
+    <div class="row">
+      <label class="tg"><input type="checkbox" id="numbering" checked><span class="track"></span>Numbering</label>
+    </div>
+
+    <div class="row sub num-opt">
+      <span class="lbl">Start</span>
+      <input type="number" class="num" id="start" min="0" step="1" value="1">
+    </div>
+
+    <div class="row sub num-opt">
+      <span class="lbl">Digits</span>
+      <select id="digits">
+        <option value="1" selected>1 &middot; 1, 2, 3</option>
+        <option value="2">2 &middot; 01, 02, 03</option>
+        <option value="3">3 &middot; 001, 002, 003</option>
+        <option value="4">4 &middot; 0001, 0002</option>
+      </select>
+    </div>
+
+    <div class="row sub num-opt">
+      <span class="lbl">Divider</span>
+      <select id="sep">
+        <option value="" selected>None &middot; Name1</option>
+        <option value=" ">Space &middot; Name 1</option>
+        <option value="_">Underscore &middot; Name_1</option>
+        <option value="-">Hyphen &middot; Name-1</option>
+        <option value=".">Dot &middot; Name.1</option>
+      </select>
+    </div>
+
+    <div class="row sub num-opt">
+      <span class="lbl">Order</span>
+      <select id="order">
+        <option value="down" selected>Top &rarr; bottom</option>
+        <option value="up">Bottom &rarr; top</option>
+      </select>
+    </div>
+
+    <div class="hint"># = number position &middot; Enter applies</div>
+
+    <div class="pv" id="preview"></div>
+  </section>
+
+  <!-- ====================================================== split -->
+  <section class="section">
+    <h2>
+      <svg viewBox="0 0 24 24"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>
+      Split to Layers
+    </h2>
+
+    <div class="row sub">
+      <span class="lbl">Into</span>
+      <select id="splitInto">
+        <option value="layers" selected>Layers (in place)</option>
+        <option value="sublayers">Sublayers</option>
+      </select>
+    </div>
+
+    <div class="row sub">
+      <span class="lbl">Names</span>
+      <select id="splitNames">
+        <option value="objects" selected>From objects</option>
+        <option value="field">From name field</option>
+      </select>
+    </div>
+
+    <div class="row">
+      <label class="tg"><input type="checkbox" id="keepColor"><span class="track"></span>Keep layer color</label>
+    </div>
+
+    <button id="btn-split" class="btn ghost block mt">
+      <svg viewBox="0 0 24 24"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/></svg>
+      Split layer content
+    </button>
+
+    <div class="readout mono" id="splitReadout"><span class="rt">select a layer or objects</span></div>
+  </section>
+
+</main>
+
+<!-- ====================================================== footer -->
+<footer id="footer">
+  <div class="footer-btns">
+    <button id="btn-clear" class="btn ghost">
+      <svg viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      Clear
+    </button>
+    <button id="btn-apply" class="btn primary">
+      <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+      Apply to layers
+    </button>
+  </div>
+  <div id="credit">
+    <svg class="cf-logo" viewBox="0 0 500 500" aria-hidden="true">
+      <path d="M305.645,267.872l14.72-50.766h0l92.16-77.943h0l10.883,12.833h0l-70.016,99.08-28.183,39.883h0l-19.501-23.087h-.063ZM317.975,184.142h-44.602l-35.417,122.355h44.602l35.48-122.355h-.063ZM181.402,306.498h44.602l35.417-122.355h-44.602l-35.48,122.355h.063ZM176.81,178.669c55.547-25.478,123.173-36.864,182.244-17.866,2.957,1.007,5.913,2.139,8.933,3.397s0,0,0,0l17.3-14.657c-25.792-12.078-54.541-15.727-82.786-15.979-55.61.566-115.624,15.412-164.126,45.294h0l12.015,14.217h0c8.618-5.347,17.551-10.128,26.484-14.343l-.063-.063ZM332.569,307.001c-41.834,20.822-88.448,32.712-135.251,32.964-22.898-.189-46.677-2.957-67.94-11.701h0l-20.382,17.237h0c7.926,4.466,16.356,8.052,24.66,10.694,46.489,14.972,97.067,12.078,143.996.629,31.328-8.052,62.09-20.571,89.077-38.562h0l-17.488-20.634h0c-5.473,3.334-11.072,6.417-16.733,9.31l.063.063ZM193.795,222.768l-19.501-23.087h0l-28.183,39.883-70.016,99.08h0l10.883,12.833h0l92.097-77.943h0l14.72-50.766h0ZM346.975,279.951l60.517,71.526h0l12.833-10.883h0l-47.055-97.821h0l-26.233,37.178h-.063ZM152.465,210.689l-60.454-71.526h0l-12.833,10.883h0l47.055,97.821h0l26.233-37.178h0ZM92.388,298.76c-3.712-6.794-5.599-14.217-5.599-22.018s3.271-21.263,9.877-32.397c3.02-5.033,6.479-9.814,10.191-14.343h0l-9.31-19.376h0c-21.766,22.269-38.311,52.528-30.699,84.045,2.139,8.996,6.039,17.111,11.26,24.282h0l14.28-20.256v.063ZM405.668,193.83c2.328,3.9,4.089,8.178,5.221,12.77,3.712,15.035-1.447,31.013-9.688,43.847-2.516,3.837-5.221,7.549-8.178,11.072h0l11.764,24.471h0c20.571-22.395,36.361-54.038,27.931-84.988-2.516-9.751-7.36-18.495-13.651-26.107,0,0-13.399,18.935-13.399,18.935Z"/>
+    </svg>
+    Made by Confinium
+  </div>
+</footer>
+
+<script src="js/CSInterface.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
