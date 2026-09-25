@@ -9,6 +9,7 @@ import ProjectCard from '../components/ProjectCard.jsx';
 import GalleryNameModal from '../components/GalleryNameModal.jsx';
 import ImageMasonry from '../components/ImageMasonry.jsx';
 import MomentsGrid from '../components/MomentsGrid.jsx';
+import StructureView from '../components/StructureView.jsx';
 
 const HEAD = {
   branding: { title: 'Branding', desc: 'Brand guidelines, presentations & identity work.', icon: FileText },
@@ -94,6 +95,15 @@ export default function GridPage({ type, reloadKey, onAdd }) {
   }, [projects, selected]);
 
   const toggle = (t) => setSelected((s) => (s.includes(t) ? s.filter((x) => x !== t) : [...s, t]));
+  const filterRow = allTags.length > 0 && (
+    <div className="filter-row">
+      <span className="filter-label"><Filter size={14} /> Filter</span>
+      {allTags.map((t) => (
+        <button key={t} className={`chip ${selected.includes(t) ? 'on' : ''}`} onClick={() => toggle(t)}>{t}</button>
+      ))}
+      {selected.length > 0 && <button className="chip clear" onClick={() => setSelected([])}><X size={13} /> Clear</button>}
+    </div>
+  );
 
   const createGallery = async (name) => {
     const g = await api.createGallery(type, name);
@@ -172,6 +182,7 @@ export default function GridPage({ type, reloadKey, onAdd }) {
           )}
           <div className="segmented">
             <button className={mode === 'all' ? 'on' : ''} onClick={() => switchMode('all')}>All</button>
+            {type === 'motion' && <button className={mode === 'structure' ? 'on' : ''} onClick={() => switchMode('structure')}>Structure</button>}
             {type === 'motion' && <button className={mode === 'moments' ? 'on' : ''} onClick={() => switchMode('moments')}>Moments</button>}
             <button className={mode === 'galleries' ? 'on' : ''} onClick={() => switchMode('galleries')}>Galleries</button>
           </div>
@@ -180,6 +191,14 @@ export default function GridPage({ type, reloadKey, onAdd }) {
 
       {error && <div className="center-msg">Couldn’t load: {error}</div>}
       {!projects && !error && <div className="spinner" />}
+
+      {/* -------- Structure mode (motion): videos compared by their sections -------- */}
+      {projects && !error && mode === 'structure' && type === 'motion' && (
+        <>
+          {filterRow}
+          <StructureView projects={filtered} />
+        </>
+      )}
 
       {/* -------- Moments mode (motion) -------- */}
       {projects && !error && mode === 'moments' && type === 'motion' && <MomentsGrid projects={projects} />}
@@ -208,15 +227,7 @@ export default function GridPage({ type, reloadKey, onAdd }) {
               )) : <div className="hint" style={{ padding: 8 }}>No colours yet.</div>}
             </div>
           )}
-          {allTags.length > 0 && (
-            <div className="filter-row">
-              <span className="filter-label"><Filter size={14} /> Filter</span>
-              {allTags.map((t) => (
-                <button key={t} className={`chip ${selected.includes(t) ? 'on' : ''}`} onClick={() => toggle(t)}>{t}</button>
-              ))}
-              {selected.length > 0 && <button className="chip clear" onClick={() => setSelected([])}><X size={13} /> Clear</button>}
-            </div>
-          )}
+          {filterRow}
 
           {filtered.length > 0 ? (
             isImage ? (

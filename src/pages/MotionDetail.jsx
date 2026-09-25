@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Camera, Film, Images, Tag as TagIcon, Trash2, Clock, ChevronLeft, ChevronRight, Maximize2, MoreVertical, Repeat, Crosshair, Gauge } from 'lucide-react';
 import { api, fileUrl } from '../lib/api.js';
 import { useSaver } from '../lib/autosave.js';
-import { captureFrame, captureSmallFrame, lengthTag, fmtTime, formatOf, resolutionOf, resolveDuration } from '../lib/media.js';
+import { captureFrame, captureSmallFrame, lengthTag, fmtTime, formatOf, resolutionOf, resolveDuration, audioPeaks } from '../lib/media.js';
 import { useToast } from '../components/Toast.jsx';
 import TagInput from '../components/TagInput.jsx';
 import Menu from '../components/Menu.jsx';
@@ -15,6 +15,7 @@ import MomentsPanel from '../components/MomentsPanel.jsx';
 
 const rid = () => Math.random().toString(36).slice(2, 8);
 const RATES = [0.25, 0.5, 1, 2];
+const WAVE_AUTO_MAX = 150 * 1024 * 1024; // bigger files: the waveform is read on request
 const loadRate = () => { try { const r = parseFloat(sessionStorage.getItem('videoRate')); return RATES.includes(r) ? r : 1; } catch { return 1; } };
 
 export default function MotionDetail({ project, setProject }) {
@@ -32,6 +33,7 @@ export default function MotionDetail({ project, setProject }) {
   const [techniques, setTechniques] = useState([]);
   const [rate, setRate] = useState(loadRate);
   const [loop, setLoop] = useState(null); // { key } — a section id, or 'all'
+  const [wave, setWave] = useState({ state: 'idle' }); // idle | working | large
   const [params] = useSearchParams();
   const jumped = useRef(false);
   const markersRef = useRef(markers);
@@ -144,6 +146,30 @@ export default function MotionDetail({ project, setProject }) {
     v.addEventListener('ended', onEnded);
     return () => { cancelAnimationFrame(raf); v.removeEventListener('ended', onEnded); };
   }, [loopRange?.start, loopRange?.end]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---- Audio waveform: read once in the browser, stored on the project ------
+  const readWave = async () => {
+    const projectId = project.id;
+    setWave({ state: 'working' });
+    let waveform = null;
+    try { waveform = await audioPeaks(fileUrl(project, project.video)); }
+    catch (e) { if (e.noAudio) waveform = { none: true }; } // silent / unreadable audio: don't try again
+    if (waveform) { try { setProject(await api.update(projectId, { waveform })); } catch { /* tried again next time */ } }
+    setWave({ state: 'idle' });
+  };
+  useEffect(() => {
+    if (project.waveform || !project.video) { setWave({ state: 'idle' }); return undefined; }
+    let alive = true;
+    fetch(fileUrl(project, project.video), { method: 'HEAD' })
+      .then((r) => Number(r.headers.get('content-length')) || 0)
+      .catch(() => 0)
+      .then((size) => {
+        if (!alive) return;
+        if (size > WAVE_AUTO_MAX) setWave({ state: 'large', size });
+        else readWave();
+      });
+    return () => { alive = false; };
+  }, [project.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- Moments: markers tagged with a technique, with a captured frame -----
   useEffect(() => { saver.flush(); setMarkers(project.markers || []); setLoop(null); }, [project.id, saver]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -331,7 +357,8 @@ export default function MotionDetail({ project, setProject }) {
 
       {/* Section timeline — the video's structure (Hook, Problem, Product reveal …) */}
       <SegmentTimeline videoRef={videoRef} current={current} duration={segDur} segments={segments}
-        onChange={saveSegments} onSeek={setCurrent} markers={markers} loopKey={loop?.key} onLoop={loopSection} />
+        onChange={saveSegments} onSeek={setCurrent} markers={markers} loopKey={loop?.key} onLoop={loopSection}
+        wave={{ ...wave, peaks: project.waveform?.peaks, onCompute: readWave }} />
 
       <MomentsPanel markers={markers} techniques={techniques} focusId={focusMarker} thumbUrl={(rel) => fileUrl(project, rel)}
         onAdd={addMoment} onPatch={patchMarker} onRemove={removeMarker} onSeek={seek} />

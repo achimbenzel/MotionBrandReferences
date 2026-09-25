@@ -158,3 +158,33 @@ export function resolveDuration(video) {
     try { video.currentTime = 1e101; } catch { done(); }
   });
 }
+
+/**
+ * Peak levels (0–100, `count` buckets) of a media file's audio track, decoded
+ * in the browser. Rejects (with `noAudio: true`) when there is no audio track
+ * the browser can read.
+ */
+export async function audioPeaks(url, count = 1200) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const buf = await res.arrayBuffer();
+  const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const ctx = new Offline(1, 1, 44100);
+  let audio;
+  try { audio = await ctx.decodeAudioData(buf); }
+  catch { throw Object.assign(new Error('No audio the browser can read'), { noAudio: true }); }
+  const channels = Array.from({ length: audio.numberOfChannels }, (_, i) => audio.getChannelData(i));
+  const len = audio.length;
+  const size = Math.max(1, Math.floor(len / count));
+  const raw = [];
+  for (let b = 0; b < count; b += 1) {
+    const from = b * size;
+    const to = Math.min(len, from + size);
+    let peak = 0;
+    for (const ch of channels) for (let i = from; i < to; i += 1) { const v = Math.abs(ch[i]); if (v > peak) peak = v; }
+    raw.push(peak);
+  }
+  const max = Math.max(...raw);
+  if (!max) return { peaks: raw.map(() => 0), duration: audio.duration };
+  return { peaks: raw.map((v) => Math.round((v / max) * 100)), duration: audio.duration };
+}

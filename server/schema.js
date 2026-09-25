@@ -26,11 +26,11 @@ export const emptyDB = () => ({
 // ---------------------------------------------------------------------------
 // Plans
 // ---------------------------------------------------------------------------
-export const BLOCK_TYPES = new Set(['moodboard', 'text', 'todos', 'files', 'pdf', 'links', 'refs', 'palette', 'heading', 'divider', 'table', 'briefing', 'storyboard', 'script', 'review']);
+export const BLOCK_TYPES = new Set(['moodboard', 'text', 'todos', 'files', 'pdf', 'links', 'refs', 'palette', 'heading', 'divider', 'table', 'briefing', 'storyboard', 'script', 'review', 'deliverables']);
 export const BLOCK_TITLES = {
   moodboard: 'Moodboard', text: 'Text', todos: 'To-dos', files: 'Files', pdf: 'PDF', links: 'Links',
   refs: 'References', palette: 'Palette', heading: 'Heading', divider: 'Divider', table: 'Table',
-  briefing: 'Briefing', storyboard: 'Storyboard', script: 'Script', review: 'Review',
+  briefing: 'Briefing', storyboard: 'Storyboard', script: 'Script', review: 'Review', deliverables: 'Deliverables',
 };
 
 // Where a plan stands. '' = no status (every plan made before statuses existed).
@@ -78,6 +78,19 @@ export const normalizeVersion = (v, blockId) => ({
   createdAt: num(v?.createdAt, 0, 1e14, 0),
   comments: (Array.isArray(v?.comments) ? v.comments : []).slice(0, 2000).map(normalizeComment),
 });
+// Deliverables block: every export to deliver, with its spec and where it stands.
+export const DELIVERABLE_STATUS = ['open', 'rendering', 'review', 'delivered'];
+export const normalizeDeliverable = (d) => ({
+  id: d?.id ? str(d.id, 40) : nanoid(6),
+  name: str(d?.name, 200),
+  aspect: str(d?.aspect, 20),
+  resolution: str(d?.resolution, 40),
+  fps: str(d?.fps, 20),
+  codec: str(d?.codec, 60),
+  length: str(d?.length, 40),
+  status: DELIVERABLE_STATUS.includes(d?.status) ? d.status : 'open',
+  notes: str(d?.notes, 2000),
+});
 export const normalizeTarget = (v) => num(v, 1, 3600, null); // seconds, or null = none / from the briefing
 export const normalizePace = (v) => num(v, 0.5, 6, 2.5);     // words per second
 
@@ -114,6 +127,8 @@ export function normalizeBlock(b, fallbackId) {
     if (!('target' in b)) b.target = null;
   } else if (b.type === 'review') {
     if (!Array.isArray(b.versions)) b.versions = [];
+  } else if (b.type === 'deliverables') {
+    if (!Array.isArray(b.items)) b.items = [];
   } else if (b.type === 'script') {
     if (!Array.isArray(b.lines)) b.lines = [];
     if (!Number.isFinite(b.pace)) b.pace = 2.5;
@@ -196,6 +211,14 @@ export const normalizeMarker = (m) => ({
 });
 export const normalizeMarkers = (arr) => (Array.isArray(arr) ? arr : []).filter((m) => m && typeof m === 'object')
   .slice(0, 1000).map(normalizeMarker).sort((a, b) => a.t - b.t);
+// Audio waveform of a motion video: peak levels (0–100) across its length.
+// `none: true` records that the video has no (readable) audio, so it isn't re-read.
+export const normalizeWaveform = (w) => {
+  if (!w || typeof w !== 'object') return null;
+  if (w.none) return { peaks: [], duration: 0, none: true };
+  if (!Array.isArray(w.peaks) || !w.peaks.length) return null;
+  return { peaks: w.peaks.slice(0, 4000).map((x) => Math.round(num(x, 0, 100, 0))), duration: num(w.duration, 0, 86400, 0) };
+};
 export const videoDim = (v) => { const n = Math.round(Number(v)); return Number.isFinite(n) && n > 0 && n <= 20000 ? n : null; };
 
 export function normalizeSegments(arr) {

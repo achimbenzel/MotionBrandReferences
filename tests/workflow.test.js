@@ -74,11 +74,15 @@ test('built-in templates are listed and a launch-video plan starts filled in', a
   const brief = plan.blocks.find((b) => b.type === 'briefing');
   assert.ok(brief.fields.some((f) => f.label === 'Target length'));
   assert.ok(brief.fields.every((f) => f.id && f.value === ''));
+  const deliver = plan.blocks.find((b) => b.type === 'deliverables');
+  assert.deepEqual(deliver.items.map((d) => [d.aspect, d.status]), [['16:9', 'open'], ['9:16', 'open'], ['1:1', 'open'], ['4:5', 'open']]);
+  assert.ok(deliver.items.every((d) => d.id));
   // Table rows are keyed by the (fresh) column ids.
-  const table = plan.blocks.find((b) => b.type === 'table');
+  const brandPlan = await newPlan({ template: 'branding' });
+  const table = brandPlan.blocks.find((b) => b.type === 'table');
   const colIds = table.columns.map((c) => c.id);
   assert.ok(!colIds.includes('c0'));
-  assert.equal(table.rows[0].cells[colIds[0]], '16:9 master');
+  assert.equal(table.rows[0].cells[colIds[0]], 'Logo (primary, secondary, icon)');
   // Every block has its own id, also across two plans from the same template.
   const again = await newPlan({ template: 'launch' });
   const allIds = [...plan.blocks, ...again.blocks].map((b) => b.id);
@@ -334,4 +338,36 @@ test('review block: versions with time-stamped comments are sanitised; in the la
   const copy = await newPlan({ template: t.data.template.id });
   assert.deepEqual(copy.blocks.find((b) => b.type === 'review').versions, []);
   await srv.api(`/api/plan-templates/${t.data.template.id}`, { method: 'DELETE' });
+});
+
+test('deliverables block: sanitised items, launch template list, template resets status', async () => {
+  const plan = await newPlan({ name: 'Deliver test' });
+  const add = await srv.api(`/api/plans/${plan.id}/blocks`, { method: 'POST', json: { type: 'deliverables' } });
+  assert.deepEqual(add.data.block.items, []);
+  const bid = add.data.block.id;
+  const r = await srv.api(`/api/plans/${plan.id}/blocks/${bid}`, { method: 'PATCH', json: { items: [
+    { id: 'd1', name: 'Master', aspect: '16:9', resolution: '3840 × 2160', fps: '25', codec: 'ProRes 422 HQ', length: '30 s', status: 'delivered', junk: 1 },
+    { name: 'Vertical', status: 'shipped' },
+  ] } });
+  const items = r.data.plan.blocks.find((b) => b.id === bid).items;
+  assert.deepEqual(Object.keys(items[0]).sort(), ['aspect', 'codec', 'fps', 'id', 'length', 'name', 'notes', 'resolution', 'status']);
+  assert.equal(items[0].status, 'delivered');
+  assert.equal(items[1].status, 'open');
+  assert.ok(items[1].id);
+  const found = await srv.api('/api/search?q=prores%20422');
+  assert.ok(found.data.results.some((x) => x.id === plan.id));
+  const t = await srv.api('/api/plan-templates', { method: 'POST', json: { planId: plan.id, name: 'DL tpl' } });
+  const copy = await newPlan({ template: t.data.template.id });
+  const citems = copy.blocks.find((b) => b.type === 'deliverables').items;
+  assert.deepEqual(citems.map((d) => [d.name, d.status]), [['Master', 'open'], ['Vertical', 'open']]);
+  await srv.api(`/api/plan-templates/${t.data.template.id}`, { method: 'DELETE' });
+});
+
+test('motion waveform: peaks clamped and capped; "no audio" remembered; bad values cleared', async () => {
+  let r = await srv.api('/api/projects/mot1', { method: 'PATCH', json: { waveform: { peaks: [0, 50, 120, -3, 'x'], duration: 12.4 } } });
+  assert.deepEqual(r.data.project.waveform, { peaks: [0, 50, 100, 0, 0], duration: 12.4 });
+  r = await srv.api('/api/projects/mot1', { method: 'PATCH', json: { waveform: { none: true, peaks: [1, 2] } } });
+  assert.deepEqual(r.data.project.waveform, { peaks: [], duration: 0, none: true });
+  r = await srv.api('/api/projects/mot1', { method: 'PATCH', json: { waveform: 'nope' } });
+  assert.equal(r.data.project.waveform, null);
 });

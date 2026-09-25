@@ -6,7 +6,7 @@ import {
   Image as ImageIcon, Camera, ArrowUp, ArrowDown, File as FileIcon, ExternalLink,
   Link2, Library, FolderOpen, Palette as PaletteIcon, Heading as HeadingIcon,
   Minus, Table as TableIcon, Wand2, Copy, FileText, AlertTriangle, ClipboardList,
-  LayoutTemplate, Building2, Clapperboard, ScrollText, MonitorPlay,
+  LayoutTemplate, Building2, Clapperboard, ScrollText, MonitorPlay, PackageCheck,
 } from 'lucide-react';
 import { api, planFileUrl, fileUrl } from '../lib/api.js';
 import { useSaver, useRefreshOnReturn } from '../lib/autosave.js';
@@ -25,6 +25,7 @@ import AutoTextarea from '../components/AutoTextarea.jsx';
 import ScriptBlock from '../components/plan/ScriptBlock.jsx';
 import StoryboardBlock from '../components/plan/StoryboardBlock.jsx';
 import ReviewBlock from '../components/plan/ReviewBlock.jsx';
+import DeliverablesBlock, { tableToDeliverables } from '../components/plan/DeliverablesBlock.jsx';
 import { voEstimate } from '../lib/timing.js';
 
 const rid = () => Math.random().toString(36).slice(2, 8);
@@ -44,6 +45,7 @@ const BLOCK_META = {
   script: { label: 'Script', icon: ScrollText },
   storyboard: { label: 'Storyboard', icon: Clapperboard },
   review: { label: 'Review', icon: MonitorPlay },
+  deliverables: { label: 'Deliverables', icon: PackageCheck },
   moodboard: { label: 'Moodboard', icon: Images },
   text: { label: 'Text', icon: StickyNote },
   todos: { label: 'To-dos', icon: ListChecks },
@@ -203,6 +205,28 @@ export default function PlanDetail() {
     try { await navigator.clipboard.writeText(`${head}\n${b.title}\n\n${lines.join('\n')}`); toast('Briefing copied'); }
     catch { toast('Copy failed', 'error'); }
   };
+  // Add a block right after another one; keeps this page's unsaved edits and
+  // only takes the new block from the server. → the new block
+  const addBlockAfter = async (type, afterId) => {
+    const before = new Set((planRef.current?.blocks || []).map((x) => x.id));
+    const next = await api.addBlock(id, type, { after: afterId });
+    setPlan((prev) => ({ ...prev, blocks: next.blocks.map((x) => prev.blocks.find((y) => y.id === x.id) || x) }));
+    return next.blocks.find((x) => !before.has(x.id));
+  };
+  const scrollToBlock = (bid) => setTimeout(() => document.getElementById(`block-${bid}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+
+  // Table → deliverables list (right below it; the table itself stays).
+  const makeDeliverables = async (b) => {
+    const items = tableToDeliverables(b);
+    if (!items.length) { toast('This table has no rows to turn into deliverables.'); return; }
+    try {
+      const nb = await addBlockAfter('deliverables', b.id);
+      editBlock(nb.id, { items, ...(b.title && b.title !== 'Table' ? { title: b.title } : {}) }, true);
+      toast(`Deliverables list with ${items.length} item${items.length === 1 ? '' : 's'} added below — the table stays until you delete it`);
+      scrollToBlock(nb.id);
+    } catch (e) { toast(`Could not create the list: ${e.message}`, 'error'); }
+  };
+
   // Script → storyboard: one shot per script line, timed by its voice-over,
   // added to the plan's first storyboard (or a new one right after the script).
   const scriptToStoryboard = async (b) => {
@@ -214,16 +238,10 @@ export default function PlanDetail() {
     });
     try {
       let sb = (planRef.current?.blocks || []).find((x) => x.type === 'storyboard');
-      if (!sb) {
-        const before = new Set((planRef.current?.blocks || []).map((x) => x.id));
-        const next = await api.addBlock(id, 'storyboard', { after: b.id });
-        sb = next.blocks.find((x) => !before.has(x.id));
-        // Keep this page's unsaved edits; only take the new block from the server.
-        setPlan((prev) => ({ ...prev, blocks: next.blocks.map((x) => prev.blocks.find((y) => y.id === x.id) || x) }));
-      }
+      if (!sb) sb = await addBlockAfter('storyboard', b.id);
       editBlock(sb.id, { shots: [...(sb.shots || []), ...shots] }, true);
       toast(`Added ${shots.length} shot${shots.length === 1 ? '' : 's'} to “${sb.title}”`);
-      setTimeout(() => document.getElementById(`block-${sb.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+      scrollToBlock(sb.id);
     } catch (e) { toast(`Could not create storyboard: ${e.message}`, 'error'); }
   };
 
@@ -353,6 +371,7 @@ export default function PlanDetail() {
 
   const blockMenu = (b, i) => [
     ...(b.type === 'script' ? [{ label: 'Storyboard from script', icon: <Clapperboard size={15} />, onClick: () => scriptToStoryboard(b) }] : []),
+    ...(b.type === 'table' && (b.rows || []).length ? [{ label: 'Make a deliverables list', icon: <PackageCheck size={15} />, onClick: () => makeDeliverables(b) }] : []),
     ...(b.type === 'heading' || b.type === 'divider' ? [] : [{ label: 'Rename', icon: <Pencil size={15} />, onClick: () => setRenameBlock(b) }]),
     ...(i > 0 ? [{ label: 'Move up', icon: <ArrowUp size={15} />, onClick: () => moveBlock(b.id, 'up') }] : []),
     ...(i < plan.blocks.length - 1 ? [{ label: 'Move down', icon: <ArrowDown size={15} />, onClick: () => moveBlock(b.id, 'down') }] : []),
@@ -488,6 +507,10 @@ export default function PlanDetail() {
             <StoryboardBlock key={b.id} plan={plan} block={b} menu={menu} icon={Meta.icon} editBlock={editBlock} planRef={planRef} toast={toast}
               upload={(files) => api.uploadBlockFiles(id, b.id, files)} fileUrl={(rel) => planFileUrl(plan, rel)} />
           );
+        }
+
+        if (b.type === 'deliverables') {
+          return <DeliverablesBlock key={b.id} plan={plan} block={b} menu={menu} icon={Meta.icon} editBlock={editBlock} planRef={planRef} toast={toast} />;
         }
 
         if (b.type === 'review') {

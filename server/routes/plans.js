@@ -8,7 +8,7 @@ import { moveInto, replaceImage, safeRm, moveToTrash, moveRelPaths, extOf } from
 import { upload } from '../upload.js';
 import {
   BLOCK_TYPES, BLOCK_TITLES, PLAN_STATUSES, STORYBOARD_ASPECTS, normalizeField, normalizeShot, normalizeAudio,
-  normalizeLine, normalizeTarget, normalizePace, normalizeVersion, str,
+  normalizeLine, normalizeTarget, normalizePace, normalizeVersion, normalizeDeliverable, str,
 } from '../schema.js';
 import { BUILTIN_TEMPLATES, builtinTemplate, planFromTemplate, templateFromPlan, templateSummary } from '../templates.js';
 import { createRouter } from '../http.js';
@@ -177,6 +177,7 @@ router.post('/api/plans/:id/blocks', async (req, res) => {
                 : type === 'storyboard' ? { ...base, aspect: '16:9', shots: [], audio: null, target: null }
                   : type === 'script' ? { ...base, pace: 2.5, target: null, lines: [normalizeLine({})] }
                     : type === 'review' ? { ...base, versions: [] }
+                      : type === 'deliverables' ? { ...base, items: [] }
                       : { ...base, files: [] }; // files + pdf
   // Appended at the end, or right after `after` (a block id) when given.
   const updated = await mutateDB((db) => {
@@ -208,6 +209,7 @@ router.patch('/api/plans/:id/blocks/:blockId', async (req, res) => {
       else if (k === 'target') b.target = normalizeTarget(v);
       else if (k === 'lines') { if (Array.isArray(v)) b.lines = v.slice(0, 500).map(normalizeLine); }
       else if (k === 'pace') b.pace = normalizePace(v);
+      else if (k === 'items' && b.type === 'deliverables') { if (Array.isArray(v)) b.items = v.slice(0, 200).map(normalizeDeliverable); }
       else if (k === 'versions') { if (Array.isArray(v)) b.versions = v.slice(0, 50).map((x) => normalizeVersion(x, b.id)).filter((x) => x.file); }
       else if (Array.isArray(v)) b[k] = v; // items / columns / rows
     }

@@ -285,8 +285,9 @@ a client, and choose what to start from —
 - **Launch video** — briefing (product, audience, key message, CTA, target
   length, formats, tone, music & VO, must-haves, budget), a script (lines
   pre-labelled Hook → Logo outro), moodboard, references, styleframes,
-  palette, a storyboard, a production checklist, a review block, a deliverables table
-  (16:9 / 9:16 / 1:1 / 4:5) plus milestones from kick-off to final delivery,
+  palette, a storyboard, a production checklist, a review block, a deliverables
+  list (16:9 master, 9:16, 1:1, 4:5) plus milestones from kick-off to final
+  delivery,
 - **Branding** — briefing, research (references, competitors), moodboard, logo
   concepts, colour palette, typography, a checklist, a deliverables table and a
   brand-guidelines PDF block,
@@ -335,6 +336,15 @@ one stage at a time (archived plans only show under **Archived**). Each
       optional **music / voice-over track** in sync (Space play/pause, ←/→
       shots, C captions, Esc close); click a frame or a strip cell to start
       there.
+    - **Deliverables** — every export to hand over, with **format** (a format
+      fills in the usual resolution), **resolution**, **fps**, **codec**,
+      **length**, an optional note and a **status** — Open → Rendering → In
+      review → Delivered — with a progress bar (“3/7 delivered”). **Add**
+      offers sets (Master 16:9 4K, ProRes master, Social set 9:16 · 1:1 · 4:5,
+      Cutdowns 15 s · 6 s); **Copy** gives a spec checklist. An existing table
+      (e.g. a “Deliverables” table) becomes a list via its ⋯ **Make a
+      deliverables list** — columns are matched by name, others go to the
+      note, and the table stays until you delete it.
     - **Review** — upload each render as a **version** (v1, v2 … — or drop the
       file on the block). Pause anywhere and write **feedback pinned to that
       moment**; comments show on a timeline under the player, jump there on
@@ -415,8 +425,14 @@ restaurant, …) and filter the grid by those tags.
 
 ### Motion Design
 Upload a **video**; scrub to the frame you want and it becomes the cover. In the
-grid, resting the mouse on a card **plays a muted preview**. On a project you
-get:
+grid, resting the mouse on a card **plays a muted preview**. Besides **All**,
+**Moments** and **Galleries**, the **Structure** view compares every video that
+has sections: one bar per video on a shared **time** axis (or **proportional**,
+full width), sortable by date or length and filterable by tag, with a table of
+**averages per section type** — in how many videos, average length, where it
+starts, share of the video. A section opens its video right there.
+
+On a project you get:
 - a **player** (its **volume / mute is remembered** across reloads) with notes
   (auto-saved) and **tags** (used for filtering),
 - an automatic **length tag** — `≤ 30s`, `30–60s`, `60–90s`, `> 90s` — and a
@@ -424,6 +440,10 @@ get:
   video, both usable as filters; the format and resolution (4K / 1080p / 720p)
   also show under the player and as a badge on the card. Videos added before
   this are measured once in the background when you open Motion Design,
+- the **audio waveform** under the section bar (see the cuts land on the beat;
+  click or drag to scrub). It's read once in the browser and stored with the
+  project; for files over 150 MB it's read when you ask for it. Videos without
+  a readable audio track simply show none,
 - **player tools** — speed **¼×, ½×, 1×, 2×** (`<` / `>`), **Loop** (`L`) the
   section under the playhead (or the whole video; each section also has its
   own loop button) and **Mark moment** (`M`),

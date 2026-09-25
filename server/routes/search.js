@@ -45,7 +45,7 @@ router.get('/api/search', async (req, res) => {
   for (const pl of db.plans) {
     const blockText = (pl.blocks || []).flatMap((b) => [
       b.title, b.content,
-      ...(b.items || []).flatMap((t) => [t.text, t.title, t.url, t.name, t.hex]),
+      ...(b.items || []).flatMap((t) => [t.text, t.title, t.url, t.name, t.hex, t.codec, t.notes]),
       ...(b.files || []).map((f) => f.name),
       ...(b.columns || []).map((c) => c.name),
       ...(b.rows || []).flatMap((r) => Object.values(r.cells || {})),

@@ -22,7 +22,7 @@ export const BUILTIN_TEMPLATES = [
   {
     id: 'launch',
     name: 'Launch video',
-    description: 'Briefing, script, styleframes, production checklist and deliverables for a product launch video.',
+    description: 'Briefing, script, storyboard, review rounds and deliverables for a product launch video.',
     emoji: '🚀',
     bannerGradient: 'midnight',
     status: 'briefing',
@@ -44,12 +44,12 @@ export const BUILTIN_TEMPLATES = [
       todos('Production checklist', ['Script approved', 'Styleframes approved', 'Storyboard / animatic approved',
         'Music & voice-over licensed', 'Animation', 'Sound design & mix', 'Final review', 'Exports delivered']),
       block('review', 'Review', { versions: [] }),
-      table('Deliverables', ['Format', 'Resolution', 'Length', 'Status'], [
-        ['16:9 master', '3840 × 2160', '', 'Open'],
-        ['9:16 social', '1080 × 1920', '', 'Open'],
-        ['1:1 feed', '1080 × 1080', '', 'Open'],
-        ['4:5 feed', '1080 × 1350', '', 'Open'],
-      ]),
+      block('deliverables', 'Deliverables', { items: [
+        { name: 'Master', aspect: '16:9', resolution: '3840 × 2160', codec: 'H.264' },
+        { name: 'Social vertical', aspect: '9:16', resolution: '1080 × 1920', codec: 'H.264' },
+        { name: 'Feed square', aspect: '1:1', resolution: '1080 × 1080', codec: 'H.264' },
+        { name: 'Feed portrait', aspect: '4:5', resolution: '1080 × 1350', codec: 'H.264' },
+      ].map((d) => ({ fps: '', length: '', status: 'open', notes: '', ...d })) }),
       block('links', 'Links', { items: [] }),
       block('files', 'Files'),
     ],
@@ -131,6 +131,7 @@ export function templateFromPlan(plan, name) {
   const blocks = cloneBlocks(plan.blocks).map((b) => {
     if (b.type === 'todos') b.items = b.items.map((t) => ({ ...t, done: false, urgent: false }));
     if (b.type === 'briefing') b.fields = b.fields.map((f) => ({ ...f, value: '' }));
+    if (b.type === 'deliverables') b.items = b.items.map((d) => ({ ...d, status: 'open' }));
     return b;
   });
   return {

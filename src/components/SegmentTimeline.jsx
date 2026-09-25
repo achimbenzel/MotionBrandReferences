@@ -6,6 +6,7 @@ import { useConfirm } from './ConfirmDialog.jsx';
 import { SEGMENT_KINDS, segmentKind, segmentColor, segmentName } from '../lib/segments.js';
 import { tagColor } from '../lib/types.js';
 import { isTouch } from '../lib/useMedia.js';
+import Waveform from './Waveform.jsx';
 
 const rid = () => Math.random().toString(36).slice(2, 8);
 const NEAR = 0.25; // seconds — a mark this close to a boundary retypes that section
@@ -25,7 +26,7 @@ function fmtT(seconds) {
  * tap a type (or press 1–7) where that part begins; the bar scrubs the video.
  * `segments` are { id, start, kind, label }; onChange(next, immediate) saves.
  */
-export default function SegmentTimeline({ videoRef, current, duration, segments, onChange, onSeek, markers = [], loopKey = null, onLoop }) {
+export default function SegmentTimeline({ videoRef, current, duration, segments, onChange, onSeek, markers = [], loopKey = null, onLoop, wave = null }) {
   const toast = useToast();
   const [dialog, ask] = useConfirm();
   const barRef = useRef(null);
@@ -151,6 +152,18 @@ export default function SegmentTimeline({ videoRef, current, duration, segments,
         ))}
         {duration > 0 && <span className="seg-playhead" style={{ left: `${clamp(current / duration, 0, 1) * 100}%` }} />}
       </div>
+
+      {wave?.peaks?.length > 0 && (
+        <div className="wave-wrap" {...barHandlers} title="Audio — click or drag to scrub">
+          <Waveform peaks={wave.peaks} progress={duration ? current / duration : 0} />
+        </div>
+      )}
+      {wave?.state === 'working' && <div className="wave-note">Reading the audio…</div>}
+      {wave?.state === 'large' && (
+        <button className="wave-note wave-btn" onClick={wave.onCompute}>
+          Show the audio waveform{wave.size ? ` (reads the whole ${Math.round(wave.size / 1048576)} MB file)` : ''}
+        </button>
+      )}
 
       <div className="seg-marks">
         <span className="seg-marks-label">Mark at playhead</span>
