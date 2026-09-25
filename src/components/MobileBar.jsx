@@ -44,7 +44,7 @@ export default function MobileBar({ onMenu, onSearch, onAdd }) {
 
   const workMode = isWorkPath(pathname);
   const onPlan = pathname === '/plan' || pathname.startsWith('/plan/');
-  const showAdd = pathname !== '/trash' && (!workMode || onPlan); // nothing to add on the Logo Tester, To-Dos…
+  const showAdd = pathname !== '/trash' && (!workMode || onPlan); // nothing to add on the Brand Tester, To-Dos…
   // Section pages have their own big title at the top; detail pages don't.
   const sectionPage = !/^\/(project|gallery|plan|software)\/./.test(pathname);
 

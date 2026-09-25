@@ -272,6 +272,15 @@ export const api = {
   },
 
   // --- To-Do board (global Kanban planner) ---
+  // One card at a time (a plan's to-do list): → the whole board, fresh.
+  async addBoardCard({ title, planId, columnId, urgent } = {}) {
+    const { board } = await request('/api/board/cards', { method: 'POST', json: { title, planId, columnId, urgent } });
+    return board;
+  },
+  async updateBoardCard(id, patch) {
+    const { board } = await request(`/api/board/cards/${id}`, { method: 'PATCH', json: patch });
+    return board;
+  },
   async getBoard() {
     const { board } = await request('/api/board');
     return board;

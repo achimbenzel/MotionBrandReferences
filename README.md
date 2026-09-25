@@ -3,7 +3,7 @@
 A personal, **local-only** design reference library with eight sections —
 **Branding**, **Motion Design**, **Logos**, **Business Cards**, **Colors**,
 **Image Gallery**, **Fonts** and **Logo No Go** — plus a **Work** area (a
-Dashboard, Plans, Software, a To-Do board and the Logo Tester). Cards with thumbnails and text below, styled after
+Dashboard, Plans, Software, a To-Do board and the Brand Tester). Cards with thumbnails and text below, styled after
 [achimbenzel.com/de/work](https://achimbenzel.com/de/work). Each section can be
 viewed as **All** (all projects) or **Galleries** (named collections you create,
 e.g. "Green Tech Companies"). A storage meter in the header sums the `data/`
@@ -96,7 +96,7 @@ Caching is already handled by the app: content-hashed build assets
 (`/assets/*`) and immutable library files (moodboard / plan-block uploads) are
 sent with a one-year `immutable` cache; `index.html` and re-uploadable files
 (banner / avatar / cover) use a short cache so a redeploy or re-upload shows up
-right away. Heavy code (pdf.js, the Logo Tester, the thumbnail studio, each
+right away. Heavy code (pdf.js, the Brand Tester, the thumbnail studio, each
 detail page) is split into its own chunk and fetched only when first needed.
 
 ---
@@ -217,7 +217,7 @@ command palette that searches **across every section at once** — project
 titles, categories, tags and notes, colours (by hex), font sites, a video's
 sections (type and note), and plan names, clients, milestones, to-dos and
 briefing answers. It also lets you **jump to any section** (or
-Plans, Logo Tester, Trash) by name. Arrow keys to move, Enter to open, Esc to
+Plans, Brand Tester, Trash) by name. Arrow keys to move, Enter to open, Esc to
 close.
 
 ### Trash (recoverable deletes)
@@ -248,7 +248,7 @@ A toggle switches between two modes:
 
 - **Work** — the **default** mode (left in the toggle), your working area. It
   opens on a **Dashboard** and holds **Plans**, **Software**, the **To-Do
-  board** and the **Logo Tester** (see below).
+  board** and the **Brand Tester** (see below).
 - **Reference** — the library (Branding, Motion Design, Logos, Business Cards,
   Colors, Image Gallery, Fonts, Logo No Go).
 
@@ -278,6 +278,13 @@ uses the **full width**, so extra lists run past the usual content margins; on
 a phone every list is a full-width, swipeable page with **list tabs** above to
 jump between them. Everything auto-saves to one global board.
 
+A card can **belong to a plan** (⋯ → **Link to plan…**): it shows the plan's
+name (a click opens the plan), the filter at the top shows **one plan's cards**
+(new cards then belong to it), and the plan lists its cards under **To-dos on
+the board** — add one there (it lands in the first list), move it to another
+list, flag it urgent or unlink it; those changes touch only that card. Urgent
+cards on the Dashboard name their plan.
+
 ### Plans
 Plan new projects. The **+** opens **New plan**: give it a name and (optionally)
 a client, and choose what to start from —
@@ -302,6 +309,8 @@ a client, and choose what to start from —
 Plans are listed in a grid like galleries, with **status chips** above to show
 one stage at a time (archived plans only show under **Archived**). Each
 **plan** has:
+  - **To-dos on the board** — the To-Do board's cards linked to this plan (see
+    To-Do board),
   - a **status** — Briefing, Concept, Design, Production, Review, Delivered or
     Archived (or none) — picked from the pill under the plan's name, next to
     its **client**,
@@ -403,15 +412,23 @@ Note: license keys and account details are stored **in plain text** in
 `data/db.json`. The file is never served over HTTP, but keep that in mind before
 syncing or backing up the folder anywhere.
 
-### Logo Tester
-A sandbox (nothing is saved) to stress-test a logo. Upload a **PNG or SVG**,
-then preview it live:
-- a big **stage** with adjustable **background** (light / dark / transparent
-  checker / custom colour), **scale**, **blur** and **pixelate** sliders, plus
-  **grayscale** and **invert** toggles;
-- real-world previews: a **browser tab** favicon, **app icons** (rounded
-  128 / 64 px tiles), exact **favicon sizes** (16 / 32 / 48 px) and a **small
-  sizes** row (24–96 px) to check legibility when tiny.
+### Brand Tester
+Stress-test a logo (the page used to be called Logo Tester; the address is the
+same). Upload a **PNG or SVG**, or pick one **from your library** (Logos) — its
+colour variants come along. Then:
+- a big **stage** with **background** (light / dark / transparent checker /
+  custom, plus your colours from **Colors** as one-click swatches), the **logo
+  colour** (original, its variants, black, white or any colour as a
+  silhouette), **scale**, **blur**, **pixelate**, **grayscale** and **invert**,
+- the **clear space** drawn around the logo — the visible mark (transparent
+  padding in the file is ignored), with a margin of x = a set % of its height,
+- previews as a **browser tab** and **favicons** (16 / 32 / 48 px), as a
+  **profile picture** (circle) and an **app icon** (squircle) with adjustable
+  padding, a **minimum size** strip (flags sizes below your minimum; screen px
+  and print mm are noted) and the logo **on your brand colours**,
+- **Sheet (PNG)** — every test on one page; **Save to plan…** puts that sheet
+  into a plan's moodboard (an existing one, or a new “Brand tests” board).
+  Nothing else is stored; the settings are remembered for the session.
 
 ## What each section does
 
@@ -550,7 +567,7 @@ everything: the **logo** and a collapse button at the top, search (⌘K) below
 it, the Work / Reference toggle, the section list (with icons, current one
 highlighted), an **Add** button, and a footer with **Settings**, **Trash** and
 the storage meter. In **Work** mode the section list is **Dashboard**,
-**Plans**, **Software**, **To-Dos** and **Logo Tester**.
+**Plans**, **Software**, **To-Dos** and **Brand Tester**.
 The collapse button **slides** the sidebar out for a full-width canvas; a small
 floating button slides it back in, and the collapsed state is remembered.
 

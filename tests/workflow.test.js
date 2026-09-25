@@ -371,3 +371,36 @@ test('motion waveform: peaks clamped and capped; "no audio" remembered; bad valu
   r = await srv.api('/api/projects/mot1', { method: 'PATCH', json: { waveform: 'nope' } });
   assert.equal(r.data.project.waveform, null);
 });
+
+test('board cards can belong to a plan; single-card add / move / unlink leave the rest alone', async () => {
+  const plan = await newPlan({ name: 'Todo link test' });
+  const board0 = (await srv.api('/api/board')).data.board;
+  // An existing card elsewhere on the board must survive untouched.
+  const cols = board0.columns.map((c, i) => (i === 0 ? { ...c, cards: [...c.cards, { id: 'keep', title: 'Untouched', tags: [{ label: 'x', color: 'red' }] }] } : c));
+  await srv.api('/api/board', { method: 'PUT', json: { columns: cols } });
+
+  let r = await srv.api('/api/board/cards', { method: 'POST', json: { title: 'Storyboard review with client', planId: plan.id } });
+  assert.equal(r.status, 201);
+  const first = r.data.board.columns[0];
+  const card = first.cards.find((k) => k.title === 'Storyboard review with client');
+  assert.equal(card.planId, plan.id);
+  assert.ok(first.cards.some((k) => k.id === 'keep' && k.tags[0].label === 'x'));
+
+  const target = r.data.board.columns[r.data.board.columns.length - 1];
+  r = await srv.api(`/api/board/cards/${card.id}`, { method: 'PATCH', json: { columnId: target.id, urgent: true, title: 'Storyboard review ✓' } });
+  const moved = r.data.board.columns.find((c) => c.id === target.id).cards.find((k) => k.id === card.id);
+  assert.ok(moved && moved.urgent && moved.title === 'Storyboard review ✓' && moved.planId === plan.id);
+  assert.ok(!r.data.board.columns[0].cards.some((k) => k.id === card.id));
+
+  r = await srv.api(`/api/board/cards/${card.id}`, { method: 'PATCH', json: { planId: null } });
+  assert.equal(r.data.board.columns.find((c) => c.id === target.id).cards.find((k) => k.id === card.id).planId, null);
+  assert.equal((await srv.api('/api/board/cards/nope', { method: 'PATCH', json: { title: 'x' } })).status, 404);
+
+  // A whole-board save keeps the link (and drops junk).
+  const b = (await srv.api('/api/board')).data.board;
+  b.columns[0].cards.push({ id: 'linked', title: 'Linked', planId: plan.id, junk: true });
+  r = await srv.api('/api/board', { method: 'PUT', json: { columns: b.columns } });
+  const linked = r.data.board.columns[0].cards.find((k) => k.id === 'linked');
+  assert.equal(linked.planId, plan.id);
+  assert.equal('junk' in linked, false);
+});

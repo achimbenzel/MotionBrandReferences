@@ -26,6 +26,7 @@ import ScriptBlock from '../components/plan/ScriptBlock.jsx';
 import StoryboardBlock from '../components/plan/StoryboardBlock.jsx';
 import ReviewBlock from '../components/plan/ReviewBlock.jsx';
 import DeliverablesBlock, { tableToDeliverables } from '../components/plan/DeliverablesBlock.jsx';
+import PlanTodos from '../components/plan/PlanTodos.jsx';
 import { voEstimate } from '../lib/timing.js';
 
 const rid = () => Math.random().toString(36).slice(2, 8);
@@ -492,6 +493,9 @@ export default function PlanDetail() {
           <button className="btn btn-ghost btn-sm ms-add" onClick={addMilestone}><Plus size={15} /> Add milestone</button>
         </div>
       </div>
+
+      {/* The To-Do board's cards linked to this plan */}
+      <PlanTodos planId={plan.id} toast={toast} />
 
       {/* Content blocks (dynamic) */}
       {plan.blocks.map((b, i) => {

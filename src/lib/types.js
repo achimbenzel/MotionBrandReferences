@@ -39,13 +39,13 @@ export const isType = (t) => TYPE_KEYS.includes(t);
 
 // "Work" mode (the counterpart to Reference mode) is the default mode. It opens
 // on the Dashboard and groups the working tools: Plans, the To-Do board and the
-// Logo Tester.
+// Brand Tester.
 export const WORK_TABS = [
   { key: 'dashboard', label: 'Dashboard', path: '/work' },
   { key: 'plan', label: 'Plans', path: '/plan' },
   { key: 'software', label: 'Software', path: '/software' },
   { key: 'board', label: 'To-Dos', path: '/board' },
-  { key: 'logotester', label: 'Logo Tester', path: '/logo-tester' },
+  { key: 'logotester', label: 'Brand Tester', path: '/logo-tester' },
 ];
 export const WORK_HOME = '/work';
 

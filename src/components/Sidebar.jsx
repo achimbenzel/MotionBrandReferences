@@ -31,7 +31,7 @@ export default function Sidebar({ onAdd, onSearch, onToggle, drawer = false, ope
   const active = useActiveTab(pathname);
 
   const go = (key) => { setLastTab(key); navigate(`/${key}`); };
-  const showAdd = !onTrash && (!workMode || onPlan); // nothing to "add" on the Logo Tester
+  const showAdd = !onTrash && (!workMode || onPlan); // nothing to "add" on the Brand Tester
 
   return (
     // A closed drawer is off-screen; `inert` keeps it out of tab order too.

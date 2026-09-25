@@ -2277,7 +2277,7 @@ img { max-width: 100%; display: block; }
 .sidebar .storage-pill { width: 100%; background: var(--surface-2); box-shadow: none; }
 .sidebar .storage-text { flex: 1; }
 
-/* ============================================================ Logo Tester */
+/* ============================================================ Brand Tester (Logo Tester) */
 .lt-drop { min-height: 220px; }
 .lt-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .lt-color { width: 40px; height: 32px; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: none; cursor: pointer; }
@@ -3027,3 +3027,102 @@ img { max-width: 100%; display: block; }
 .wave-note { display: block; margin-top: 6px; font-size: 12px; color: var(--text-faint); }
 .wave-btn { border: 1px dashed var(--border-strong); background: transparent; border-radius: 8px; padding: 8px 10px; cursor: pointer; width: 100%; text-align: left; font: inherit; font-size: 12.5px; color: var(--text-muted); }
 .wave-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ------------------------------------------------ To-dos ↔ plans */
+.kb-filter { display: inline-flex; align-items: center; gap: 8px; color: var(--text-muted); margin-left: auto; }
+.kb-filter select { height: 34px; padding: 0 28px 0 10px; font-size: 13px; width: auto; max-width: 260px; }
+.kb-plan {
+  display: inline-flex; align-items: center; gap: 5px; max-width: 100%; margin: 2px 0 4px; padding: 2px 8px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text-muted); font: inherit; font-size: 11.5px; font-weight: 600;
+  cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.kb-plan:hover { color: var(--text); border-color: var(--border-strong); }
+.plan-picker { max-width: 460px; }
+.pp-search { display: flex; align-items: center; gap: 8px; color: var(--text-faint); margin-bottom: 10px; }
+.pp-search .input { flex: 1; }
+.pp-list { display: flex; flex-direction: column; gap: 2px; max-height: 50vh; overflow-y: auto; }
+.pp-item {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px;
+  background: transparent; color: var(--text); font: inherit; font-size: 14px; text-align: left; cursor: pointer;
+}
+.pp-item:hover { background: var(--surface-2); }
+.pp-item.on { border-color: var(--accent); background: var(--accent-dim); }
+.pp-avatar { width: 30px; height: 30px; border-radius: 8px; background: var(--surface-3); display: grid; place-items: center; font-size: 17px; color: var(--text-muted); flex: none; }
+.pp-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.pp-client { font-weight: 400; color: var(--text-muted); }
+.pp-check { color: var(--accent); flex: none; }
+.plan-todos .section-head { margin-bottom: 10px; }
+.pt-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.pt-row { display: flex; align-items: center; gap: 8px; padding: 5px 6px 5px 6px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.pt-row.urgent { box-shadow: inset 3px 0 0 var(--danger); }
+.pt-col {
+  display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 8px 0 10px; border-radius: 999px; border: 0;
+  background: var(--surface-3); color: var(--text-muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; max-width: 150px; overflow: hidden;
+}
+.pt-col.done { background: #22483a; color: #7fe0b0; }
+.pt-title { flex: 1; min-width: 0; height: 30px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--text); font: inherit; font-size: 14px; padding: 4px 8px; outline: none; }
+.pt-title:hover { border-color: var(--border); }
+.pt-title:focus { border-color: var(--accent); background: var(--bg); }
+.pt-row.done .pt-title { color: var(--text-faint); text-decoration: line-through; }
+.pt-urgent, .pt-unlink { width: 30px; height: 30px; color: var(--text-faint); flex: none; }
+.pt-urgent.on { color: var(--danger); }
+.pt-urgent:hover { color: var(--danger); }
+.pt-unlink:hover { color: var(--text); }
+.pt-add { display: flex; align-items: center; gap: 8px; color: var(--text-faint); }
+.pt-add .input { flex: 1; min-width: 0; }
+@media (max-width: 640px) {
+  .kb-filter { margin-left: 0; width: 100%; }
+  .kb-filter select { flex: 1; max-width: none; }
+  .page-head-row:has(.kb-filter) { flex-wrap: wrap; }
+}
+
+/* Brand Tester additions */
+.bt-start { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+.bt-library {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 220px;
+  border: 1px dashed var(--border-strong); border-radius: var(--radius); background: transparent; color: var(--text-muted);
+  font: inherit; font-weight: 600; cursor: pointer; padding: 18px;
+}
+.bt-library:hover { border-color: var(--accent); color: var(--accent); }
+.bt-name { font-weight: 700; font-size: 15px; max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bt-label { font-size: 12px; font-weight: 600; color: var(--text-faint); text-transform: uppercase; letter-spacing: .04em; }
+.bt-swatches { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.bt-swatch {
+  width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--border-strong); cursor: pointer; padding: 0;
+  display: grid; place-items: center; font: inherit; font-size: 10px; font-weight: 700; color: var(--text);
+}
+.bt-swatch.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-dim); }
+.bt-original { background: conic-gradient(#ff6a88, #ffd43b, #69db7c, #4dabf7, #b197fc, #ff6a88); color: #111; }
+.lt-stage { position: relative; }
+.lt-logo { position: relative; flex: none; }
+.lt-clear-inner, .lt-clear-outer { position: absolute; pointer-events: none; }
+.lt-clear-inner { outline: 1px solid rgba(31, 167, 179, .9); }
+.lt-clear-outer { border: 1.5px dashed #e5484d; }
+.lt-clear-x {
+  position: absolute; left: 50%; top: 0; transform: translateX(-50%); display: grid; place-items: center; min-height: 12px;
+  font-size: 11px; font-weight: 700; color: #e5484d; border-left: 1px solid #e5484d; padding-left: 4px;
+}
+.bt-avatar { border-radius: 50%; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--border); }
+.bt-squircle { display: grid; place-items: center; -webkit-mask-size: 100% 100%; mask-size: 100% 100%; }
+.bt-pad { margin-top: 14px; }
+.bt-pad input[type=range] { width: 140px; }
+.bt-min-head { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 18px; margin-bottom: 14px; }
+.bt-min { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted); }
+.bt-min .input { width: 64px; height: 30px; padding: 2px 8px; text-align: right; }
+.bt-minstrip { padding: 14px 12px; gap: 22px; }
+.bt-small span { color: var(--danger); font-weight: 600; }
+.bt-small > :first-child { opacity: .8; outline: 1px dashed var(--danger); outline-offset: 3px; }
+.bt-brand { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
+.bt-brand-tile { display: flex; flex-direction: column; gap: 6px; font-size: 11.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.bt-brand-bg { height: 80px; border-radius: 10px; display: grid; place-items: center; border: 1px solid var(--border); }
+.bt-picker { max-width: 720px; }
+.bt-picker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; max-height: 56vh; overflow-y: auto; }
+.bt-pick { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 6px; cursor: pointer; font: inherit; color: var(--text); text-align: left; }
+.bt-pick:hover { border-color: var(--accent); }
+.bt-pick-plate { aspect-ratio: 1; border-radius: 8px; display: grid; place-items: center; overflow: hidden; }
+.bt-pick-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4px 4px; }
+@media (max-width: 640px) {
+  .bt-start { grid-template-columns: 1fr; }
+  .bt-library { min-height: 120px; }
+  .bt-name { max-width: 100%; flex-basis: 100%; }
+}

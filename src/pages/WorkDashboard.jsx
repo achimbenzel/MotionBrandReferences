@@ -65,8 +65,13 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
   const recent = (plans || []).filter((p) => p.status !== 'archived').slice(0, 6);
 
   // Urgent to-dos, gathered from the board and every plan's to-do blocks.
+  const planName = (id) => (plans || []).find((p) => p.id === id)?.name;
   const urgentBoard = (board?.columns || []).flatMap((c) =>
-    (c.cards || []).filter((k) => k.urgent).map((k) => ({ id: k.id, kind: 'board', label: k.title || 'Untitled to-do', context: c.name || 'To-Dos', to: '/board' })));
+    (c.cards || []).filter((k) => k.urgent).map((k) => ({
+      id: k.id, kind: 'board', label: k.title || 'Untitled to-do',
+      context: [planName(k.planId), c.name || 'To-Dos'].filter(Boolean).join(' · '),
+      to: planName(k.planId) ? `/board?plan=${k.planId}` : '/board',
+    })));
   const urgentPlans = (plans || []).flatMap((p) =>
     (p.blocks || []).filter((b) => b.type === 'todos').flatMap((b) =>
       (b.items || []).filter((it) => it.urgent && !it.done).map((it) => ({ id: it.id, kind: 'plan', label: it.text || 'Untitled to-do', context: p.name || 'Plan', to: `/plan/${p.id}` }))));
@@ -89,7 +94,7 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
     { key: 'plan', icon: PencilRuler, title: 'Plans', sub: planCount ? `${planCount} plan${planCount === 1 ? '' : 's'}` : 'Plan a new project', to: '/plan', accent: 'linear-gradient(120deg,#6a11cb,#2575fc)' },
     { key: 'software', icon: AppWindow, title: 'Software', sub: softCount ? `${softCount} app${softCount === 1 ? '' : 's'}` : 'Plugins, scripts & more', to: '/software', accent: 'linear-gradient(120deg,#7b4397,#dc2430)' },
     { key: 'board', icon: ListTodo, title: 'To-Do Board', sub: boardCards ? `${boardCards} card${boardCards === 1 ? '' : 's'} · ${boardLists} lists` : 'Plan your to-dos', to: '/board', accent: 'linear-gradient(120deg,#00c6a7,#1e4fd6)' },
-    { key: 'logotester', icon: FlaskConical, title: 'Logo Tester', sub: 'Stress-test a logo', to: '/logo-tester', accent: 'linear-gradient(120deg,#f83600,#f9d423)' },
+    { key: 'logotester', icon: FlaskConical, title: 'Brand Tester', sub: 'Test a logo, keep the sheet', to: '/logo-tester', accent: 'linear-gradient(120deg,#f83600,#f9d423)' },
   ];
 
   return (

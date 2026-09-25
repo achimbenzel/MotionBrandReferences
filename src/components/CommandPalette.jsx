@@ -15,7 +15,7 @@ const TYPE_ICON = {
 const NAV = [
   ...TABS.map((t) => ({ kind: 'nav', title: t.label, subtitle: 'Section', to: `/${t.key}`, icon: TYPE_ICON[t.key] || LayoutGrid })),
   { kind: 'nav', title: 'Plans', subtitle: 'Work mode', to: '/plan', icon: PencilRuler },
-  { kind: 'nav', title: 'Logo Tester', subtitle: 'Work mode', to: '/logo-tester', icon: FlaskConical },
+  { kind: 'nav', title: 'Brand Tester', subtitle: 'Work mode · logo tests', to: '/logo-tester', icon: FlaskConical },
   { kind: 'nav', title: 'Trash', subtitle: 'Deleted items', to: '/trash', icon: Trash2 },
   { kind: 'nav', title: 'Settings', subtitle: 'Shortcuts & preferences', to: '/settings', icon: Settings },
 ];

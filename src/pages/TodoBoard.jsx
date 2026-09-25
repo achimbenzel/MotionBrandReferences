@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { Plus, X, MoreHorizontal, Trash2, Tag as TagIcon, GripVertical, AlertTriangle, Palette, ArrowRight, ArrowUp, ArrowDown } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Plus, X, MoreHorizontal, Trash2, Tag as TagIcon, GripVertical, AlertTriangle, Palette, ArrowRight, ArrowUp, ArrowDown, PencilRuler, Link2, Unlink } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { TAG_COLORS, tagColor } from '../lib/types.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
 import { useConfirm } from '../components/ConfirmDialog.jsx';
 import { useSaver, useRefreshOnReturn } from '../lib/autosave.js';
+import PlanPicker from '../components/PlanPicker.jsx';
 
 const rid = () => Math.random().toString(36).slice(2, 10);
 
@@ -27,6 +29,17 @@ export default function TodoBoard() {
   columnsRef.current = columns;
   const kanbanRef = useRef(null);
   const [activeCol, setActiveCol] = useState(0); // phone: which list is in view
+  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const [plans, setPlans] = useState([]);
+  const [linkFor, setLinkFor] = useState(null); // { colId, cardId, planId } whose plan is being picked
+  // Show all cards, only one plan's ('<id>'), or only unlinked ones ('none').
+  const planFilter = params.get('plan') || '';
+  const setPlanFilter = (v) => setParams(v ? { plan: v } : {}, { replace: true });
+  const planById = Object.fromEntries(plans.map((p) => [p.id, p]));
+  const visible = (card) => !planFilter || (planFilter === 'none' ? !planById[card.planId] : card.planId === planFilter);
+
+  useEffect(() => { api.listPlans().then(setPlans).catch(() => {}); }, []);
 
   useEffect(() => {
     let alive = true;
@@ -60,7 +73,8 @@ export default function TodoBoard() {
 
   // Cards
   const addCard = (colId) => {
-    const card = { id: rid(), title: '', tags: [] };
+    // While one plan is shown, new cards belong to it.
+    const card = { id: rid(), title: '', tags: [], ...(planFilter && planFilter !== 'none' ? { planId: planFilter } : {}) };
     setFocusCard(card.id);
     commit(mapCol(colId, (c) => ({ ...c, cards: [...c.cards, card] })), true);
   };
@@ -94,7 +108,10 @@ export default function TodoBoard() {
     const cards = [...c.cards]; [cards[i], cards[j]] = [cards[j], cards[i]];
     return { ...c, cards };
   }), true);
+  const setCardPlan = (colId, cardId, planId) => { commit(mapCard(colId, cardId, (k) => ({ ...k, planId: planId || null })), true); setLinkFor(null); };
   const cardMenu = (col, card, idx) => [
+    { label: planById[card.planId] ? 'Change plan…' : 'Link to plan…', icon: <Link2 size={15} />, onClick: () => setLinkFor({ colId: col.id, cardId: card.id, planId: card.planId || null }) },
+    ...(card.planId ? [{ label: 'Unlink from plan', icon: <Unlink size={15} />, onClick: () => setCardPlan(col.id, card.id, null) }] : []),
     { label: card.urgent ? 'Unmark urgent' : 'Mark urgent', icon: <AlertTriangle size={15} />, onClick: () => toggleUrgent(col.id, card.id) },
     { label: 'Colour…', icon: <Palette size={15} />, onClick: () => setColorEditFor(card.id) },
     { label: 'Add tag', icon: <TagIcon size={15} />, onClick: () => setTagEditFor(card.id) },
@@ -150,20 +167,34 @@ export default function TodoBoard() {
   if (!columns) return <div className="spinner" />;
 
   const total = columns.reduce((n, c) => n + c.cards.length, 0);
+  const linkedPlans = plans.filter((p) => columns.some((c) => c.cards.some((k) => k.planId === p.id)));
 
   return (
     <div className="board-page">
       <div className="page-head-row">
         <div className="page-head">
           <h1>To-Dos</h1>
-          <p>A general planner — add cards and move them across your lists.</p>
+          <p>A general planner — add cards and move them across your lists. Link a card to a plan to see it there too.</p>
         </div>
+        {(linkedPlans.length > 0 || planFilter) && (
+          <label className="kb-filter">
+            <PencilRuler size={15} />
+            <select className="input" value={planFilter} onChange={(e) => setPlanFilter(e.target.value)} aria-label="Show cards of">
+              <option value="">All cards</option>
+              {linkedPlans.map((p) => <option key={p.id} value={p.id}>{p.avatarEmoji ? `${p.avatarEmoji} ` : ''}{p.name}</option>)}
+              {planFilter && planFilter !== 'none' && !linkedPlans.some((p) => p.id === planFilter) && planById[planFilter] && (
+                <option value={planFilter}>{planById[planFilter].name}</option>
+              )}
+              <option value="none">Not linked to a plan</option>
+            </select>
+          </label>
+        )}
       </div>
 
       <div className="kb-tabs" role="tablist" aria-label="Lists">
         {columns.map((c, i) => (
           <button key={c.id} role="tab" aria-selected={i === activeCol} className={`kb-tab ${i === activeCol ? 'on' : ''}`} onClick={() => showCol(i)}>
-            {c.name || 'Untitled'} <span>{c.cards.length}</span>
+            {c.name || 'Untitled'} <span>{c.cards.filter(visible).length}</span>
           </button>
         ))}
         <button className="kb-tab kb-tab-add" onClick={() => { addColumn(); setTimeout(() => showCol(columns.length), 60); }} aria-label="Add list"><Plus size={15} /></button>
@@ -181,7 +212,7 @@ export default function TodoBoard() {
             <div className="kb-col-head">
               <input className="kb-col-name" value={col.name} placeholder="List name…"
                 onChange={(e) => renameColumn(col.id, e.target.value)} />
-              <span className="kb-col-count">{col.cards.length}</span>
+              <span className="kb-col-count">{col.cards.filter(visible).length}</span>
               <Menu
                 align="right"
                 trigger={<button className="icon-btn kb-col-menu" title="List options"><MoreHorizontal size={16} /></button>}
@@ -195,7 +226,9 @@ export default function TodoBoard() {
 
             <div className="kb-cards">
               {col.cards.map((card, idx) => {
+                if (!visible(card)) return null;
                 const cc = card.color ? tagColor(card.color) : null;
+                const plan = planById[card.planId];
                 return (
                 <div
                   key={card.id}
@@ -234,6 +267,11 @@ export default function TodoBoard() {
                     ref={(el) => { if (el) { el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`; } }}
                     onChange={(e) => { e.target.style.height = 'auto'; e.target.style.height = `${e.target.scrollHeight}px`; editCard(col.id, card.id, { title: e.target.value }); }}
                   />
+                  {plan && (
+                    <button className="kb-plan" onClick={() => navigate(`/plan/${plan.id}`)} title={`Open the plan “${plan.name}”`}>
+                      {plan.avatarEmoji ? <span>{plan.avatarEmoji}</span> : <PencilRuler size={12} />}{plan.name}
+                    </button>
+                  )}
                   {(card.tags || []).length > 0 && (
                     <div className="kb-tags">
                       {card.tags.map((t) => {
@@ -263,6 +301,10 @@ export default function TodoBoard() {
       </div>
 
       {total === 0 && <div className="hint" style={{ marginTop: 16 }}>Add a card to a list, then drag it (or use its ⋯ menu) to move it across lists.</div>}
+      {linkFor && (
+        <PlanPicker plans={plans} current={linkFor.planId} title="Link to plan" allowNone
+          onPick={(pid) => setCardPlan(linkFor.colId, linkFor.cardId, pid)} onClose={() => setLinkFor(null)} />
+      )}
       {dialog}
     </div>
   );

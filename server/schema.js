@@ -251,6 +251,7 @@ export function normalizeBoard(board) {
         notes: str(card?.notes, 8000),
         color: TAG_KEYS.has(card?.color) ? card.color : null,
         urgent: !!card?.urgent,
+        planId: typeof card?.planId === 'string' && card.planId ? str(card.planId, 40) : null, // the plan it belongs to
         tags: (Array.isArray(card?.tags) ? card.tags : []).slice(0, 20).map((t) => ({
           id: t?.id || nanoid(6),
           label: str(t?.label, 60),

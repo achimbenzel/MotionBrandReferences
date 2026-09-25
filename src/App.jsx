@@ -10,7 +10,7 @@ import NewPlanModal from './components/NewPlanModal.jsx';
 import CommandPalette from './components/CommandPalette.jsx';
 import { StorageProvider } from './components/StorageMeter.jsx';
 // The two landing pages load eagerly (shown first); everything else is split
-// into its own chunk so, e.g., the Logo Tester isn't downloaded just to browse
+// into its own chunk so, e.g., the Brand Tester isn't downloaded just to browse
 // the Reference grid.
 import GridPage from './pages/GridPage.jsx';
 import WorkDashboard from './pages/WorkDashboard.jsx';
