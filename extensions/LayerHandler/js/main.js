@@ -47,7 +47,7 @@
     colorReadout: $("colorReadout"),
     name: $("name"), numbering: $("numbering"), start: $("start"),
     digits: $("digits"), sep: $("sep"), order: $("order"),
-    preview: $("preview"),
+    preview: $("preview"), nameSummary: $("nameSummary"),
     splitInto: $("splitInto"), splitNames: $("splitNames"),
     keepColor: $("keepColor"), split: $("btn-split"),
     splitLabel: $("splitLabel"), splitReadout: $("splitReadout")
@@ -150,6 +150,7 @@
   function setReadout(node, text) {
     var rt = node.querySelector(".rt");
     (rt || node).textContent = text;
+    node.title = text;   // readouts ellipsize in narrow panels
   }
 
   function paintColor(hover) {
@@ -165,7 +166,8 @@
       setReadout(el.colorReadout, shown.name);
     } else {
       el.colorReadout.style.removeProperty("--dot");
-      setReadout(el.colorReadout, "keep color");
+      setReadout(el.colorReadout, "keep");
+      el.colorReadout.title = "Keep each layer's color";
     }
     el.customDot.classList.toggle("set", !!custom);
     el.customDot.style.background = custom ? rgbCss(custom) : "";
@@ -229,7 +231,25 @@
     return n;
   }
 
+  // One-line result under the name field while typing
+  function renderSummary() {
+    var st = nameSettings();
+    var box = el.nameSummary;
+    if (st.name === "") { box.hidden = true; return; }
+    var n = loaded ? loaded.layers.length : 0;
+    var first = buildName(st.name, numberIndex(0, Math.max(n, 1), st), st);
+    var txt = "\u2192 " + first;
+    if (n > 1) {
+      txt = n + " layers \u2192 " + first;
+      if (st.numbering) { txt += " \u2026 " + buildName(st.name, numberIndex(n - 1, n, st), st); }
+    }
+    box.textContent = txt;
+    box.title = txt;
+    box.hidden = false;
+  }
+
   function renderPreview() {
+    renderSummary();
     var box = el.preview;
     while (box.firstChild) { box.removeChild(box.firstChild); }
 
@@ -311,9 +331,10 @@
   function paintSplit() {
     var s = selNow();
     var label;
-    if (s.text) { label = "Leave text editing first"; }
-    else if (s.objects > 0) { label = "Split " + plural(s.objects, "selected object", "selected objects"); }
-    else if (loaded && loaded.layers.length > 1) { label = "Split " + loaded.layers.length + " whole layers"; }
+    // Short enough for a 200 px panel; the readout in the options says more
+    if (s.text) { label = "Leave text editing"; }
+    else if (s.objects > 0) { label = "Split " + plural(s.objects, "object", "objects"); }
+    else if (loaded) { label = "Split all " + wholeCount(); }
     else { label = "Split whole layer"; }
     el.splitLabel.textContent = label;
     el.split.disabled = busy || s.text;
@@ -426,6 +447,39 @@
     showStatus(null);
   }
 
+  // ---------------------------------------------------------------- folds
+  // Section titles open / close the extra options; closed by default and
+  // remembered per machine (localStorage can be unavailable - then they
+  // simply start closed).
+  function bindFolds() {
+    var heads = document.querySelectorAll("h2.fold");
+    for (var i = 0; i < heads.length; i++) {
+      (function (head) {
+        var key = head.getAttribute("data-fold");
+        var body = $("fold-" + key);
+        if (!body) { return; }
+        function set(open, save) {
+          body.hidden = !open;
+          head.classList.toggle("open", open);
+          head.setAttribute("aria-expanded", open ? "true" : "false");
+          if (save) {
+            try { localStorage.setItem("lh.fold." + key, open ? "1" : "0"); } catch (e) {}
+          }
+        }
+        var start = false;
+        try { start = localStorage.getItem("lh.fold." + key) === "1"; } catch (e2) {}
+        set(start, false);
+        head.addEventListener("click", function () { set(body.hidden, true); });
+        head.addEventListener("keydown", function (e) {
+          if (e.key === "Enter" || e.key === " " || e.keyCode === 13 || e.keyCode === 32) {
+            e.preventDefault();
+            set(body.hidden, true);
+          }
+        });
+      })(heads[i]);
+    }
+  }
+
   // ---------------------------------------------------------------- wiring
   function syncNumbering() {
     var on = el.numbering.checked;
@@ -480,6 +534,7 @@
 
   // ------------------------------------------------------------------ init
   buildSwatches();
+  bindFolds();
   bindAll();
   syncNumbering();
   paintColor();

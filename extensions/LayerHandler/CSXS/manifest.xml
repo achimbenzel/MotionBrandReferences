@@ -34,12 +34,12 @@
           <Menu>LayerHandler</Menu>
           <Geometry>
             <Size>
-              <Height>680</Height>
-              <Width>340</Width>
+              <Height>440</Height>
+              <Width>240</Width>
             </Size>
             <MinSize>
-              <Height>420</Height>
-              <Width>300</Width>
+              <Height>200</Height>
+              <Width>200</Width>
             </MinSize>
             <MaxSize>
               <Height>1400</Height>

@@ -58,17 +58,19 @@ svg {
 /* ------------------------------------------------------------ header */
 #header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 14px 12px;
+  gap: 8px;
+  padding: 10px 10px 9px;
   border-bottom: 1px solid var(--border);
   background: var(--bg);
   flex: none;
 }
 
-.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.brand-text { min-width: 0; }
 
 /* LayerHandler mark - accent layer stack with soft glow */
 .logo-mark {
-  width: 24px; height: 24px;
+  width: 22px; height: 22px; flex: none;
   filter: drop-shadow(0 0 9px rgba(var(--color-accent-rgb), .4));
 }
 .logo-mark .top  { fill: var(--accent); stroke: var(--accent); stroke-width: 4; }
@@ -85,11 +87,12 @@ svg {
   font-size: 9.5px;
   letter-spacing: .06em; text-transform: uppercase;
   color: var(--text2);
-  margin-top: 2px;
+  margin-top: 1px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 .icon-btn {
-  display: flex; align-items: center; justify-content: center;
+  display: flex; align-items: center; justify-content: center; flex: none;
   width: 28px; height: 28px;
   background: transparent;
   border: 1px solid var(--border2); border-radius: var(--radius-btn);
@@ -107,8 +110,8 @@ svg {
 /* ------------------------------------------------------------ status */
 .status {
   flex: none;
-  margin: 10px 12px 0;
-  padding: 7px 12px;
+  margin: 8px 8px 0;
+  padding: 6px 11px;
   font-family: var(--font-mono);
   font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase;
   color: #e08a7a;
@@ -123,7 +126,7 @@ svg {
 }
 
 /* -------------------------------------------------------------- main */
-#main { flex: 1; overflow-y: auto; padding: 12px; }
+#main { flex: 1; overflow-y: auto; padding: 8px; }
 #main::-webkit-scrollbar { width: 8px; }
 #main::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 4px; }
 #main::-webkit-scrollbar-thumb:hover { background: var(--text3); }
@@ -133,10 +136,10 @@ svg {
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
-  padding: 14px;
+  padding: 10px;
   transition: border-color var(--transition-fast);
 }
-.section + .section { margin-top: 10px; }
+.section + .section { margin-top: 8px; }
 .section:hover { border-color: var(--border2); }
 
 /* Section title = the brand's mono accent eyebrow with the drawn-in line */
@@ -146,9 +149,39 @@ svg {
   font-size: 9.5px; font-weight: 400;
   letter-spacing: .15em; text-transform: uppercase;
   color: rgba(var(--color-accent-rgb), .85);
-  margin-bottom: 12px;
+  margin-bottom: 9px;
 }
 .section h2 svg { width: 13px; height: 13px; color: rgba(var(--color-accent-rgb), .7); }
+
+/* Foldable title: click opens the extra options (chevron turns) */
+.section h2.fold { cursor: pointer; outline: none; }
+.section h2.fold::after { order: 1; min-width: 8px; }
+.section h2.fold .h2-val, .section h2.fold .chev { order: 2; }
+.section h2 .chev {
+  width: 12px; height: 12px;
+  color: var(--text3);
+  transition: transform var(--transition-fast), color var(--transition-fast);
+}
+.section h2.fold:hover .chev,
+.section h2.fold:focus-visible .chev { color: var(--accent); }
+.section h2.fold.open .chev { transform: rotate(180deg); color: rgba(var(--color-accent-rgb), .8); }
+.fold-body { margin-top: 8px; }
+
+/* Picked color shown in the Color title */
+.h2-val {
+  display: inline-flex; align-items: center; gap: 5px;
+  min-width: 0; max-width: 55%;
+  font-size: 9px; letter-spacing: .06em;
+  color: var(--text2);
+}
+.h2-val .rt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.h2-dot {
+  width: 8px; height: 8px; flex: none;
+  border-radius: 2px;
+  background: var(--dot, transparent);
+  border: 1px solid rgba(255,255,255,.3);
+}
+.h2-val.keep .h2-dot { border-style: dashed; border-color: var(--text3); }
 .section h2::after {
   content: ""; flex: 1; height: 1px;
   background: rgba(var(--color-accent-rgb), .25);
@@ -157,14 +190,14 @@ svg {
 /* --------------------------------------------------------------- rows */
 .row {
   display: flex; align-items: center; gap: 8px;
-  min-height: 27px;
+  min-height: 26px;
   min-width: 0;        /* allow rows to shrink inside the card */
 }
 .row + .row { margin-top: 3px; }
 
 .lbl {
   font-size: 11px; color: var(--text2);
-  min-width: 46px; font-weight: 500; flex: none;
+  min-width: 42px; font-weight: 500; flex: none;
 }
 .spacer { flex: 1; }
 .unit { font-size: 9.5px; color: var(--text3); width: 16px; flex: none; }
@@ -253,6 +286,15 @@ select:focus { outline: none; border-color: rgba(var(--color-accent-rgb), .6); }
   box-shadow: 0 0 12px rgba(var(--color-accent-rgb), .12);
 }
 
+.tg-num { flex: none; gap: 6px; font-family: var(--font-mono); color: var(--text2); }
+
+.mini {
+  margin-top: 5px;
+  font-size: 9.5px; letter-spacing: .04em;
+  color: var(--text2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
 .hint {
   margin-top: 5px;
   font-family: var(--font-mono);
@@ -266,16 +308,16 @@ select:focus { outline: none; border-color: rgba(var(--color-accent-rgb), .6); }
 .lc-grid {
   display: grid;
   grid-template-columns: repeat(9, minmax(0, 1fr));
-  grid-gap: 5px; gap: 5px;
+  grid-gap: 4px; gap: 4px;
 }
-.lc-grid + .lc-grid {
-  margin-top: 9px; padding-top: 9px;
+.lc-more {
+  margin-top: 8px; padding-top: 8px;
   border-top: 1px solid var(--border);
 }
 .lc {
-  height: 20px; padding: 0;
+  height: 17px; min-width: 0; padding: 0;
   border: 1px solid rgba(255,255,255,.12);
-  border-radius: 5px;
+  border-radius: 4px;
   cursor: pointer;
   transition: transform var(--transition-fast), border-color var(--transition-fast),
               box-shadow var(--transition-fast);
@@ -291,8 +333,7 @@ select:focus { outline: none; border-color: rgba(var(--color-accent-rgb), .6); }
               0 0 14px rgba(var(--color-accent-rgb), .45);
 }
 
-.lc-foot { margin-top: 10px; }
-.lc-foot .readout { margin-top: 0; }
+.lc-foot { margin-top: 8px; }
 
 /* Small ghost button (Custom...) */
 .btn.sm {
@@ -309,7 +350,7 @@ select:focus { outline: none; border-color: rgba(var(--color-accent-rgb), .6); }
 
 /* ------------------------------------------------------ rename preview */
 .pv {
-  margin-top: 10px;
+  margin-top: 8px;
   padding: 6px 9px;
   background: var(--color-bg-card-dark);
   border: 1px solid var(--border);
@@ -342,7 +383,7 @@ select:focus { outline: none; border-color: rgba(var(--color-accent-rgb), .6); }
 /* Measurement pill, matching .ef-tag / .nav-pill */
 .readout {
   display: inline-flex; align-items: center; gap: 7px;
-  margin-top: 10px;
+  margin-top: 8px;
   padding: 5px 12px;
   font-family: var(--font-mono);
   font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase;
@@ -358,19 +399,11 @@ select:focus { outline: none; border-color: rgba(var(--color-accent-rgb), .6); }
 }
 .readout { max-width: 100%; min-width: 0; }
 .readout .rt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Color readout: the dot shows the picked layer color */
-.readout.swatch::before {
-  width: 8px; height: 8px; border-radius: 2px;
-  background: var(--dot, transparent);
-  border: 1px solid rgba(255,255,255,.3);
-  box-shadow: none;
-}
-.readout.swatch.keep::before { border-style: dashed; border-color: var(--text3); }
 
 /* -------------------------------------------------------------- footer */
 #footer {
-  display: flex; flex-direction: column; gap: 9px;
-  padding: 12px 12px 10px;
+  display: flex; flex-direction: column;
+  padding: 8px;
   border-top: 1px solid var(--border);
   background: var(--bg);
   flex: none;
@@ -378,24 +411,10 @@ select:focus { outline: none; border-color: rgba(var(--color-accent-rgb), .6); }
 
 .footer-btns { display: flex; gap: 8px; }
 
-/* Made by Confinium credit */
-#credit {
-  display: flex; align-items: center; justify-content: center; gap: 9px;
-  padding-top: 2px;
-  font-family: var(--font-mono);
-  font-size: 11px; font-weight: 500;
-  letter-spacing: .14em; text-transform: uppercase;
-  color: var(--text2);
-  transition: color var(--transition-fast);
-}
-#credit:hover { color: var(--text); }
-.cf-logo { width: 32px; height: 32px; }
-.cf-logo path { fill: currentColor; stroke: none; }
-
 /* Buttons matching .btn: mono, uppercase, letterspaced, 10px radius */
 .btn {
   display: flex; align-items: center; justify-content: center; gap: 7px;
-  height: 30px; padding: 0 14px;
+  min-width: 0; height: 30px; padding: 0 12px;
   font-family: var(--font-mono);
   font-size: 9.5px; font-weight: 600;
   letter-spacing: .1em; text-transform: uppercase;
@@ -404,6 +423,8 @@ select:focus { outline: none; border-color: rgba(var(--color-accent-rgb), .6); }
   transition: all var(--transition-fast);
 }
 .btn svg { width: 12px; height: 12px; }
+.btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn.ghost.icon-only { flex: none; width: 30px; padding: 0; }
 
 .btn.ghost {
   flex: 1;
@@ -418,7 +439,7 @@ select:focus { outline: none; border-color: rgba(var(--color-accent-rgb), .6); }
 }
 
 .btn.primary {
-  flex: 2;
+  flex: 1;
   background: rgba(var(--color-accent-rgb), .12);
   border: 1px solid rgba(var(--color-accent-rgb), .45);
   color: var(--accent);
@@ -431,7 +452,7 @@ select:focus { outline: none; border-color: rgba(var(--color-accent-rgb), .6); }
 }
 .btn.primary:active { transform: none; }
 .btn.block { width: 100%; }
-.btn.block.mt { margin-top: 10px; }
+
 .btn:disabled { opacity: .4; cursor: default; }
 
 @media (prefers-reduced-motion: reduce) {

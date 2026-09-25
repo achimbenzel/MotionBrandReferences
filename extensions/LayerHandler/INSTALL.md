@@ -61,25 +61,35 @@ The panel appears under **Window > Extensions > LayerHandler**.
 
 Select layers in the **Layers panel** as usual (click, Shift-click,
 Ctrl/Cmd-click), then press the refresh button in the panel header. The
-stats line shows how many layers were picked up, and the Rename preview
-lists them. Apply and Split always re-read the current selection, so the
-preview is only a guide.
+stats line shows how many layers were picked up. Apply and Split always
+re-read the current selection, so the preview is only a guide.
+
+The panel is built to sit in a narrow column (from 200 px wide). Only the
+essentials are shown; **click a section title** (Color, Rename, Split) to
+open its extra options - the chevron turns. All sections start closed and
+the panel remembers what you left open.
 
 ### Layer Color
 
 The 27 swatches are Illustrator's own layer colors (Light Blue ... Yellow,
 in Layer Options order, exact RGB), so the Layer Options dialog shows the
-color by name afterwards. **Custom...** opens the Illustrator color picker.
+color by name afterwards. The first nine are always visible; the other 18
+and **Custom...** (the Illustrator color picker) are in the Color options.
+The picked color's name is shown in the section title.
 
-- Click a swatch to pick it, click it again to go back to "keep color".
+- Click a swatch to pick it, click it again to go back to "keep".
 - **Double-click** a swatch to recolor the selected layers right away
   (color only - the name field is ignored).
 
 ### Rename
 
-Type a name and press **Apply to layers** (or Enter). With **Numbering**
-on, `Hallo` becomes `Hallo1`, `Hallo2`, `Hallo3` ... from the top of the
-Layers panel down.
+Type a name and press **Apply** (or Enter). With the **#** toggle next to
+the name field on (numbering), `Hallo` becomes `Hallo1`, `Hallo2`,
+`Hallo3` ... from the top of the Layers panel down. A line under the field
+shows the result, e.g. `8 layers -> Hallo1 ... Hallo8`.
+
+The Rename options hold the numbering settings and the full list of the
+loaded layers (old name -> new name):
 
 | Option  | Effect                                                   |
 |---------|----------------------------------------------------------|
@@ -92,13 +102,13 @@ A `#` in the name marks where the number goes: `Scene_#_v2` gives
 `Scene_1_v2`, `Scene_2_v2` ... (`###` also sets three digits).
 With Numbering off, every selected layer gets the same name.
 
-**Apply to layers** applies the picked color and the name together; leave
-the name empty to only recolor, or keep the color on "keep color" to only
-rename. **Clear** resets the name and the color choice.
+**Apply** applies the picked color and the name together; leave the name
+empty to only recolor, or keep the color on "keep" to only rename. The
+**x** button next to it clears the name and the color choice.
 
 ### Split to Layers
 
-**Split layer content** puts every object into its own layer - paths,
+The Split button puts every object into its own layer - paths,
 groups, compound paths, text, images, symbols, anything that sits directly
 in the layer. Groups and compound paths stay intact.
 
@@ -117,15 +127,17 @@ the Layers panel only highlights the row - Illustrator does not tell
 scripts about highlighted object rows, so they count as "no selection" and
 the whole layer is split.
 
-The button always says what it is about to do - **Split 3 selected
-objects** or **Split whole layer** - and follows the artboard selection
-live, so check it before clicking.
+The button always says what it is about to do - **Split 3 objects** (the
+selection) or **Split all 37** (every object of the highlighted layer) -
+and follows the artboard selection live, so check it before clicking.
 
 The stacking order never changes: an object that was in front of another
 stays in front of it. When split-out objects overlap objects that stay
 behind in both directions, the source layer is cut into extra layers named
 `<layer> (2)`, `<layer> (3)` ... so every object keeps its exact place.
 The status line reports these as "+N to keep the stacking".
+
+The Split options:
 
 | Option          | Effect                                                    |
 |-----------------|-----------------------------------------------------------|
@@ -168,7 +180,7 @@ Notes:
   the ExtendScript engine reloads with it.
 - **Split took the whole layer instead of a few objects** - the objects were
   only highlighted in the Layers panel, not selected (see "Selected vs.
-  highlighted" above). The button reads "Split whole layer" in that case.
+  highlighted" above). The button reads "Split all ..." in that case.
 - **Only one layer gets renamed** - check the stats line after refresh; if
   it says "(active)", the Hide Others action could not run. Make sure a
   document is open and not in isolation mode.
