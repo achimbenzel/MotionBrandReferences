@@ -109,6 +109,18 @@ in the layer. Groups and compound paths stay intact.
   in its layer. Selecting a path inside a group splits out the whole group.
   Selections spanning several layers are handled layer by layer.
 
+**Selected vs. highlighted.** "Selected" means selected on the artboard:
+click the objects with the Selection tool (Shift adds), or in the Layers
+panel click each object's target circle / the selection square at the
+right edge of its row (Shift-click adds). Clicking an object's *name* in
+the Layers panel only highlights the row - Illustrator does not tell
+scripts about highlighted object rows, so they count as "no selection" and
+the whole layer is split.
+
+The button always says what it is about to do - **Split 3 selected
+objects** or **Split whole layer** - and follows the artboard selection
+live, so check it before clicking.
+
 The stacking order never changes: an object that was in front of another
 stays in front of it. When split-out objects overlap objects that stay
 behind in both directions, the source layer is cut into extra layers named
@@ -154,6 +166,9 @@ Notes:
   (`extensions/LayerHandler/CSXS/manifest.xml` must exist).
 - **"Host did not respond"** - reopen the panel (Window > Extensions);
   the ExtendScript engine reloads with it.
+- **Split took the whole layer instead of a few objects** - the objects were
+  only highlighted in the Layers panel, not selected (see "Selected vs.
+  highlighted" above). The button reads "Split whole layer" in that case.
 - **Only one layer gets renamed** - check the stats line after refresh; if
   it says "(active)", the Hide Others action could not run. Make sure a
   document is open and not in isolation mode.

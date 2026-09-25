@@ -31,7 +31,10 @@
   var picked = null;   // { name, r, g, b } - null keeps each layer's color
   var custom = null;   // last custom color, shown on the Custom button
   var loaded = null;   // last host detection (see LH_detect)
+  var live = null;     // artboard selection right now (see LH_state poll)
   var busy = false;
+  var polling = false;
+  var POLL_MS = 1200;
 
   // ------------------------------------------------------------------ DOM
   function $(id) { return document.getElementById(id); }
@@ -47,7 +50,7 @@
     preview: $("preview"),
     splitInto: $("splitInto"), splitNames: $("splitNames"),
     keepColor: $("keepColor"), split: $("btn-split"),
-    splitReadout: $("splitReadout")
+    splitLabel: $("splitLabel"), splitReadout: $("splitReadout")
   };
 
   // ----------------------------------------------------------- host bridge
@@ -128,7 +131,7 @@
     busy = on;
     el.refresh.classList.toggle("spin", on);
     el.apply.disabled = on;
-    el.split.disabled = on;
+    paintSplit();
   }
 
   function plural(n, one, many) { return n + " " + (n === 1 ? one : many); }
@@ -271,25 +274,50 @@
     return s;
   }
 
+  // What Split will do right now: the live artboard selection wins over
+  // the last detection (objects highlighted only in the Layers panel are
+  // invisible to scripts, so they count as "no selection").
+  function selNow() {
+    if (live) { return { objects: live.objects || 0, text: !!live.text }; }
+    if (loaded) { return { objects: loaded.selObjects, text: loaded.textEditing }; }
+    return { objects: 0, text: false };
+  }
+
+  function wholeCount() {
+    var total = 0;
+    if (!loaded) { return total; }
+    for (var i = 0; i < loaded.layers.length; i++) { total += loaded.layers[i].items || 0; }
+    return total;
+  }
+
   function splitText() {
-    if (!loaded) { return "select a layer or objects"; }
-    if (loaded.textEditing) { return "leave text editing first"; }
+    var s = selNow();
+    if (s.text) { return "leave text editing first"; }
     var txt;
-    if (loaded.selObjects > 0) {
-      txt = plural(loaded.selObjects, "object", "objects") + " \u2192 " +
-            plural(loaded.selObjects, "layer", "layers");
-      if (loaded.selLayers > 1) { txt += " \u00b7 from " + loaded.selLayers + " layers"; }
+    if (s.objects > 0) {
+      txt = "\u2192 " + plural(s.objects, "layer", "layers") + " \u00b7 rest stays";
     } else {
-      var total = 0;
-      for (var i = 0; i < loaded.layers.length; i++) { total += loaded.layers[i].items || 0; }
+      if (!loaded) { return "select a layer or objects"; }
+      var total = wholeCount();
       if (total === 0) { return "no objects in the selected layer"; }
-      txt = (loaded.layers.length === 1 ? "whole layer" : plural(loaded.layers.length, "layer", "layers")) +
-            " \u00b7 " + plural(total, "object", "objects") + " \u2192 " + plural(total, "layer", "layers");
+      txt = plural(total, "object", "objects") + " \u2192 " + plural(total, "layer", "layers");
     }
     if (el.splitNames.value === "field" && nameSettings().name === "") {
       txt += " \u00b7 name empty";
     }
     return txt;
+  }
+
+  function paintSplit() {
+    var s = selNow();
+    var label;
+    if (s.text) { label = "Leave text editing first"; }
+    else if (s.objects > 0) { label = "Split " + plural(s.objects, "selected object", "selected objects"); }
+    else if (loaded && loaded.layers.length > 1) { label = "Split " + loaded.layers.length + " whole layers"; }
+    else { label = "Split whole layer"; }
+    el.splitLabel.textContent = label;
+    el.split.disabled = busy || s.text;
+    setReadout(el.splitReadout, splitText());
   }
 
   function useDetection(d) {
@@ -300,8 +328,9 @@
       selLayers: d.selLayers || 0,
       textEditing: !!d.textEditing
     };
+    live = { objects: loaded.selObjects, text: loaded.textEditing };
     el.stats.textContent = statsText(loaded);
-    setReadout(el.splitReadout, splitText());
+    paintSplit();
     renderPreview();
   }
 
@@ -315,7 +344,7 @@
         if (!data.ok) {
           loaded = null;
           el.stats.textContent = "no layers loaded";
-          setReadout(el.splitReadout, splitText());
+          paintSplit();
           renderPreview();
           showStatus(data.msg || "Could not read the layers.");
           return;
@@ -364,7 +393,11 @@
         setBusy(false);
         if (!data) { showStatus("Host did not respond."); return; }
         if (!data.ok) { showStatus(data.msg || "Split failed."); return; }
-        var msg = plural(data.created, "layer", "layers") + " created";
+        var head = data.fromSelection
+          ? plural(data.created, "selected object", "selected objects")
+          : data.layers > 1 ? data.layers + " whole layers"
+          : "Whole layer" + (data.source ? " \u201c" + data.source + "\u201d" : "");
+        var msg = head + " \u2192 " + plural(data.created, "layer", "layers");
         if (data.extra > 0) {
           msg += " \u00b7 +" + data.extra + " to keep the stacking";
         }
@@ -377,8 +410,9 @@
         // drop the stale list instead of re-reading (keeps Undo simple).
         loaded = null;
         el.stats.textContent = "split \u00b7 " + plural(data.created, "new layer", "new layers");
-        setReadout(el.splitReadout, "select a layer or objects");
+        paintSplit();
         renderPreview();
+        poll();
       });
     });
   }
@@ -388,7 +422,7 @@
     el.name.value = "";
     paintColor();
     renderPreview();
-    setReadout(el.splitReadout, splitText());
+    paintSplit();
     showStatus(null);
   }
 
@@ -424,7 +458,24 @@
   function onFormChange() {
     syncNumbering();
     renderPreview();
-    setReadout(el.splitReadout, splitText());
+    paintSplit();
+  }
+
+  // Keep the Split button honest about what it will split: poll the
+  // artboard selection (read-only, no layer round trip).
+  function poll() {
+    if (busy || polling || document.hidden) { return; }
+    polling = true;
+    cs.evalScript("typeof $.global.LH_state === 'function' ? $.global.LH_state() : ''", function (res) {
+      polling = false;
+      var d = null;
+      try { d = JSON.parse(res); } catch (e) { return; }
+      var next = d && d.ok ? { objects: d.objects || 0, text: !!d.text } : { objects: 0, text: false };
+      if (!live || next.objects !== live.objects || next.text !== live.text) {
+        live = next;
+        paintSplit();
+      }
+    });
   }
 
   // ------------------------------------------------------------------ init
@@ -433,6 +484,10 @@
   syncNumbering();
   paintColor();
   renderPreview();
+  paintSplit();
   refresh(); // read whatever is selected when the panel opens
+  setInterval(poll, POLL_MS);
+  window.addEventListener("focus", poll);
+  document.addEventListener("mouseenter", poll);
 
 })();

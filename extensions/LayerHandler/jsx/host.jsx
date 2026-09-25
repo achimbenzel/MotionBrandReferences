@@ -247,12 +247,23 @@
 
     // Returns the highlighted layers top-to-bottom, [] for an empty
     // document, or null when the action could not be played.
+    // Hiding a layer deselects its artwork, so the selection is saved
+    // first and put back if the round trip changed it.
     function panelLayers(doc) {
         var flat = [];
         var tree = layerTree(doc, 0, flat);
         var i;
         if (flat.length === 0) { return []; }
         if (flat.length === 1) { return [flat[0].layer]; }
+
+        var savedSel = null;
+        try {
+            var cur = doc.selection;
+            if (cur && !cur.typename && cur.length) {
+                savedSel = [];
+                for (i = 0; i < cur.length; i++) { savedSel.push(cur[i]); }
+            }
+        } catch (eSel) { savedSel = null; }
 
         var before = [];
         for (i = 0; i < flat.length; i++) {
@@ -271,6 +282,12 @@
             try {
                 if (flat[i].layer.visible !== before[i]) { flat[i].layer.visible = before[i]; }
             } catch (e4) {}
+        }
+        if (savedSel) {
+            try {
+                var now = doc.selection;
+                if (!now || now.typename || now.length !== savedSel.length) { doc.selection = savedSel; }
+            } catch (e5) {}
         }
 
         if (!played) { return null; }
@@ -546,6 +563,26 @@
     };
 
     // ------------------------------------------------------------------------
+    // LH_state: cheap poll for the panel - how many objects are selected on
+    // the artboard right now (no layer round trip, nothing is changed).
+    // ------------------------------------------------------------------------
+    $.global.LH_state = function () {
+        try {
+            if (app.documents.length === 0) { return jval({ ok: false, doc: false }); }
+            var doc = app.activeDocument;
+            var sel = doc.selection;
+            if (sel && sel.typename) { return jval({ ok: true, doc: true, objects: 0, text: true }); }
+            var n = sel ? sel.length : 0;
+            // Count distinct top-level objects (a path inside a group counts
+            // as its group) unless the selection is huge
+            if (n > 0 && n <= 300) { n = selectionTops(doc).list.length; }
+            return jval({ ok: true, doc: true, objects: n, text: false });
+        } catch (err) {
+            return jval({ ok: false, doc: false });
+        }
+    };
+
+    // ------------------------------------------------------------------------
     // LH_apply: rename and/or recolor the highlighted layers.
     //   { name, numbering, start, digits, sep, order, color: {r,g,b}|null }
     // ------------------------------------------------------------------------
@@ -644,6 +681,8 @@
                 for (c = 0; c < p.chunks.length; c++) { if (p.chunks[c].sel) { total++; } }
             }
 
+            var srcLabel = jobs.length === 1 ? layerName(jobs[0].layer) : "";
+
             var base = trim(st.name || "");
             var useField = st.naming === "field" && base !== "";
             var counter = 0, created = 0, extra = 0, removed = 0, runsCut = 0;
@@ -739,7 +778,8 @@
                 runsCut: runsCut,
                 layers: plans.length,
                 skipped: skipped,
-                fromSelection: fromSelection
+                fromSelection: fromSelection,
+                source: fromSelection ? "selection" : srcLabel
             });
         } catch (err) {
             return fail("Split error: " + err);
