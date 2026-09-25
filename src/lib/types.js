@@ -49,6 +49,18 @@ export const WORK_TABS = [
 ];
 export const WORK_HOME = '/work';
 
+// Where a plan stands — its phase, from briefing to delivery. '' = no status.
+export const PLAN_STATUSES = [
+  { key: 'briefing', label: 'Briefing', color: 'blue' },
+  { key: 'concept', label: 'Concept', color: 'purple' },
+  { key: 'design', label: 'Design', color: 'pink' },
+  { key: 'production', label: 'Production', color: 'orange' },
+  { key: 'review', label: 'Review', color: 'yellow' },
+  { key: 'delivered', label: 'Delivered', color: 'green' },
+  { key: 'archived', label: 'Archived', color: 'gray' },
+];
+export const planStatus = (key) => PLAN_STATUSES.find((s) => s.key === key) || null;
+
 // Currencies for the software plugin database (symbol used for the spend sum).
 export const CURRENCIES = [
   { key: 'EUR', symbol: '€' }, { key: 'USD', symbol: '$' }, { key: 'GBP', symbol: '£' },

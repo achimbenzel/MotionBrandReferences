@@ -1,15 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Trash2, Pencil, MoreHorizontal, CalendarRange, Images, StickyNote,
   ListChecks, Paperclip, UploadCloud, X, Plus, Check, ChevronDown, ChevronRight,
   Image as ImageIcon, Camera, ArrowUp, ArrowDown, File as FileIcon, ExternalLink,
   Link2, Library, FolderOpen, Palette as PaletteIcon, Heading as HeadingIcon,
-  Minus, Table as TableIcon, Wand2, Copy, FileText, AlertTriangle,
+  Minus, Table as TableIcon, Wand2, Copy, FileText, AlertTriangle, ClipboardList,
+  LayoutTemplate, Building2,
 } from 'lucide-react';
 import { api, planFileUrl, fileUrl } from '../lib/api.js';
 import { useSaver, useRefreshOnReturn } from '../lib/autosave.js';
-import { PLAN_GRADIENTS, gradientCss, normalizeUrl, hostOf } from '../lib/types.js';
+import { PLAN_GRADIENTS, PLAN_STATUSES, gradientCss, normalizeUrl, hostOf, planStatus, tagColor } from '../lib/types.js';
 import { rgbToHex, hexToRgb } from '../lib/color.js';
 import { extractPalette } from '../lib/imaging.js';
 import { useToast } from '../components/Toast.jsx';
@@ -34,6 +35,7 @@ function firstEmoji(str) {
 }
 
 const BLOCK_META = {
+  briefing: { label: 'Briefing', icon: ClipboardList },
   moodboard: { label: 'Moodboard', icon: Images },
   text: { label: 'Text', icon: StickyNote },
   todos: { label: 'To-dos', icon: ListChecks },
@@ -72,6 +74,8 @@ export default function PlanDetail() {
   const [avatarPicker, setAvatarPicker] = useState(false);
   const [emojiInput, setEmojiInput] = useState('');
   const [dragBlock, setDragBlock] = useState(null);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [client, setClient] = useState('');
   const saver = useSaver();
   const planRef = useRef(null);
   const bannerRef = useRef(null);
@@ -93,13 +97,13 @@ export default function PlanDetail() {
     setPlan(null); setError(null);
     api.getPlan(id).then((p) => {
       if (!alive) return;
-      setPlan(p); setMilestones(p.milestones || []);
+      setPlan(p); setMilestones(p.milestones || []); setClient(p.client || '');
     }).catch((e) => { if (alive) setError(e.message); });
     return () => { alive = false; };
   }, [id, saver]);
 
   // Back on this tab after a while: pick up changes made on another device.
-  useRefreshOnReturn(() => api.getPlan(id), (p) => { setPlan(p); setMilestones(p.milestones || []); }, saver);
+  useRefreshOnReturn(() => api.getPlan(id), (p) => { setPlan(p); setMilestones(p.milestones || []); setClient(p.client || ''); }, saver);
 
   // Paste images into the last-used (or first) moodboard block.
   useEffect(() => {
@@ -161,6 +165,47 @@ export default function PlanDetail() {
   const addMilestone = () => saveMilestones([...milestonesRef.current, { id: rid(), title: '', date: '', done: false }]);
   const editMilestone = (mid, p) => saveMilestones(milestonesRef.current.map((x) => (x.id === mid ? { ...x, ...p } : x)));
   const removeMilestone = (mid) => saveMilestones(milestonesRef.current.filter((x) => x.id !== mid));
+
+  // Status + client — shown right away, saved without applying the response
+  // (it could carry a block's state from before an edit that's still pending).
+  const setStatus = (status) => {
+    setPlan((p) => ({ ...p, status }));
+    api.updatePlan(id, { status }).catch((e) => toast(`Could not save: ${e.message}`, 'error'));
+  };
+  const editClient = (value) => {
+    setClient(value);
+    const planId = id;
+    saver.schedule('client', () => api.updatePlan(planId, { client: value }).catch((e) => toast(`Could not save: ${e.message}`, 'error')));
+  };
+
+  // Save this plan's structure as a template for new plans.
+  const saveAsTemplate = async (name) => {
+    try {
+      await saver.flush();
+      const { template, replaced } = await api.savePlanTemplate(id, name);
+      setSavingTemplate(false);
+      toast(replaced ? `Template “${template.name}” updated` : `Saved as template “${template.name}”`);
+    } catch (e) { toast(`Could not save template: ${e.message}`, 'error'); }
+  };
+
+  // Briefing block — copy all answers as plain text (for an email or a doc).
+  const copyBriefing = async (b) => {
+    const head = [plan.name, client].filter(Boolean).join(' — ');
+    const lines = (b.fields || []).filter((f) => f.label.trim() || f.value.trim()).map((f) => `${f.label.trim() || 'Note'}: ${f.value.trim() || '—'}`);
+    try { await navigator.clipboard.writeText(`${head}\n${b.title}\n\n${lines.join('\n')}`); toast('Briefing copied'); }
+    catch { toast('Copy failed', 'error'); }
+  };
+  const removeField = (b, f) => {
+    const fields = b.fields || [];
+    const idx = fields.findIndex((x) => x.id === f.id);
+    editBlock(b.id, { fields: fields.filter((x) => x.id !== f.id) }, true);
+    if (!f.label.trim() && !f.value.trim()) return;
+    toast('Field removed', 'ok', { label: 'Undo', onClick: () => {
+      const cur = (planRef.current?.blocks || []).find((x) => x.id === b.id)?.fields || [];
+      const next = [...cur]; next.splice(Math.min(idx, next.length), 0, f);
+      editBlock(b.id, { fields: next }, true);
+    } });
+  };
 
   // Blocks
   const addBlock = async (type) => { try { setPlan(await api.addBlock(id, type)); } catch (e) { toast(`Could not add block: ${e.message}`, 'error'); } };
@@ -290,6 +335,7 @@ export default function PlanDetail() {
           trigger={<button className="btn btn-sm"><Pencil size={15} /> Edit <MoreHorizontal size={15} /></button>}
           items={[
             { label: 'Rename', icon: <Pencil size={15} />, onClick: () => setRenaming(true) },
+            { label: 'Save as template…', icon: <LayoutTemplate size={15} />, onClick: () => setSavingTemplate(true) },
             { separator: true },
             { label: 'Delete plan', icon: <Trash2 size={15} />, danger: true, onClick: remove },
           ]}
@@ -346,6 +392,22 @@ export default function PlanDetail() {
         </div>
         <h1 className="plan-name">{plan.name}</h1>
       </div>
+      <div className="plan-meta">
+        <Menu
+          align="left"
+          title="Status"
+          trigger={<StatusPick status={plan.status} />}
+          items={[
+            ...PLAN_STATUSES.map((st) => ({ label: st.label, icon: <span className="status-dot" style={{ background: tagColor(st.color).fg }} />, onClick: () => setStatus(st.key) })),
+            { separator: true },
+            { label: 'No status', icon: <span className="status-dot" style={{ background: 'var(--text-faint)' }} />, onClick: () => setStatus('') },
+          ]}
+        />
+        <label className="plan-client" title="Client">
+          <Building2 size={15} />
+          <input value={client} placeholder="Add client" onChange={(e) => editClient(e.target.value)} aria-label="Client" />
+        </label>
+      </div>
 
       <input ref={bannerRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { setImage('banner', e.target.files[0]); e.target.value = ''; }} />
       <input ref={avatarRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { setImage('avatar', e.target.files[0]); e.target.value = ''; }} />
@@ -383,6 +445,36 @@ export default function PlanDetail() {
       {plan.blocks.map((b, i) => {
         const Meta = BLOCK_META[b.type] || BLOCK_META.text;
         const menu = <Menu align="right" trigger={<button className="icon-btn" style={{ width: 34, height: 34 }}><MoreHorizontal size={16} /></button>} items={blockMenu(b, i)} />;
+
+        if (b.type === 'briefing') {
+          const fields = b.fields || [];
+          const setFields = (next, immediate = false) => editBlock(b.id, { fields: next }, immediate);
+          const patchField = (fid, p) => setFields(fields.map((f) => (f.id === fid ? { ...f, ...p } : f)));
+          const answered = fields.filter((f) => f.value.trim()).length;
+          return (
+            <div className="section block" key={b.id}>
+              <div className="section-head">
+                <h2><Meta.icon size={16} /> {b.title} {fields.length > 0 && <span className="count" title="Answered">{answered}/{fields.length}</span>}</h2>
+                <div className="moodboard-actions">
+                  {fields.length > 0 && <button className="btn btn-sm" onClick={() => copyBriefing(b)}><Copy size={14} /> Copy</button>}
+                  {menu}
+                </div>
+              </div>
+              <div className="brief">
+                {fields.map((f) => (
+                  <div className={`brief-row ${f.value.trim() ? 'done' : ''}`} key={f.id}>
+                    <input className="brief-label" value={f.label} placeholder="Question…" aria-label="Question"
+                      onChange={(e) => patchField(f.id, { label: e.target.value })} />
+                    <AutoTextarea className="brief-value" value={f.value} placeholder="—" aria-label={f.label || 'Answer'}
+                      onChange={(e) => patchField(f.id, { value: e.target.value })} />
+                    <button className="icon-btn brief-del" title="Remove field" onClick={() => removeField(b, f)}><X size={14} /></button>
+                  </div>
+                ))}
+                <button className="btn btn-ghost btn-sm ms-add" onClick={() => setFields([...fields, { id: rid(), label: '', value: '' }], true)}><Plus size={15} /> Add field</button>
+              </div>
+            </div>
+          );
+        }
 
         if (b.type === 'moodboard') {
           return (
@@ -758,6 +850,11 @@ export default function PlanDetail() {
         <GalleryNameModal title="Rename plan" initialName={plan.name} submitLabel="Save" placeholder="Plan name"
           onSubmit={async (name) => { await patch({ name }); setRenaming(false); }} onClose={() => setRenaming(false)} />
       )}
+      {savingTemplate && (
+        <GalleryNameModal title="Save as template" initialName="" submitLabel="Save template" placeholder="e.g. Launch video — short"
+          hint="Keeps the blocks, text, to-dos (unticked), tables and briefing questions. Images, files, dates and briefing answers are left out. Using the name of one of your templates updates it."
+          onSubmit={saveAsTemplate} onClose={() => setSavingTemplate(false)} />
+      )}
       {renameBlock && (
         <GalleryNameModal title="Rename block" initialName={renameBlock.title} submitLabel="Save" placeholder="Block name"
           onSubmit={async (name) => { editBlock(renameBlock.id, { title: name }, true); setRenameBlock(null); }} onClose={() => setRenameBlock(null)} />
@@ -814,4 +911,29 @@ function PlanPdfBlock({ plan, files, onRemove }) {
       )}
     </div>
   );
+}
+
+// The status pill in the plan header (opens the status menu).
+function StatusPick({ status }) {
+  const st = planStatus(status);
+  const c = st ? tagColor(st.color) : null;
+  return (
+    <button className={`status-pick ${st ? '' : 'none'}`} style={c ? { background: c.bg, color: c.fg } : undefined} aria-label="Status">
+      <span className="status-dot" style={{ background: c ? c.fg : 'var(--text-faint)' }} />
+      {st ? st.label : 'Set status'}
+      <ChevronDown size={13} />
+    </button>
+  );
+}
+
+// A textarea that grows with its content (briefing answers).
+function AutoTextarea({ value, className = '', ...rest }) {
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+  return <textarea ref={ref} rows={1} className={className} value={value} {...rest} />;
 }

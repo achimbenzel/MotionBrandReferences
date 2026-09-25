@@ -19,18 +19,25 @@ export const TAG_KEYS = new Set(['red', 'orange', 'yellow', 'green', 'blue', 'pu
 export const CURRENCIES = new Set(['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD']);
 
 export const emptyDB = () => ({
-  schemaVersion: SCHEMA_VERSION, projects: [], galleries: [], plans: [], software: [], trash: [],
+  schemaVersion: SCHEMA_VERSION, projects: [], galleries: [], plans: [], planTemplates: [], software: [], trash: [],
   settings: { storageLimitBytes: DEFAULT_STORAGE_LIMIT },
 });
 
 // ---------------------------------------------------------------------------
 // Plans
 // ---------------------------------------------------------------------------
-export const BLOCK_TYPES = new Set(['moodboard', 'text', 'todos', 'files', 'pdf', 'links', 'refs', 'palette', 'heading', 'divider', 'table']);
+export const BLOCK_TYPES = new Set(['moodboard', 'text', 'todos', 'files', 'pdf', 'links', 'refs', 'palette', 'heading', 'divider', 'table', 'briefing']);
 export const BLOCK_TITLES = {
   moodboard: 'Moodboard', text: 'Text', todos: 'To-dos', files: 'Files', pdf: 'PDF', links: 'Links',
   refs: 'References', palette: 'Palette', heading: 'Heading', divider: 'Divider', table: 'Table',
+  briefing: 'Briefing',
 };
+
+// Where a plan stands. '' = no status (every plan made before statuses existed).
+export const PLAN_STATUSES = ['briefing', 'concept', 'design', 'production', 'review', 'delivered', 'archived'];
+
+// A briefing block is a list of question → answer fields.
+export const normalizeField = (f) => ({ id: f?.id ? str(f.id, 40) : nanoid(6), label: str(f?.label, 120), value: str(f?.value, 20000) });
 
 // `fallbackId` keeps ids stable across reads for records that never had one,
 // so the client can address a block it was just sent.
@@ -56,6 +63,8 @@ export function normalizeBlock(b, fallbackId) {
   } else if (b.type === 'table') {
     if (!Array.isArray(b.columns)) b.columns = [];
     if (!Array.isArray(b.rows)) b.rows = [];
+  } else if (b.type === 'briefing') {
+    if (!Array.isArray(b.fields)) b.fields = [];
   }
   return b;
 }
@@ -92,7 +101,50 @@ export function normalizePlan(plan) {
   if (!('bannerGradient' in plan)) plan.bannerGradient = null;
   if (!('avatar' in plan)) plan.avatar = null;
   if (!('avatarEmoji' in plan)) plan.avatarEmoji = null;
+  if (!PLAN_STATUSES.includes(plan.status)) plan.status = '';
+  if (typeof plan.client !== 'string') plan.client = '';
   return plan;
+}
+
+// ---------------------------------------------------------------------------
+// Motion segments — labeled sections of a video (Hook, Problem, Reveal …)
+// ---------------------------------------------------------------------------
+export const SEGMENT_KINDS = ['hook', 'problem', 'reveal', 'features', 'proof', 'cta', 'outro'];
+// Segments written before section types existed only have a free-text label.
+// A label that names a type is read as that type — an exact name moves into
+// the type (the label would just repeat it), anything else stays as a note.
+const SEGMENT_ALIASES = {
+  hook: ['hook', 'opener', 'opening'],
+  problem: ['problem', 'pain', 'pain point', 'challenge'],
+  reveal: ['reveal', 'product reveal', 'solution', 'product', 'lösung', 'produkt'],
+  features: ['features', 'feature', 'demo', 'product demo', 'showcase', 'benefits'],
+  proof: ['social proof', 'proof', 'testimonial', 'testimonials', 'reviews', 'trust'],
+  cta: ['cta', 'call to action', 'call-to-action'],
+  outro: ['outro', 'logo outro', 'end card', 'endcard', 'end', 'abspann'],
+};
+export function inferSegmentKind(label) {
+  const t = String(label || '').trim().toLowerCase();
+  if (!t) return null;
+  const base = t.replace(/[\s\d.:#()–-]+$/, '');
+  for (const [kind, names] of Object.entries(SEGMENT_ALIASES)) {
+    if (names.includes(t)) return { kind, exact: true };
+    if (base && names.includes(base)) return { kind, exact: false };
+  }
+  return null;
+}
+export function normalizeSegments(arr) {
+  const segs = (Array.isArray(arr) ? arr : []).filter((s) => s && typeof s === 'object').slice(0, 200).map((s) => {
+    let kind = SEGMENT_KINDS.includes(s.kind) ? s.kind : '';
+    let label = str(s.label, 80);
+    if (!('kind' in s)) {
+      const hit = inferSegmentKind(label);
+      if (hit) { kind = hit.kind; if (hit.exact) label = ''; }
+    }
+    const start = Number(s.start);
+    return { id: s.id ? str(s.id, 40) : nanoid(6), start: Number.isFinite(start) ? Math.max(0, start) : 0, kind, label };
+  }).sort((a, b) => a.start - b.start);
+  if (segs.length) segs[0].start = 0;
+  return segs;
 }
 
 // ---------------------------------------------------------------------------
@@ -222,8 +274,14 @@ export function normalizeDB(db) {
   if (!Array.isArray(db.plans)) db.plans = [];
   if (!Array.isArray(db.software)) db.software = [];
   if (!Array.isArray(db.trash)) db.trash = [];
+  if (!Array.isArray(db.planTemplates)) db.planTemplates = [];
   for (const plan of db.plans) normalizePlan(plan);
   for (const s of db.software) normalizeSoftware(s);
+  for (const p of db.projects) {
+    if (p?.type === 'motion' && Array.isArray(p.segments) && p.segments.some((x) => x && !('kind' in x))) {
+      p.segments = normalizeSegments(p.segments);
+    }
+  }
   if (!db.settings || typeof db.settings !== 'object') db.settings = {};
   if (db.settings.storageLimitBytes == null) db.settings.storageLimitBytes = DEFAULT_STORAGE_LIMIT;
   if (!('dashboardBanner' in db.settings)) db.settings.dashboardBanner = null;

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
+import { isTouch } from '../lib/useMedia.js';
 
 /** Small modal to create or rename a gallery. */
-export default function GalleryNameModal({ title = 'New Gallery', initialName = '', submitLabel = 'Create', placeholder = 'e.g. Green Tech Companies', onSubmit, onClose }) {
+export default function GalleryNameModal({ title = 'New Gallery', initialName = '', submitLabel = 'Create', placeholder = 'e.g. Green Tech Companies', hint, onSubmit, onClose }) {
   const [name, setName] = useState(initialName);
   const [busy, setBusy] = useState(false);
 
@@ -28,9 +29,10 @@ export default function GalleryNameModal({ title = 'New Gallery', initialName = 
         <div className="modal-body">
           <div className="field" style={{ marginBottom: 0 }}>
             <label>Name</label>
-            <input className="input" value={name} autoFocus placeholder={placeholder}
+            <input className="input" value={name} autoFocus={!isTouch()} placeholder={placeholder}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') submit(); }} />
+            {hint && <div className="hint" style={{ marginTop: 8 }}>{hint}</div>}
           </div>
         </div>
         <div className="modal-foot">

@@ -2,14 +2,30 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   PencilRuler, ListTodo, FlaskConical, Plus, ArrowRight, CalendarRange, AppWindow,
-  AlertTriangle, Image as ImageIcon, UploadCloud, Database,
+  AlertTriangle, Image as ImageIcon, UploadCloud, Database, Flag, CalendarClock,
 } from 'lucide-react';
 import { api, planFileUrl, dashboardFileUrl } from '../lib/api.js';
-import { gradientCss, PLAN_GRADIENTS } from '../lib/types.js';
+import { gradientCss, PLAN_GRADIENTS, PLAN_STATUSES, tagColor } from '../lib/types.js';
 import { useToast } from '../components/Toast.jsx';
+import StatusBadge from '../components/StatusBadge.jsx';
 
 const fmtRange = (s, e) => (s && e ? `${s} – ${e}` : s || e || '');
 const DEFAULT_BANNER = 'linear-gradient(120deg,#6a11cb,#2575fc)';
+
+// Days from today to a yyyy-mm-dd date (negative = past), in local time.
+function daysFromToday(iso) {
+  const [y, m, d] = String(iso || '').split('-').map(Number);
+  if (!y || !m || !d) return NaN;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return Math.round((new Date(y, m - 1, d) - today) / 86400000);
+}
+const whenLabel = (n) => (n === 0 ? 'Today' : n === 1 ? 'Tomorrow' : n === -1 ? 'Yesterday' : n > 1 ? `In ${n} days` : `${-n} days ago`);
+const fmtDay = (iso) => {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+};
+const DUE_AHEAD = 14; // days ahead shown under "Coming up"
+const DUE_BEHIND = 30; // overdue items stay this long
 
 /** Work-mode landing: a Notion-style card view of the working tools. */
 export default function WorkDashboard({ reloadKey, onNewPlan }) {
@@ -45,7 +61,8 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
   const boardCards = (board?.columns || []).reduce((n, c) => n + c.cards.length, 0);
   const boardLists = (board?.columns || []).length;
   const softCount = software?.length ?? 0;
-  const recent = [...(plans || [])].slice(-6).reverse();
+  // The API lists plans newest first; archived ones stay off the dashboard.
+  const recent = (plans || []).filter((p) => p.status !== 'archived').slice(0, 6);
 
   // Urgent to-dos, gathered from the board and every plan's to-do blocks.
   const urgentBoard = (board?.columns || []).flatMap((c) =>
@@ -54,6 +71,19 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
     (p.blocks || []).filter((b) => b.type === 'todos').flatMap((b) =>
       (b.items || []).filter((it) => it.urgent && !it.done).map((it) => ({ id: it.id, kind: 'plan', label: it.text || 'Untitled to-do', context: p.name || 'Plan', to: `/plan/${p.id}` }))));
   const urgent = [...urgentBoard, ...urgentPlans];
+
+  // Open plans by status, and their upcoming milestones / deadlines.
+  const openPlans = (plans || []).filter((p) => p.status !== 'delivered' && p.status !== 'archived');
+  const pipeline = PLAN_STATUSES.filter((st) => st.key !== 'archived')
+    .map((st) => ({ ...st, plans: (plans || []).filter((p) => p.status === st.key) }));
+  const showPipeline = pipeline.some((st) => st.plans.length > 0);
+  const due = openPlans.flatMap((p) => [
+    ...(p.milestones || []).filter((m) => m.date && !m.done).map((m) => ({ id: `${p.id}:${m.id}`, date: m.date, label: m.title || 'Milestone', plan: p, end: false })),
+    ...(p.end ? [{ id: `${p.id}:end`, date: p.end, label: 'Deadline', plan: p, end: true }] : []),
+  ]).map((x) => ({ ...x, days: daysFromToday(x.date) }))
+    .filter((x) => Number.isFinite(x.days) && x.days <= DUE_AHEAD && x.days >= -DUE_BEHIND)
+    .sort((a, b) => a.days - b.days || Number(a.end) - Number(b.end))
+    .slice(0, 8);
 
   const tools = [
     { key: 'plan', icon: PencilRuler, title: 'Plans', sub: planCount ? `${planCount} plan${planCount === 1 ? '' : 's'}` : 'Plan a new project', to: '/plan', accent: 'linear-gradient(120deg,#6a11cb,#2575fc)' },
@@ -136,6 +166,55 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
         </>
       )}
 
+      {/* Coming up: milestones and plan deadlines in the next two weeks (and overdue) */}
+      {due.length > 0 && (
+        <>
+          <div className="dash-section-head">
+            <h2><CalendarClock size={17} /> Coming up <span className="count">{due.length}</span></h2>
+          </div>
+          <div className="dash-due">
+            {due.map((d) => (
+              <button key={d.id} className={`dash-due-row ${d.days < 0 ? 'overdue' : d.days <= 1 ? 'soon' : ''}`} onClick={() => navigate(`/plan/${d.plan.id}`)}>
+                <span className="dash-due-when"><b>{whenLabel(d.days)}</b><span>{fmtDay(d.date)}</span></span>
+                <span className="dash-due-main">
+                  <span className="dash-due-label">{d.end ? <Flag size={13} /> : null}{d.label}</span>
+                  <span className="dash-due-plan">{d.plan.avatarEmoji ? `${d.plan.avatarEmoji} ` : ''}{d.plan.name}{d.plan.client ? ` · ${d.plan.client}` : ''}</span>
+                </span>
+                <ArrowRight className="dash-due-go" size={15} />
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Pipeline: plans by status */}
+      {showPipeline && (
+        <>
+          <div className="dash-section-head">
+            <h2>Pipeline</h2>
+            <button className="btn btn-sm btn-ghost" onClick={() => navigate('/plan')}>All plans <ArrowRight size={14} /></button>
+          </div>
+          <div className="dash-pipeline">
+            {pipeline.map((st) => {
+              const c = tagColor(st.color);
+              return (
+                <button key={st.key} className={`dash-stage ${st.plans.length ? '' : 'is-empty'}`} onClick={() => navigate(`/plan?status=${st.key}`)}>
+                  <span className="dash-stage-head">
+                    <span className="status-dot" style={{ background: c.fg }} />
+                    <span className="dash-stage-name">{st.label}</span>
+                    <span className="dash-stage-count" style={st.plans.length ? { background: c.bg, color: c.fg } : undefined}>{st.plans.length}</span>
+                  </span>
+                  <span className="dash-stage-plans">
+                    {st.plans.slice(0, 3).map((p) => <span key={p.id} className="dash-stage-plan">{p.name}</span>)}
+                    {st.plans.length > 3 && <span className="dash-stage-more">+{st.plans.length - 3} more</span>}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+
       <div className="dash-section-head">
         <h2>Recent plans</h2>
         <button className="btn btn-sm" onClick={onNewPlan}><Plus size={15} /> New plan</button>
@@ -158,6 +237,7 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
                     : p.avatarEmoji ? <span className="dash-plan-emoji">{p.avatarEmoji}</span>
                       : <span>{(p.name || '?').charAt(0).toUpperCase()}</span>}
                 </span>
+                <StatusBadge status={p.status} className="dash-plan-status" />
                 <span className="dash-plan-name">{p.name}</span>
                 {fmtRange(p.start, p.end) && (
                   <span className="dash-plan-range"><CalendarRange size={12} /> {fmtRange(p.start, p.end)}</span>

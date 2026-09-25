@@ -6,7 +6,8 @@ import { DATA_DIR, TRASH_DIR } from '../config.js';
 import { readDB, mutateDB } from '../db.js';
 import { moveInto, replaceImage, safeRm, moveToTrash, moveRelPaths, extOf } from '../files.js';
 import { upload } from '../upload.js';
-import { BLOCK_TYPES, BLOCK_TITLES, str } from '../schema.js';
+import { BLOCK_TYPES, BLOCK_TITLES, PLAN_STATUSES, normalizeField, str } from '../schema.js';
+import { BUILTIN_TEMPLATES, builtinTemplate, planFromTemplate, templateFromPlan, templateSummary } from '../templates.js';
 import { createRouter } from '../http.js';
 
 const router = createRouter();
@@ -16,7 +17,11 @@ const planDir = (planId) => path.join(DATA_DIR, 'plan', planId);
 const blockDir = (planId, blockId) => path.join(planDir(planId), 'blocks', blockId);
 const findBlock = (plan, blockId) => (plan && Array.isArray(plan.blocks)) ? plan.blocks.find((b) => b.id === blockId) : null;
 
-const PLAN_EDITABLE = ['name', 'start', 'end', 'milestones', 'bannerGradient', 'avatarEmoji'];
+const PLAN_EDITABLE = ['name', 'start', 'end', 'milestones', 'bannerGradient', 'avatarEmoji', 'status', 'client'];
+
+// Fields a briefing block starts with when added by hand.
+const DEFAULT_BRIEFING = ['Product / company', 'Target audience', 'Key message', 'Call to action',
+  'Deliverables', 'Must-haves / no-gos', 'Budget'];
 
 router.get('/api/plans', async (_req, res) => {
   const db = await readDB();
@@ -31,22 +36,74 @@ router.get('/api/plans/:id', async (req, res) => {
   res.json({ plan });
 });
 
+// A new plan is empty, or starts from a template (built-in or saved).
 router.post('/api/plans', async (req, res) => {
-  const plan = {
-    id: nanoid(10),
-    name: str(req.body.name || 'Untitled plan', 200).trim() || 'Untitled plan',
-    start: '',
-    end: '',
-    banner: null,
-    bannerGradient: null,
-    avatar: null,
-    avatarEmoji: null,
-    milestones: [],
-    blocks: [], // a new plan is empty — blocks are added by the user
-    createdAt: Date.now(),
-  };
-  await mutateDB((db) => { db.plans.push(plan); });
+  const templateId = req.body.template ? String(req.body.template) : '';
+  const plan = await mutateDB((db) => {
+    const t = templateId ? (builtinTemplate(templateId) || db.planTemplates.find((x) => x.id === templateId)) : null;
+    if (templateId && !t) return null;
+    const p = {
+      id: nanoid(10),
+      name: str(req.body.name || 'Untitled plan', 200).trim() || 'Untitled plan',
+      client: str(req.body.client, 200).trim(),
+      status: '',
+      start: '',
+      end: '',
+      banner: null,
+      bannerGradient: null,
+      avatar: null,
+      avatarEmoji: null,
+      milestones: [],
+      blocks: [],
+      ...(t ? planFromTemplate(t) : {}),
+      createdAt: Date.now(),
+    };
+    db.plans.push(p);
+    return p;
+  });
+  if (!plan) return res.status(400).json({ error: 'unknown_template', message: 'That template no longer exists.' });
   res.status(201).json({ plan });
+});
+
+// --- Templates ---
+router.get('/api/plan-templates', async (_req, res) => {
+  const db = await readDB();
+  res.json({
+    templates: [
+      ...BUILTIN_TEMPLATES.map((t) => templateSummary(t, true)),
+      ...[...db.planTemplates].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)).map((t) => templateSummary(t, false)),
+    ],
+  });
+});
+
+// Save a plan as a template. Saving under the name of one of your templates
+// replaces it (that's how a template is updated).
+router.post('/api/plan-templates', async (req, res) => {
+  const name = str(req.body.name, 120).trim();
+  if (!name) return res.status(400).json({ error: 'name_required', message: 'Give the template a name.' });
+  const result = await mutateDB((db) => {
+    const plan = db.plans.find((p) => p.id === req.body.planId);
+    if (!plan) return null;
+    const t = templateFromPlan(plan, name);
+    const i = db.planTemplates.findIndex((x) => x.name.trim().toLowerCase() === name.toLowerCase());
+    if (i === -1) db.planTemplates.push(t);
+    else { t.id = db.planTemplates[i].id; t.createdAt = db.planTemplates[i].createdAt || t.createdAt; db.planTemplates[i] = t; }
+    return { template: templateSummary(t, false), replaced: i !== -1 };
+  });
+  if (!result) return res.status(404).json({ error: 'not_found' });
+  res.status(result.replaced ? 200 : 201).json(result);
+});
+
+router.delete('/api/plan-templates/:id', async (req, res) => {
+  if (builtinTemplate(req.params.id)) return res.status(400).json({ error: 'builtin_template', message: 'Built-in templates can’t be deleted.' });
+  const ok = await mutateDB((db) => {
+    const i = db.planTemplates.findIndex((t) => t.id === req.params.id);
+    if (i === -1) return false;
+    db.planTemplates.splice(i, 1);
+    return true;
+  });
+  if (!ok) return res.status(404).json({ error: 'not_found' });
+  res.json({ ok: true });
 });
 
 router.patch('/api/plans/:id', async (req, res) => {
@@ -55,8 +112,11 @@ router.patch('/api/plans/:id', async (req, res) => {
     if (!plan) return null;
     for (const k of PLAN_EDITABLE) {
       if (!(k in req.body)) continue;
-      if (k === 'milestones') { if (Array.isArray(req.body.milestones)) plan.milestones = req.body.milestones; }
-      else plan[k] = req.body[k];
+      const v = req.body[k];
+      if (k === 'milestones') { if (Array.isArray(v)) plan.milestones = v; }
+      else if (k === 'status') { if (v === '' || v == null || PLAN_STATUSES.includes(v)) plan.status = v || ''; }
+      else if (k === 'client') plan.client = str(v, 200);
+      else plan[k] = v;
     }
     return plan;
   });
@@ -110,14 +170,15 @@ router.post('/api/plans/:id/blocks', async (req, res) => {
         : type === 'heading' ? { ...base, title: '', content: '' }
           : type === 'divider' ? { ...base }
             : type === 'table' ? { ...base, columns: [{ id: nanoid(6), name: '' }, { id: nanoid(6), name: '' }], rows: [] }
-              : { ...base, files: [] }; // files + pdf
+              : type === 'briefing' ? { ...base, fields: DEFAULT_BRIEFING.map((label) => normalizeField({ label })) }
+                : { ...base, files: [] }; // files + pdf
   const updated = await mutateDB((db) => { const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null; p.blocks.push(block); return p; });
   if (!updated) return res.status(404).json({ error: 'not_found' });
   res.status(201).json({ plan: updated, block });
 });
 
 // Update only the content/label fields — never the file arrays.
-const BLOCK_EDITABLE = ['title', 'collapsed', 'content', 'items', 'columns', 'rows'];
+const BLOCK_EDITABLE = ['title', 'collapsed', 'content', 'items', 'columns', 'rows', 'fields'];
 router.patch('/api/plans/:id/blocks/:blockId', async (req, res) => {
   const updated = await mutateDB((db) => {
     const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null;
@@ -127,6 +188,7 @@ router.patch('/api/plans/:id/blocks/:blockId', async (req, res) => {
       const v = req.body[k];
       if (k === 'title' || k === 'content') b[k] = str(v, k === 'content' ? 200000 : 400);
       else if (k === 'collapsed') b[k] = !!v;
+      else if (k === 'fields') { if (Array.isArray(v)) b.fields = v.slice(0, 100).map(normalizeField); }
       else if (Array.isArray(v)) b[k] = v; // items / columns / rows
     }
     return p;

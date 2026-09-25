@@ -5,7 +5,7 @@ import { DATA_DIR, TRASH_DIR, TYPES } from '../config.js';
 import { readDB, mutateDB } from '../db.js';
 import { moveInto, replaceImage, safeRm, moveToTrash, extOf } from '../files.js';
 import { upload, parseJSON } from '../upload.js';
-import { str } from '../schema.js';
+import { str, normalizeSegments } from '../schema.js';
 import { createRouter, HttpError } from '../http.js';
 
 const router = createRouter();
@@ -156,16 +156,9 @@ router.patch('/api/projects/:id', async (req, res) => {
       } else if (key === 'variant') {
         if (req.body.variant === 'light' || req.body.variant === 'dark') project.variant = req.body.variant;
       } else if (key === 'segments') {
-        // Labeled video sections (Hook / Demo / Outro …). Each carries a
-        // start time; the first is pinned to 0 and the rest sorted.
-        const arr = Array.isArray(req.body.segments) ? req.body.segments : [];
-        const segs = arr.slice(0, 200).map((s) => ({
-          id: s?.id ? str(s.id, 40) : nanoid(6),
-          start: Math.max(0, Number(s?.start) || 0),
-          label: str(s?.label, 80),
-        })).sort((a, b) => a.start - b.start);
-        if (segs.length) segs[0].start = 0;
-        project.segments = segs;
+        // Labeled video sections (Hook / Problem / Reveal …). Each carries a
+        // start time and a section type; the first is pinned to 0.
+        project.segments = normalizeSegments(req.body.segments);
       } else if (key === 'tags') {
         if (Array.isArray(req.body.tags)) project.tags = req.body.tags.map((t) => str(t, 80)).filter(Boolean);
       } else if (['title', 'year', 'category', 'notes', 'url'].includes(key)) {

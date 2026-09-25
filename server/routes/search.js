@@ -4,6 +4,12 @@ import { readDB } from '../db.js';
 import { createRouter } from '../http.js';
 
 const router = createRouter();
+
+// Section types of a motion video, as shown in the app (search finds "social proof").
+const SEGMENT_LABEL = {
+  hook: 'Hook', problem: 'Problem', reveal: 'Product reveal', features: 'Features',
+  proof: 'Social proof', cta: 'Call to action', outro: 'Logo outro',
+};
 export default router;
 
 function scoreMatch(terms, title, hay) {
@@ -26,7 +32,8 @@ router.get('/api/search', async (req, res) => {
 
   for (const p of db.projects) {
     const hay = [p.title, p.year, p.category, ...(p.tags || []), p.notes, p.url,
-      ...(p.colors || []).flatMap((c) => [c.hex, c.name])].filter(Boolean).join(' ').toLowerCase();
+      ...(p.colors || []).flatMap((c) => [c.hex, c.name]),
+      ...(p.segments || []).flatMap((sg) => [SEGMENT_LABEL[sg.kind], sg.label])].filter(Boolean).join(' ').toLowerCase();
     const score = scoreMatch(terms, p.title || '', hay);
     if (score > 0) results.push({
       kind: 'project', id: p.id, type: p.type, title: p.title || 'Untitled',
@@ -41,12 +48,13 @@ router.get('/api/search', async (req, res) => {
       ...(b.files || []).map((f) => f.name),
       ...(b.columns || []).map((c) => c.name),
       ...(b.rows || []).flatMap((r) => Object.values(r.cells || {})),
+      ...(b.fields || []).flatMap((f) => [f.label, f.value]),
     ]);
-    const hay = [pl.name, ...(pl.milestones || []).map((m) => m.title), ...blockText]
+    const hay = [pl.name, pl.client, ...(pl.milestones || []).map((m) => m.title), ...blockText]
       .filter(Boolean).join(' ').toLowerCase();
     const score = scoreMatch(terms, pl.name || '', hay);
     if (score > 0) results.push({
-      kind: 'plan', id: pl.id, title: pl.name || 'Untitled plan', subtitle: 'Plan',
+      kind: 'plan', id: pl.id, title: pl.name || 'Untitled plan', subtitle: pl.client ? `Plan · ${pl.client}` : 'Plan',
       thumb: pl.avatar ? `/data/plan/${pl.id}/${pl.avatar}` : null, score,
     });
   }

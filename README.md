@@ -179,6 +179,10 @@ nothing changes after an update.
 and every file reference is kept. To undo, stop the app and copy that backup
 over `data/db.json`.
 
+Newer additions — plan status and client, the briefing block, plan templates
+and video section types — need no migration: records without them read as
+“no status”, “no client”, “no type”, and older section labels keep their text.
+
 ### Unused files cleanup
 
 **Settings → Library → Unused files → Scan** lists files in the library folders
@@ -210,8 +214,9 @@ and full **ZIP64** is supported, so archives and individual files larger than
 
 Press **⌘K** (macOS) / **Ctrl-K**, or the header search button, to open a
 command palette that searches **across every section at once** — project
-titles, categories, tags and notes, colours (by hex), font sites, and plan
-names, milestones and to-dos. It also lets you **jump to any section** (or
+titles, categories, tags and notes, colours (by hex), font sites, a video's
+sections (type and note), and plan names, clients, milestones, to-dos and
+briefing answers. It also lets you **jump to any section** (or
 Plans, Logo Tester, Trash) by name. Arrow keys to move, Enter to open, Esc to
 close.
 
@@ -253,7 +258,14 @@ to the Dashboard.
 ### Dashboard
 The Work landing page: a Notion-style **card view** of your tools — **Plans**
 (with the plan count), the **To-Do Board** (open cards / lists) and the **Logo
-Tester** — each opening its tool, plus a **Recent plans** row.
+Tester** — each opening its tool, plus:
+- **Coming up** — milestones and plan deadlines of the next two weeks (and
+  anything overdue), soonest first, from every plan that isn't delivered or
+  archived,
+- **Pipeline** — your plans by status (Briefing → Concept → Design →
+  Production → Review → Delivered); a stage opens the plan list filtered to it
+  (shown once any plan has a status),
+- **Recent plans**, newest first, with their status.
 
 ### To-Do board
 A general **Kanban planner**. Lists (columns) hold **cards**; add lists and
@@ -267,8 +279,29 @@ a phone every list is a full-width, swipeable page with **list tabs** above to
 jump between them. Everything auto-saves to one global board.
 
 ### Plans
-Plan new projects. The **+** creates a new plan; plans are listed
-  in a grid like galleries. Each **plan** has:
+Plan new projects. The **+** opens **New plan**: give it a name and (optionally)
+a client, and choose what to start from —
+- **Empty plan** — a blank page,
+- **Launch video** — briefing (product, audience, key message, CTA, target
+  length, formats, tone, music & VO, must-haves, budget), script & VO,
+  moodboard, references, styleframes, palette, a production checklist, a
+  deliverables table (16:9 / 9:16 / 1:1 / 4:5) plus milestones from kick-off
+  to final delivery,
+- **Branding** — briefing, research (references, competitors), moodboard, logo
+  concepts, colour palette, typography, a checklist, a deliverables table and a
+  brand-guidelines PDF block,
+- **your own templates** — any plan can be saved with **Edit → Save as
+  template…**. A template keeps the blocks, text, to-dos (unticked), tables and
+  briefing questions, and leaves out images, files, dates and briefing answers.
+  Saving under the name of an existing template updates it; delete one with
+  its **×** in the New plan dialog. The dialog remembers the last choice.
+
+Plans are listed in a grid like galleries, with **status chips** above to show
+one stage at a time (archived plans only show under **Archived**). Each
+**plan** has:
+  - a **status** — Briefing, Concept, Design, Production, Review, Delivered or
+    Archived (or none) — picked from the pill under the plan's name, next to
+    its **client**,
   - a **Notion-style banner** — pick a **preset gradient** or upload a **custom
     image** — plus a **profile image** that can be an **emoji** (quick-pick grid
     or type/paste your own) or an **uploaded image**; both banner and profile
@@ -278,7 +311,11 @@ Plan new projects. The **+** creates a new plan; plans are listed
   - a stack of **content blocks** below the timeframe. A **new plan is empty**;
     add blocks with **+ Add block** at the bottom, reorder them (**Move up /
     down**), rename them, or remove them — each block has its own **⋯** menu.
-    Four block types are available:
+    These block types are available:
+    - **Briefing** — question → answer rows (rename, add or remove questions;
+      answers grow as you type). The header counts answered questions, and
+      **Copy** puts the whole briefing on the clipboard as text, e.g. to send
+      to the client.
     - **Moodboard** — a **collapsible** board of images. Add images by button, by
       **dropping** files onto the board, or by **pasting** (⌘V) into the last-used
       board.
@@ -362,7 +399,17 @@ project you get:
 - a **big frame preview** with prev/next arrows (fixed position; wrapping past
   the last frame returns to the first), click-to-**fullscreen** with arrow
   navigation, and the thumbnail strip below. Each frame has a **⋯ menu** to
-  delete (no accidental one-click deletes).
+  delete (no accidental one-click deletes),
+- **Sections** — the video's structure as a coloured bar under the player:
+  **Hook, Problem, Product reveal, Features, Social proof, Call to action,
+  Logo outro**. Play the video and click a type — or press **1–7** — where that
+  part begins; **Split** adds an untyped section. Click or drag along the bar to
+  scrub. The list below shows each section's start and length; change its type,
+  add a note, move its start to the playhead or remove it (its time joins the
+  one before). The structure also shows as a thin strip on the video's card in
+  the grid. Sections labelled before types existed keep their text: a label that
+  names a type (“Hook”, “CTA”, “Demo”…) is read as that type, anything else
+  stays as the section's name.
 
 ### Logos
 Upload one image — **SVG** or **PNG** (transparent silhouette). Each colour
@@ -516,6 +563,7 @@ Nothing is fetched from a third-party CDN at runtime.
   ├── config.js       # paths, ports, env vars
   ├── db.js           # atomic writes, self-healing reads, snapshots, write queue
   ├── schema.js       # record shapes, read-time normalizing, the v1→v2 migration
+  ├── templates.js    # built-in plan templates, save-as-template
   ├── files.js        # fs helpers (path containment, moves, trash, storage size)
   ├── http.js         # async-safe routers, JSON errors, host/CSRF/data guards
   ├── upload.js       # multer (per-request tmp folder, always cleaned up)

@@ -4,6 +4,7 @@ import { fileUrl } from '../lib/api.js';
 import { fmtTime } from '../lib/media.js';
 import { cardSize, logoSource, logoScale, logoActive, hostOf, setLastTab } from '../lib/types.js';
 import LogoImage from './LogoImage.jsx';
+import { segmentColor, segmentName } from '../lib/segments.js';
 
 export default function ProjectCard({ project, onRemove, removeTitle = 'Remove from gallery' }) {
   const navigate = useNavigate();
@@ -48,6 +49,7 @@ export default function ProjectCard({ project, onRemove, removeTitle = 'Remove f
             <>
               <div className="card-play"><span><Play size={20} fill="#fff" color="#fff" /></span></div>
               {project.duration ? <span className="card-duration">{fmtTime(project.duration)}</span> : null}
+              <StructureStrip segments={project.segments} duration={Number(project.duration) || 0} />
             </>
           )}
         </div>
@@ -70,6 +72,20 @@ export default function ProjectCard({ project, onRemove, removeTitle = 'Remove f
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// A motion video's sections as a thin coloured strip along the cover.
+function StructureStrip({ segments, duration }) {
+  if (!duration || !Array.isArray(segments) || !segments.length) return null;
+  const list = [...segments].sort((a, b) => a.start - b.start);
+  return (
+    <div className="card-structure" title={list.map((s, i) => segmentName(s, i)).join(' → ')}>
+      {list.map((s, i) => {
+        const end = i < list.length - 1 ? list[i + 1].start : duration;
+        return <span key={s.id} style={{ flexGrow: Math.max(0.0001, end - s.start), background: segmentColor(s.kind).fg }} />;
+      })}
     </div>
   );
 }

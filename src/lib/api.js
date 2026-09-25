@@ -120,9 +120,21 @@ export const api = {
     const { plan } = await request(`/api/plans/${id}`);
     return plan;
   },
-  async createPlan(name) {
-    const { plan } = await request('/api/plans', { method: 'POST', json: { name } });
+  async createPlan({ name, client, template } = {}) {
+    const { plan } = await request('/api/plans', { method: 'POST', json: { name, client, template } });
     return plan;
+  },
+  // Plan templates: built-in ones plus those saved from plans.
+  async listPlanTemplates() {
+    const { templates } = await request('/api/plan-templates');
+    return templates;
+  },
+  // → { template, replaced } (saving under an existing template's name updates it)
+  async savePlanTemplate(planId, name) {
+    return request('/api/plan-templates', { method: 'POST', json: { planId, name } });
+  },
+  async removePlanTemplate(id) {
+    return request(`/api/plan-templates/${id}`, { method: 'DELETE' });
   },
   async updatePlan(id, patch) {
     const { plan } = await request(`/api/plans/${id}`, { method: 'PATCH', json: patch });

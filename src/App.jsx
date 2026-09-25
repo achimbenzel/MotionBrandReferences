@@ -6,6 +6,7 @@ import { PanelLeft } from 'lucide-react';
 import MobileBar from './components/MobileBar.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import UploadModal from './components/UploadModal.jsx';
+import NewPlanModal from './components/NewPlanModal.jsx';
 import CommandPalette from './components/CommandPalette.jsx';
 import { StorageProvider } from './components/StorageMeter.jsx';
 // The two landing pages load eagerly (shown first); everything else is split
@@ -24,11 +25,11 @@ const SoftwareDetail = lazy(() => import('./pages/SoftwareDetail.jsx'));
 const TrashPage = lazy(() => import('./pages/TrashPage.jsx'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage.jsx'));
 import { TABS, isWorkPath, WORK_HOME } from './lib/types.js';
-import { api } from './lib/api.js';
 import { useMediaQuery, DESKTOP } from './lib/useMedia.js';
 
 function Shell() {
   const [modalType, setModalType] = useState(null); // null = closed
+  const [newPlan, setNewPlan] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(() => {
@@ -76,13 +77,13 @@ function Shell() {
     else if (project?.type) { toast('Images added'); navigate(`/${project.type}`); }
   }, [navigate, toast]);
 
-  const createPlan = useCallback(async () => {
-    try {
-      const plan = await api.createPlan('Untitled plan');
-      setReloadKey((k) => k + 1);
-      navigate(`/plan/${plan.id}`);
-    } catch (e) { toast(`Could not create plan: ${e.message}`, 'error'); }
-  }, [navigate, toast]);
+  // "New plan" opens a dialog to name it and pick a template.
+  const createPlan = useCallback(() => setNewPlan(true), []);
+  const planCreated = useCallback((plan) => {
+    setNewPlan(false);
+    setReloadKey((k) => k + 1);
+    navigate(`/plan/${plan.id}`);
+  }, [navigate]);
 
   const onAdd = (key) => { setDrawer(false); (workMode ? createPlan : openModal)(key); };
   const openSearch = () => { setDrawer(false); setPaletteOpen(true); };
@@ -133,6 +134,7 @@ function Shell() {
       {modalType && (
         <UploadModal initialType={modalType} onClose={closeModal} onCreated={handleCreated} />
       )}
+      {newPlan && <NewPlanModal onClose={() => setNewPlan(false)} onCreated={planCreated} />}
       {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
     </div>
     </StorageProvider>
