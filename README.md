@@ -285,7 +285,7 @@ a client, and choose what to start from —
 - **Launch video** — briefing (product, audience, key message, CTA, target
   length, formats, tone, music & VO, must-haves, budget), a script (lines
   pre-labelled Hook → Logo outro), moodboard, references, styleframes,
-  palette, a storyboard, a production checklist, a deliverables table
+  palette, a storyboard, a production checklist, a review block, a deliverables table
   (16:9 / 9:16 / 1:1 / 4:5) plus milestones from kick-off to final delivery,
 - **Branding** — briefing, research (references, competitors), moodboard, logo
   concepts, colour palette, typography, a checklist, a deliverables table and a
@@ -335,6 +335,13 @@ one stage at a time (archived plans only show under **Archived**). Each
       optional **music / voice-over track** in sync (Space play/pause, ←/→
       shots, C captions, Esc close); click a frame or a strip cell to start
       there.
+    - **Review** — upload each render as a **version** (v1, v2 … — or drop the
+      file on the block). Pause anywhere and write **feedback pinned to that
+      moment**; comments show on a timeline under the player, jump there on
+      click, and are ticked off as they're fixed (“open only” filter, **Copy
+      feedback** as a checklist). **Approve** a version, **compare** two side
+      by side (they play in sync), and on a new version check what was **still
+      open in the one before**: mark each point *fixed* or carry it over.
     - **Moodboard** — a **collapsible** board of images. Add images by button, by
       **dropping** files onto the board, or by **pasting** (⌘V) into the last-used
       board.
@@ -407,11 +414,26 @@ cover** thumbnail. Tag each project by **color scheme** and **type** (tech,
 restaurant, …) and filter the grid by those tags.
 
 ### Motion Design
-Upload a **video**; scrub to the frame you want and it becomes the cover. On a
-project you get:
+Upload a **video**; scrub to the frame you want and it becomes the cover. In the
+grid, resting the mouse on a card **plays a muted preview**. On a project you
+get:
 - a **player** (its **volume / mute is remembered** across reloads) with notes
   (auto-saved) and **tags** (used for filtering),
-- an automatic **length tag** — `≤ 30s`, `30–60s`, `60–90s`, `> 90s`,
+- an automatic **length tag** — `≤ 30s`, `30–60s`, `60–90s`, `> 90s` — and a
+  **format tag** (`16:9`, `9:16`, `1:1`, `4:5`, `4:3`, `21:9`) read from the
+  video, both usable as filters; the format and resolution (4K / 1080p / 720p)
+  also show under the player and as a badge on the card. Videos added before
+  this are measured once in the background when you open Motion Design,
+- **player tools** — speed **¼×, ½×, 1×, 2×** (`<` / `>`), **Loop** (`L`) the
+  section under the playhead (or the whole video; each section also has its
+  own loop button) and **Mark moment** (`M`),
+- **Moments** — markers on the video, each tagged with a **technique** (Match
+  cut, Speed ramp, Whip pan, Kinetic type, UI zoom … or your own) and an
+  optional note, with the frame captured when you marked it. Tap a technique
+  to mark the current moment with it, or press `M` and type. Moments show as
+  ticks on the section bar. **Motion Design → Moments** lists every moment in
+  the library, filterable by technique (“all speed ramps”); a card opens the
+  video right at that moment,
 - a **“Add current frame”** button: pause anywhere and save that frame; frames
   are stored as **WebP** in the project folder. While paused, step **frame by
   frame** with **`,`** (back) and **`.`** (forward), YouTube-style,

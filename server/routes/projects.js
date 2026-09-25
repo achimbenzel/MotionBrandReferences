@@ -5,7 +5,7 @@ import { DATA_DIR, TRASH_DIR, TYPES } from '../config.js';
 import { readDB, mutateDB } from '../db.js';
 import { moveInto, replaceImage, safeRm, moveToTrash, extOf } from '../files.js';
 import { upload, parseJSON } from '../upload.js';
-import { str, normalizeSegments } from '../schema.js';
+import { str, normalizeSegments, normalizeMarkers, videoDim } from '../schema.js';
 import { createRouter, HttpError } from '../http.js';
 
 const router = createRouter();
@@ -56,7 +56,10 @@ router.post('/api/projects', upload.any(), async (req, res) => {
       if (!video) return res.status(400).json({ error: 'video_required', message: 'Please choose a video.' });
       project.video = await moveInto(dir, video.path, `video${extOf(video.originalname) || '.mp4'}`);
       project.duration = Number(req.body.duration) || 0;
+      project.width = videoDim(req.body.width);
+      project.height = videoDim(req.body.height);
       project.frames = [];
+      project.markers = [];
     }
 
     if (type === 'color') {
@@ -141,7 +144,8 @@ router.post('/api/projects', upload.any(), async (req, res) => {
 });
 
 // ---- Update (notes / tags / colors / meta) --------------------------------
-const EDITABLE = ['title', 'year', 'category', 'notes', 'tags', 'colors', 'bg', 'scale', 'variant', 'renditions', 'original', 'rendition', 'url', 'segments'];
+const EDITABLE = ['title', 'year', 'category', 'notes', 'tags', 'colors', 'bg', 'scale', 'variant', 'renditions', 'original', 'rendition', 'url', 'segments',
+  'markers', 'width', 'height', 'duration'];
 router.patch('/api/projects/:id', async (req, res) => {
   const updated = await mutateDB((db) => {
     const project = db.projects.find((p) => p.id === req.params.id);
@@ -159,6 +163,15 @@ router.patch('/api/projects/:id', async (req, res) => {
         // Labeled video sections (Hook / Problem / Reveal …). Each carries a
         // start time and a section type; the first is pinned to 0.
         project.segments = normalizeSegments(req.body.segments);
+      } else if (key === 'markers') {
+        project.markers = normalizeMarkers(req.body.markers);
+      } else if (key === 'width' || key === 'height') {
+        // Filled in when a video's size is first read (upload, or later backfill).
+        const v = videoDim(req.body[key]);
+        if (v) project[key] = v;
+      } else if (key === 'duration') {
+        const d = Number(req.body.duration);
+        if (Number.isFinite(d) && d > 0 && d < 86400) project.duration = d;
       } else if (key === 'tags') {
         if (Array.isArray(req.body.tags)) project.tags = req.body.tags.map((t) => str(t, 80)).filter(Boolean);
       } else if (['title', 'year', 'category', 'notes', 'url'].includes(key)) {
@@ -218,6 +231,32 @@ router.post('/api/projects/:id/frames', upload.single('frame'), async (req, res)
   });
   if (!updated) return res.status(404).json({ error: 'not_found' });
   res.status(201).json({ frame, project: updated });
+});
+
+// ---- Store a moment's captured frame; the page saves it into `markers` ----
+router.post('/api/projects/:id/marker-thumb', upload.single('thumb'), async (req, res) => {
+  const project = await findProject(req.params.id, 'motion');
+  if (!req.file) return res.status(400).json({ error: 'thumb_required' });
+  const stored = await moveInto(path.join(DATA_DIR, 'motion', project.id, 'markers'), req.file.path, `${nanoid(8)}${extOf(req.file.originalname) || '.webp'}`);
+  res.status(201).json({ file: `markers/${stored}` });
+});
+
+// ---- Technique tags used on motion moments, most used first --------------
+router.get('/api/motion/techniques', async (_req, res) => {
+  const db = await readDB();
+  const counts = new Map();
+  for (const p of db.projects) {
+    if (p.type !== 'motion') continue;
+    for (const m of (p.markers || [])) {
+      const label = String(m?.label || '').trim();
+      if (!label) continue;
+      const key = label.toLowerCase();
+      const cur = counts.get(key) || { label, count: 0 };
+      cur.count += 1;
+      counts.set(key, cur);
+    }
+  }
+  res.json({ techniques: [...counts.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label)) });
 });
 
 // ---- Add many frames at once (the "a frame for each second" capture) -------

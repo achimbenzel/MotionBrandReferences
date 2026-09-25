@@ -270,3 +270,68 @@ test('templates keep storyboard text but drop frames and tracks', async () => {
   assert.equal(csb.audio, null);
   await srv.api(`/api/plan-templates/${t.data.template.id}`, { method: 'DELETE' });
 });
+
+test('motion moments: frame upload, sanitised markers, technique counts, search; size is stored', async () => {
+  const fd = new FormData();
+  fd.append('thumb', new Blob([png(16, 9, [200, 30, 30])], { type: 'image/webp' }), 'moment.webp');
+  const up = await srv.api('/api/projects/mot1/marker-thumb', { method: 'POST', body: fd });
+  assert.equal(up.status, 201);
+  assert.ok(up.data.file.startsWith('markers/'));
+  assert.equal((await fetch(`${srv.base}/data/motion/mot1/${up.data.file}`)).status, 200);
+  const notMotion = await srv.api('/api/projects/brand1/marker-thumb', { method: 'POST', body: new FormData() });
+  assert.equal(notMotion.status, 404);
+
+  const r = await srv.api('/api/projects/mot1', { method: 'PATCH', json: {
+    width: 1080, height: 1920,
+    markers: [
+      { id: 'm2', t: 7.5, label: 'Speed ramp', note: 'into the logo', thumb: up.data.file },
+      { id: 'm1', t: 2, label: 'Match cut', thumb: '../../db.json' },
+      { t: 'x', label: 'speed ramp' },
+    ],
+  } });
+  assert.equal(r.status, 200);
+  assert.equal(r.data.project.width, 1080);
+  assert.equal(r.data.project.height, 1920);
+  assert.deepEqual(r.data.project.markers.map((m) => [m.t, m.label, m.thumb]), [
+    [0, 'speed ramp', null], [2, 'Match cut', null], [7.5, 'Speed ramp', up.data.file],
+  ]);
+  assert.ok(r.data.project.markers.every((m) => m.id));
+  const bad = await srv.api('/api/projects/mot1', { method: 'PATCH', json: { width: -5, height: 'big' } });
+  assert.equal(bad.data.project.width, 1080);
+
+  const tech = await srv.api('/api/motion/techniques');
+  assert.deepEqual(tech.data.techniques.map((t) => [t.label.toLowerCase(), t.count]), [['speed ramp', 2], ['match cut', 1]]);
+  const found = await srv.api('/api/search?q=into%20the%20logo');
+  assert.ok(found.data.results.some((x) => x.id === 'mot1'));
+});
+
+test('review block: versions with time-stamped comments are sanitised; in the launch template', async () => {
+  const plan = await newPlan({ name: 'Review test', template: 'launch' });
+  const rv = plan.blocks.find((b) => b.type === 'review');
+  assert.ok(rv, 'launch template has a review block');
+  assert.deepEqual(rv.versions, []);
+
+  const fd = new FormData();
+  fd.append('files', new Blob([Buffer.from('fake-mp4')], { type: 'video/mp4' }), 'render_v1.mp4');
+  const up = await srv.api(`/api/plans/${plan.id}/blocks/${rv.id}/uploads`, { method: 'POST', body: fd });
+  assert.equal(up.status, 201);
+  const [file] = up.data.files;
+  const r = await srv.api(`/api/plans/${plan.id}/blocks/${rv.id}`, { method: 'PATCH', json: { versions: [
+    { id: 'v1', file: file.file, name: file.name, size: file.size, label: 'v1', approved: 'yes', createdAt: 1,
+      comments: [{ id: 'c1', t: 3.25, text: 'Logo a bit small', done: false }, { t: -4, text: 'Nice cut', done: 1 }] },
+    { id: 'v2', file: '../../../db.json', label: 'bad' }, // dropped: no file of its own
+  ] } });
+  const saved = r.data.plan.blocks.find((b) => b.id === rv.id).versions;
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].approved, true);
+  assert.deepEqual(saved[0].comments.map((c) => [c.t, c.text, c.done]), [[3.25, 'Logo a bit small', false], [0, 'Nice cut', true]]);
+  assert.ok(saved[0].comments[1].id);
+  const found = await srv.api('/api/search?q=logo%20a%20bit%20small');
+  assert.ok(found.data.results.some((x) => x.id === plan.id));
+
+  // Templates never carry renders.
+  const t = await srv.api('/api/plan-templates', { method: 'POST', json: { planId: plan.id, name: 'RV tpl' } });
+  const copy = await newPlan({ template: t.data.template.id });
+  assert.deepEqual(copy.blocks.find((b) => b.type === 'review').versions, []);
+  await srv.api(`/api/plan-templates/${t.data.template.id}`, { method: 'DELETE' });
+});

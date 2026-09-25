@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Camera, Film, Images, Tag as TagIcon, Trash2, Clock, ChevronLeft, ChevronRight, Maximize2, MoreVertical } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Camera, Film, Images, Tag as TagIcon, Trash2, Clock, ChevronLeft, ChevronRight, Maximize2, MoreVertical, Repeat, Crosshair, Gauge } from 'lucide-react';
 import { api, fileUrl } from '../lib/api.js';
 import { useSaver } from '../lib/autosave.js';
-import { captureFrame, lengthTag, fmtTime } from '../lib/media.js';
+import { captureFrame, captureSmallFrame, lengthTag, fmtTime, formatOf, resolutionOf, resolveDuration } from '../lib/media.js';
 import { useToast } from '../components/Toast.jsx';
 import TagInput from '../components/TagInput.jsx';
 import Menu from '../components/Menu.jsx';
@@ -10,6 +11,11 @@ import Lightbox from '../components/Lightbox.jsx';
 import NotesField from '../components/NotesField.jsx';
 import DetailLayout from '../components/DetailLayout.jsx';
 import SegmentTimeline from '../components/SegmentTimeline.jsx';
+import MomentsPanel from '../components/MomentsPanel.jsx';
+
+const rid = () => Math.random().toString(36).slice(2, 8);
+const RATES = [0.25, 0.5, 1, 2];
+const loadRate = () => { try { const r = parseFloat(sessionStorage.getItem('videoRate')); return RATES.includes(r) ? r : 1; } catch { return 1; } };
 
 export default function MotionDetail({ project, setProject }) {
   const toast = useToast();
@@ -21,10 +27,21 @@ export default function MotionDetail({ project, setProject }) {
   const [sel, setSel] = useState(0);
   const [lightbox, setLightbox] = useState(false);
   const [segments, setSegments] = useState(project.segments || []);
+  const [markers, setMarkers] = useState(project.markers || []);
+  const [focusMarker, setFocusMarker] = useState(null);
+  const [techniques, setTechniques] = useState([]);
+  const [rate, setRate] = useState(loadRate);
+  const [loop, setLoop] = useState(null); // { key } — a section id, or 'all'
+  const [params] = useSearchParams();
+  const jumped = useRef(false);
+  const markersRef = useRef(markers);
+  markersRef.current = markers;
   const saver = useSaver();
 
   const frames = [...(project.frames || [])].sort((a, b) => a.t - b.t);
   const autoLen = project.duration ? lengthTag(project.duration) : null;
+  const format = formatOf(project.width, project.height);
+  const resolution = resolutionOf(project.width, project.height);
   const selClamped = Math.min(sel, Math.max(0, frames.length - 1));
 
   // Keep selection valid as frames change.
@@ -46,14 +63,21 @@ export default function MotionDetail({ project, setProject }) {
   // YouTube-style frame stepping: when the video is paused, "," and "." step
   // one frame back / forward. (No universal way to read a file's fps from the
   // browser, so a frame is 1/30s — fine for grabbing an exact-ish frame.)
+  // Also: M marks a moment, L loops the current section, < / > change speed.
+  const keys = useRef({});
   useEffect(() => {
     const FRAME = 1 / 30;
     const onKey = (e) => {
-      if (e.key !== ',' && e.key !== '.') return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
       const v = videoRef.current;
       if (!v) return;
       const el = document.activeElement;
-      if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+      if (el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable)) return;
+      if (document.querySelector('.overlay, .lightbox, .sheet-backdrop')) return;
+      if (e.key === 'm' || e.key === 'M') { e.preventDefault(); keys.current.mark?.(); return; }
+      if (e.key === 'l' || e.key === 'L') { e.preventDefault(); keys.current.loop?.(); return; }
+      if (e.key === '<' || e.key === '>') { e.preventDefault(); keys.current.speed?.(e.key === '>' ? 1 : -1); return; }
+      if (e.key !== ',' && e.key !== '.') return;
       if (!v.paused) return; // only step while paused
       e.preventDefault();
       if (e.key === ',') v.currentTime = Math.max(0, v.currentTime - FRAME);
@@ -77,6 +101,94 @@ export default function MotionDetail({ project, setProject }) {
     setSegments(next);
     const projectId = project.id;
     saver.schedule('segments', () => api.update(projectId, { segments: next }).catch((e) => toast(`Could not save: ${e.message}`, 'error')), { immediate });
+  };
+  const segList = [...segments].sort((a, b) => a.start - b.start)
+    .map((sg, i, arr) => ({ ...sg, end: i < arr.length - 1 ? arr[i + 1].start : segDur }));
+
+  // ---- Playback speed (this session) and looping a section -----------------
+  useEffect(() => {
+    const v = videoRef.current; if (v) v.playbackRate = rate;
+    try { sessionStorage.setItem('videoRate', String(rate)); } catch { /* ignore */ }
+  }, [rate]);
+  const changeSpeed = (d) => setRate((r) => RATES[Math.min(RATES.length - 1, Math.max(0, RATES.indexOf(r) + d))] ?? 1);
+  // The loop follows its section if boundaries move; it ends if the section goes.
+  const loopRange = !loop ? null : loop.key === 'all' ? { start: 0, end: segDur }
+    : (() => { const sg = segList.find((x) => x.id === loop.key); return sg ? { start: sg.start, end: sg.end } : null; })();
+  const toggleLoop = () => {
+    if (loop) { setLoop(null); return; }
+    const t = videoRef.current?.currentTime ?? current;
+    const sg = segList.find((x, i) => t >= x.start && (i === segList.length - 1 || t < x.end));
+    setLoop({ key: sg ? sg.id : 'all' });
+  };
+  const loopSection = (sg) => {
+    if (loop?.key === sg.id) { setLoop(null); return; }
+    setLoop({ key: sg.id });
+    const v = videoRef.current;
+    if (v) { v.currentTime = sg.start; setCurrent(sg.start); v.play().catch(() => {}); }
+  };
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !loopRange || !(loopRange.end > loopRange.start)) return undefined;
+    const { start, end } = loopRange;
+    let raf = 0;
+    let prev = v.currentTime;
+    // Jump back when playback runs over the loop's end (not when you seek past it).
+    const tick = () => {
+      const t = v.currentTime;
+      if (!v.paused && prev < end && t >= end - 0.03) { v.currentTime = start; prev = start; }
+      else prev = t;
+      raf = requestAnimationFrame(tick);
+    };
+    const onEnded = () => { if (end >= (v.duration || segDur) - 0.1) { v.currentTime = start; v.play().catch(() => {}); } };
+    raf = requestAnimationFrame(tick);
+    v.addEventListener('ended', onEnded);
+    return () => { cancelAnimationFrame(raf); v.removeEventListener('ended', onEnded); };
+  }, [loopRange?.start, loopRange?.end]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---- Moments: markers tagged with a technique, with a captured frame -----
+  useEffect(() => { saver.flush(); setMarkers(project.markers || []); setLoop(null); }, [project.id, saver]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { api.listTechniques().then(setTechniques).catch(() => {}); }, [project.id]);
+  const saveMarkers = (next, immediate = false) => {
+    markersRef.current = next;
+    setMarkers(next);
+    const projectId = project.id;
+    saver.schedule('markers', () => api.update(projectId, { markers: markersRef.current }).catch((e) => toast(`Could not save: ${e.message}`, 'error')), { immediate });
+  };
+  const addMoment = async (label = '') => {
+    const v = videoRef.current;
+    if (!v) return;
+    const t = Number((v.currentTime || 0).toFixed(2));
+    const id = rid();
+    saveMarkers([...markersRef.current, { id, t, label, note: '', thumb: null }], true);
+    setFocusMarker(label ? null : id);
+    if (label) toast(`${label} marked at ${fmtTime(t)}`);
+    try {
+      if (v.readyState >= 2 && v.videoWidth) {
+        const file = await api.uploadMarkerThumb(project.id, await captureSmallFrame(v));
+        saveMarkers(markersRef.current.map((m) => (m.id === id ? { ...m, thumb: file } : m)), true);
+      }
+    } catch { /* the moment works without its frame */ }
+  };
+  const patchMarker = (id, p) => saveMarkers(markersRef.current.map((m) => (m.id === id ? { ...m, ...p } : m)));
+  const removeMarker = (m) => {
+    saveMarkers(markersRef.current.filter((x) => x.id !== m.id), true);
+    toast('Moment removed', 'ok', { label: 'Undo', onClick: () => saveMarkers([...markersRef.current, m], true) });
+  };
+  const seek = (t) => { const v = videoRef.current; if (v) { v.currentTime = t; setCurrent(t); } };
+  keys.current = { mark: () => addMoment(''), loop: toggleLoop, speed: changeSpeed };
+
+  // First load: fill in a missing size / length, and jump to ?t= (from Moments).
+  const onMeta = (e) => {
+    const v = e.currentTarget;
+    v.playbackRate = rate;
+    const patch = {};
+    if (v.videoWidth && (project.width !== v.videoWidth || project.height !== v.videoHeight)) { patch.width = v.videoWidth; patch.height = v.videoHeight; }
+    const t = Number(params.get('t'));
+    resolveDuration(v).then((d) => {
+      if (!project.duration && d > 0) patch.duration = d;
+      if (Object.keys(patch).length) api.update(project.id, patch).then(setProject).catch(() => {});
+      if (!jumped.current && Number.isFinite(t) && t > 0) { jumped.current = true; v.currentTime = t; setCurrent(t); }
+    });
   };
 
   const addFrame = async () => {
@@ -175,8 +287,8 @@ export default function MotionDetail({ project, setProject }) {
           {/* Tags */}
           <div className="section">
             <div className="section-head"><h2><TagIcon size={16} /> Tags</h2></div>
-            <TagInput tags={project.tags || []} onChange={saveTags} autoTags={autoLen ? [autoLen] : []} placeholder="Add a tag…" />
-            <div className="hint" style={{ marginTop: 8 }}>The length tag <b>{autoLen}</b> is added automatically and used for filtering.</div>
+            <TagInput tags={project.tags || []} onChange={saveTags} autoTags={[autoLen, format].filter(Boolean)} placeholder="Add a tag…" />
+            <div className="hint" style={{ marginTop: 8 }}>Length{format ? ' and format' : ''} tags are added automatically and used for filtering.</div>
           </div>
 
           {/* Notes */}
@@ -193,12 +305,36 @@ export default function MotionDetail({ project, setProject }) {
           onPause={() => setPaused(true)}
           onVolumeChange={saveVolume}
           onTimeUpdate={(e) => setCurrent(e.target.currentTime)}
+          onLoadedMetadata={onMeta}
         />
+      </div>
+
+      {/* Player tools: speed, loop, mark a moment; the video's format */}
+      <div className="player-tools">
+        <div className="seg-toggle rate-toggle" role="group" aria-label="Playback speed" title="Playback speed (< / >)">
+          <Gauge size={14} className="rate-ico" />
+          {RATES.map((r) => (
+            <button key={r} className={rate === r ? 'on' : ''} onClick={() => setRate(r)} aria-pressed={rate === r}>{r === 0.25 ? '¼' : r === 0.5 ? '½' : r}×</button>
+          ))}
+        </div>
+        <button className={`btn btn-sm ${loop ? 'btn-on' : ''}`} onClick={toggleLoop} aria-pressed={!!loop}
+          title={loop ? 'Stop looping (L)' : 'Loop the section under the playhead — or the whole video (L)'}>
+          <Repeat size={14} /> {loop ? (loop.key === 'all' ? 'Looping video' : 'Looping section') : 'Loop'}
+        </button>
+        <button className="btn btn-sm" onClick={() => addMoment('')} title="Mark this moment and tag its technique (M)"><Crosshair size={14} /> Mark moment</button>
+        {(format || resolution) && (
+          <span className="player-meta" title={project.width ? `${project.width} × ${project.height}` : undefined}>
+            {[format, resolution].filter(Boolean).join(' · ')}
+          </span>
+        )}
       </div>
 
       {/* Section timeline — the video's structure (Hook, Problem, Product reveal …) */}
       <SegmentTimeline videoRef={videoRef} current={current} duration={segDur} segments={segments}
-        onChange={saveSegments} onSeek={setCurrent} />
+        onChange={saveSegments} onSeek={setCurrent} markers={markers} loopKey={loop?.key} onLoop={loopSection} />
+
+      <MomentsPanel markers={markers} techniques={techniques} focusId={focusMarker} thumbUrl={(rel) => fileUrl(project, rel)}
+        onAdd={addMoment} onPatch={patchMarker} onRemove={removeMarker} onSeek={seek} />
 
       <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap', alignItems: 'center' }}>
         <button className="btn btn-primary" onClick={addFrame} disabled={capturing || !!bulk}>

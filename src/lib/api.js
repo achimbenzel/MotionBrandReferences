@@ -59,6 +59,18 @@ export const api = {
     return request(`/api/projects/${id}`, { method: 'DELETE' });
   },
 
+  // Store a moment's captured frame → 'markers/…' (saved into `markers` by the page).
+  async uploadMarkerThumb(id, blob) {
+    const fd = new FormData();
+    fd.append('thumb', blob, 'moment.webp');
+    const { file } = await request(`/api/projects/${id}/marker-thumb`, { method: 'POST', body: fd });
+    return file;
+  },
+  // Technique tags used on motion moments → [{ label, count }], most used first.
+  async listTechniques() {
+    const { techniques } = await request('/api/motion/techniques');
+    return techniques;
+  },
   async addFrame(id, blob, t) {
     const fd = new FormData();
     fd.append('frame', blob, 'frame.webp');

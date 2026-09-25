@@ -43,6 +43,7 @@ export const BUILTIN_TEMPLATES = [
       heading('Production'),
       todos('Production checklist', ['Script approved', 'Styleframes approved', 'Storyboard / animatic approved',
         'Music & voice-over licensed', 'Animation', 'Sound design & mix', 'Final review', 'Exports delivered']),
+      block('review', 'Review', { versions: [] }),
       table('Deliverables', ['Format', 'Resolution', 'Length', 'Status'], [
         ['16:9 master', '3840 × 2160', '', 'Open'],
         ['9:16 social', '1080 × 1920', '', 'Open'],
@@ -109,6 +110,7 @@ export function cloneBlocks(blocks) {
     if (b.type === 'moodboard') b.images = [];
     if (b.type === 'files' || b.type === 'pdf') b.files = [];
     if (b.type === 'storyboard') b.audio = null;
+    if (b.type === 'review') b.versions = [];
     return normalizeBlock(b);
   }).filter(Boolean);
 }

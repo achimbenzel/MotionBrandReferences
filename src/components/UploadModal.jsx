@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { X, Film, Palette, FileText, UploadCloud, Trash2, Scissors, Crop, Square, CreditCard, Images, Type, Wand2, Ban } from 'lucide-react';
 import { api } from '../lib/api.js';
-import { captureFrame, lengthTag, fmtTime } from '../lib/media.js';
+import { captureFrame, lengthTag, fmtTime, formatOf, resolutionOf, resolveDuration } from '../lib/media.js';
 import { renderPdfPage, cropToBlob, centerCover, extractPalette } from '../lib/imaging.js';
 import { expandColor } from '../lib/color.js';
 import { CARD_SIZES, cardSizeAspect, coverAspect, DEFAULT_RENDITIONS } from '../lib/types.js';
@@ -44,6 +44,7 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
   const [videoFile, setVideoFile] = useState(null);
   const [videoSrc, setVideoSrc] = useState(null);
   const [duration, setDuration] = useState(0);
+  const [dims, setDims] = useState(null); // { w, h } of the chosen video
   const videoRef = useRef(null);
 
   // color
@@ -116,13 +117,16 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
   const pickVideo = (file) => {
     if (!file) return;
     if (videoSrc) URL.revokeObjectURL(videoSrc);
-    setVideoFile(file); setVideoSrc(URL.createObjectURL(file)); setDuration(0);
+    setVideoFile(file); setVideoSrc(URL.createObjectURL(file)); setDuration(0); setDims(null);
     if (!title) setTitle(file.name.replace(/\.[^.]+$/, ''));
   };
   const onVideoMeta = () => {
     const v = videoRef.current; if (!v) return;
-    setDuration(v.duration || 0);
-    v.currentTime = Math.min((v.duration || 0) * 0.15, (v.duration || 0) - 0.05);
+    if (v.videoWidth) setDims({ w: v.videoWidth, h: v.videoHeight });
+    resolveDuration(v).then((d) => {
+      setDuration(d);
+      v.currentTime = Math.max(0, Math.min(d * 0.15, d - 0.05));
+    });
   };
   const pickExample = (file) => {
     if (!file) return;
@@ -227,7 +231,10 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
       fd.append('category', category.trim());
       fd.append('tags', JSON.stringify(tags));
 
-      if (type === 'motion') { fd.append('video', videoFile); fd.append('duration', String(duration)); }
+      if (type === 'motion') {
+        fd.append('video', videoFile); fd.append('duration', String(duration));
+        if (dims) { fd.append('width', String(dims.w)); fd.append('height', String(dims.h)); }
+      }
       if (type === 'color') { if (exampleFile) fd.append('example', exampleFile); fd.append('colors', JSON.stringify(colors)); }
       if (type === 'branding') { files.forEach((f) => fd.append('files', f)); }
       if (type === 'logo') {
@@ -334,6 +341,7 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
                   <div className="hint" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <Scissors size={13} /> Scrub/pause on the frame you want as the cover — it’s captured on save.
                     {duration > 0 && (<><span className="tag auto" style={{ marginLeft: 4 }}>{fmtTime(duration)}</span><span className="tag auto">{lengthTag(duration)}</span></>)}
+                    {dims && <span className="tag auto">{formatOf(dims.w, dims.h)} · {resolutionOf(dims.w, dims.h)}</span>}
                     <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setVideoFile(null); setVideoSrc(null); }}>Change</button>
                   </div>
                 </div>

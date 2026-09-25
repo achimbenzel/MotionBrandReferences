@@ -73,3 +73,88 @@ export function grabThumbnail(file, atFraction = 0.15) {
     video.addEventListener('error', () => { cleanup(); reject(new Error('Could not read video')); }, { once: true });
   });
 }
+
+// Common delivery formats, matched within 3 % (a 1920×1088 export is 16:9).
+const FORMATS = [['21:9', 21 / 9], ['16:9', 16 / 9], ['4:3', 4 / 3], ['1:1', 1], ['4:5', 4 / 5], ['3:4', 3 / 4], ['9:16', 9 / 16]];
+
+/** '16:9', '9:16', '1:1', '4:5' … for a width × height (null if unknown). */
+export function formatOf(w, h) {
+  if (!w || !h) return null;
+  const r = w / h;
+  let best = null;
+  for (const [key, v] of FORMATS) {
+    const d = Math.abs(r - v) / v;
+    if (d < 0.03 && (!best || d < best.d)) best = { key, d };
+  }
+  if (best) return best.key;
+  return r > 1 ? 'Landscape' : 'Portrait';
+}
+
+/** '4K', '1080p', '720p' or 'SD' by the short side (portrait videos too). */
+export function resolutionOf(w, h) {
+  if (!w || !h) return null;
+  const short = Math.min(w, h);
+  const long = Math.max(w, h);
+  if (short >= 2160 || long >= 3840) return '4K';
+  if (short >= 1080) return '1080p';
+  if (short >= 720) return '720p';
+  return 'SD';
+}
+
+/** Read a video's size and length without playing it → { w, h, d } or null. */
+export function probeVideo(url, timeout = 15000) {
+  return new Promise((resolve) => {
+    const v = document.createElement('video');
+    v.preload = 'metadata';
+    v.muted = true;
+    let timer = 0;
+    const done = (r) => {
+      clearTimeout(timer);
+      v.onloadedmetadata = null; v.onerror = null;
+      v.removeAttribute('src'); v.load();
+      resolve(r);
+    };
+    timer = setTimeout(() => done(null), timeout);
+    v.onloadedmetadata = () => done(v.videoWidth ? { w: v.videoWidth, h: v.videoHeight, d: Number.isFinite(v.duration) ? v.duration : 0 } : null);
+    v.onerror = () => done(null);
+    v.src = url;
+  });
+}
+
+/** The current frame of a <video>, scaled to at most `maxW` wide, as WebP. */
+export function captureSmallFrame(video, maxW = 480, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    try {
+      const scale = Math.min(1, maxW / (video.videoWidth || maxW));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+      canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('capture failed'))), 'image/webp', quality);
+    } catch (err) { reject(err); }
+  });
+}
+
+/**
+ * A video's length in seconds. Some recordings (e.g. browser / screen
+ * recordings in WebM) report an endless duration until they've been read to
+ * the end — seeking far ahead makes the browser work it out. → 0 if unknown.
+ */
+export function resolveDuration(video) {
+  return new Promise((resolve) => {
+    if (Number.isFinite(video.duration)) { resolve(video.duration); return; }
+    const back = video.currentTime;
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      video.removeEventListener('durationchange', onChange);
+      try { video.currentTime = back; } catch { /* ignore */ }
+      resolve(Number.isFinite(video.duration) ? video.duration : 0);
+    };
+    const onChange = () => { if (Number.isFinite(video.duration)) done(); };
+    video.addEventListener('durationchange', onChange);
+    setTimeout(done, 5000);
+    try { video.currentTime = 1e101; } catch { done(); }
+  });
+}

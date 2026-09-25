@@ -6,7 +6,7 @@ import {
   Image as ImageIcon, Camera, ArrowUp, ArrowDown, File as FileIcon, ExternalLink,
   Link2, Library, FolderOpen, Palette as PaletteIcon, Heading as HeadingIcon,
   Minus, Table as TableIcon, Wand2, Copy, FileText, AlertTriangle, ClipboardList,
-  LayoutTemplate, Building2, Clapperboard, ScrollText,
+  LayoutTemplate, Building2, Clapperboard, ScrollText, MonitorPlay,
 } from 'lucide-react';
 import { api, planFileUrl, fileUrl } from '../lib/api.js';
 import { useSaver, useRefreshOnReturn } from '../lib/autosave.js';
@@ -24,6 +24,7 @@ import ProjectCard from '../components/ProjectCard.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import ScriptBlock from '../components/plan/ScriptBlock.jsx';
 import StoryboardBlock from '../components/plan/StoryboardBlock.jsx';
+import ReviewBlock from '../components/plan/ReviewBlock.jsx';
 import { voEstimate } from '../lib/timing.js';
 
 const rid = () => Math.random().toString(36).slice(2, 8);
@@ -42,6 +43,7 @@ const BLOCK_META = {
   briefing: { label: 'Briefing', icon: ClipboardList },
   script: { label: 'Script', icon: ScrollText },
   storyboard: { label: 'Storyboard', icon: Clapperboard },
+  review: { label: 'Review', icon: MonitorPlay },
   moodboard: { label: 'Moodboard', icon: Images },
   text: { label: 'Text', icon: StickyNote },
   todos: { label: 'To-dos', icon: ListChecks },
@@ -484,6 +486,13 @@ export default function PlanDetail() {
         if (b.type === 'storyboard') {
           return (
             <StoryboardBlock key={b.id} plan={plan} block={b} menu={menu} icon={Meta.icon} editBlock={editBlock} planRef={planRef} toast={toast}
+              upload={(files) => api.uploadBlockFiles(id, b.id, files)} fileUrl={(rel) => planFileUrl(plan, rel)} />
+          );
+        }
+
+        if (b.type === 'review') {
+          return (
+            <ReviewBlock key={b.id} plan={plan} block={b} menu={menu} icon={Meta.icon} editBlock={editBlock} planRef={planRef} toast={toast}
               upload={(files) => api.uploadBlockFiles(id, b.id, files)} fileUrl={(rel) => planFileUrl(plan, rel)} />
           );
         }

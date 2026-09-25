@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Filter, X, Film, Palette, FileText, Square, CreditCard, FolderPlus, Images, Type, UploadCloud, Ban } from 'lucide-react';
 import { api, fileUrl } from '../lib/api.js';
-import { lengthTag } from '../lib/media.js';
+import { lengthTag, formatOf, probeVideo } from '../lib/media.js';
 import { hexToRgb, readableText } from '../lib/color.js';
 import { useToast } from '../components/Toast.jsx';
 import ProjectCard from '../components/ProjectCard.jsx';
 import GalleryNameModal from '../components/GalleryNameModal.jsx';
 import ImageMasonry from '../components/ImageMasonry.jsx';
+import MomentsGrid from '../components/MomentsGrid.jsx';
 
 const HEAD = {
   branding: { title: 'Branding', desc: 'Brand guidelines, presentations & identity work.', icon: FileText },
@@ -20,10 +21,11 @@ const HEAD = {
   logonogo: { title: 'Logo No Go', desc: 'Logos & symbols with a bad reputation — so you can avoid resembling them.', icon: Ban },
 };
 
-/** Effective, filterable tag list for a project (adds the auto length tag). */
+/** Effective, filterable tag list for a project (adds the auto length and format tags). */
 export function effectiveTags(project) {
   const tags = [...(project.tags || [])];
   if (project.type === 'motion' && project.duration) tags.push(lengthTag(project.duration));
+  if (project.type === 'motion') { const f = formatOf(project.width, project.height); if (f) tags.push(f); }
   return tags;
 }
 
@@ -59,6 +61,25 @@ export default function GridPage({ type, reloadKey, onAdd }) {
   }, [type, reloadKey]);
 
   const switchMode = (m) => { setMode(m); sessionStorage.setItem(`galmode:${type}`, m); };
+
+  // Motion: videos added before formats were recorded get their size (and a
+  // missing length) read once, in the background, one at a time.
+  const probed = useRef(new Set());
+  useEffect(() => {
+    if (type !== 'motion' || !projects) return undefined;
+    const next = projects.find((p) => p.video && (!p.width || !p.height || !p.duration) && !probed.current.has(p.id));
+    if (!next) return undefined;
+    probed.current.add(next.id);
+    let alive = true;
+    probeVideo(fileUrl(next, next.video)).then(async (d) => {
+      if (!alive || !d) { if (alive) setProjects((list) => [...list]); return; } // move on to the next one
+      try {
+        const updated = await api.update(next.id, { width: d.w, height: d.h, ...(next.duration ? {} : { duration: d.d }) });
+        if (alive) setProjects((list) => list.map((x) => (x.id === updated.id ? updated : x)));
+      } catch { if (alive) setProjects((list) => [...list]); }
+    });
+    return () => { alive = false; };
+  }, [type, projects]);
 
   const allTags = useMemo(() => {
     const set = new Map();
@@ -151,6 +172,7 @@ export default function GridPage({ type, reloadKey, onAdd }) {
           )}
           <div className="segmented">
             <button className={mode === 'all' ? 'on' : ''} onClick={() => switchMode('all')}>All</button>
+            {type === 'motion' && <button className={mode === 'moments' ? 'on' : ''} onClick={() => switchMode('moments')}>Moments</button>}
             <button className={mode === 'galleries' ? 'on' : ''} onClick={() => switchMode('galleries')}>Galleries</button>
           </div>
         </div>
@@ -158,6 +180,9 @@ export default function GridPage({ type, reloadKey, onAdd }) {
 
       {error && <div className="center-msg">Couldn’t load: {error}</div>}
       {!projects && !error && <div className="spinner" />}
+
+      {/* -------- Moments mode (motion) -------- */}
+      {projects && !error && mode === 'moments' && type === 'motion' && <MomentsGrid projects={projects} />}
 
       {/* -------- Galleries mode -------- */}
       {projects && !error && mode === 'galleries' && (

@@ -26,11 +26,11 @@ export const emptyDB = () => ({
 // ---------------------------------------------------------------------------
 // Plans
 // ---------------------------------------------------------------------------
-export const BLOCK_TYPES = new Set(['moodboard', 'text', 'todos', 'files', 'pdf', 'links', 'refs', 'palette', 'heading', 'divider', 'table', 'briefing', 'storyboard', 'script']);
+export const BLOCK_TYPES = new Set(['moodboard', 'text', 'todos', 'files', 'pdf', 'links', 'refs', 'palette', 'heading', 'divider', 'table', 'briefing', 'storyboard', 'script', 'review']);
 export const BLOCK_TITLES = {
   moodboard: 'Moodboard', text: 'Text', todos: 'To-dos', files: 'Files', pdf: 'PDF', links: 'Links',
   refs: 'References', palette: 'Palette', heading: 'Heading', divider: 'Divider', table: 'Table',
-  briefing: 'Briefing', storyboard: 'Storyboard', script: 'Script',
+  briefing: 'Briefing', storyboard: 'Storyboard', script: 'Script', review: 'Review',
 };
 
 // Where a plan stands. '' = no status (every plan made before statuses existed).
@@ -60,6 +60,24 @@ export const normalizeAudio = (a, blockId) => {
   return file ? { file, name: str(a?.name, 200), size: Number.isFinite(a?.size) ? a.size : 0 } : null;
 };
 export const normalizeLine = (l) => ({ id: l?.id ? str(l.id, 40) : nanoid(6), visual: str(l?.visual, 4000), vo: str(l?.vo, 4000) });
+// Review block: uploaded versions (renders) with time-stamped comments.
+export const normalizeComment = (c) => ({
+  id: c?.id ? str(c.id, 40) : nanoid(6),
+  t: num(c?.t, 0, 86400, 0),
+  text: str(c?.text, 4000),
+  done: !!c?.done,
+  createdAt: num(c?.createdAt, 0, 1e14, 0),
+});
+export const normalizeVersion = (v, blockId) => ({
+  id: v?.id ? str(v.id, 40) : nanoid(6),
+  file: blockFile(blockId, v?.file),
+  name: str(v?.name, 200),
+  size: num(v?.size, 0, 1e13, 0),
+  label: str(v?.label, 40),
+  approved: !!v?.approved,
+  createdAt: num(v?.createdAt, 0, 1e14, 0),
+  comments: (Array.isArray(v?.comments) ? v.comments : []).slice(0, 2000).map(normalizeComment),
+});
 export const normalizeTarget = (v) => num(v, 1, 3600, null); // seconds, or null = none / from the briefing
 export const normalizePace = (v) => num(v, 0.5, 6, 2.5);     // words per second
 
@@ -94,6 +112,8 @@ export function normalizeBlock(b, fallbackId) {
     if (!STORYBOARD_ASPECTS.includes(b.aspect)) b.aspect = '16:9';
     if (!('audio' in b)) b.audio = null;
     if (!('target' in b)) b.target = null;
+  } else if (b.type === 'review') {
+    if (!Array.isArray(b.versions)) b.versions = [];
   } else if (b.type === 'script') {
     if (!Array.isArray(b.lines)) b.lines = [];
     if (!Number.isFinite(b.pace)) b.pace = 2.5;
@@ -165,6 +185,19 @@ export function inferSegmentKind(label) {
   }
   return null;
 }
+// Moments: time markers on a motion video, tagged with a technique (Match
+// cut, Speed ramp …), an optional note and a captured frame (markers/…).
+export const normalizeMarker = (m) => ({
+  id: m?.id ? str(m.id, 40) : nanoid(6),
+  t: num(m?.t, 0, 86400, 0),
+  label: str(m?.label, 60),
+  note: str(m?.note, 4000),
+  thumb: typeof m?.thumb === 'string' && m.thumb.startsWith('markers/') && !m.thumb.includes('..') ? str(m.thumb, 200) : null,
+});
+export const normalizeMarkers = (arr) => (Array.isArray(arr) ? arr : []).filter((m) => m && typeof m === 'object')
+  .slice(0, 1000).map(normalizeMarker).sort((a, b) => a.t - b.t);
+export const videoDim = (v) => { const n = Math.round(Number(v)); return Number.isFinite(n) && n > 0 && n <= 20000 ? n : null; };
+
 export function normalizeSegments(arr) {
   const segs = (Array.isArray(arr) ? arr : []).filter((s) => s && typeof s === 'object').slice(0, 200).map((s) => {
     let kind = SEGMENT_KINDS.includes(s.kind) ? s.kind : '';

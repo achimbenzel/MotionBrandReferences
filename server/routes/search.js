@@ -33,7 +33,8 @@ router.get('/api/search', async (req, res) => {
   for (const p of db.projects) {
     const hay = [p.title, p.year, p.category, ...(p.tags || []), p.notes, p.url,
       ...(p.colors || []).flatMap((c) => [c.hex, c.name]),
-      ...(p.segments || []).flatMap((sg) => [SEGMENT_LABEL[sg.kind], sg.label])].filter(Boolean).join(' ').toLowerCase();
+      ...(p.segments || []).flatMap((sg) => [SEGMENT_LABEL[sg.kind], sg.label]),
+      ...(p.markers || []).flatMap((m) => [m.label, m.note])].filter(Boolean).join(' ').toLowerCase();
     const score = scoreMatch(terms, p.title || '', hay);
     if (score > 0) results.push({
       kind: 'project', id: p.id, type: p.type, title: p.title || 'Untitled',
@@ -51,6 +52,7 @@ router.get('/api/search', async (req, res) => {
       ...(b.fields || []).flatMap((f) => [f.label, f.value]),
       ...(b.lines || []).flatMap((l) => [l.visual, l.vo]),
       ...(b.shots || []).flatMap((x) => [x.visual, x.vo, x.notes]),
+      ...(b.versions || []).flatMap((v) => [v.label, v.name, ...(v.comments || []).map((c) => c.text)]),
     ]);
     const hay = [pl.name, pl.client, ...(pl.milestones || []).map((m) => m.title), ...blockText]
       .filter(Boolean).join(' ').toLowerCase();

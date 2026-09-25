@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Scissors, X, ChevronDown, ArrowRightToLine, ListVideo } from 'lucide-react';
+import { Scissors, X, ChevronDown, ArrowRightToLine, ListVideo, Repeat } from 'lucide-react';
 import Menu from './Menu.jsx';
 import { useToast } from './Toast.jsx';
 import { useConfirm } from './ConfirmDialog.jsx';
@@ -25,7 +25,7 @@ function fmtT(seconds) {
  * tap a type (or press 1–7) where that part begins; the bar scrubs the video.
  * `segments` are { id, start, kind, label }; onChange(next, immediate) saves.
  */
-export default function SegmentTimeline({ videoRef, current, duration, segments, onChange, onSeek }) {
+export default function SegmentTimeline({ videoRef, current, duration, segments, onChange, onSeek, markers = [], loopKey = null, onLoop }) {
   const toast = useToast();
   const [dialog, ask] = useConfirm();
   const barRef = useRef(null);
@@ -139,13 +139,16 @@ export default function SegmentTimeline({ videoRef, current, duration, segments,
           const c = segmentColor(s.kind);
           const k = segmentKind(s.kind);
           return (
-            <div key={s.id} className={`seg ${i === active ? 'active' : ''}`}
+            <div key={s.id} className={`seg ${i === active ? 'active' : ''} ${loopKey === s.id ? 'looped' : ''}`}
               style={{ flexGrow: Math.max(0.0001, s.end - s.start), background: c.bg, color: c.fg }}
               title={`${segmentName(s, i)}${s.label && k ? ` — ${s.label}` : ''} · ${fmtT(s.start)}–${fmtT(s.end)}`}>
               <span className="seg-name">{k ? (k.short || k.label) : (s.label || '—')}</span>
             </div>
           );
         }) : <span className="seg-bar-empty">No sections yet</span>}
+        {duration > 0 && markers.map((m) => (
+          <span key={m.id} className="seg-moment" style={{ left: `${clamp(m.t / duration, 0, 1) * 100}%` }} title={`${m.label || 'Moment'} · ${fmtT(m.t)}`} />
+        ))}
         {duration > 0 && <span className="seg-playhead" style={{ left: `${clamp(current / duration, 0, 1) * 100}%` }} />}
       </div>
 
@@ -185,6 +188,10 @@ export default function SegmentTimeline({ videoRef, current, duration, segments,
                   onChange={(e) => patchSeg(s.id, { label: e.target.value })} />
                 <span className="seg-dur">{(s.end - s.start).toFixed(1)} s</span>
                 <span className="seg-row-tools">
+                  {onLoop && (
+                    <button className={`icon-btn ${loopKey === s.id ? 'on' : ''}`} title={loopKey === s.id ? 'Stop looping' : 'Loop this section'}
+                      aria-pressed={loopKey === s.id} onClick={() => onLoop(s)}><Repeat size={14} /></button>
+                  )}
                   {i > 0 && (
                     <button className="icon-btn" title="Move this section’s start to the playhead" onClick={() => moveStart(i)}><ArrowRightToLine size={15} /></button>
                   )}
