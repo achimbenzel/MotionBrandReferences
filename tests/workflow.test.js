@@ -174,3 +174,99 @@ test('save as template: structure and text, without files, ticks or answers; sam
   const gone = await srv.api('/api/plans', { method: 'POST', json: { template: tid } });
   assert.equal(gone.status, 400);
 });
+
+test('storyboard: uploads store files only; shots, track and format are sanitised', async () => {
+  const plan = await newPlan({ name: 'Board test' });
+  const add = await srv.api(`/api/plans/${plan.id}/blocks`, { method: 'POST', json: { type: 'storyboard' } });
+  const sb = add.data.block;
+  assert.deepEqual([sb.aspect, sb.shots, sb.audio, sb.target], ['16:9', [], null, null]);
+
+  const fd = new FormData();
+  fd.append('files', new Blob([png(16, 9, [0, 120, 255])], { type: 'image/png' }), 'frame1.png');
+  fd.append('files', new Blob([Buffer.from('ID3fake-audio')], { type: 'audio/mpeg' }), 'music.mp3');
+  const up = await srv.api(`/api/plans/${plan.id}/blocks/${sb.id}/uploads`, { method: 'POST', body: fd });
+  assert.equal(up.status, 201);
+  const [img, mp3] = up.data.files;
+  assert.ok(img.file.startsWith(`blocks/${sb.id}/`) && img.file.endsWith('.png'));
+  assert.equal(mp3.name, 'music.mp3');
+  // Nothing is referenced until the page saves it.
+  const before = (await srv.api(`/api/plans/${plan.id}`)).data.plan.blocks.find((b) => b.id === sb.id);
+  assert.deepEqual(before.shots, []);
+  const served = await fetch(`${srv.base}/data/plan/${plan.id}/${img.file}`);
+  assert.equal(served.status, 200);
+
+  const r = await srv.api(`/api/plans/${plan.id}/blocks/${sb.id}`, {
+    method: 'PATCH',
+    json: {
+      aspect: '9:16', target: '30', audio: { file: mp3.file, name: mp3.name, size: mp3.size },
+      shots: [
+        { id: 'a', image: img.file, duration: 2.5, visual: 'Logo', vo: 'Hi' },
+        { id: 'b', image: '../../../db.json', duration: 'x', visual: 'Bad path' },
+        { id: 'c', image: 'blocks/other/x.png', duration: 9999 },
+      ],
+    },
+  });
+  const saved = r.data.plan.blocks.find((b) => b.id === sb.id);
+  assert.equal(saved.aspect, '9:16');
+  assert.equal(saved.target, 30);
+  assert.equal(saved.audio.file, mp3.file);
+  assert.deepEqual(saved.shots.map((x) => [x.id, x.image, x.duration]), [['a', img.file, 2.5], ['b', null, 2], ['c', null, 600]]);
+  const bad = await srv.api(`/api/plans/${plan.id}/blocks/${sb.id}`, { method: 'PATCH', json: { aspect: '2:1', target: '' } });
+  const after = bad.data.plan.blocks.find((b) => b.id === sb.id);
+  assert.equal(after.aspect, '9:16');
+  assert.equal(after.target, null);
+
+  // Uploads are only for storyboards.
+  const other = await srv.api(`/api/plans/${plan.id}/blocks`, { method: 'POST', json: { type: 'text' } });
+  const nope = await srv.api(`/api/plans/${plan.id}/blocks/${other.data.block.id}/uploads`, { method: 'POST', body: new FormData() });
+  assert.equal(nope.status, 404);
+
+  // Deleting the block takes its frames and track to Trash; restoring brings them back.
+  const del = await srv.api(`/api/plans/${plan.id}/blocks/${sb.id}`, { method: 'DELETE' });
+  assert.equal((await fetch(`${srv.base}/data/plan/${plan.id}/${img.file}`)).status, 404);
+  await srv.api(`/api/trash/${del.data.trashId}/restore`, { method: 'POST' });
+  assert.equal((await fetch(`${srv.base}/data/plan/${plan.id}/${mp3.file}`)).status, 200);
+});
+
+test('script block: lines and pace saved, searchable; blocks can be inserted after another', async () => {
+  const plan = await newPlan({ name: 'Script test', template: 'launch' });
+  const script = plan.blocks.find((b) => b.type === 'script');
+  assert.ok(script, 'launch template has a script block');
+  assert.deepEqual(script.lines.map((l) => l.visual).slice(0, 2), ['Hook', 'Problem']);
+  assert.ok(plan.blocks.some((b) => b.type === 'storyboard'), 'launch template has a storyboard');
+
+  const lines = [{ id: 'l1', visual: 'Phone on desk', vo: 'Meet Zephyr, your pocket gardener.', junk: 1 }, { visual: 'Logo' }];
+  const r = await srv.api(`/api/plans/${plan.id}/blocks/${script.id}`, { method: 'PATCH', json: { lines, pace: 99, target: 45 } });
+  const saved = r.data.plan.blocks.find((b) => b.id === script.id);
+  assert.deepEqual(Object.keys(saved.lines[0]).sort(), ['id', 'visual', 'vo']);
+  assert.ok(saved.lines[1].id);
+  assert.equal(saved.pace, 6);
+  assert.equal(saved.target, 45);
+  const found = await srv.api('/api/search?q=pocket%20gardener');
+  assert.ok(found.data.results.some((x) => x.id === plan.id));
+
+  const ins = await srv.api(`/api/plans/${plan.id}/blocks`, { method: 'POST', json: { type: 'storyboard', after: script.id } });
+  const order = ins.data.plan.blocks.map((b) => b.id);
+  assert.equal(order[order.indexOf(script.id) + 1], ins.data.block.id);
+});
+
+test('templates keep storyboard text but drop frames and tracks', async () => {
+  const plan = await newPlan({ name: 'SB source' });
+  const sb = (await srv.api(`/api/plans/${plan.id}/blocks`, { method: 'POST', json: { type: 'storyboard' } })).data.block;
+  const fd = new FormData();
+  fd.append('files', new Blob([png(8, 8, [9, 9, 9])], { type: 'image/png' }), 'f.png');
+  const [img] = (await srv.api(`/api/plans/${plan.id}/blocks/${sb.id}/uploads`, { method: 'POST', body: fd })).data.files;
+  await srv.api(`/api/plans/${plan.id}/blocks/${sb.id}`, { method: 'PATCH', json: {
+    shots: [{ id: 's1', image: img.file, duration: 3, visual: 'Opening shot', vo: '' }], audio: { file: img.file, name: 'x' },
+  } });
+  const t = await srv.api('/api/plan-templates', { method: 'POST', json: { planId: plan.id, name: 'SB tpl' } });
+  const copy = await newPlan({ template: t.data.template.id });
+  const csb = copy.blocks.find((b) => b.type === 'storyboard');
+  assert.equal(csb.shots.length, 1);
+  assert.equal(csb.shots[0].visual, 'Opening shot');
+  assert.equal(csb.shots[0].duration, 3);
+  assert.equal(csb.shots[0].image, null);
+  assert.notEqual(csb.shots[0].id, 's1');
+  assert.equal(csb.audio, null);
+  await srv.api(`/api/plan-templates/${t.data.template.id}`, { method: 'DELETE' });
+});

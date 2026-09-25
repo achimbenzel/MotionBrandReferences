@@ -154,9 +154,18 @@ export const api = {
     return plan;
   },
   // --- Plan content blocks (moodboard / text / todos / files) ---
-  async addBlock(id, type) {
-    const { plan } = await request(`/api/plans/${id}/blocks`, { method: 'POST', json: { type } });
+  // `after`: insert right after that block (default: at the end). → plan
+  async addBlock(id, type, { after } = {}) {
+    const { plan } = await request(`/api/plans/${id}/blocks`, { method: 'POST', json: { type, after } });
     return plan;
+  },
+  // Store files in a storyboard's folder → [{ file, name, size }] (the block
+  // itself is saved by the page, with the paths added to its shots / track).
+  async uploadBlockFiles(id, blockId, fileList) {
+    const fd = new FormData();
+    Array.from(fileList).forEach((f) => fd.append('files', f));
+    const { files } = await request(`/api/plans/${id}/blocks/${blockId}/uploads`, { method: 'POST', body: fd });
+    return files;
   },
   async updateBlock(id, blockId, patch) {
     const { plan } = await request(`/api/plans/${id}/blocks/${blockId}`, { method: 'PATCH', json: patch });

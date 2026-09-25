@@ -6,7 +6,10 @@ import { DATA_DIR, TRASH_DIR } from '../config.js';
 import { readDB, mutateDB } from '../db.js';
 import { moveInto, replaceImage, safeRm, moveToTrash, moveRelPaths, extOf } from '../files.js';
 import { upload } from '../upload.js';
-import { BLOCK_TYPES, BLOCK_TITLES, PLAN_STATUSES, normalizeField, str } from '../schema.js';
+import {
+  BLOCK_TYPES, BLOCK_TITLES, PLAN_STATUSES, STORYBOARD_ASPECTS, normalizeField, normalizeShot, normalizeAudio,
+  normalizeLine, normalizeTarget, normalizePace, str,
+} from '../schema.js';
 import { BUILTIN_TEMPLATES, builtinTemplate, planFromTemplate, templateFromPlan, templateSummary } from '../templates.js';
 import { createRouter } from '../http.js';
 
@@ -171,14 +174,23 @@ router.post('/api/plans/:id/blocks', async (req, res) => {
           : type === 'divider' ? { ...base }
             : type === 'table' ? { ...base, columns: [{ id: nanoid(6), name: '' }, { id: nanoid(6), name: '' }], rows: [] }
               : type === 'briefing' ? { ...base, fields: DEFAULT_BRIEFING.map((label) => normalizeField({ label })) }
-                : { ...base, files: [] }; // files + pdf
-  const updated = await mutateDB((db) => { const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null; p.blocks.push(block); return p; });
+                : type === 'storyboard' ? { ...base, aspect: '16:9', shots: [], audio: null, target: null }
+                  : type === 'script' ? { ...base, pace: 2.5, target: null, lines: [normalizeLine({})] }
+                    : { ...base, files: [] }; // files + pdf
+  // Appended at the end, or right after `after` (a block id) when given.
+  const updated = await mutateDB((db) => {
+    const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null;
+    const i = req.body.after ? p.blocks.findIndex((b) => b.id === req.body.after) : -1;
+    if (i === -1) p.blocks.push(block); else p.blocks.splice(i + 1, 0, block);
+    return p;
+  });
   if (!updated) return res.status(404).json({ error: 'not_found' });
   res.status(201).json({ plan: updated, block });
 });
 
 // Update only the content/label fields — never the file arrays.
-const BLOCK_EDITABLE = ['title', 'collapsed', 'content', 'items', 'columns', 'rows', 'fields'];
+const BLOCK_EDITABLE = ['title', 'collapsed', 'content', 'items', 'columns', 'rows', 'fields',
+  'shots', 'audio', 'aspect', 'target', 'lines', 'pace'];
 router.patch('/api/plans/:id/blocks/:blockId', async (req, res) => {
   const updated = await mutateDB((db) => {
     const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null;
@@ -189,6 +201,12 @@ router.patch('/api/plans/:id/blocks/:blockId', async (req, res) => {
       if (k === 'title' || k === 'content') b[k] = str(v, k === 'content' ? 200000 : 400);
       else if (k === 'collapsed') b[k] = !!v;
       else if (k === 'fields') { if (Array.isArray(v)) b.fields = v.slice(0, 100).map(normalizeField); }
+      else if (k === 'shots') { if (Array.isArray(v)) b.shots = v.slice(0, 500).map((x) => normalizeShot(x, b.id)); }
+      else if (k === 'audio') b.audio = normalizeAudio(v, b.id);
+      else if (k === 'aspect') { if (STORYBOARD_ASPECTS.includes(v)) b.aspect = v; }
+      else if (k === 'target') b.target = normalizeTarget(v);
+      else if (k === 'lines') { if (Array.isArray(v)) b.lines = v.slice(0, 500).map(normalizeLine); }
+      else if (k === 'pace') b.pace = normalizePace(v);
       else if (Array.isArray(v)) b[k] = v; // items / columns / rows
     }
     return p;
@@ -217,6 +235,8 @@ function blockPaths(block) {
   const refs = [
     ...(block.images || []).map((i) => i?.file),
     ...(block.files || []).flatMap((f) => [f?.file, f?.example]),
+    ...(block.shots || []).map((x) => x?.image),
+    block.audio?.file,
   ].filter((r) => typeof r === 'string' && r && !r.includes('..'));
   return [...new Set([`blocks/${block.id}`, `moodboard/${block.id}`, ...refs])];
 }
@@ -237,6 +257,23 @@ router.delete('/api/plans/:id/blocks/:blockId', async (req, res) => {
   if (!updated) return res.status(404).json({ error: 'not_found' });
   await moveRelPaths(planDir(req.params.id), path.join(TRASH_DIR, trashId), entry.data.rels);
   res.json({ plan: updated, trashId });
+});
+
+// Store files in a storyboard's folder and return their paths. The block
+// itself isn't changed: the page adds them to its shots / audio and saves
+// that, so an upload can never race an edit that's still being typed.
+router.post('/api/plans/:id/blocks/:blockId/uploads', upload.array('files', 100), async (req, res) => {
+  const db = await readDB();
+  const plan = db.plans.find((p) => p.id === req.params.id);
+  const b = findBlock(plan, req.params.blockId);
+  if (!plan || !b || b.type !== 'storyboard') return res.status(404).json({ error: 'not_found' });
+  const dir = blockDir(plan.id, b.id);
+  const files = [];
+  for (const f of (req.files || [])) {
+    const stored = await moveInto(dir, f.path, `${nanoid(8)}${extOf(f.originalname) || ''}`);
+    files.push({ file: `blocks/${b.id}/${stored}`, name: f.originalname, size: f.size });
+  }
+  res.status(201).json({ files });
 });
 
 // Add files to a moodboard (images) or a files / pdf block.

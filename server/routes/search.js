@@ -49,6 +49,8 @@ router.get('/api/search', async (req, res) => {
       ...(b.columns || []).map((c) => c.name),
       ...(b.rows || []).flatMap((r) => Object.values(r.cells || {})),
       ...(b.fields || []).flatMap((f) => [f.label, f.value]),
+      ...(b.lines || []).flatMap((l) => [l.visual, l.vo]),
+      ...(b.shots || []).flatMap((x) => [x.visual, x.vo, x.notes]),
     ]);
     const hay = [pl.name, pl.client, ...(pl.milestones || []).map((m) => m.title), ...blockText]
       .filter(Boolean).join(' ').toLowerCase();

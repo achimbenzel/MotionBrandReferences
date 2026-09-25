@@ -26,11 +26,11 @@ export const emptyDB = () => ({
 // ---------------------------------------------------------------------------
 // Plans
 // ---------------------------------------------------------------------------
-export const BLOCK_TYPES = new Set(['moodboard', 'text', 'todos', 'files', 'pdf', 'links', 'refs', 'palette', 'heading', 'divider', 'table', 'briefing']);
+export const BLOCK_TYPES = new Set(['moodboard', 'text', 'todos', 'files', 'pdf', 'links', 'refs', 'palette', 'heading', 'divider', 'table', 'briefing', 'storyboard', 'script']);
 export const BLOCK_TITLES = {
   moodboard: 'Moodboard', text: 'Text', todos: 'To-dos', files: 'Files', pdf: 'PDF', links: 'Links',
   refs: 'References', palette: 'Palette', heading: 'Heading', divider: 'Divider', table: 'Table',
-  briefing: 'Briefing',
+  briefing: 'Briefing', storyboard: 'Storyboard', script: 'Script',
 };
 
 // Where a plan stands. '' = no status (every plan made before statuses existed).
@@ -38,6 +38,30 @@ export const PLAN_STATUSES = ['briefing', 'concept', 'design', 'production', 're
 
 // A briefing block is a list of question → answer fields.
 export const normalizeField = (f) => ({ id: f?.id ? str(f.id, 40) : nanoid(6), label: str(f?.label, 120), value: str(f?.value, 20000) });
+
+// Storyboard + script blocks.
+export const STORYBOARD_ASPECTS = ['16:9', '9:16', '1:1', '4:5'];
+const num = (v, min, max, fallback) => {
+  const n = Number(v);
+  return v !== '' && v != null && Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+};
+// A block's files live in its own folder; nothing else may be referenced.
+const blockFile = (blockId, v) => (typeof v === 'string' && v.startsWith(`blocks/${blockId}/`) && !v.includes('..') ? str(v, 300) : null);
+export const normalizeShot = (s, blockId) => ({
+  id: s?.id ? str(s.id, 40) : nanoid(6),
+  image: blockFile(blockId, s?.image),
+  duration: num(s?.duration, 0.1, 600, 2),
+  visual: str(s?.visual, 4000),
+  vo: str(s?.vo, 4000),
+  notes: str(s?.notes, 4000),
+});
+export const normalizeAudio = (a, blockId) => {
+  const file = blockFile(blockId, a?.file);
+  return file ? { file, name: str(a?.name, 200), size: Number.isFinite(a?.size) ? a.size : 0 } : null;
+};
+export const normalizeLine = (l) => ({ id: l?.id ? str(l.id, 40) : nanoid(6), visual: str(l?.visual, 4000), vo: str(l?.vo, 4000) });
+export const normalizeTarget = (v) => num(v, 1, 3600, null); // seconds, or null = none / from the briefing
+export const normalizePace = (v) => num(v, 0.5, 6, 2.5);     // words per second
 
 // `fallbackId` keeps ids stable across reads for records that never had one,
 // so the client can address a block it was just sent.
@@ -65,6 +89,15 @@ export function normalizeBlock(b, fallbackId) {
     if (!Array.isArray(b.rows)) b.rows = [];
   } else if (b.type === 'briefing') {
     if (!Array.isArray(b.fields)) b.fields = [];
+  } else if (b.type === 'storyboard') {
+    if (!Array.isArray(b.shots)) b.shots = [];
+    if (!STORYBOARD_ASPECTS.includes(b.aspect)) b.aspect = '16:9';
+    if (!('audio' in b)) b.audio = null;
+    if (!('target' in b)) b.target = null;
+  } else if (b.type === 'script') {
+    if (!Array.isArray(b.lines)) b.lines = [];
+    if (!Number.isFinite(b.pace)) b.pace = 2.5;
+    if (!('target' in b)) b.target = null;
   }
   return b;
 }

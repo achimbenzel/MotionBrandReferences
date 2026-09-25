@@ -31,11 +31,15 @@ export const BUILTIN_TEMPLATES = [
       fields('Briefing', ['Product', 'Target audience', 'Key message', 'Call to action', 'Target length', 'Formats',
         'Tone & style', 'Music & voice-over', 'Must-haves / no-gos', 'Budget']),
       heading('Concept', 'Idea, script and look'),
-      block('text', 'Script & voice-over', { content: '' }),
+      block('script', 'Script & voice-over', {
+        pace: 2.5, target: null,
+        lines: ['Hook', 'Problem', 'Product reveal', 'Features', 'Call to action', 'Logo outro'].map((visual) => ({ visual, vo: '' })),
+      }),
       block('moodboard', 'Moodboard'),
       block('refs', 'References', { items: [] }),
       block('moodboard', 'Styleframes'),
       block('palette', 'Palette', { items: [] }),
+      block('storyboard', 'Storyboard', { aspect: '16:9', shots: [], audio: null, target: null }),
       heading('Production'),
       todos('Production checklist', ['Script approved', 'Styleframes approved', 'Storyboard / animatic approved',
         'Music & voice-over licensed', 'Animation', 'Sound design & mix', 'Final review', 'Exports delivered']),
@@ -84,13 +88,16 @@ export const BUILTIN_TEMPLATES = [
 ];
 export const builtinTemplate = (id) => BUILTIN_TEMPLATES.find((t) => t.id === id) || null;
 
-/** Deep-copy blocks with fresh ids, empty file lists and table cells re-keyed. */
+/** Deep-copy blocks with fresh ids, no files (images, storyboard frames and
+ *  tracks) and table cells re-keyed. */
 export function cloneBlocks(blocks) {
   return (Array.isArray(blocks) ? blocks : []).map((src) => {
     const b = structuredClone(src);
     b.id = nanoid(8);
     if (Array.isArray(b.items)) b.items = b.items.map((it) => ({ ...it, id: nanoid(6) }));
     if (Array.isArray(b.fields)) b.fields = b.fields.map((f) => ({ ...f, id: nanoid(6) }));
+    if (Array.isArray(b.lines)) b.lines = b.lines.map((l) => ({ ...l, id: nanoid(6) }));
+    if (Array.isArray(b.shots)) b.shots = b.shots.map((x) => ({ ...x, id: nanoid(6), image: null }));
     if (Array.isArray(b.columns)) {
       const ids = {};
       b.columns = b.columns.map((c) => { const id = nanoid(6); ids[c?.id] = id; return { ...c, id }; });
@@ -101,6 +108,7 @@ export function cloneBlocks(blocks) {
     }
     if (b.type === 'moodboard') b.images = [];
     if (b.type === 'files' || b.type === 'pdf') b.files = [];
+    if (b.type === 'storyboard') b.audio = null;
     return normalizeBlock(b);
   }).filter(Boolean);
 }

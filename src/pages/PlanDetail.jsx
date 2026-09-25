@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Trash2, Pencil, MoreHorizontal, CalendarRange, Images, StickyNote,
@@ -6,7 +6,7 @@ import {
   Image as ImageIcon, Camera, ArrowUp, ArrowDown, File as FileIcon, ExternalLink,
   Link2, Library, FolderOpen, Palette as PaletteIcon, Heading as HeadingIcon,
   Minus, Table as TableIcon, Wand2, Copy, FileText, AlertTriangle, ClipboardList,
-  LayoutTemplate, Building2,
+  LayoutTemplate, Building2, Clapperboard, ScrollText,
 } from 'lucide-react';
 import { api, planFileUrl, fileUrl } from '../lib/api.js';
 import { useSaver, useRefreshOnReturn } from '../lib/autosave.js';
@@ -21,6 +21,10 @@ import GalleryNameModal from '../components/GalleryNameModal.jsx';
 import RefPicker from '../components/RefPicker.jsx';
 import FileAddModal from '../components/FileAddModal.jsx';
 import ProjectCard from '../components/ProjectCard.jsx';
+import AutoTextarea from '../components/AutoTextarea.jsx';
+import ScriptBlock from '../components/plan/ScriptBlock.jsx';
+import StoryboardBlock from '../components/plan/StoryboardBlock.jsx';
+import { voEstimate } from '../lib/timing.js';
 
 const rid = () => Math.random().toString(36).slice(2, 8);
 
@@ -36,6 +40,8 @@ function firstEmoji(str) {
 
 const BLOCK_META = {
   briefing: { label: 'Briefing', icon: ClipboardList },
+  script: { label: 'Script', icon: ScrollText },
+  storyboard: { label: 'Storyboard', icon: Clapperboard },
   moodboard: { label: 'Moodboard', icon: Images },
   text: { label: 'Text', icon: StickyNote },
   todos: { label: 'To-dos', icon: ListChecks },
@@ -195,6 +201,30 @@ export default function PlanDetail() {
     try { await navigator.clipboard.writeText(`${head}\n${b.title}\n\n${lines.join('\n')}`); toast('Briefing copied'); }
     catch { toast('Copy failed', 'error'); }
   };
+  // Script → storyboard: one shot per script line, timed by its voice-over,
+  // added to the plan's first storyboard (or a new one right after the script).
+  const scriptToStoryboard = async (b) => {
+    const lines = (b.lines || []).filter((l) => l.visual.trim() || l.vo.trim());
+    if (!lines.length) { toast('Write a few script lines first.'); return; }
+    const shots = lines.map((l) => {
+      const secs = voEstimate(l.vo, b.pace || 2.5).seconds;
+      return { id: rid(), image: null, duration: secs ? Math.max(1, Math.ceil(secs * 2) / 2) : 2, visual: l.visual, vo: l.vo, notes: '' };
+    });
+    try {
+      let sb = (planRef.current?.blocks || []).find((x) => x.type === 'storyboard');
+      if (!sb) {
+        const before = new Set((planRef.current?.blocks || []).map((x) => x.id));
+        const next = await api.addBlock(id, 'storyboard', { after: b.id });
+        sb = next.blocks.find((x) => !before.has(x.id));
+        // Keep this page's unsaved edits; only take the new block from the server.
+        setPlan((prev) => ({ ...prev, blocks: next.blocks.map((x) => prev.blocks.find((y) => y.id === x.id) || x) }));
+      }
+      editBlock(sb.id, { shots: [...(sb.shots || []), ...shots] }, true);
+      toast(`Added ${shots.length} shot${shots.length === 1 ? '' : 's'} to “${sb.title}”`);
+      setTimeout(() => document.getElementById(`block-${sb.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+    } catch (e) { toast(`Could not create storyboard: ${e.message}`, 'error'); }
+  };
+
   const removeField = (b, f) => {
     const fields = b.fields || [];
     const idx = fields.findIndex((x) => x.id === f.id);
@@ -320,6 +350,7 @@ export default function PlanDetail() {
   const avatarEmoji = !avatarUrl ? (plan.avatarEmoji || null) : null;
 
   const blockMenu = (b, i) => [
+    ...(b.type === 'script' ? [{ label: 'Storyboard from script', icon: <Clapperboard size={15} />, onClick: () => scriptToStoryboard(b) }] : []),
     ...(b.type === 'heading' || b.type === 'divider' ? [] : [{ label: 'Rename', icon: <Pencil size={15} />, onClick: () => setRenameBlock(b) }]),
     ...(i > 0 ? [{ label: 'Move up', icon: <ArrowUp size={15} />, onClick: () => moveBlock(b.id, 'up') }] : []),
     ...(i < plan.blocks.length - 1 ? [{ label: 'Move down', icon: <ArrowDown size={15} />, onClick: () => moveBlock(b.id, 'down') }] : []),
@@ -445,6 +476,17 @@ export default function PlanDetail() {
       {plan.blocks.map((b, i) => {
         const Meta = BLOCK_META[b.type] || BLOCK_META.text;
         const menu = <Menu align="right" trigger={<button className="icon-btn" style={{ width: 34, height: 34 }}><MoreHorizontal size={16} /></button>} items={blockMenu(b, i)} />;
+
+        if (b.type === 'script') {
+          return <ScriptBlock key={b.id} plan={plan} block={b} menu={menu} icon={Meta.icon} editBlock={editBlock} planRef={planRef} toast={toast} />;
+        }
+
+        if (b.type === 'storyboard') {
+          return (
+            <StoryboardBlock key={b.id} plan={plan} block={b} menu={menu} icon={Meta.icon} editBlock={editBlock} planRef={planRef} toast={toast}
+              upload={(files) => api.uploadBlockFiles(id, b.id, files)} fileUrl={(rel) => planFileUrl(plan, rel)} />
+          );
+        }
 
         if (b.type === 'briefing') {
           const fields = b.fields || [];
@@ -924,16 +966,4 @@ function StatusPick({ status }) {
       <ChevronDown size={13} />
     </button>
   );
-}
-
-// A textarea that grows with its content (briefing answers).
-function AutoTextarea({ value, className = '', ...rest }) {
-  const ref = useRef(null);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight}px`;
-  }, [value]);
-  return <textarea ref={ref} rows={1} className={className} value={value} {...rest} />;
 }

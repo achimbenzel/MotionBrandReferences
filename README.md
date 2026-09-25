@@ -283,16 +283,18 @@ Plan new projects. The **+** opens **New plan**: give it a name and (optionally)
 a client, and choose what to start from —
 - **Empty plan** — a blank page,
 - **Launch video** — briefing (product, audience, key message, CTA, target
-  length, formats, tone, music & VO, must-haves, budget), script & VO,
-  moodboard, references, styleframes, palette, a production checklist, a
-  deliverables table (16:9 / 9:16 / 1:1 / 4:5) plus milestones from kick-off
-  to final delivery,
+  length, formats, tone, music & VO, must-haves, budget), a script (lines
+  pre-labelled Hook → Logo outro), moodboard, references, styleframes,
+  palette, a storyboard, a production checklist, a deliverables table
+  (16:9 / 9:16 / 1:1 / 4:5) plus milestones from kick-off to final delivery,
 - **Branding** — briefing, research (references, competitors), moodboard, logo
   concepts, colour palette, typography, a checklist, a deliverables table and a
   brand-guidelines PDF block,
 - **your own templates** — any plan can be saved with **Edit → Save as
-  template…**. A template keeps the blocks, text, to-dos (unticked), tables and
-  briefing questions, and leaves out images, files, dates and briefing answers.
+  template…**. A template keeps the blocks, text, to-dos (unticked), tables,
+  script lines, storyboard shots (their text and timing) and briefing
+  questions, and leaves out images, frames, tracks, files, dates and briefing
+  answers.
   Saving under the name of an existing template updates it; delete one with
   its **×** in the New plan dialog. The dialog remembers the last choice.
 
@@ -316,6 +318,23 @@ one stage at a time (archived plans only show under **Archived**). Each
       answers grow as you type). The header counts answered questions, and
       **Copy** puts the whole briefing on the clipboard as text, e.g. to send
       to the client.
+    - **Script** — two columns, **what we see | what we hear**. Each line shows
+      when it starts and roughly how long its voice-over takes at the chosen
+      **pace** (English 2.5, German 2.2, slow or fast words per second), and the
+      total runs against a **target length** — the block's own, or the target
+      length in the plan's briefing. Text in [brackets] or (parentheses) is a
+      direction and isn't counted; `[pause 1s]` adds a pause. **Copy** puts the
+      script on the clipboard; the block's ⋯ **Storyboard from script** turns
+      every line into a shot, timed by its voice-over.
+    - **Storyboard** — shots with a **frame** (sketch / styleframe), a
+      **duration**, what we see and the VO / on-screen text, in **16:9, 9:16,
+      1:1 or 4:5**. **Add frames** (or drop images onto the block) makes one
+      shot per image; drop an image on a shot to replace its frame. A timing
+      strip and the total show the length against the target. **Play
+      animatic** plays the frames in time — fullscreen, VO as captions, with an
+      optional **music / voice-over track** in sync (Space play/pause, ←/→
+      shots, C captions, Esc close); click a frame or a strip cell to start
+      there.
     - **Moodboard** — a **collapsible** board of images. Add images by button, by
       **dropping** files onto the board, or by **pasting** (⌘V) into the last-used
       board.
