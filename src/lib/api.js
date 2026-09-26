@@ -482,6 +482,16 @@ export const api = {
     const { days: list } = await request(`/api/activity?days=${days}`);
     return list;
   },
+  // --- Time tracker ---
+  async getTime(planId) { return request(`/api/time${planId ? `?plan=${encodeURIComponent(planId)}` : ''}`); }, // → { entries, running, activities }
+  async addTimeEntry(entry) { const { entry: e } = await request('/api/time/entries', { method: 'POST', json: entry }); return e; },
+  async updateTimeEntry(id, patch) { const { entry } = await request(`/api/time/entries/${id}`, { method: 'PATCH', json: patch }); return entry; },
+  async removeTimeEntry(id) { return request(`/api/time/entries/${id}`, { method: 'DELETE' }); }, // → { trashId }
+  async timeStart(body) { return request('/api/time/start', { method: 'POST', json: body }); },
+  async timeUpdateRunning(patch) { return request('/api/time/running', { method: 'PATCH', json: patch }); },
+  async timeStop(body) { return request('/api/time/stop', { method: 'POST', json: body }); }, // → { entry, running, activities }
+  async setTimeActivities(activities) { return request('/api/time/activities', { method: 'PUT', json: { activities } }); },
+  timeExportUrl(q) { return `/api/time/export.xlsx?${new URLSearchParams(Object.entries(q).filter(([, v]) => v))}`; },
   // A finished focus-timer session → today's focus minutes.
   async addFocusMinutes(minutes) {
     return request('/api/activity/focus', { method: 'POST', json: { minutes } });

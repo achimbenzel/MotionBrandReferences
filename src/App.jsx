@@ -28,6 +28,7 @@ const StoryboardsPage = lazy(() => import('./pages/StoryboardsPage.jsx'));
 const StoryboardEditor = lazy(() => import('./pages/StoryboardEditor.jsx'));
 const MockupsPage = lazy(() => import('./pages/MockupsPage.jsx'));
 const MockupOpen = lazy(() => import('./pages/MockupOpen.jsx'));
+const TimeTracker = lazy(() => import('./pages/TimeTracker.jsx'));
 import { TABS, isWorkPath, WORK_HOME } from './lib/types.js';
 import { useMediaQuery, DESKTOP } from './lib/useMedia.js';
 
@@ -128,6 +129,7 @@ function Shell() {
                 <Route path="/storyboards/:planId/:blockId" element={<StoryboardEditor />} />
                 <Route path="/mockups" element={<MockupsPage />} />
                 <Route path="/mockups/:id" element={<MockupOpen />} />
+                <Route path="/time" element={<TimeTracker />} />
                 <Route path="/inbox" element={<InboxPage />} />
                 <Route path="/trash" element={<TrashPage />} />
                 <Route path="/settings" element={<SettingsPage />} />

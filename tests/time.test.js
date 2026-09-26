@@ -41,6 +41,8 @@ test('entries: saved with a plan or a free project, sanitised, edited, deleted t
   const back = (await srv.api('/api/time')).data.entries;
   assert.deepEqual(back.map((e) => e.id).sort(), [a.id, b.id].sort());
   assert.ok(!('label' in back.find((e) => e.id === b.id)));
+  // One plan's entries only.
+  assert.deepEqual((await srv.api('/api/time?plan=plan3')).data.entries.map((e) => e.id), [a.id]);
 });
 
 test('running tracker: start, change, stop into an entry (the browser gives the local times); short ones and discards save nothing', async () => {

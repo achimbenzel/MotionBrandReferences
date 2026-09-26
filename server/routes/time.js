@@ -17,9 +17,11 @@ export const planLabel = (p) => (p ? (p.client ? `${p.client} · ${p.name || 'Pl
 const labelOf = (db, e) => planLabel(db.plans.find((p) => p.id === e.planId)) || e.project || '';
 const sorted = (list) => [...list].sort((a, b) => (b.date + b.start).localeCompare(a.date + a.start));
 
-router.get('/api/time', async (_req, res) => {
+router.get('/api/time', async (req, res) => {
   const db = await readDB();
-  res.json({ entries: sorted(db.timeEntries.map(normalizeTimeEntry)), ...db.timeTracker });
+  const all = db.timeEntries.map(normalizeTimeEntry);
+  const entries = req.query.plan ? all.filter((e) => e.planId === req.query.plan) : all; // one plan's entries
+  res.json({ entries: sorted(entries), ...db.timeTracker });
 });
 
 // Only what the body brings (and makes sense) changes.

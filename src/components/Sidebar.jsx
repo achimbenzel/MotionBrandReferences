@@ -4,12 +4,13 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Search, Plus, PanelLeftClose, PanelLeftOpen, Trash2, Settings, X,
   FileText, Film, Square, CreditCard, Palette, Images, Type, PencilRuler, FlaskConical,
-  LayoutDashboard, ListTodo, Ban, AppWindow, Inbox, Clapperboard, MonitorSmartphone,
+  LayoutDashboard, ListTodo, Ban, AppWindow, Inbox, Clapperboard, MonitorSmartphone, Clock,
 } from 'lucide-react';
 import { TABS, WORK_TABS, isWorkPath, setLastTab } from '../lib/types.js';
 import { useActiveTab } from '../lib/useActiveTab.js';
 import ModeToggle from './ModeToggle.jsx';
 import FocusPill from './FocusPill.jsx';
+import TrackerPill from './TrackerPill.jsx';
 import StorageMeter from './StorageMeter.jsx';
 import { useInboxCount } from '../lib/inbox.js';
 import logoWide from '../../logo_wide_dark.svg';
@@ -18,7 +19,7 @@ const ICON = {
   branding: FileText, motion: Film, logo: Square, businesscard: CreditCard,
   color: Palette, imagegallery: Images, font: Type, logonogo: Ban,
 };
-const WORK_ICON = { dashboard: LayoutDashboard, plan: PencilRuler, software: AppWindow, board: ListTodo, logotester: FlaskConical, storyboards: Clapperboard, mockups: MonitorSmartphone };
+const WORK_ICON = { dashboard: LayoutDashboard, plan: PencilRuler, software: AppWindow, board: ListTodo, logotester: FlaskConical, storyboards: Clapperboard, mockups: MonitorSmartphone, time: Clock };
 
 /**
  * Notion-style sidebar holding all navigation. Docked on desktop, where it
@@ -66,6 +67,7 @@ export default function Sidebar({ onAdd, onSearch, onToggle, drawer = false, ope
         </button>
 
         <FocusPill compact={rail} />
+        <TrackerPill compact={rail} />
 
         <button className={`sb-item sb-inbox ${onInbox ? 'active' : ''}`} onClick={() => navigate('/inbox')} data-tip={inboxCount ? `Inbox · ${inboxCount} to sort` : 'Inbox'}>
           <Inbox size={17} /> <span>Inbox</span>

@@ -48,6 +48,7 @@ export const WORK_TABS = [
   { key: 'logotester', label: 'Brand Tester', path: '/logo-tester' },
   { key: 'storyboards', label: 'Storyboards', path: '/storyboards' },
   { key: 'mockups', label: 'Mockups', path: '/mockups' },
+  { key: 'time', label: 'Time Tracker', path: '/time' },
 ];
 export const WORK_HOME = '/work';
 

@@ -36,6 +36,7 @@ import PlanOverview from '../components/plan/PlanOverview.jsx';
 import BlockRow from '../components/plan/BlockRow.jsx';
 import PlanWhen from '../components/plan/PlanWhen.jsx';
 import { PlanToc, PlanJump } from '../components/plan/PlanToc.jsx';
+import PlanTime from '../components/plan/PlanTime.jsx';
 import { PLAN_TABS, BLOCK_TABS, STRUCTURAL, blockTabs, statusTab, isEmptyBlock, tabColor, planTab } from '../lib/planTabs.js';
 import { voEstimate } from '../lib/timing.js';
 import { useSortable, moveItem } from '../lib/useSortable.js';
@@ -1077,6 +1078,7 @@ export default function PlanDetail() {
           <input value={client} placeholder="Add client" onChange={(e) => editClient(e.target.value)} aria-label="Client" />
         </label>
         <PlanWhen plan={plan} milestones={milestones} open={whenOpen} onToggle={() => setWhenOpen((v) => !v)} />
+        <PlanTime plan={plan} toast={toast} />
       </div>
       {/* Timeframe + milestones: one line in the header, the details on click */}
       {whenOpen && (

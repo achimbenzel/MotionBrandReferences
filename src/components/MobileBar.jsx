@@ -5,6 +5,7 @@ import { TABS, WORK_TABS, isWorkPath } from '../lib/types.js';
 import { useActiveTab } from '../lib/useActiveTab.js';
 import { useInboxCount } from '../lib/inbox.js';
 import FocusPill from './FocusPill.jsx';
+import TrackerPill from './TrackerPill.jsx';
 
 // Title for the current page, shown in the middle of the bar.
 function titleFor(pathname, tab) {
@@ -59,6 +60,7 @@ export default function MobileBar({ onMenu, onSearch, onAdd }) {
       </button>
       <div className={`mbar-title ${sectionPage && !scrolled ? 'quiet' : ''}`}>{titleFor(pathname, tab)}</div>
       <FocusPill compact />
+      <TrackerPill compact />
       <button className="icon-btn mbar-btn" onClick={onSearch} aria-label="Search"><Search size={19} /></button>
       {showAdd && (
         <button className="icon-btn mbar-btn mbar-add" onClick={() => onAdd(tab)}
