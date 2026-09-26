@@ -39,6 +39,7 @@ router.get('/api/mockups/:id', async (req, res) => {
 // Screen content is server-owned: whatever a client sends for it is ignored.
 const withoutContent = (body) => ({
   ...body, content: null, items: Array.isArray(body?.items) ? body.items.map((it) => ({ ...it, content: null })) : body?.items,
+  d2: body?.d2 && typeof body.d2 === 'object' ? { ...body.d2, slots: {} } : body?.d2,
 });
 
 router.post('/api/mockups', async (req, res) => {
@@ -52,8 +53,9 @@ router.post('/api/mockups', async (req, res) => {
 // endpoints. `items` replaces the scene's devices (each keeps its content by
 // id; a new one can share another's with `contentFrom`); the single-device
 // fields at the top change the first device.
-const SCENE_FIELDS = ['name', 'camera', 'frame', 'background', 'shadow', 'animation'];
-const DEVICE_FIELDS = ['device', 'modelId', 'color', 'landscape', 'lying', 'lid', 'url', 'fit', 'adjust', 'logo', 'hidden', 'size', 'x', 'z', 'rotY'];
+const SCENE_FIELDS = ['name', 'camera', 'frame', 'background', 'shadow', 'light', 'animation'];
+const DEVICE_FIELDS = ['device', 'modelId', 'color', 'landscape', 'lying', 'lid', 'url', 'fit', 'adjust', 'logo', 'hidden', 'size', 'x', 'z', 'rotY',
+  'hingeAngle', 'keys', 'videoStart', 'sound', 'volume'];
 router.patch('/api/mockups/:id', async (req, res) => {
   const body = req.body || {};
   const updated = await mutateDB((db) => {
@@ -71,6 +73,16 @@ router.patch('/api/mockups/:id', async (req, res) => {
       const first = { ...cur.items[0] };
       for (const k of DEVICE_FIELDS) if (k in body) first[k] = body[k];
       next.items = [first, ...cur.items.slice(1)];
+    }
+    // A 2D mockup's texts and look; its pictures (slots) only change through the content routes.
+    if (body.d2 && typeof body.d2 === 'object' && cur.kind === '2d') {
+      next.d2 = { ...cur.d2, ...body.d2, slots: cur.d2?.slots || {} };
+      // …except their size / position on the picture.
+      for (const [k, v] of Object.entries(body.d2.slots || {})) {
+        if (next.d2.slots[k] && v && typeof v === 'object') {
+          next.d2.slots = { ...next.d2.slots, [k]: { ...next.d2.slots[k], ...(v.adjust ? { adjust: v.adjust } : {}), ...(v.fit ? { fit: v.fit } : {}) } };
+        }
+      }
     }
     db.mockups[i] = { ...normalizeMockup(next), thumb: cur.thumb, updatedAt: Date.now() };
     return db.mockups[i];
@@ -105,35 +117,48 @@ router.delete('/api/mockups/:id', async (req, res) => {
   res.json({ ok: true, trashId });
 });
 
-// ---- The picture / video on a device's screen -----------------------------------
-// ?item=<device id> picks the device (default: the first one). A replaced file
-// is removed once no device of the scene shows it any more.
-async function setContent(id, itemId, write) {
+// ---- The picture / video on a device's screen (or in a 2D mockup's slot) --------
+// ?item=<device id> picks the device (default: the first one); a 2D mockup
+// takes ?slot=<name> (avatar, banner, media-0 …). A replaced file is removed
+// once nothing in the scene shows it any more.
+const SLOT = /^[a-z][a-z0-9-]{0,30}$/;
+const filesIn = (scene) => [...scene.items.map((x) => x.content?.file), ...Object.values(scene.d2?.slots || {}).map((x) => x?.file)].filter(Boolean);
+async function setContent(id, { item: itemId, slot }, write) {
   const db = await readDB();
   const m = db.mockups.find((x) => x.id === id);
   if (!m) return null;
   const scene = normalizeMockup(m);
-  const target = itemId ? scene.items.find((it) => it.id === itemId) : scene.items[0];
-  if (!target) return null;
+  if (slot && (scene.kind !== '2d' || !SLOT.test(slot))) return null;
+  const target = slot ? null : itemId ? scene.items.find((it) => it.id === itemId) : scene.items[0];
+  if (!slot && !target) return null;
   const content = await write(mockupDir(id));
   let old = null;
   const updated = await mutateDB((d) => {
     const i = d.mockups.findIndex((y) => y.id === id);
     if (i === -1) return null;
     const cur = normalizeMockup(d.mockups[i]);
-    const it = cur.items.find((x) => x.id === target.id);
-    if (!it) return null;
-    old = it.content?.file || null;
-    it.content = content;
-    const still = cur.items.some((x) => x.content?.file === old);
-    if (still) old = null;
+    if (slot) {
+      old = cur.d2.slots[slot]?.file || null;
+      const slots = { ...cur.d2.slots };
+      if (content) slots[slot] = { ...content, adjust: { scale: 1, x: 0, y: 0 } }; else delete slots[slot];
+      cur.d2 = { ...cur.d2, slots };
+    } else {
+      const it = cur.items.find((x) => x.id === target.id);
+      if (!it) return null;
+      old = it.content?.file || null;
+      it.content = content;
+    }
+    if (filesIn(cur).includes(old)) old = null;
     d.mockups[i] = { ...normalizeMockup(cur), thumb: cur.thumb, updatedAt: Date.now() };
     return d.mockups[i];
   });
   if (old && old !== content?.file) await safeRm(path.join(mockupDir(id), path.basename(old)), { force: true }).catch(() => {});
   return updated;
 }
-const itemOf = (req) => (typeof req.query.item === 'string' ? req.query.item.slice(0, 40) : null);
+const itemOf = (req) => ({
+  item: typeof req.query.item === 'string' ? req.query.item.slice(0, 40) : null,
+  slot: typeof req.query.slot === 'string' ? req.query.slot.slice(0, 40) : null,
+});
 
 router.post('/api/mockups/:id/content', upload.single('file'), async (req, res) => {
   const f = req.file;
@@ -235,7 +260,7 @@ router.patch('/api/mockup-models/:id', async (req, res) => {
     if (i === -1) return null;
     const cur = db.mockupModels[i];
     const next = { ...cur };
-    for (const k of ['name', 'screenMesh', 'screenTurn', 'screenFlip']) if (k in req.body) next[k] = req.body[k];
+    for (const k of ['name', 'screenMesh', 'screenTurn', 'screenFlip', 'hinge']) if (k in req.body) next[k] = req.body[k];
     db.mockupModels[i] = { ...normalizeMockupModel(next), file: cur.file, format: cur.format, size: cur.size };
     return db.mockupModels[i];
   });

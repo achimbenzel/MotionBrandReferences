@@ -159,7 +159,7 @@ test('several devices per scene: items with their own screens; older single-devi
   assert.equal(m.items[2].content, null);
   assert.deepEqual(m.items[0].adjust, { scale: 1.5, x: 0.1, y: -3 });
   assert.deepEqual([m.items[1].x, m.items[1].z, m.items[1].rotY, m.items[2].lid], [18, 10, -20, 180]);
-  assert.deepEqual(m.animation, { preset: 'turntable', duration: 30, easing: 'linear' });
+  assert.deepEqual(m.animation, { preset: 'turntable', duration: 60, easing: 'linear', camera: [] });
   assert.equal(m.device, 'ipad'); // the first device, mirrored for simple readers
 
   // Replacing the picture on one device keeps the shared file for the other…
@@ -180,4 +180,63 @@ test('several devices per scene: items with their own screens; older single-devi
   // Single-device fields still change the first device.
   r = await srv.api(`/api/mockups/${legacy.id}`, { method: 'PATCH', json: { color: 'spacegray' } });
   assert.deepEqual([r.data.mockup.items[0].color, r.data.mockup.items.length], ['spacegray', 3]);
+});
+
+test('timeline, hinge, sound, light: keyframes sorted and bounded, legacy shadow read as a light setting', async () => {
+  const m = (await srv.api('/api/mockups', { method: 'POST', json: { device: 'custom', shadow: false } })).data.mockup;
+  assert.deepEqual(m.light, { setup: 'studio', rotation: 0, exposure: 1, shadow: 'none', strength: 0.6 });
+  const main = m.items[0].id;
+  const r = await srv.api(`/api/mockups/${m.id}`, {
+    method: 'PATCH',
+    json: {
+      light: { setup: 'golden', rotation: 45, exposure: 9, shadow: 'both' },
+      animation: { duration: 8, camera: [{ t: 5, position: [1, 2, 3] }, { t: 1, position: [0, 1, 9], target: [0, 1, 0], fov: 40 }, { t: 2, position: 'nope' }] },
+      items: [{ id: main, device: 'custom', hingeAngle: -25, keys: { hinge: [{ t: 3, v: 20 }, { t: 0, v: -60 }, { t: 'x', v: 1 }] }, videoStart: 12.5, sound: true, volume: 3 }],
+    },
+  });
+  const s = r.data.mockup;
+  assert.deepEqual(s.light, { setup: 'golden', rotation: 45, exposure: 3, shadow: 'both', strength: 0.6 });
+  assert.deepEqual(s.animation.camera.map((k) => k.t), [1, 5]);
+  assert.deepEqual(s.animation.camera[0], { t: 1, position: [0, 1, 9], target: [0, 1, 0], fov: 40 });
+  const it = s.items[0];
+  assert.deepEqual([it.hingeAngle, it.videoStart, it.sound, it.volume], [-25, 12.5, true, 1]);
+  assert.deepEqual(it.keys.hinge, [{ t: 0, v: -60 }, { t: 3, v: 20 }]);
+
+  // Imported models remember their hinge.
+  const fd = new FormData();
+  fd.append('model', new Blob([Buffer.from('glTF')]), 'MacBook Pro.glb');
+  const model = (await srv.api('/api/mockup-models', { method: 'POST', body: fd })).data.model;
+  let mr = await srv.api(`/api/mockup-models/${model.id}`, { method: 'PATCH', json: { hinge: { node: 'Rotate_Screen001', axis: 'q', invert: true } } });
+  assert.deepEqual(mr.data.model.hinge, { node: 'Rotate_Screen001', axis: 'x', invert: true });
+  mr = await srv.api(`/api/mockup-models/${model.id}`, { method: 'PATCH', json: { hinge: false } });
+  assert.equal(mr.data.model.hinge, false);
+});
+
+test('2D mockups: texts / numbers / switches sanitised, pictures in named slots, server-owned', async () => {
+  let r = await srv.api('/api/mockups', {
+    method: 'POST',
+    json: { kind: '2d', name: 'Launch post', frame: 'auto', d2: { type: 'ig-post', theme: 'dark', text: { username: 'orbit', caption: 'Hello', 'bad key!': 'x' }, nums: { likes: '1200', nope: 'x' }, flags: { verified: true, liked: 'yes' }, slots: { media: { file: 'evil.png' } } } },
+  });
+  const m = r.data.mockup;
+  assert.deepEqual([m.kind, m.frame, m.d2.type, m.d2.theme], ['2d', 'auto', 'ig-post', 'dark']);
+  assert.deepEqual(m.d2.text, { username: 'orbit', caption: 'Hello' });
+  assert.deepEqual([m.d2.nums, m.d2.flags, m.d2.slots], [{ likes: 1200 }, { verified: true }, {}]);
+
+  let fd = new FormData();
+  fd.append('file', new Blob([png(8, 8, [5, 5, 5])], { type: 'image/png' }), 'shot.png');
+  r = await srv.api(`/api/mockups/${m.id}/content?slot=media-0`, { method: 'POST', body: fd });
+  const slot = r.data.mockup.d2.slots['media-0'];
+  assert.deepEqual([slot.kind, slot.name, slot.adjust], ['image', 'shot.png', { scale: 1, x: 0, y: 0 }]);
+  assert.equal(await served(m, slot.file), 200);
+  fd = new FormData();
+  fd.append('file', new Blob([png(8, 8, [5, 5, 5])], { type: 'image/png' }), 'x.png');
+  assert.equal((await srv.api(`/api/mockups/${m.id}/content?slot=../evil`, { method: 'POST', body: fd })).status, 404);
+
+  // Texts change; slots keep their file, only their size / position can be set.
+  r = await srv.api(`/api/mockups/${m.id}`, { method: 'PATCH', json: { d2: { text: { username: 'orbit.app' }, padding: 2, slots: { 'media-0': { file: 'other.png', adjust: { scale: 2, x: 0.1, y: 0 } } } } } });
+  const p = r.data.mockup.d2;
+  assert.deepEqual([p.text.username, p.padding, p.slots['media-0'].file, p.slots['media-0'].adjust.scale], ['orbit.app', 0.45, slot.file, 2]);
+  r = await srv.api(`/api/mockups/${m.id}/content?slot=media-0`, { method: 'DELETE' });
+  assert.deepEqual(r.data.mockup.d2.slots, {});
+  assert.equal(await served(m, slot.file), 404);
 });

@@ -222,6 +222,15 @@ export const api = {
   },
   async importMockupContent(id, source, item) { const { mockup } = await request(`/api/mockups/${id}/content/import${item ? `?item=${encodeURIComponent(item)}` : ''}`, { method: 'POST', json: { source } }); return mockup; },
   async clearMockupContent(id, item) { const { mockup } = await request(`/api/mockups/${id}/content${item ? `?item=${encodeURIComponent(item)}` : ''}`, { method: 'DELETE' }); return mockup; },
+  // A picture in a 2D mockup's slot (avatar, banner, media-0 …).
+  async setMockupSlot(id, slot, file) {
+    const fd = new FormData();
+    fd.append('file', file, file.name || 'picture.png');
+    const { mockup } = await request(`/api/mockups/${id}/content?slot=${encodeURIComponent(slot)}`, { method: 'POST', body: fd });
+    return mockup;
+  },
+  async importMockupSlot(id, slot, source) { const { mockup } = await request(`/api/mockups/${id}/content/import?slot=${encodeURIComponent(slot)}`, { method: 'POST', json: { source } }); return mockup; },
+  async clearMockupSlot(id, slot) { const { mockup } = await request(`/api/mockups/${id}/content?slot=${encodeURIComponent(slot)}`, { method: 'DELETE' }); return mockup; },
   async setMockupThumb(id, blob) {
     const fd = new FormData(); fd.append('thumb', blob, 'thumb.webp');
     const { mockup } = await request(`/api/mockups/${id}/thumb`, { method: 'POST', body: fd }); return mockup;

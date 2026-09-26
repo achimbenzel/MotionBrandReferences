@@ -28,10 +28,43 @@ export async function videoFormats(width, height) {
 }
 
 /**
- * Render `stage`'s animation into a video Blob. `onProgress(0…1)`; abort with
- * `signal`. `background` overrides the scene's (videos have no transparency).
+ * The sound of the screen videos for the length of the animation: each from
+ * its start point (looping if it's shorter), at its volume, mixed. → an
+ * AudioBuffer, or null when none of them has sound.
  */
-export async function recordVideo(stage, { width, height, fps = 30, duration, format = 'mp4', background, onProgress, signal }) {
+export async function mixAudio(sources, duration, sampleRate = 48000) {
+  if (!sources?.length || typeof OfflineAudioContext === 'undefined') return null;
+  const length = Math.max(1, Math.ceil(duration * sampleRate));
+  const ctx = new OfflineAudioContext(2, length, sampleRate);
+  const out = ctx.createBuffer(2, length, sampleRate);
+  let any = false;
+  for (const s of sources) {
+    let buf;
+    try { buf = await ctx.decodeAudioData(await (await fetch(s.url)).arrayBuffer()); } catch { continue; } // no sound track
+    if (!buf?.length) continue;
+    any = true;
+    const from = Math.floor((s.start || 0) * buf.sampleRate) % buf.length;
+    const vol = s.volume ?? 1;
+    for (let ch = 0; ch < 2; ch += 1) {
+      const src = buf.getChannelData(Math.min(ch, buf.numberOfChannels - 1));
+      const dst = out.getChannelData(ch);
+      for (let i = 0; i < length; i += 1) dst[i] += src[(from + i) % src.length] * vol;
+    }
+  }
+  if (!any) return null;
+  for (let ch = 0; ch < 2; ch += 1) {
+    const d = out.getChannelData(ch);
+    for (let i = 0; i < d.length; i += 1) d[i] = Math.max(-1, Math.min(1, d[i]));
+  }
+  return out;
+}
+
+/**
+ * Render `stage`'s animation into a video Blob. `onProgress(0…1)`; abort with
+ * `signal`. `background` overrides the scene's (videos have no transparency);
+ * `audio` = [{ url, start, volume }] screen videos whose sound goes along.
+ */
+export async function recordVideo(stage, { width, height, fps = 30, duration, format = 'mp4', background, audio, onProgress, signal }) {
   const w = even(width); const h = even(height);
   if (!hasWebCodecs()) return recordRealtime(stage, { width: w, height: h, fps, duration, background, onProgress, signal });
   const mb = await import('mediabunny');
@@ -41,7 +74,16 @@ export async function recordVideo(stage, { width, height, fps = 30, duration, fo
     format: format === 'mp4' ? new mb.Mp4OutputFormat({ fastStart: 'in-memory' }) : new mb.WebMOutputFormat(),
     target: new mb.BufferTarget(),
   });
+  const sound = await mixAudio(audio, duration).catch(() => null);
+  let audioCodec = null;
+  if (sound) {
+    const tryCodecs = format === 'mp4' ? ['aac', 'opus'] : ['opus', 'vorbis'];
+    for (const c of tryCodecs) {
+      if (await mb.canEncodeAudio(c, { numberOfChannels: 2, sampleRate: sound.sampleRate }).catch(() => false)) { audioCodec = c; break; }
+    }
+  }
   let source = null;
+  let audioSource = null;
   try {
     await stage.renderFrames({
       width: w, height: h, fps, duration, background, signal,
@@ -49,7 +91,12 @@ export async function recordVideo(stage, { width, height, fps = 30, duration, fo
         if (!source) {
           source = new mb.CanvasSource(canvas, { codec, bitrate: mb.QUALITY_VERY_HIGH, keyFrameInterval: 2 });
           output.addVideoTrack(source, { frameRate: fps });
+          if (audioCodec) {
+            audioSource = new mb.AudioBufferSource({ codec: audioCodec, bitrate: mb.QUALITY_HIGH });
+            output.addAudioTrack(audioSource);
+          }
           await output.start();
+          if (audioSource) await audioSource.add(sound);
         }
         await source.add(t, 1 / fps);
         onProgress?.((i + 1) / count);

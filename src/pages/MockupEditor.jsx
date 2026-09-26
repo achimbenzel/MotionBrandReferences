@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, UploadCloud, Library, X, Download, FolderInput, MoreHorizontal, Copy, Trash2, Play, Pause, Box, RotateCw,
-  FlipHorizontal, Camera, Plus, Move, Crop, LayoutGrid, Square,
+  ArrowLeft, UploadCloud, Library, X, Download, FolderInput, MoreHorizontal, Copy, Trash2, Play, Box, RotateCw,
+  FlipHorizontal, Camera, Plus, Move, Crop, LayoutGrid, Volume2, VolumeX, Sun, DoorOpen,
 } from 'lucide-react';
 import { api, mockupFileUrl, mockupModelUrl } from '../lib/api.js';
 import { useSaver } from '../lib/autosave.js';
@@ -12,54 +12,71 @@ import SaveToPlanModal from '../components/SaveToPlanModal.jsx';
 import ExportDialog from '../components/ExportDialog.jsx';
 import MediaPicker from '../components/mockups/MediaPicker.jsx';
 import ScreenFitter from '../components/mockups/ScreenFitter.jsx';
-import { MockupStage, FRAMES, VIEW_LABELS, ANIMATIONS, LOOPING, loadModel, guessScreen, buildModel } from '../lib/mockup3d/stage.js';
+import Timeline from '../components/mockups/Timeline.jsx';
+import {
+  MockupStage, FRAMES, VIEW_LABELS, MOTIONS_LABELS, CAMERA_MOVES, LOOPING, loadModel, guessScreen, buildModel, modelJoints, guessHinge, valueAt,
+} from '../lib/mockup3d/stage.js';
+import { LIGHT_SETUPS } from '../lib/mockup3d/lighting.js';
 import { buildDevice } from '../lib/mockup3d/devices.js';
 import { recordVideo, videoFormats } from '../lib/mockup3d/video.js';
 import { DEVICES, DEVICE_ICON, exportSize } from '../lib/mockup3d/catalog.js';
 
-// Roughly how wide a device stands (cm) — to place a new one next to the others.
-const WIDTH = { iphone: 7.2, android: 7.3, ipad: 17.9, macbook: 31.3, imac: 54.7, watch: 4, tv: 144.6, browser: 32 };
 const MOCKUP_BOARD = /mockup/i;
 const IMAGE_SIZES = [
   { label: '1080', long: 1080 }, { label: 'Full HD', long: 1920 }, { label: '2.5K', long: 2560 }, { label: '4K', long: 3840 }, { label: '8K', long: 7680 },
 ];
 const VIDEO_SIZES = [{ label: '720p', long: 1280 }, { label: '1080p', long: 1920 }, { label: '1440p', long: 2560 }, { label: '4K', long: 3840 }];
 const BACKGROUNDS = { white: { mode: 'color', color: '#FFFFFF' }, black: { mode: 'color', color: '#000000' }, transparent: { mode: 'transparent' } };
+const LEGACY_MOVES = { orbit: 'orbit', push: 'push', reveal: 'reveal' };
+const SHADOW_MODES = [['contact', 'Soft'], ['sun', 'Sun'], ['both', 'Both'], ['none', 'None']];
+// A hint of each light setup for its button.
+const LIGHT_SWATCH = {
+  studio: 'radial-gradient(circle at 30% 25%, #f2f2f2 0 18%, #3a3a40 45%, #151518)',
+  product: 'linear-gradient(90deg, #fff 0 5%, #050507 12% 88%, #fff 95%)',
+  daylight: 'linear-gradient(90deg, #cfe2ff 0 22%, #b8a58c 30% 100%)',
+  golden: 'linear-gradient(180deg, #3c5a9a 0%, #ff9b50 55%, #3b2616 60%)',
+  overcast: 'linear-gradient(180deg, #f4f6fa 0%, #d9dde3 55%, #555 60%)',
+  office: 'repeating-linear-gradient(90deg, #eee 0 10%, #3d3f44 10% 25%)',
+  neon: 'linear-gradient(90deg, #ff2aa0 0 8%, #0c0b1c 20% 80%, #1ecbff 92%)',
+};
 
 const safeName = (s) => String(s || 'mockup').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'mockup';
 const newId = () => `d${Math.random().toString(36).slice(2, 8)}`;
 const itemLabel = (it, models) => (it.device === 'custom' ? models.find((x) => x.id === it.modelId)?.name || '3D model' : DEVICES[it.device]?.label || 'Device');
+const r2 = (v) => Math.round(v * 100) / 100;
+// Put a keyframe at t (replacing one that is already there).
+const putKey = (keys, key) => [...keys.filter((k) => Math.abs(k.t - key.t) > 0.05), key].sort((a, b) => a.t - b.t);
 
 /**
- * The mockup editor: one or more 3D devices (or imported models), each with a
- * picture or video on its screen that you can size and place on a grid; turn
- * the view with the mouse / a finger, pick a view, finish, background, format
- * and an animation, then export an image or a video, or save into a plan.
- * Settings save as you go.
+ * The 3D mockup editor: your own 3D models — one or more — each with a
+ * picture or video on its screen (sized and placed on a grid), a hinge to
+ * open / close, light setups, and a timeline with keyframes for the camera
+ * and the hinges and the part of each screen video that plays (with sound).
+ * Export an image or a video, or save into a plan. Settings save as you go.
  */
-export default function MockupEditor() {
-  const { id } = useParams();
+export default function MockupEditor({ initial, initialModels }) {
+  const id = initial.id;
   const navigate = useNavigate();
   const toast = useToast();
   const saver = useSaver(600);
-  const [m, setM] = useState(null);
-  const [models, setModels] = useState([]);
-  const [error, setError] = useState(null);
-  const [selId, setSelId] = useState(null);
+  const [m, setM] = useState(initial);
+  const [models, setModels] = useState(initialModels || []);
+  const [selId, setSelId] = useState(initial.items[0]?.id || null);
   const [parts, setParts] = useState([]);          // parts of the selected imported model
-  const [meshes, setMeshes] = useState({});        // model id → mesh names
+  const [info, setInfo] = useState({});            // model id → { meshes, joints }
+  const [videoLen, setVideoLen] = useState({});    // device id → length of its screen video (s)
   const [loading, setLoading] = useState('');
   const [picking, setPicking] = useState(false);
   const [fitting, setFitting] = useState(false);
   const [exporting, setExporting] = useState(null); // null | { initial, formats }
-  const [planFile, setPlanFile] = useState(null);   // a rendered file on its way into a plan
+  const [planFile, setPlanFile] = useState(null);
   const [quickPlan, setQuickPlan] = useState(false);
-  const [paused, setPaused] = useState(false);
-  const [preview, setPreview] = useState(false);    // animation preview running
+  const [time, setTime] = useState(0);
+  const [playing, setPlaying] = useState(false);
   const [brand, setBrand] = useState([]);
   const holder = useRef(null);
   const stageRef = useRef(null);
-  const mRef = useRef(null);
+  const mRef = useRef(initial);
   const pending = useRef({});
   const modelCache = useRef(new Map());
   const framed = useRef(false);
@@ -67,25 +84,17 @@ export default function MockupEditor() {
   const reframe = useRef(false);
   const fileRef = useRef(null);
   const modelRef = useRef(null);
+  const timeRef = useRef(0);
   mRef.current = m;
 
   useEffect(() => {
-    let on = true;
-    Promise.all([api.getMockup(id), api.listMockups()]).then(([mock, list]) => {
-      if (!on) return;
-      setM(mock); setModels(list.models || []); setSelId(mock.items[0]?.id || null);
-    }).catch((e) => { if (on) setError(e.message); });
     api.list('color').then((ps) => {
       const seen = new Set();
       setBrand(ps.flatMap((p) => p.colors || []).map((c) => c.hex).filter((h) => h && !seen.has(h) && seen.add(h)).slice(0, 14));
     }).catch(() => {});
-    return () => { on = false; };
-  }, [id]);
+  }, []);
 
   // ---- Saving (merged patches) and the thumbnail for the list ------------------------
-  // The thumbnail is rendered a moment after the last change (or when there
-  // is none yet), or right away when leaving the editor with one still due —
-  // never while a picture is still loading.
   const thumbTimer = useRef(0);
   const changed = useRef(false);
   const makeThumb = useCallback(async (st = stageRef.current) => {
@@ -117,7 +126,7 @@ export default function MockupEditor() {
   }, [id, saver, toast, refreshThumb]);
   const patchItems = useCallback((fn, immediate) => patch({ items: fn(mRef.current.items) }, immediate), [patch]);
   const patchItem = useCallback((itemId, p, immediate) => patchItems((list) => list.map((it) => (it.id === itemId ? { ...it, ...p } : it)), immediate), [patchItems]);
-  // After an upload: take the server's screen content, keep everything else as it is here.
+  const patchAnim = useCallback((p) => patch({ animation: { ...mRef.current.animation, ...p } }), [patch]);
   const takeContent = (server) => {
     changed.current = true;
     const next = { ...mRef.current, items: mRef.current.items.map((it) => ({ ...it, content: server.items.find((x) => x.id === it.id)?.content ?? null })), thumb: server.thumb };
@@ -126,33 +135,39 @@ export default function MockupEditor() {
   };
 
   // ---- The stage ------------------------------------------------------------------------
-  const ready = !!m;
   useEffect(() => {
-    if (!ready || !holder.current) return undefined;
+    if (!holder.current) return undefined;
     const st = new MockupStage(holder.current, {
       onCamera: (camera) => patch({ camera: { ...camera, preset: '' } }),
       onSelect: (itemId) => setSelId(itemId),
       onMove: (itemId, pos) => patchItem(itemId, pos),
     });
+    let raf = 0;
+    st.onTime = (t) => {
+      timeRef.current = t;
+      if (!raf) raf = requestAnimationFrame(() => { raf = 0; setTime(timeRef.current); });
+    };
     st.setFrame(mRef.current.frame);
+    st.setLight(mRef.current.light);
     st.setAnimation(mRef.current.animation);
+    st.time = 0;
     stageRef.current = st;
-    return () => { flushThumb(st); st.dispose(); stageRef.current = null; framed.current = false; lastShape.current = ''; };
-  }, [ready, patch, patchItem, flushThumb]);
+    return () => { cancelAnimationFrame(raf); flushThumb(st); st.dispose(); stageRef.current = null; framed.current = false; lastShape.current = ''; };
+  }, [patch, patchItem, flushThumb]);
 
   const lookFrom = useCallback((name) => {
     const st = stageRef.current;
     if (!st) return;
-    st.stop(); setPreview(false);
     st.view(name);
     patch({ camera: { ...st.getCamera(), preset: name } });
   }, [patch]);
 
-  const items = useMemo(() => m?.items || [], [m?.items]);
+  const items = useMemo(() => m.items || [], [m.items]);
   const sel = items.find((it) => it.id === selId) || items[0] || null;
+  const anim = m.animation;
   // What is built, and where it stands (not the pictures on the screens).
-  const structKey = JSON.stringify([items.map((it) => [it.id, it.device, it.modelId, it.color, it.landscape, it.lying, it.lid, it.url, it.size, it.x, it.z, it.rotY, it.logo, it.hidden]),
-    models.map((x) => [x.id, x.screenMesh, x.screenTurn, x.screenFlip])]);
+  const structKey = JSON.stringify([items.map((it) => [it.id, it.device, it.modelId, it.landscape, it.lying, it.size, it.x, it.z, it.rotY, it.logo, it.hidden]),
+    models.map((x) => [x.id, x.screenMesh, x.screenTurn, x.screenFlip, x.hinge])]);
   const shapeKey = items.map((it) => `${it.id}:${it.device}:${it.modelId}:${it.landscape}:${it.lying}:${it.size}`).join('|');
   useEffect(() => {
     const st = stageRef.current;
@@ -165,7 +180,7 @@ export default function MockupEditor() {
         for (const it of cur.items) {
           const pos = { x: it.x, z: it.z, rotY: it.rotY };
           if (it.device !== 'custom') {
-            st.setItem(it.id, { key: JSON.stringify([it.device, it.color, it.landscape, it.lying, it.lid, it.url]), build: () => buildDevice(it.device, it), ...pos, screenOpts: {} });
+            st.setItem(it.id, { key: JSON.stringify(['old', it.device, it.landscape, it.lying]), build: () => buildDevice(it.device, it), ...pos, screenOpts: {} });
             continue;
           }
           const model = models.find((x) => x.id === it.modelId);
@@ -178,18 +193,26 @@ export default function MockupEditor() {
             setLoading('Loading the 3D model…');
             loaded = await loadModel(mockupModelUrl(model), model.format);
             modelCache.current.set(model.id, loaded);
-            if (alive) setMeshes((ms) => ({ ...ms, [model.id]: loaded.meshes }));
           }
           if (!alive) return;
           const screenMesh = model.screenMesh || guessScreen(loaded.meshes);
-          if (!model.screenMesh && screenMesh) {
-            api.updateMockupModel(model.id, { screenMesh }).then((x) => setModels((ms) => ms.map((y) => (y.id === x.id ? x : y)))).catch(() => {});
+          const { joints, guess } = modelJoints(loaded.object, screenMesh);
+          setInfo((x) => (x[model.id] ? x : { ...x, [model.id]: { meshes: loaded.meshes, joints } }));
+          // First time: remember the guessed screen part and hinge with the model.
+          const auto = {};
+          if (!model.screenMesh && screenMesh) auto.screenMesh = screenMesh;
+          if (model.hinge === null) auto.hinge = guess ? guessHinge(loaded.object, guess, screenMesh) : false;
+          if (Object.keys(auto).length) {
+            Object.assign(model, auto); // don't guess twice while the save is on its way
+            api.updateMockupModel(model.id, auto).then((x) => setModels((ms) => ms.map((y) => (y.id === x.id ? x : y)))).catch(() => {});
           }
           st.setItem(it.id, {
             key: JSON.stringify(['custom', model.id, screenMesh, it.size]), build: () => buildModel(loaded.object, { screenMesh, size: it.size }), ...pos,
             screenOpts: { turn: (model.screenTurn || 0) / 90, mirror: model.screenFlip, flipV: model.format !== 'usdz' },
           });
           st.setItemParts(it.id, { hidden: it.hidden, logo: it.logo });
+          st.setItemHinge(it.id, model.hinge || null);
+          st.setItemTimeline(it.id, { hingeAngle: it.hingeAngle, hingeKeys: it.keys?.hinge || [], videoStart: it.videoStart, sound: it.sound, volume: it.volume });
         }
         if (!alive) return;
         st.select(selId);
@@ -197,6 +220,10 @@ export default function MockupEditor() {
           framed.current = true;
           if (cur.camera?.position) st.setCamera(cur.camera);
           else lookFrom(cur.camera?.preset || 'three-right');
+          // Camera moves made before the timeline: turn them into camera keyframes.
+          const a = cur.animation;
+          if (LEGACY_MOVES[a.preset] && !a.camera.length) patchAnim({ preset: 'none', camera: st.cameraMove(LEGACY_MOVES[a.preset], a.duration) });
+          st.seek(0);
         } else if (reframe.current || shapeKey !== lastShape.current) {
           lookFrom(cur.camera?.preset || 'three-right');
         }
@@ -209,46 +236,131 @@ export default function MockupEditor() {
       } finally { if (alive) setLoading(''); }
     })();
     return () => { alive = false; };
-  }, [structKey, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [structKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Pictures on the screens, and how they fit.
+  // Pictures on the screens, how they fit, the per-device timeline.
   const contentKey = JSON.stringify(items.map((it) => [it.id, it.content?.file || '']));
   useEffect(() => {
     const st = stageRef.current; const cur = mRef.current;
     if (!st || !cur) return;
     if (cur.items.some((it) => it.content)) setLoading('Loading…');
     Promise.all(cur.items.map((it) => st.setItemContent(it.id, it.content ? { url: mockupFileUrl(cur, it.content.file), kind: it.content.kind } : null)))
-      .then(() => { setPaused(false); refreshThumb(); })
+      .then(() => {
+        const lens = {};
+        for (const it of cur.items) { const v = st.items.get(it.id)?.content?.video; if (v?.duration) lens[it.id] = v.duration; }
+        setVideoLen(lens);
+        st.seek(timeRef.current);
+        refreshThumb();
+      })
       .catch((e) => toast(e.message, 'error'))
       .finally(() => setLoading(''));
-  }, [contentKey, structKey, ready, toast, refreshThumb]);
+  }, [contentKey, structKey, toast, refreshThumb]);
   const fitKey = JSON.stringify(items.map((it) => [it.id, it.fit, it.adjust]));
   useEffect(() => {
     const st = stageRef.current;
     if (!st) return;
     for (const it of mRef.current.items) st.setItemFit(it.id, it.fit, it.adjust);
-  }, [fitKey, structKey, ready]);
+  }, [fitKey, structKey]);
+  const tlKey = JSON.stringify(items.map((it) => [it.id, it.hingeAngle, it.keys, it.videoStart, it.sound, it.volume]));
+  useEffect(() => {
+    const st = stageRef.current;
+    if (!st) return;
+    for (const it of mRef.current.items) st.setItemTimeline(it.id, { hingeAngle: it.hingeAngle, hingeKeys: it.keys?.hinge || [], videoStart: it.videoStart, sound: it.sound, volume: it.volume });
+  }, [tlKey, structKey]);
+  const animKey = JSON.stringify(anim);
+  useEffect(() => { stageRef.current?.setAnimation(mRef.current.animation); }, [animKey]);
   useEffect(() => {
     const st = stageRef.current;
     st?.select(selId);
     setParts(st && sel?.device === 'custom' ? st.parts(sel.id) : []);
-  }, [selId, ready]); // eslint-disable-line react-hooks/exhaustive-deps
-  const bgKey = m ? JSON.stringify(m.background) : '';
-  useEffect(() => { if (m) stageRef.current?.setBackground(m.background); }, [bgKey, ready]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (m) stageRef.current?.setShadow(m.shadow); }, [m?.shadow, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const bgKey = JSON.stringify(m.background);
+  useEffect(() => { stageRef.current?.setBackground(mRef.current.background); }, [bgKey]);
+  const lightKey = JSON.stringify(m.light);
+  useEffect(() => { stageRef.current?.setLight(mRef.current.light); }, [lightKey]);
   useEffect(() => {
     const st = stageRef.current; const cur = mRef.current;
-    if (!st || !cur) return;
+    if (!st) return;
     st.setFrame(cur.frame);
     if (framed.current && cur.camera?.preset) lookFrom(cur.camera.preset);
-  }, [m?.frame, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [m.frame]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---- Timeline -------------------------------------------------------------------------
+  const seek = (t) => { stageRef.current?.seek(t); timeRef.current = t; setTime(t); };
+  const play = () => { const st = stageRef.current; if (!st) return; st.play(); setPlaying(true); };
+  const pause = () => { const st = stageRef.current; if (!st) return; st.stop(); setPlaying(false); };
+  useEffect(() => () => stageRef.current?.stop(), []);
+  const hingeOf = (it) => (it.device === 'custom' ? models.find((x) => x.id === it.modelId)?.hinge : null);
+  const hingeValue = (it) => (it.keys?.hinge?.length ? valueAt(it.keys.hinge, time, anim.easing) : it.hingeAngle);
+  const setHinge = (it, v) => {
+    const val = Math.round(v);
+    if (it.keys?.hinge?.length) patchItem(it.id, { keys: { ...it.keys, hinge: putKey(it.keys.hinge, { t: r2(time), v: val }) } });
+    else patchItem(it.id, { hingeAngle: val });
+  };
+  const tracks = [
+    { id: 'camera', kind: 'camera', label: 'Camera', keys: anim.camera.map((k) => ({ t: k.t })) },
+    ...items.filter((it) => hingeOf(it)).map((it) => ({ id: `hinge:${it.id}`, kind: 'hinge', label: `${itemLabel(it, models)} · open`, keys: it.keys.hinge })),
+    ...items.filter((it) => it.content?.kind === 'video').map((it) => ({
+      id: `video:${it.id}`, kind: 'video', label: `${itemLabel(it, models)} · video`, start: it.videoStart, length: videoLen[it.id] || 0, sound: it.sound, volume: it.volume,
+    })),
+  ];
+  const itemOfTrack = (trackId) => items.find((it) => it.id === trackId.split(':')[1]);
+  const onAddKey = (trackId) => {
+    const st = stageRef.current;
+    if (trackId === 'camera') {
+      if (!st) return;
+      patchAnim({ camera: putKey(anim.camera, { t: r2(time), ...st.getCamera() }) });
+      toast(`Camera key at ${time.toFixed(1)} s`);
+    } else {
+      const it = itemOfTrack(trackId);
+      if (it) patchItem(it.id, { keys: { ...it.keys, hinge: putKey(it.keys.hinge, { t: r2(time), v: Math.round(hingeValue(it)) }) } });
+    }
+  };
+  const onMoveKey = (trackId, index, t) => {
+    if (trackId === 'camera') {
+      patchAnim({ camera: anim.camera.map((k, i) => (i === index ? { ...k, t } : k)).sort((a, b) => a.t - b.t) });
+    } else {
+      const it = itemOfTrack(trackId);
+      if (it) patchItem(it.id, { keys: { ...it.keys, hinge: it.keys.hinge.map((k, i) => (i === index ? { ...k, t } : k)).sort((a, b) => a.t - b.t) } });
+    }
+    seek(t);
+  };
+  const onDeleteKey = (trackId, index) => {
+    if (trackId === 'camera') patchAnim({ camera: anim.camera.filter((_, i) => i !== index) });
+    else {
+      const it = itemOfTrack(trackId);
+      if (it) patchItem(it.id, { keys: { ...it.keys, hinge: it.keys.hinge.filter((_, i) => i !== index) } });
+    }
+  };
+  const onMotion = (preset) => {
+    patchAnim({ preset });
+    const st = stageRef.current;
+    if (st && LOOPING.has(preset) && !anim.camera.length) {
+      const cam = st.fitMotion(preset);
+      if (cam) patch({ camera: { ...cam, preset: '' } });
+    }
+  };
+  const onCameraMove = (kind) => {
+    const st = stageRef.current;
+    if (!st) return;
+    const before = anim.camera;
+    patchAnim({ camera: st.cameraMove(kind, anim.duration) });
+    seek(0);
+    toast(`${CAMERA_MOVES[kind]} — ${anim.duration} s`, 'ok', before.length ? { label: 'Undo', onClick: () => patchAnim({ camera: before }) } : undefined);
+  };
+  const onDuration = (d) => {
+    const k = d / anim.duration;
+    // Keys keep their place relative to the length.
+    patchAnim({ duration: d, camera: anim.camera.map((x) => ({ ...x, t: r2(x.t * k) })) });
+    patchItems((list) => list.map((it) => (it.keys?.hinge?.length ? { ...it, keys: { ...it.keys, hinge: it.keys.hinge.map((x) => ({ ...x, t: r2(x.t * k) })) } } : it)));
+    if (time > d) seek(d);
+  };
 
   // ---- Devices -----------------------------------------------------------------------
-  const addDevice = (device, modelId = null) => {
+  const addModel = (modelId) => {
     const b = stageRef.current?.bounds;
-    const w = device === 'custom' ? 20 : WIDTH[device] || 20;
-    const x = b ? b.max.x + Math.max(3, w * 0.25) + w / 2 : 0;
-    const it = { id: newId(), device, modelId, color: '', x: Math.round(x * 10) / 10, z: 0, rotY: 0, fit: 'cover', adjust: { scale: 1, x: 0, y: 0 } };
+    const x = b && items.length ? b.max.x + 18 : 0;
+    const it = { id: newId(), device: 'custom', modelId, x: Math.round(x * 10) / 10, z: 0, rotY: 0, fit: 'cover', adjust: { scale: 1, x: 0, y: 0 }, size: 25 };
     reframe.current = true;
     patchItems((list) => [...list, it], true);
     setSelId(it.id);
@@ -273,11 +385,7 @@ export default function MockupEditor() {
       onClick: () => { reframe.current = true; patchItems((list) => [...list.slice(0, at), gone, ...list.slice(at)], true); setSelId(gone.id); },
     });
   };
-  const setDevice = (device, modelId = null) => {
-    if (!sel || (device === sel.device && modelId === (sel.modelId || null))) return;
-    patchItem(sel.id, { device, modelId, color: '' }, true);
-  };
-  // Put the devices next to / in front of each other.
+  const pickModel = (modelId) => { if (sel) patchItem(sel.id, { device: 'custom', modelId, size: sel.device === 'custom' ? sel.size : 25 }, true); };
   const arrange = (mode) => {
     const st = stageRef.current;
     if (!st) return;
@@ -329,15 +437,16 @@ export default function MockupEditor() {
 
   // ---- Imported models ------------------------------------------------------------------
   const model = sel?.device === 'custom' ? models.find((x) => x.id === sel.modelId) || null : null;
-  const importModel = async (file) => {
+  const modelInfo = model ? info[model.id] : null;
+  const importModel = async (file, useIt = true) => {
     if (!file) return;
     setLoading('Importing the 3D model…');
     try {
       const mdl = await api.addMockupModel(file);
       setModels((ms) => [...ms, mdl]);
-      if (sel) patchItem(sel.id, { device: 'custom', modelId: mdl.id, size: 25 }, true);
+      if (useIt && sel) patchItem(sel.id, { device: 'custom', modelId: mdl.id, size: 25 }, true);
       toast(`“${mdl.name}” imported — pick its screen part if it doesn’t show your picture`);
-    } catch (e) { toast(`Import failed: ${e.message}`, 'error'); setLoading(''); }
+    } catch (e) { toast(`Import failed: ${e.message}`, 'error'); } finally { setLoading(''); }
   };
   const patchModel = async (p) => {
     if (!model) return;
@@ -347,50 +456,30 @@ export default function MockupEditor() {
   };
   const logoParts = parts.filter((p) => p.logo);
 
-  // ---- Animation, playback ------------------------------------------------------------
-  const anim = m?.animation || { preset: 'none', duration: 6, easing: 'ease' };
-  const togglePreview = () => {
-    const st = stageRef.current;
-    if (!st) return;
-    if (st.animating) { st.stop(); setPreview(false); } else { st.setAnimation(mRef.current.animation); st.play(); setPreview(true); }
-  };
-  const setAnim = (p) => {
-    const next = { ...anim, ...p };
-    patch({ animation: next });
-    const st = stageRef.current;
-    if (!st) return;
-    st.setAnimation(next);
-    if (next.preset === 'none') { st.stop(); setPreview(false); } else if (!st.animating) { st.play(); setPreview(true); }
-  };
-  const toggleVideo = () => {
-    stageRef.current?.setPaused(!paused);
-    setPaused(!paused);
-  };
-  const hasVideo = items.some((it) => it.content?.kind === 'video');
-
   // ---- Export -------------------------------------------------------------------------
-  const openExport = async (initial = 'image') => {
+  const openExport = async (initialTarget = 'image') => {
     const [w, h] = exportSize(mRef.current.frame, 1920);
     const formats = await videoFormats(w, h).catch(() => []);
-    setExporting({ initial, formats });
+    pause();
+    setExporting({ initial: initialTarget, formats });
   };
   const exportTargets = (formats) => {
     const aspect = FRAMES[m.frame] || 16 / 9;
     const sizes = (list) => list.map((s) => { const [w, h] = exportSize(m.frame, s.long); return { label: s.label, w, h }; });
+    const withSound = items.filter((it) => it.content?.kind === 'video' && it.sound).length;
+    const keyed = anim.camera.length || items.some((it) => it.keys?.hinge?.length) || anim.preset !== 'none';
     return [
       {
         key: 'image', label: 'Image', kind: 'image', aspect, sizes: sizes(IMAGE_SIZES), defaultSize: 3,
+        note: keyed ? `The frame at the playhead (${time.toFixed(1)} s).` : null,
         backgrounds: [{ key: 'scene', label: 'As in the scene' }, { key: 'transparent', label: 'Transparent' }, { key: 'white', label: 'White', swatch: '#fff' }, { key: 'black', label: 'Black', swatch: '#000' }],
         allowColor: true, formats: ['png', 'jpg', 'webp'], maxSize: stageRef.current?.maxExport() || 8192,
-        options: [{ key: 'shadow', label: 'Floor shadow', type: 'select', default: 'scene', choices: [{ key: 'scene', label: 'As in the scene' }, { key: 'on', label: 'On' }, { key: 'off', label: 'Off' }] }],
       },
       {
         key: 'video', label: 'Video', kind: 'video', aspect, sizes: sizes(VIDEO_SIZES), defaultSize: 1,
         backgrounds: [{ key: 'scene', label: 'As in the scene' }, { key: 'white', label: 'White', swatch: '#fff' }, { key: 'black', label: 'Black', swatch: '#000' }],
         allowColor: true, formats, fps: [24, 30, 60], duration: anim.duration, maxSize: 3840,
-        note: anim.preset === 'none'
-          ? `No animation picked — the camera stays still for ${anim.duration} s while screen videos play. Choose one under Animation.`
-          : `${ANIMATIONS[anim.preset]}, ${anim.duration} s${LOOPING.has(anim.preset) ? ', loops seamlessly' : ''} — from the view you set.`,
+        note: `The timeline, ${anim.duration} s${keyed ? '' : ' (nothing animated yet — the view stays still)'}${withSound ? ` · with sound from ${withSound} screen video${withSound > 1 ? 's' : ''}` : ''}.`,
       },
     ];
   };
@@ -399,13 +488,13 @@ export default function MockupEditor() {
     if (!st) throw new Error('The 3D view isn’t ready');
     const override = o.background === 'scene' ? null : o.background === 'color' ? { mode: 'color', color: o.color } : BACKGROUNDS[o.background];
     if (target.kind === 'video') {
-      setPreview(false);
+      pause();
       const bg = override || (mRef.current.background.mode === 'transparent' ? BACKGROUNDS.black : null);
-      return recordVideo(st, { width: o.width, height: o.height, fps: o.fps, duration: anim.duration, format: o.format, background: bg, onProgress, signal });
+      const audio = mRef.current.items.filter((it) => it.content?.kind === 'video' && it.sound)
+        .map((it) => ({ url: mockupFileUrl(mRef.current, it.content.file), start: it.videoStart, volume: it.volume }));
+      return recordVideo(st, { width: o.width, height: o.height, fps: o.fps, duration: anim.duration, format: o.format, background: bg, audio, onProgress, signal });
     }
-    const shadow = mRef.current.shadow;
-    if (o.shadow !== 'scene') st.setShadow(o.shadow === 'on');
-    try { return await st.toBlob(o.width, o.height, o.mime, o.quality, override); } finally { st.setShadow(shadow); }
+    return st.toBlob(o.width, o.height, o.mime, o.quality, override);
   };
   const quickPng = async () => {
     const [w, h] = exportSize(mRef.current.frame, 3840);
@@ -424,17 +513,17 @@ export default function MockupEditor() {
     } catch (e) { toast(e.message, 'error'); }
   };
 
-  if (error) return <div className="detail"><button className="detail-back" onClick={() => navigate('/mockups')}><ArrowLeft size={16} /> Mockups</button><div className="center-msg">Couldn’t load: {error}</div></div>;
-  if (!m) return <div className="spinner" />;
-
-  const spec = sel ? DEVICES[sel.device] : null;
   const bg = m.background;
+  const light = m.light;
   const setBg = (p) => patch({ background: { ...bg, ...p } });
+  const setLight = (p) => patch({ light: { ...light, ...p } });
   const addItems = [
-    ...Object.entries(DEVICES).map(([key, d]) => { const I = DEVICE_ICON[key]; return { label: d.label, icon: <I size={15} />, onClick: () => addDevice(key) }; }),
+    ...models.map((x) => ({ label: x.name, icon: <Box size={15} />, onClick: () => addModel(x.id) })),
     ...(models.length ? [{ separator: true }] : []),
-    ...models.map((x) => ({ label: x.name, icon: <Box size={15} />, onClick: () => addDevice('custom', x.id) })),
+    { label: 'Import a 3D model…', icon: <UploadCloud size={15} />, onClick: () => { modelRef.current.dataset.add = '1'; modelRef.current.click(); } },
   ];
+  const hinge = sel ? hingeOf(sel) : null;
+  const vlen = sel ? videoLen[sel.id] : 0;
 
   return (
     <div className="mke">
@@ -455,28 +544,31 @@ export default function MockupEditor() {
       </div>
 
       <div className="mke-body">
-        <div className={`mke-stage ${bg.mode === 'transparent' ? 'transparent' : ''}`} style={{ '--mk-aspect': FRAMES[m.frame] || 16 / 9 }}>
-          <div className="mke-holder" ref={holder} />
-          {loading && <div className="mke-loading">{loading}</div>}
-          {sel && !sel.content && !loading && !preview && (
-            <div className="mke-empty">
-              <button type="button" className="btn btn-sm" onClick={() => fileRef.current?.click()}><UploadCloud size={14} /> Upload a picture or video</button>
-              <button type="button" className="btn btn-sm" onClick={() => setPicking(true)}><Library size={14} /> From the app</button>
-            </div>
-          )}
-          {hasVideo && (
-            <button className="mke-play icon-btn" onClick={toggleVideo} aria-label={paused ? 'Play screen videos' : 'Pause screen videos'}>{paused ? <Play size={16} /> : <Pause size={16} />}</button>
-          )}
-          <div className="mke-views">
-            {anim.preset !== 'none' && (
-              <button type="button" className={`mke-anim-btn ${preview ? 'on' : ''}`} onClick={togglePreview} aria-label={preview ? 'Stop the animation' : 'Play the animation'}>
-                {preview ? <Square size={11} fill="currentColor" /> : <Play size={11} fill="currentColor" />} {preview ? 'Stop' : 'Play'}
-              </button>
+        <div className="mke-main">
+          <div className={`mke-stage ${bg.mode === 'transparent' ? 'transparent' : ''}`} style={{ '--mk-aspect': FRAMES[m.frame] || 16 / 9 }}>
+            <div className="mke-holder" ref={holder} />
+            {loading && <div className="mke-loading">{loading}</div>}
+            {sel && !sel.content && !loading && !playing && (
+              <div className="mke-empty">
+                <button type="button" className="btn btn-sm" onClick={() => fileRef.current?.click()}><UploadCloud size={14} /> Upload a picture or video</button>
+                <button type="button" className="btn btn-sm" onClick={() => setPicking(true)}><Library size={14} /> From the app</button>
+              </div>
             )}
-            {Object.entries(VIEW_LABELS).map(([k, label]) => (
-              <button key={k} type="button" className={m.camera?.preset === k ? 'on' : ''} onClick={() => lookFrom(k)}>{label}</button>
-            ))}
+            <div className="mke-views">
+              {Object.entries(VIEW_LABELS).map(([k, label]) => (
+                <button key={k} type="button" className={m.camera?.preset === k ? 'on' : ''} onClick={() => lookFrom(k)}>{label}</button>
+              ))}
+            </div>
           </div>
+          <Timeline
+            duration={anim.duration} time={time} playing={playing} tracks={tracks}
+            motion={LOOPING.has(anim.preset) ? anim.preset : 'none'} motions={MOTIONS_LABELS} easing={anim.easing} cameraMoves={CAMERA_MOVES}
+            onSeek={seek} onPlay={play} onPause={pause} onDuration={onDuration} onMotion={onMotion} onEasing={(e) => patchAnim({ easing: e })} onCameraMove={onCameraMove}
+            onAddKey={onAddKey} onMoveKey={onMoveKey} onDeleteKey={onDeleteKey}
+            onVideoStart={(trackId, s) => { const it = itemOfTrack(trackId); if (it) { patchItem(it.id, { videoStart: s }); stageRef.current?.setItemTimeline(it.id, { videoStart: s }); stageRef.current?.syncVideos(time, playing); } }}
+            onSound={(trackId, on) => { const it = itemOfTrack(trackId); if (it) { patchItem(it.id, { sound: on }); stageRef.current?.setItemTimeline(it.id, { sound: on }); } }}
+            onVolume={(trackId, v) => { const it = itemOfTrack(trackId); if (it) patchItem(it.id, { volume: v }); }}
+          />
         </div>
 
         <aside className="mke-panel">
@@ -513,43 +605,51 @@ export default function MockupEditor() {
           {sel && (
             <section>
               <h3>{items.length > 1 ? `Device · ${itemLabel(sel, models)}` : 'Device'}</h3>
-              <div className="mke-devices">
-                {Object.entries(DEVICES).map(([key, d]) => {
-                  const Icon = DEVICE_ICON[key];
-                  return <button key={key} type="button" className={sel.device === key ? 'on' : ''} onClick={() => setDevice(key)}><Icon size={18} /><span>{d.label}</span></button>;
-                })}
+              {sel.device !== 'custom' && (
+                <div className="mke-legacy">
+                  The built-in devices were removed — this one stays as a plain screen until you pick one of your 3D models.
+                  {!models.length && <> Import one first.</>}
+                </div>
+              )}
+              <div className="mke-models">
                 {models.map((x) => (
-                  <button key={x.id} type="button" className={sel.device === 'custom' && sel.modelId === x.id ? 'on' : ''} onClick={() => setDevice('custom', x.id)} title={x.name}><Box size={18} /><span>{x.name}</span></button>
+                  <button key={x.id} type="button" className={sel.device === 'custom' && sel.modelId === x.id ? 'on' : ''} onClick={() => pickModel(x.id)} title={x.name}><Box size={16} /><span>{x.name}</span></button>
                 ))}
-                <button type="button" className="mke-import" onClick={() => modelRef.current?.click()}><UploadCloud size={18} /><span>Import 3D…</span></button>
+                <button type="button" className="mke-import" onClick={() => { delete modelRef.current.dataset.add; modelRef.current.click(); }}><UploadCloud size={16} /><span>Import 3D…</span></button>
               </div>
-              {spec?.finishes && (
-                <div className="mke-finishes">
-                  {spec.finishes.map((f) => (
-                    <button key={f.key} type="button" className={(sel.color || spec.finishes[0].key) === f.key ? 'on' : ''} onClick={() => patchItem(sel.id, { color: f.key })} title={f.label}>
-                      <span style={{ background: `linear-gradient(135deg, ${f.frame}, ${f.back})` }} />{f.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {spec?.rotates && (
-                <div className="mke-toggles">
-                  <label><input type="checkbox" checked={sel.landscape} onChange={(e) => patchItem(sel.id, { landscape: e.target.checked })} /> Landscape</label>
-                  <label><input type="checkbox" checked={sel.lying} onChange={(e) => patchItem(sel.id, { lying: e.target.checked })} /> Lying flat</label>
-                </div>
-              )}
-              {spec?.lid && (
-                <label className="mke-range">Lid <input type="range" min="40" max="150" value={sel.lid} onChange={(e) => patchItem(sel.id, { lid: Number(e.target.value) })} /> <span>{sel.lid}°</span></label>
-              )}
-              {spec?.url && (
-                <input className="input mke-url" value={sel.url} onChange={(e) => patchItem(sel.id, { url: e.target.value })} placeholder="yourproduct.com" aria-label="Address in the address bar" />
-              )}
               {sel.device === 'custom' && model && (
                 <div className="mke-model">
+                  {modelInfo?.joints?.length > 0 && (
+                    <div className="mke-hinge">
+                      <label className="mke-field"><span><DoorOpen size={13} /> Opens / closes with</span>
+                        <select className="input" value={model.hinge?.node || ''} onChange={(e) => {
+                          const node = e.target.value;
+                          const obj = modelCache.current.get(model.id)?.object;
+                          patchModel({ hinge: node ? (obj ? guessHinge(obj, node, model.screenMesh) : { node, axis: 'x', invert: false }) : false });
+                        }}>
+                          <option value="">— nothing —</option>
+                          {modelInfo.joints.map((n) => <option key={n} value={n}>{n}</option>)}
+                        </select>
+                      </label>
+                      {hinge && (
+                        <>
+                          <label className="mke-range">Open <input type="range" min="-150" max="150" value={Math.round(hingeValue(sel))} onChange={(e) => setHinge(sel, Number(e.target.value))} /> <span>{Math.round(hingeValue(sel))}°</span></label>
+                          <div className="mke-row mke-axis">
+                            <span className="hint">Axis</span>
+                            <div className="segmented segmented-sm">
+                              {['x', 'y', 'z'].map((a) => <button key={a} type="button" className={hinge.axis === a ? 'on' : ''} onClick={() => patchModel({ hinge: { ...hinge, axis: a } })}>{a.toUpperCase()}</button>)}
+                            </div>
+                            <button type="button" className={`btn btn-sm ${hinge.invert ? 'btn-on' : ''}`} onClick={() => patchModel({ hinge: { ...hinge, invert: !hinge.invert } })}><FlipHorizontal size={13} /> Flip</button>
+                          </div>
+                          {sel.keys.hinge.length > 0 && <div className="hint">Keyframed — the slider sets a key at the playhead.</div>}
+                        </>
+                      )}
+                    </div>
+                  )}
                   <label className="mke-field">Screen part
                     <select className="input" value={model.screenMesh || ''} onChange={(e) => patchModel({ screenMesh: e.target.value })}>
                       <option value="">— none —</option>
-                      {(meshes[model.id] || []).map((n) => <option key={n} value={n}>{n}</option>)}
+                      {(modelInfo?.meshes || []).map((n) => <option key={n} value={n}>{n}</option>)}
                     </select>
                   </label>
                   <div className="mke-row">
@@ -573,7 +673,7 @@ export default function MockupEditor() {
                   )}
                 </div>
               )}
-              {sel.device === 'custom' && !model && <div className="hint">This model is gone (see Trash) — pick another device.</div>}
+              {sel.device === 'custom' && !model && <div className="hint">This model is gone (see Trash) — pick another one.</div>}
               {items.length > 1 && (
                 <label className="mke-range">Turn <input type="range" min="-180" max="180" value={sel.rotY} onChange={(e) => patchItem(sel.id, { rotY: Number(e.target.value) })} /> <span>{sel.rotY}°</span></label>
               )}
@@ -600,68 +700,77 @@ export default function MockupEditor() {
                     <button type="button" className={sel.fit === 'cover' ? 'on' : ''} onClick={() => patchItem(sel.id, { fit: 'cover', adjust: { scale: 1, x: 0, y: 0 } })}>Fill screen</button>
                     <button type="button" className={sel.fit === 'contain' ? 'on' : ''} onClick={() => patchItem(sel.id, { fit: 'contain', adjust: { scale: 1, x: 0, y: 0 } })}>Show whole</button>
                   </div>
-                  {(sel.adjust.scale !== 1 || sel.adjust.x !== 0 || sel.adjust.y !== 0) && (
-                    <div className="hint">Your size / position: {Math.round(sel.adjust.scale * 100)}% · x {Math.round(sel.adjust.x * 100)}% · y {Math.round(sel.adjust.y * 100)}%</div>
-                  )}
                 </>
+              )}
+              {sel.content?.kind === 'video' && (
+                <div className="mke-video">
+                  <label className="mke-range">Starts at
+                    <input type="range" min="0" max={Math.max(0.1, vlen || 0)} step="0.1" value={Math.min(sel.videoStart, vlen || sel.videoStart)} onChange={(e) => { const s = Number(e.target.value); patchItem(sel.id, { videoStart: s }); stageRef.current?.setItemTimeline(sel.id, { videoStart: s }); stageRef.current?.syncVideos(time, playing); }} />
+                    <span>{sel.videoStart.toFixed(1)} s</span>
+                  </label>
+                  <div className="mke-row">
+                    <button type="button" className={`btn btn-sm ${sel.sound ? 'btn-on' : ''}`} onClick={() => { patchItem(sel.id, { sound: !sel.sound }); stageRef.current?.setItemTimeline(sel.id, { sound: !sel.sound }); }}>
+                      {sel.sound ? <Volume2 size={14} /> : <VolumeX size={14} />} Sound {sel.sound ? 'on' : 'off'}
+                    </button>
+                    {sel.sound && <input className="mke-vol" type="range" min="0" max="1" step="0.05" value={sel.volume} onChange={(e) => patchItem(sel.id, { volume: Number(e.target.value) })} aria-label="Volume" />}
+                  </div>
+                  <div className="hint">The part from {sel.videoStart.toFixed(1)} s plays on the screen during the timeline{sel.sound ? ' — with its sound, also in the exported video' : ''}.</div>
+                </div>
               )}
             </section>
           )}
 
           <section>
-            <h3>Format</h3>
-            <div className="segmented mke-seg" role="group" aria-label="Format">
-              {Object.keys(FRAMES).map((f) => <button key={f} type="button" className={m.frame === f ? 'on' : ''} onClick={() => patch({ frame: f })}>{f}</button>)}
+            <h3><Sun size={12} style={{ verticalAlign: '-1px' }} /> Light</h3>
+            <div className="mke-lights">
+              {Object.entries(LIGHT_SETUPS).map(([k, s]) => (
+                <button key={k} type="button" className={light.setup === k ? 'on' : ''} onClick={() => setLight({ setup: k })} title={s.note}>
+                  <i style={{ background: LIGHT_SWATCH[k] }} /><span>{s.label}</span>
+                </button>
+              ))}
             </div>
-            <div className="hint mke-tip"><Camera size={12} /> Drag to turn, scroll / pinch to zoom, right-drag to move.</div>
+            <label className="mke-range">Turn light <input type="range" min="-180" max="180" value={light.rotation} onChange={(e) => setLight({ rotation: Number(e.target.value) })} /> <span>{light.rotation}°</span></label>
+            <label className="mke-range">Brightness <input type="range" min="0.3" max="2.5" step="0.05" value={light.exposure} onChange={(e) => setLight({ exposure: Number(e.target.value) })} /> <span>{Math.round(light.exposure * 100)}%</span></label>
+            <div className="mke-subhead">Shadow</div>
+            <div className="segmented mke-seg" role="group" aria-label="Shadow">
+              {SHADOW_MODES.map(([k, label]) => <button key={k} type="button" className={light.shadow === k ? 'on' : ''} onClick={() => setLight({ shadow: k })}>{label}</button>)}
+            </div>
+            {light.shadow !== 'none' && (
+              <label className="mke-range">Strength <input type="range" min="0" max="1" step="0.05" value={light.strength} onChange={(e) => setLight({ strength: Number(e.target.value) })} /> <span>{Math.round(light.strength * 100)}%</span></label>
+            )}
           </section>
 
           <section>
-            <h3>Background</h3>
+            <h3>Background &amp; format</h3>
             <div className="segmented mke-seg" role="group" aria-label="Background">
-              {[['transparent', 'None'], ['color', 'Colour'], ['gradient', 'Gradient']].map(([k, label]) => (
-                <button key={k} type="button" className={bg.mode === k ? 'on' : ''} onClick={() => setBg({ mode: k })}>{label}</button>
+              {[['transparent', 'None'], ['color', 'Colour'], ['gradient', 'Gradient'], ['environment', 'Room']].map(([k, label]) => (
+                <button key={k} type="button" className={bg.mode === k ? 'on' : ''} onClick={() => setBg({ mode: k })} title={k === 'environment' ? 'The light setup’s room / sky, out of focus' : undefined}>{label}</button>
               ))}
             </div>
-            {bg.mode !== 'transparent' && (
+            {(bg.mode === 'color' || bg.mode === 'gradient') && (
               <div className="mke-colors">
                 <label title="Colour"><input type="color" value={bg.color.toLowerCase()} onChange={(e) => setBg({ color: e.target.value.toUpperCase() })} /></label>
                 {bg.mode === 'gradient' && <label title="Top colour"><input type="color" value={bg.color2.toLowerCase()} onChange={(e) => setBg({ color2: e.target.value.toUpperCase() })} /></label>}
                 {brand.map((hex) => <button key={hex} type="button" className="mke-swatch" style={{ background: hex }} title={hex} onClick={() => setBg({ color: hex.toUpperCase() })} />)}
               </div>
             )}
-            <label className="mke-check"><input type="checkbox" checked={m.shadow} onChange={(e) => patch({ shadow: e.target.checked })} /> Shadow on the floor</label>
-          </section>
-
-          <section>
-            <h3>Animation</h3>
-            <div className="mke-anims">
-              {Object.entries(ANIMATIONS).map(([k, label]) => (
-                <button key={k} type="button" className={anim.preset === k ? 'on' : ''} onClick={() => setAnim({ preset: k })}>{label}</button>
-              ))}
+            <div className="segmented mke-seg mke-frames" role="group" aria-label="Format">
+              {Object.keys(FRAMES).map((f) => <button key={f} type="button" className={m.frame === f ? 'on' : ''} onClick={() => patch({ frame: f })}>{f}</button>)}
             </div>
-            {anim.preset !== 'none' && (
-              <>
-                <label className="mke-range">Length <input type="range" min="1" max="30" step="0.5" value={anim.duration} onChange={(e) => setAnim({ duration: Number(e.target.value) })} /> <span>{anim.duration} s</span></label>
-                {!LOOPING.has(anim.preset) && (
-                  <div className="segmented mke-seg" role="group" aria-label="Easing">
-                    <button type="button" className={anim.easing === 'ease' ? 'on' : ''} onClick={() => setAnim({ easing: 'ease' })}>Smooth</button>
-                    <button type="button" className={anim.easing === 'linear' ? 'on' : ''} onClick={() => setAnim({ easing: 'linear' })}>Even</button>
-                  </div>
-                )}
-                <div className="mke-row">
-                  <button type="button" className="btn btn-sm" onClick={togglePreview}>{preview ? <><Square size={13} /> Stop</> : <><Play size={13} /> Preview</>}</button>
-                  <button type="button" className="btn btn-sm" onClick={() => openExport('video')}><Download size={13} /> Video…</button>
-                </div>
-                <div className="hint">It starts from the view you set.{LOOPING.has(anim.preset) ? ' Loops seamlessly.' : ''}</div>
-              </>
-            )}
+            <div className="hint mke-tip"><Camera size={12} /> Drag to turn, scroll / pinch to zoom, right-drag to move.</div>
           </section>
         </aside>
       </div>
 
       <input ref={fileRef} type="file" accept="image/*,video/*" className="visually-hidden-input" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; upload(f); }} />
-      <input ref={modelRef} type="file" accept=".glb,.gltf,.usdz" className="visually-hidden-input" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; importModel(f); }} />
+      <input ref={modelRef} type="file" accept=".glb,.gltf,.usdz" className="visually-hidden-input" onChange={async (e) => {
+        const f = e.target.files?.[0]; const add = !!e.target.dataset.add; e.target.value = '';
+        if (!f) return;
+        if (add) {
+          setLoading('Importing the 3D model…');
+          try { const mdl = await api.addMockupModel(f); setModels((ms) => [...ms, mdl]); addModel(mdl.id); } catch (err) { toast(`Import failed: ${err.message}`, 'error'); } finally { setLoading(''); }
+        } else importModel(f);
+      }} />
       {picking && <MediaPicker onPick={fromApp} onClose={() => setPicking(false)} />}
       {fitting && sel?.content && (
         <ScreenFitter

@@ -135,7 +135,7 @@ data/
     └── blocks/<blockId>/*          # one folder per content block
                                     # (moodboard images, files + example images)
 ├── software/<id>/*                 # plugin installers + your own script files
-├── mockup/<id>/                    # a mockup's screen picture / video + thumb.webp
+├── mockup/<id>/                    # a mockup's screen pictures / videos, 2D pictures + thumb.webp
 └── mockup-model/<id>/model.<ext>   # an imported 3D model (.glb / .gltf / .usdz)
 ```
 
@@ -528,64 +528,104 @@ the Storyboards page always show the same thing.
   included) to rework for another format; **Delete storyboard** (→ Trash).
 
 ### Mockups
-**Mockups** (sidebar, under Storyboards) puts your designs and videos on 3D
-devices — rendered live in the browser (three.js), no plugins, nothing online.
+**Mockups** (sidebar, under Storyboards) puts your designs and videos on
+**your own 3D models** — rendered live in the browser (three.js), no plugins,
+nothing online — or into **2D mockups**: a browser window and look-alikes of
+Instagram and X posts, stories and profiles. **New mockup** offers both:
+*3D · ‹your model›*, *3D · Import a model…* or *2D · ‹type›*.
 
-- **Devices**: **iPhone** (5 finishes), **Android phone** (3), **iPad** (2),
-  **MacBook** (2), **Apple Watch** (3, with band), **iMac** (5 colours), **TV**
-  (2) and a **browser window** (light / dark, with your address in the bar) —
-  modelled after the current ones, without logos, at their real sizes. Phones
-  and tablets turn to **landscape** or **lie flat**; the MacBook's **lid**
-  opens 40–150°.
-- **Several devices in one scene** — **Add** a device (e.g. a phone in front
-  of a MacBook), click one in the view or the list to select it, **drag it**
-  to move it on the floor, **Turn** it, **Duplicate** / **Remove** it (with
-  Undo), or **Arrange** them: side by side, the big one behind with the others
-  in front, or a cascade. Each device has its own finish, settings and screen.
-- **Screen**: **upload** a picture or a video (a screen recording plays on the
-  device), or take one **from the app** — a plan's moodboards, files,
-  storyboard frames and review renders, your Motion references (the video, its
-  saved frames and moments), library images or the Inbox. **Fill screen**
-  crops to fit, **Show whole** keeps it all.
-- **Position & size…** opens the screen as you see it — its real shape with
-  rounded corners, island / notch / camera hole and the **safe area** (status
-  bar, home bar, TV title-safe) — over a **grid** (thirds, fine or off). Drag
-  the picture to move it, scroll / pinch / drag a corner to resize it, nudge
-  it with the arrow keys; it **snaps** to the middle and the edges, and the 3D
-  device follows live. Fill / Fit / Centre / Reset, or type the size and
-  position in %.
+#### 3D mockups
+- **Your models**: import a **.glb**, a single-file **.gltf** or a **.usdz**
+  (on the Mockups page or in the editor) — USDZ is the format Apple uses for
+  its 3D / AR product models. Check the licence of any model you use in client
+  work. Rigged models (parts bound to bones) come in exactly as they sit in
+  Blender — logos and other parts stay where they belong.
+  **Screen part** picks the part that shows your picture (a part named
+  *Screen* / *Display* is picked for you); **Turn picture** and **Mirror** fix
+  its orientation, **Size** sets how big it stands (cm). **Show logo** hides /
+  shows the logo parts (named like *Logo*), **Parts** lists every part to show
+  or hide. Deleting a model moves it to Trash.
+- **Opening / closing** (a laptop lid, a case, a door): if your model has a
+  hinge — an **empty** or bone the lid hangs from, like a circle empty
+  *Rotate Screen* in Blender — it is found for you and shows up as **Opens /
+  closes with**. **Open** turns it (0° = as modelled); **Axis** and **Flip**
+  fix it if it turns the wrong way. Pick *— nothing —* for models without one.
+- **Several models in one scene** — **Add** one (e.g. a phone in front of a
+  laptop), click it in the view or the list to select it, **drag it** to move
+  it on the floor, **Turn** it, **Duplicate** / **Remove** it (with Undo), or
+  **Arrange** them: side by side, the big one behind with the others in
+  front, or a cascade.
+- **Screen**: **upload** a picture or a video, or take one **from the app** —
+  a plan's moodboards, files, storyboard frames and review renders, your
+  Motion references (the video, its saved frames and moments), library images
+  or the Inbox. **Fill screen** crops to fit, **Show whole** keeps it all.
+  For a video, **Starts at** picks the part that plays (also by dragging its
+  clip in the timeline) and **Sound on** plays its sound — in the preview and
+  in the exported video, with its own volume.
+- **Position & size…** opens the screen as you see it — its real shape, over a
+  **grid** (thirds, fine or off). Drag the picture to move it, scroll / pinch /
+  drag a corner to resize it, nudge it with the arrow keys; it **snaps** to the
+  middle and the edges, and the 3D view follows live.
+- **Light**: seven setups, each a studio-made **environment** (a soft-box
+  studio, a dark product stage, a daylight room with windows, a golden-hour
+  terrace, an overcast sky, an office with ceiling panels, a neon-lit night
+  street — all generated in the app, nothing downloaded) that the models
+  reflect, plus matching key / fill / rim lights. **Turn light** rotates it
+  around the scene, **Brightness** sets the exposure. **Shadow**: **Soft**
+  (a contact shadow as under a soft box), **Sun** (a sharp one from the key
+  light), **Both** or **None**, with its **Strength**.
 - **Camera**: drag to turn, scroll / pinch to zoom, right-drag to move — or a
-  view: **Front, ¾ left, ¾ right, Low hero, From above, Side, Back** (devices
-  lying flat get matching views from above).
+  view: **Front, ¾ left, ¾ right, Low hero, From above, Side, Back**.
 - **Look**: format **16:9, 4:5, 1:1, 9:16, 3:2**; background **none**
-  (transparent), a **colour** or a **gradient** — with your **brand colours**
-  from the Colors library one click away; **shadow** on the floor on / off.
-- **Animation**: **Turntable (360°)**, **Sway**, **Float**, **Camera orbit**,
-  **Push in** or **Reveal**, 1–30 s, smooth or even — **Play** previews it
-  from the view you set (turning ones loop seamlessly, and the camera steps
-  back so nothing leaves the picture).
+  (transparent), a **colour**, a **gradient** — with your **brand colours**
+  from the Colors library one click away — or the **Room** of the light setup.
+- **Timeline** (under the view): **Play** / pause (Space), scrub, **Length**
+  1–60 s. **Camera**: set a view, press ◆+ to keep it as a key, move the
+  playhead, change the view, press it again — the camera glides between the
+  keys (**Smooth** or **Even**). **Camera move** adds a ready-made one (Orbit,
+  Push in, Pull out, Reveal, Rise); **Motion** lets the models turn
+  (Turntable 360°), **Sway** or **Float**. Every hinge gets its own track —
+  keys for the lid opening and closing (once it has keys, moving **Open** sets
+  a key at the playhead). Drag keys to move them, Delete removes the selected one.
+  Screen videos show as clips you slide to pick the part that plays.
 - **Export…**: an **image** — 1080 / Full HD / 2.5K / 4K / 8K or your own
   size, background as in the scene, **transparent**, white, black or any
-  colour, floor shadow on / off, **PNG, JPG or WebP** (with quality) and a
-  file name — or a **video** of the animation: 720p–4K, 24 / 30 / 60 fps,
-  **MP4** (H.264) or **WebM**, rendered frame by frame so it's smooth on any
-  computer (screen videos play along; MP4 where the browser can encode it —
-  Chrome, Edge, Safari). **Save to plan** puts the file into a “Mockups”
-  moodboard of any plan (or a new one); the quick **Save to plan** button
-  saves a 4K PNG.
-- Everything **saves as you go**; the list shows a small render of each scene.
-  ⋯ **Duplicate** / **Delete** (→ Trash, with Undo). Scenes made before
-  several devices were possible open as scenes with one device.
+  colour, **PNG, JPG or WebP** (with quality) and a file name — or a **video**
+  of the timeline: 720p–4K, 24 / 30 / 60 fps, **MP4** (H.264 + AAC) or
+  **WebM** (VP9 + Opus), rendered frame by frame so it's smooth on any
+  computer, with the screen videos' sound where it is on (MP4 where the
+  browser can encode it — Chrome, Edge, Safari). **Save to plan** puts the
+  file into a “Mockups” moodboard of any plan (or a new one); the quick
+  **Save to plan** button saves a 4K PNG.
+- **The built-in devices are gone** (iPhone, iPad, MacBook … drawn by the app)
+  in favour of your own models. Scenes made with them still open — each old
+  device as a plain screen of its size with your picture on it — so you can
+  pick one of your models for it; nothing in the scene is lost. Their old
+  animations (orbit, push in, reveal) became camera keys.
 
-**Your own 3D models** — import a **.glb**, a single-file **.gltf** or a
-**.usdz** (on the Mockups page or in the editor) — USDZ is the format Apple
-uses for its 3D / AR product models. Check the licence of any model you use in
-client work. In the editor, **Screen part** picks the part of the model that
-shows your picture (a part named *Screen* / *Display* is picked for you);
-**Turn picture** and **Mirror** fix its orientation, **Size** sets how big it
-stands (cm). **Show logo** hides / shows the model's logo parts (parts named
-like *Logo*), and **Parts** lists every part to show or hide. Deleting a model
-moves it to Trash.
+#### 2D mockups
+- **Browser window** (light / dark: tab with your title and icon, the address
+  bar, the page in 16:10, 16:9, 4:3 or 3:2), **Instagram post** (square,
+  portrait or landscape picture, likes, caption, comments, verified, liked /
+  saved, carousel dots, sponsored), **Instagram story** (story parts, reply
+  bar), **Instagram profile** (stats, bio, link, highlights, a 3 × 3 grid in
+  3:4 or square), **X post** (1–4 pictures laid out like X does, replies /
+  reposts / likes / views) and **X profile** (header, bio, location, website,
+  joined, follower counts) — light, dim and dark where the app has them.
+  These are look-alikes drawn by this app for presentations; nothing is
+  posted anywhere.
+- **Click a picture** in the preview (or in the **Pictures** list) to upload
+  one or take it **from the app**; **Position & size…** places it in its
+  frame over a grid, as for the 3D screens. Texts, numbers and switches are
+  in **Content**; switching the type keeps what you typed.
+- **Look**: format **Fit** (the mockup with space around it) or 16:9, 4:5,
+  1:1, 9:16, 3:2; background none / colour / gradient (brand colours at
+  hand); **Space**, **Size** and a **soft shadow**.
+- **Export…** as PNG / JPG / WebP at 1×–4× (Fit) or 1080–4K, transparent,
+  white, black, any colour or as set — or **Save to plan**.
+
+Everything **saves as you go**; the list shows a small picture of each mockup.
+⋯ **Duplicate** / **Delete** (→ Trash, with Undo).
 
 ### Inbox (share from your phone)
 Everything you come across on the go — a screenshot, a screen recording, an
@@ -846,8 +886,9 @@ lookup off with `LINK_LOOKUP=off`).
 ## Tech
 
 - **Frontend:** React 18 + Vite + React Router; three.js for the 3D mockups
-  (loaded only by the mockup editor) and Mediabunny to write MP4 / WebM (loaded
-  only when a video is exported).
+  (loaded only by the mockup editor), Mediabunny to write MP4 / WebM (loaded
+  only when a video is exported) and modern-screenshot to turn the 2D mockups
+  into images.
 - **Backend:** a small Express server that stores files on disk and metadata in
   `data/db.json` (writes are serialized so nothing clobbers). Layout:
 

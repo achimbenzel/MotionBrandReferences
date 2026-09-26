@@ -25,6 +25,7 @@
     "express": "^4.21.2",
     "lucide-react": "^0.462.0",
     "mediabunny": "^1.60.0",
+    "modern-screenshot": "^4.7.0",
     "multer": "^2.0.2",
     "nanoid": "^5.0.9",
     "pdfjs-dist": "^4.10.38",

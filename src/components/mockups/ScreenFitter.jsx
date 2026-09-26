@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { X, Maximize, Minimize, Crosshair, RotateCcw, Grid3x3 } from 'lucide-react';
-import { contentBox } from '../../lib/mockup3d/screen.js';
+import { contentBox } from '../../lib/mockup3d/fit.js';
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const round = (v, d = 4) => Math.round(v * 10 ** d) / 10 ** d;

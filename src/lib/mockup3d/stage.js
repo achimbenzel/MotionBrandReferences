@@ -4,8 +4,9 @@
 // rendering for PNG / video export.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { clone as cloneWithSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { screenMaterial, fitScreen } from './screen.js';
+import { LIGHT_SETUPS, makeEnvironment, lightDir, ContactShadow } from './lighting.js';
 import { FRAMES } from './catalog.js';
 
 export { FRAMES };
@@ -34,16 +35,8 @@ const LYING_VIEWS = {
 export const VIEW_LABELS = {
   front: 'Front', 'three-left': '¾ left', 'three-right': '¾ right', hero: 'Low hero', top: 'From above', side: 'Side', back: 'Back',
 };
-export const ANIMATIONS = {
-  none: 'None',
-  turntable: 'Turntable (360°)',
-  sway: 'Sway',
-  float: 'Float',
-  orbit: 'Camera orbit',
-  push: 'Push in',
-  reveal: 'Reveal',
-};
-// Seamless loops: the last frame leads straight into the first.
+export const MOTIONS_LABELS = { none: 'None', turntable: 'Turntable 360°', sway: 'Sway', float: 'Float' };
+export const CAMERA_MOVES = { orbit: 'Orbit', push: 'Push in', pull: 'Pull out', reveal: 'Reveal', rise: 'Rise' };
 export const LOOPING = new Set(['turntable', 'sway', 'float']);
 
 const LOGO_PART = /logo|apple_?mark|brand_?mark/i;
@@ -78,6 +71,42 @@ function uvAspect(mesh) {
 }
 
 const ease = (p) => (p < 0.5 ? 4 * p * p * p : 1 - ((-2 * p + 2) ** 3) / 2);
+const MOTIONS = new Set(['turntable', 'sway', 'float']);
+
+/** A keyframed value at time t: [{ t, v }] eased between keys. */
+export function valueAt(keys, t, easing = 'ease') {
+  if (!keys?.length) return null;
+  if (t <= keys[0].t) return keys[0].v;
+  const last = keys[keys.length - 1];
+  if (t >= last.t) return last.v;
+  let i = 0;
+  while (i < keys.length - 2 && keys[i + 1].t <= t) i += 1;
+  const a = keys[i]; const b = keys[i + 1];
+  const p = (t - a.t) / Math.max(1e-6, b.t - a.t);
+  const e = easing === 'linear' ? p : ease(p);
+  return a.v + (b.v - a.v) * e;
+}
+// The camera at time t between its keyframes: the target moves straight, the
+// camera swings around it (so an orbit stays an arc), lens eased.
+function cameraAt(keys, t, easing) {
+  const at = (k) => ({ position: new THREE.Vector3().fromArray(k.position), target: new THREE.Vector3().fromArray(k.target), fov: k.fov || 30 });
+  if (keys.length === 1 || t <= keys[0].t) return at(keys[0]);
+  const last = keys[keys.length - 1];
+  if (t >= last.t) return at(last);
+  let i = 0;
+  while (i < keys.length - 2 && keys[i + 1].t <= t) i += 1;
+  const a = at(keys[i]); const b = at(keys[i + 1]);
+  const p = (t - keys[i].t) / Math.max(1e-6, keys[i + 1].t - keys[i].t);
+  const e = easing === 'linear' ? p : ease(p);
+  const target = a.target.clone().lerp(b.target, e);
+  const sa = new THREE.Spherical().setFromVector3(a.position.clone().sub(a.target));
+  const sb = new THREE.Spherical().setFromVector3(b.position.clone().sub(b.target));
+  let dTheta = sb.theta - sa.theta;
+  if (dTheta > Math.PI) dTheta -= Math.PI * 2;
+  if (dTheta < -Math.PI) dTheta += Math.PI * 2;
+  const s = new THREE.Spherical(sa.radius + (sb.radius - sa.radius) * e, sa.phi + (sb.phi - sa.phi) * e, sa.theta + dTheta * e);
+  return { position: target.clone().add(new THREE.Vector3().setFromSpherical(s)), target, fov: a.fov + (b.fov - a.fov) * e };
+}
 
 function disposeObject(obj, keep) {
   obj?.traverse((o) => {
@@ -91,10 +120,67 @@ function disposeObject(obj, keep) {
   });
 }
 
+/**
+ * The parts of an imported model that can turn with what's under them — an
+ * empty / group / bone such as a lid's hinge ("Rotate Screen") — and a good
+ * guess which one opens the screen.
+ */
+export function modelJoints(object, screenMesh) {
+  const out = [];
+  object.traverse((o) => {
+    if (o === object || o.isMesh || !o.name) return;
+    let meshes = 0;
+    o.traverse((c) => { if (c.isMesh) meshes += 1; });
+    if (meshes) out.push({ name: o.name, meshes, bone: !!o.isBone, hasScreen: !!(screenMesh && o.getObjectByName(screenMesh)) });
+  });
+  const named = out.find((j) => /hinge|rotate|lid|open|screen/i.test(j.name));
+  const screenPart = out.filter((j) => j.hasScreen).sort((a, b) => a.meshes - b.meshes)[0];
+  return { joints: out.map((j) => j.name), guess: named?.name || screenPart?.name || '' };
+}
+
+/**
+ * How a hinge most likely turns: around the longest side of what it carries
+ * (a lid's width), and — when it carries the screen — which way opens it
+ * (the screen turns up), so "more" on the slider always means "more open".
+ */
+export function guessHinge(object, node, screenMesh) {
+  const j = object.getObjectByName(node);
+  if (!j) return { node, axis: 'x', invert: false };
+  object.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(j.matrixWorld).invert();
+  const box = new THREE.Box3();
+  j.traverse((o) => {
+    if (!o.isMesh) return;
+    if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+    box.union(o.geometry.boundingBox.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld)));
+  });
+  const s = box.getSize(new THREE.Vector3());
+  const axis = s.x >= s.y && s.x >= s.z ? 'x' : s.y >= s.z ? 'y' : 'z';
+  let invert = false;
+  const screen = screenMesh ? j.getObjectByName(screenMesh) : null;
+  const nor = screen?.geometry?.attributes?.normal;
+  if (nor) {
+    const local = new THREE.Vector3();
+    for (let i = 0; i < nor.count; i += Math.max(1, Math.floor(nor.count / 200))) local.add(new THREE.Vector3().fromBufferAttribute(nor, i));
+    const normalY = () => { object.updateMatrixWorld(true); return local.clone().transformDirection(screen.matrixWorld).y; };
+    const rest = j.quaternion.clone();
+    const before = normalY();
+    j.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(axis === 'x' ? 1 : 0, axis === 'y' ? 1 : 0, axis === 'z' ? 1 : 0), 0.1));
+    const after = normalY();
+    j.quaternion.copy(rest);
+    object.updateMatrixWorld(true);
+    invert = after < before; // turning "+" would close it
+  }
+  return { node, axis, invert };
+}
+export const guessHingeAxis = (object, node) => guessHinge(object, node).axis;
+
 /** An imported model (a loaded Object3D) as a device: scaled to `size` cm, its screen part showing the picture. */
 export function buildModel(object, { screenMesh, size = 25 } = {}) {
   const group = new THREE.Group();
-  const obj = object.clone(true);
+  // Skinned parts (rigged lids…) need their own copy of the skeleton, or
+  // they stay behind in the file's pose while the rest moves.
+  const obj = cloneWithSkeleton(object);
   const box = new THREE.Box3().setFromObject(obj);
   const dims = box.getSize(new THREE.Vector3());
   obj.scale.multiplyScalar(size / (Math.max(dims.x, dims.y, dims.z) || 1));
@@ -138,19 +224,24 @@ export class MockupStage {
 
     const scene = new THREE.Scene();
     this.pmrem = new THREE.PMREMGenerator(r);
-    this.envTexture = this.pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    scene.environment = this.envTexture;
-    const key = new THREE.DirectionalLight(0xffffff, 2.0);
-    key.castShadow = true;
-    key.shadow.mapSize.set(2048, 2048);
-    key.shadow.bias = -0.0004; key.shadow.normalBias = 0.02; key.shadow.radius = 5;
-    scene.add(key, key.target, new THREE.HemisphereLight(0xffffff, 0x3a3a40, 0.35));
-    this.key = key;
+    this.envCache = new Map(); // setup → { equirect, pmrem }
+    // Direct lights of the light setup (the first with `shadow` casts the hard shadow).
+    this.lights = [0, 1, 2].map(() => {
+      const l = new THREE.DirectionalLight(0xffffff, 0);
+      l.shadow.mapSize.set(2048, 2048);
+      l.shadow.bias = -0.0004; l.shadow.normalBias = 0.02; l.shadow.radius = 4;
+      scene.add(l, l.target);
+      return l;
+    });
+    this.key = this.lights[0];
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.ShadowMaterial({ opacity: 0.3 }));
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     scene.add(floor);
     this.floor = floor;
+    this.contact = new ContactShadow(512);
+    scene.add(this.contact.group);
+    this.light = { setup: 'studio', rotation: 0, exposure: 1, shadow: 'contact', strength: 0.6 };
     // pivot (at the scene's centre, animated) → root (offset back) → one holder per device
     this.pivot = new THREE.Group();
     this.root = new THREE.Group();
@@ -170,6 +261,7 @@ export class MockupStage {
     this.controls.maxDistance = 600;
     this.controls.addEventListener('change', () => { this.dirty = true; });
     this.controls.addEventListener('end', () => { if (!this.playing) this.onCamera?.(this.getCamera()); });
+    this.setLight(this.light);
     this.layout();
 
     // Click a device to select it; with several, drag one to move it on the floor.
@@ -185,13 +277,26 @@ export class MockupStage {
 
   tick() {
     if (this.exporting) return;
-    if (this.playing) this.pose(this.anim.preset === 'none' ? null : ((performance.now() - this.playing.start) / 1000) % this.anim.duration);
-    else this.controls.update();
+    if (this.playing) {
+      const t = (performance.now() - this.playing.start) / 1000;
+      const d = this.anim.duration;
+      if (t >= d) { // loop: back to the start, screen videos too
+        this.playing.start = performance.now();
+        this.syncVideos(0, true);
+      }
+      this.time = Math.min(t, d);
+      this.pose(this.time);
+      this.onTime?.(this.time);
+    } else this.controls.update();
     const video = this.videos.some((v) => !v.paused);
-    if (this.dirty || video || this.playing) {
-      this.renderer.render(this.scene, this.camera);
-      this.dirty = false;
-    }
+    if (this.dirty || video || this.playing) this.draw();
+  }
+
+  /** Render a frame (the contact shadow first). */
+  draw() {
+    if (this.contact.group.visible) this.contact.update(this.renderer, this.scene, [this.floor, this.selBox]);
+    this.renderer.render(this.scene, this.camera);
+    this.dirty = false;
   }
 
   /** The canvas takes the frame's aspect, as large as fits the container. */
@@ -234,7 +339,7 @@ export class MockupStage {
       g.position.x -= c.x; g.position.z -= c.z; g.position.y -= box.min.y; // centred on its footprint, on the floor
       g.traverse((o) => { if (o.isMesh) o.userData.itemId = id; });
       it.holder.add(g);
-      Object.assign(it, { key, group: g, screens: built.screens, lying: !!built.lying });
+      Object.assign(it, { key, group: g, screens: built.screens, lying: !!built.lying, hinge: null, hingeSpec: null });
     }
     if (screenOpts) it.screenOpts = { turn: 0, flipV: false, mirror: false, ...screenOpts };
     it.holder.position.set(x, 0, z);
@@ -297,12 +402,10 @@ export class MockupStage {
     // Light and shadow cover the whole scene, however big.
     const radius = Math.max(20, box.getBoundingSphere(new THREE.Sphere()).radius);
     this.radius = radius;
-    const sc = this.key.shadow.camera;
-    sc.left = -radius * 1.4; sc.right = radius * 1.4; sc.top = radius * 1.4; sc.bottom = -radius * 1.4;
-    sc.near = 1; sc.far = radius * 8;
-    sc.updateProjectionMatrix();
-    this.key.position.set(c.x - radius * 0.7, radius * 1.9, c.z + radius * 1.2);
-    this.key.target.position.set(c.x, 0, c.z);
+    this.center = c;
+    this.placeLights();
+    const size = box.getSize(new THREE.Vector3());
+    this.contact.fit(c.x, c.z, Math.max(size.x, size.z) * 1.9 + 10, Math.max(8, size.y * 0.9));
     this.controls.maxDistance = Math.max(600, radius * 12);
     // Depth precision follows the scene's size (no flicker on a big TV).
     this.camera.near = Math.max(0.5, radius * 0.04);
@@ -489,6 +592,43 @@ export class MockupStage {
     this.layout();
   }
 
+  // ---- Hinges (a lid that opens / closes) and per-device timeline settings -----------
+  /** The hinge of an imported model: { node, axis: 'x'|'y'|'z', invert } or null. */
+  setItemHinge(id, spec) {
+    const it = this.items.get(id);
+    if (!it?.group) return;
+    const same = JSON.stringify(spec || null) === JSON.stringify(it.hingeSpec || null);
+    if (same && (it.hinge || !spec)) return;
+    if (it.hinge) it.hinge.obj.quaternion.copy(it.hinge.rest);
+    it.hinge = null; it.hingeSpec = spec || null;
+    const obj = spec?.node ? it.group.getObjectByName(spec.node) : null;
+    if (obj) {
+      const axis = new THREE.Vector3(spec.axis === 'x' ? 1 : 0, spec.axis === 'y' ? 1 : 0, spec.axis === 'z' ? 1 : 0);
+      it.hinge = { obj, rest: obj.quaternion.clone(), axis, sign: spec.invert ? -1 : 1 };
+    }
+    this.applyHinge(it, this.time ?? null);
+    this.layout();
+  }
+
+  /** { hingeAngle, hingeKeys, videoStart, sound, volume } of a device. */
+  setItemTimeline(id, opts) {
+    const it = this.items.get(id);
+    if (!it) return;
+    Object.assign(it, opts);
+    this.applyHinge(it, this.time ?? null);
+    const v = it.content?.video;
+    if (v) { v.muted = !it.sound; v.volume = it.volume ?? 1; }
+    this.dirty = true;
+  }
+
+  applyHinge(it, t) {
+    if (!it.hinge) return;
+    const keyed = t != null && it.hingeKeys?.length ? valueAt(it.hingeKeys, t, this.anim.easing) : null;
+    const angle = keyed ?? (it.hingeAngle || 0);
+    it.hinge.obj.quaternion.copy(it.hinge.rest).multiply(new THREE.Quaternion().setFromAxisAngle(it.hinge.axis, it.hinge.sign * THREE.MathUtils.degToRad(angle)));
+    this.dirty = true;
+  }
+
   get videos() { return [...new Set([...this.items.values()].map((it) => it.content?.video).filter(Boolean))]; }
 
   setPaused(paused) {
@@ -500,8 +640,15 @@ export class MockupStage {
   // ---- Look --------------------------------------------------------------------------
   setBackground({ mode, color, color2 }) {
     this.bg = { mode, color, color2 };
-    this.scene.background?.dispose?.();
-    if (mode === 'color') this.scene.background = new THREE.Color(color);
+    if (this.scene.background?.isTexture && !this.scene.background.userData.env) this.scene.background.dispose();
+    this.scene.backgroundBlurriness = 0;
+    this.scene.backgroundIntensity = 1;
+    if (mode === 'environment') {
+      // The light setup's own room / sky, softly out of focus.
+      const env = this.envCache.get(this.light.setup);
+      if (env) { env.equirect.userData.env = true; this.scene.background = env.equirect; }
+      this.scene.backgroundBlurriness = 0.35;
+    } else if (mode === 'color') this.scene.background = new THREE.Color(color);
     else if (mode === 'gradient') {
       const c = document.createElement('canvas');
       c.width = 4; c.height = 512;
@@ -516,7 +663,58 @@ export class MockupStage {
     this.dirty = true;
   }
 
-  setShadow(on) { this.floor.visible = !!on; this.key.castShadow = !!on; this.dirty = true; }
+  // ---- Light ---------------------------------------------------------------------------
+  /** { setup, rotation (°), exposure, shadow: 'contact' | 'sun' | 'both' | 'none', strength 0–1 } */
+  setLight(light) {
+    this.light = { ...this.light, ...light };
+    const setup = LIGHT_SETUPS[this.light.setup] || LIGHT_SETUPS.studio;
+    let env = this.envCache.get(this.light.setup);
+    if (!env) {
+      const equirect = makeEnvironment(this.light.setup);
+      env = { equirect, pmrem: this.pmrem.fromEquirectangular(equirect).texture };
+      this.envCache.set(this.light.setup, env);
+    }
+    this.scene.environment = env.pmrem;
+    const rot = THREE.MathUtils.degToRad(this.light.rotation || 0);
+    this.scene.environmentRotation.set(0, rot, 0);
+    this.scene.backgroundRotation.set(0, rot, 0);
+    this.renderer.toneMappingExposure = (setup.exposure || 1) * (this.light.exposure || 1);
+    const mode = this.light.shadow;
+    const k = this.light.strength ?? 0.6;
+    this.contact.group.visible = mode === 'contact' || mode === 'both';
+    this.contact.set({ opacity: Math.min(1, (setup.contact?.opacity || 0.5) * k * 1.6), blur: setup.contact?.blur || 3 });
+    this.floor.visible = mode === 'sun' || mode === 'both';
+    this.floor.material.opacity = 0.45 * k * 1.4;
+    this.placeLights();
+    if (this.bg?.mode === 'environment') this.setBackground(this.bg);
+    this.dirty = true;
+  }
+
+  placeLights() {
+    const setup = LIGHT_SETUPS[this.light.setup] || LIGHT_SETUPS.studio;
+    const c = this.center || new THREE.Vector3();
+    const r = this.radius || 20;
+    const castSun = this.light.shadow === 'sun' || this.light.shadow === 'both';
+    const shadowIdx = setup.lights.findIndex((x) => x.shadow);
+    this.lights.forEach((l, i) => {
+      const spec = setup.lights[i];
+      l.visible = !!spec;
+      if (!spec) return;
+      l.color.setRGB(...spec.color);
+      l.intensity = spec.intensity;
+      const d = lightDir(spec.az, spec.el, this.light.rotation || 0);
+      l.position.copy(c).addScaledVector(d, r * 3);
+      l.target.position.copy(c);
+      l.castShadow = castSun && i === shadowIdx;
+      const sc = l.shadow.camera;
+      sc.left = -r * 1.5; sc.right = r * 1.5; sc.top = r * 1.5; sc.bottom = -r * 1.5;
+      sc.near = r * 0.2; sc.far = r * 7;
+      sc.updateProjectionMatrix();
+    });
+    this.dirty = true;
+  }
+
+  setShadow(on) { this.setLight({ shadow: on ? (this.light.shadow === 'none' ? 'contact' : this.light.shadow) : 'none' }); }
 
   // ---- Camera -------------------------------------------------------------------------
   getCamera() {
@@ -569,89 +767,131 @@ export class MockupStage {
     this.dirty = true;
   }
 
-  // ---- Animation --------------------------------------------------------------------
-  setAnimation(anim) { this.anim = { preset: 'none', duration: 6, easing: 'ease', ...anim }; }
+  // ---- Timeline -------------------------------------------------------------------
+  // The scene at a time of the animation: camera keyframes, the scene's motion
+  // (turntable / sway / float), each hinge's keyframes; screen videos run from
+  // their chosen start. `time` is the playhead; `null` = at rest.
+  setAnimation(anim) {
+    this.anim = { preset: 'none', duration: 6, easing: 'ease', camera: [], ...anim };
+    if (this.time != null) this.time = Math.min(this.time, this.anim.duration);
+    this.pose(this.time ?? null);
+  }
 
-  /**
-   * The scene at `t` seconds into the animation (null = at rest). Devices
-   * turn / float around the scene's centre; camera moves start from the
-   * camera you set.
-   */
   pose(t) {
-    const run = this.playing || this.exporting;
-    const base = run?.base;
     this.pivot.rotation.set(0, 0, 0);
     this.pivot.position.y = 0;
-    if (base) {
-      this.controls.target.copy(base.target);
-      this.camera.position.copy(base.target).addScaledVector(base.position.clone().sub(base.target), t == null ? 1 : run.zoom || 1);
+    const { preset, duration, easing, camera } = this.anim;
+    if (t != null && camera?.length) {
+      const k = cameraAt(camera, t, easing);
+      this.camera.position.copy(k.position);
+      this.controls.target.copy(k.target);
+      if (Math.abs(this.camera.fov - k.fov) > 0.01) { this.camera.fov = k.fov; this.camera.updateProjectionMatrix(); }
+      this.camera.lookAt(k.target);
     }
-    const { preset, duration, easing } = this.anim;
-    if (t != null && preset !== 'none' && base) {
+    if (t != null && MOTIONS.has(preset)) {
       const p = Math.min(1, Math.max(0, t / duration));
-      const e = easing === 'linear' ? p : ease(p);
       const turn = p * Math.PI * 2;
-      const offset = base.position.clone().sub(base.target).multiplyScalar(run.zoom || 1);
       if (preset === 'turntable') this.pivot.rotation.y = turn;
       else if (preset === 'sway') this.pivot.rotation.y = Math.sin(turn) * THREE.MathUtils.degToRad(22);
       else if (preset === 'float') {
         this.pivot.position.y = (1 - Math.cos(turn)) * 0.5 * Math.max(1, this.radius * 0.06);
         this.pivot.rotation.set(Math.sin(turn) * 0.035, Math.sin(turn + 1) * 0.12, Math.sin(turn * 2) * 0.02);
-      } else if (preset === 'orbit') {
-        offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), THREE.MathUtils.degToRad(-30 + 60 * e));
-        this.camera.position.copy(base.target).add(offset);
-      } else if (preset === 'push') {
-        this.camera.position.copy(base.target).addScaledVector(offset, 1.22 - 0.34 * e);
-      } else if (preset === 'reveal') {
-        this.pivot.rotation.y = THREE.MathUtils.degToRad(-75) * (1 - e);
-        this.camera.position.copy(base.target).addScaledVector(offset, 1.3 - 0.3 * e);
       }
     }
-    this.camera.lookAt(this.controls.target);
+    for (const it of this.items.values()) this.applyHinge(it, t);
+    this.dirty = true;
+  }
+
+  /** Move the playhead (and the screen videos with it). */
+  seek(t) {
+    this.time = Math.min(this.anim.duration, Math.max(0, t));
+    if (this.playing) this.playing.start = performance.now() - this.time * 1000;
+    this.pose(this.time);
+    this.syncVideos(this.time, !!this.playing);
+  }
+
+  /** Screen videos to their moment of the timeline; sound as each device says. */
+  syncVideos(t, play) {
+    const done = new Set();
+    for (const it of this.items.values()) {
+      const v = it.content?.video;
+      if (!v || done.has(v)) continue;
+      done.add(v);
+      v.muted = !it.sound; v.volume = it.volume ?? 1;
+      if (v.duration) v.currentTime = ((it.videoStart || 0) + t) % v.duration;
+      if (play) v.play().catch(() => { v.muted = true; v.play().catch(() => {}); }); else v.pause();
+    }
     this.dirty = true;
   }
 
   get animating() { return !!this.playing; }
 
+  play() {
+    if (this.playing) return;
+    if ((this.time ?? 0) >= this.anim.duration - 0.02) this.time = 0;
+    this.playing = { start: performance.now() - (this.time || 0) * 1000 };
+    if (this.anim.camera?.length) this.controls.enabled = false;
+    this.syncVideos(this.time || 0, true);
+    this.updateSelection();
+  }
+
+  stop() {
+    if (!this.playing) return;
+    this.playing = null;
+    this.controls.enabled = true;
+    this.controls.update();
+    for (const v of this.videos) v.pause();
+    this.updateSelection();
+    this.dirty = true;
+  }
+
   /**
-   * Turning / swaying devices show sides the view wasn't framed for: how much
-   * further back the camera has to be so nothing leaves the picture.
+   * Turning / swaying devices show sides the view wasn't framed for: step the
+   * camera back so nothing leaves the picture. Returns the new camera.
    */
-  animZoom(base) {
-    const { preset } = this.anim;
+  fitMotion(preset) {
     const angles = preset === 'turntable' ? Array.from({ length: 16 }, (_, i) => i * 22.5) : preset === 'sway' ? [-22, -11, 0, 11, 22] : null;
-    if (!angles || !this.fitPoints?.length) return preset === 'float' ? 1.05 : 1;
+    if (!angles || !this.fitPoints?.length) return null;
     const c = this.bounds.getCenter(new THREE.Vector3());
-    const cam = this.camera.clone();
-    cam.position.copy(base.position); cam.lookAt(base.target); cam.updateMatrixWorld(true);
+    this.camera.updateMatrixWorld(true);
     const p = new THREE.Vector3(); const axis = new THREE.Vector3(0, 1, 0);
     let worst = 0;
     const step = Math.max(1, Math.floor(this.fitPoints.length / 1500));
     for (const a of angles) {
       const rad = THREE.MathUtils.degToRad(a);
       for (let i = 0; i < this.fitPoints.length; i += step) {
-        p.copy(this.fitPoints[i]).sub(c).applyAxisAngle(axis, rad).add(c).project(cam);
+        p.copy(this.fitPoints[i]).sub(c).applyAxisAngle(axis, rad).add(c).project(this.camera);
         if (p.z < 1) worst = Math.max(worst, Math.abs(p.x), Math.abs(p.y));
       }
     }
-    return Math.min(3, Math.max(1, worst / 0.92));
+    const k = Math.min(3, Math.max(1, worst / 0.9));
+    if (k > 1.01) {
+      const off = this.camera.position.clone().sub(this.controls.target).multiplyScalar(k);
+      this.camera.position.copy(this.controls.target).add(off);
+      this.controls.update();
+      this.dirty = true;
+    }
+    return this.getCamera();
   }
 
-  play() {
-    if (this.playing) return;
-    this.playing = { start: performance.now(), base: { position: this.camera.position.clone(), target: this.controls.target.clone() } };
-    this.playing.zoom = this.animZoom(this.playing.base);
-    this.controls.enabled = false;
-    this.updateSelection();
-  }
-
-  stop() {
-    if (!this.playing) return;
-    this.pose(null);
-    this.playing = null;
-    this.controls.enabled = true;
-    this.controls.update();
-    this.updateSelection();
+  /** Camera keyframes for a camera move (orbit, push in, reveal, rise) from the current view. */
+  cameraMove(kind, duration) {
+    const target = this.controls.target.clone();
+    const off = this.camera.position.clone().sub(target);
+    const at = (angle, dist = 1, lift = 0) => {
+      const o = off.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), THREE.MathUtils.degToRad(angle)).multiplyScalar(dist);
+      o.y += lift * off.length();
+      return { position: target.clone().add(o).toArray().map((x) => Math.round(x * 1000) / 1000), target: target.toArray().map((x) => Math.round(x * 1000) / 1000), fov: this.camera.fov };
+    };
+    const moves = {
+      orbit: [at(-30), at(30)],
+      push: [at(0, 1.22), at(0, 0.88)],
+      pull: [at(0, 0.85), at(0, 1.2)],
+      reveal: [at(-75, 1.3), at(0, 1)],
+      rise: [at(0, 1, -0.25), at(0, 1, 0.3)],
+    };
+    const [a, b] = moves[kind] || moves.orbit;
+    return [{ t: 0, ...a }, { t: duration, ...b }];
   }
 
   // ---- Export --------------------------------------------------------------------------
@@ -681,7 +921,7 @@ export class MockupStage {
   /** Render the frame at width × height → PNG (or `type`) Blob; `background` overrides the scene's. */
   toBlob(width, height, type = 'image/png', quality, background) {
     const restore = this.beginRender(width, height, background);
-    this.renderer.render(this.scene, this.camera);
+    this.draw();
     // toBlob copies the pixels right away, so the canvas can go back to its size at once.
     const blob = new Promise((res) => this.renderer.domElement.toBlob(res, type, quality));
     restore();
@@ -700,7 +940,6 @@ export class MockupStage {
     const wasPaused = videos.map((v) => v.paused);
     videos.forEach((v) => v.pause());
     this.exporting = { base };
-    this.exporting.zoom = this.animZoom(base);
     this.controls.enabled = false;
     const restore = this.beginRender(width, height, background);
     try {
@@ -708,9 +947,10 @@ export class MockupStage {
       for (let i = 0; i < frames; i += 1) {
         if (signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
         const t = i / fps;
-        this.pose(this.anim.preset === 'none' ? null : t);
+        this.pose(t);
         await Promise.all(videos.map((v) => new Promise((resolve) => {
-          const at = v.duration ? t % v.duration : 0;
+          const start = [...this.items.values()].find((it) => it.content?.video === v)?.videoStart || 0;
+          const at = v.duration ? (start + t) % v.duration : 0;
           if (Math.abs(v.currentTime - at) < 0.0005) { resolve(); return; }
           const timer = setTimeout(() => done(), 2000);
           function done() { clearTimeout(timer); v.removeEventListener('seeked', done); resolve(); }
@@ -718,12 +958,12 @@ export class MockupStage {
           v.currentTime = at;
         })));
         for (const it of this.items.values()) if (it.content?.video) it.content.texture.needsUpdate = true;
-        this.renderer.render(this.scene, this.camera);
+        this.draw();
         await onFrame(this.renderer.domElement, t, i, frames);
       }
     } finally {
-      this.pose(null);
       this.exporting = null;
+      this.pose(this.time ?? null);
       restore();
       this.camera.position.copy(base.position);
       this.controls.target.copy(base.target);
@@ -741,8 +981,9 @@ export class MockupStage {
     this.controls.dispose();
     for (const it of this.items.values()) { this.dropContent(it); disposeObject(it.group, new Set()); }
     this.items.clear();
-    this.scene.background?.dispose?.();
-    this.envTexture.dispose();
+    if (this.scene.background?.isTexture && !this.scene.background.userData.env) this.scene.background.dispose();
+    for (const env of this.envCache.values()) { env.equirect.dispose(); env.pmrem.dispose(); }
+    this.contact.dispose();
     this.pmrem.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();

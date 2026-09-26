@@ -391,9 +391,19 @@ export const logoNeedsMigration = (p) => p.type === 'logo' && (
 // Mockups — saved 3D device scenes, and 3D models imported by the user
 // ---------------------------------------------------------------------------
 export const MOCKUP_DEVICES = ['iphone', 'android', 'ipad', 'macbook', 'imac', 'watch', 'tv', 'browser', 'custom'];
-export const MOCKUP_FRAMES = ['16:9', '4:5', '1:1', '9:16', '3:2'];
+export const MOCKUP_FRAMES = ['16:9', '4:5', '1:1', '9:16', '3:2', 'auto'];
 export const MOCKUP_ANIMATIONS = ['none', 'turntable', 'sway', 'float', 'orbit', 'push', 'reveal'];
-const MOCKUP_BG = ['transparent', 'color', 'gradient'];
+export const MOCKUP_LIGHTS = ['studio', 'product', 'daylight', 'golden', 'overcast', 'office', 'neon'];
+export const MOCKUP_2D = ['browser', 'ig-post', 'ig-story', 'ig-profile', 'x-post', 'x-profile'];
+const MOCKUP_BG = ['transparent', 'color', 'gradient', 'environment'];
+const SHADOWS = ['contact', 'sun', 'both', 'none'];
+const KEY_NAME = /^[a-zA-Z][\w-]{0,30}$/;
+// Keyframes: [{ t (s), v }] sorted by time.
+const keyList = (list, min, max) => (Array.isArray(list) ? list : [])
+  .filter((k) => k && Number.isFinite(Number(k.t)) && Number.isFinite(Number(k.v)))
+  .slice(0, 200)
+  .map((k) => ({ t: num(k.t, 0, 600, 0), v: num(k.v, min, max, 0) }))
+  .sort((a, b) => a.t - b.t);
 const MAX_MOCKUP_ITEMS = 8;
 const HEX6 = /^#[0-9a-f]{6}$/i;
 const vec3 = (v, fallback) => (Array.isArray(v) && v.length === 3 && v.every((x) => Number.isFinite(Number(x)))
@@ -427,6 +437,34 @@ export function normalizeMockupItem(it, i = 0) {
     x: num(it?.x, -1000, 1000, 0),          // position on the floor (cm)
     z: num(it?.z, -1000, 1000, 0),
     rotY: num(it?.rotY, -360, 360, 0),      // turned around its vertical axis (degrees)
+    hingeAngle: num(it?.hingeAngle, -360, 360, 0), // imported models: the hinge (e.g. a lid) turned from how the file has it
+    keys: { hinge: keyList(it?.keys?.hinge, -360, 360) }, // …and its keyframes on the timeline
+    videoStart: num(it?.videoStart, 0, 86400, 0), // a screen video: where in it the animation starts (s)
+    sound: !!it?.sound,                     // play / export the screen video's sound
+    volume: num(it?.volume, 0, 1, 1),
+  };
+}
+
+// A 2D mockup (browser window, social posts / profiles): what it is, its
+// texts, numbers and switches, and the pictures in its slots.
+const mapOf = (o, pick) => Object.fromEntries(Object.entries(o && typeof o === 'object' && !Array.isArray(o) ? o : {})
+  .filter(([k]) => KEY_NAME.test(k)).slice(0, 80).map(([k, v]) => [k, pick(v)]).filter(([, v]) => v !== undefined));
+export function normalize2D(d) {
+  return {
+    type: MOCKUP_2D.includes(d?.type) ? d.type : 'browser',
+    theme: ['light', 'dark', 'dim'].includes(d?.theme) ? d.theme : 'light',
+    text: mapOf(d?.text, (v) => (typeof v === 'string' ? v.slice(0, 4000) : undefined)),
+    nums: mapOf(d?.nums, (v) => (Number.isFinite(Number(v)) ? Math.max(-1e12, Math.min(1e12, Number(v))) : undefined)),
+    flags: mapOf(d?.flags, (v) => (typeof v === 'boolean' ? v : undefined)),
+    slots: mapOf(d?.slots, (v) => {
+      const c = mockupContent(v);
+      if (!c) return undefined;
+      const adj = v.adjust && typeof v.adjust === 'object' ? v.adjust : {};
+      return { ...c, fit: v.fit === 'contain' ? 'contain' : 'cover', adjust: { scale: num(adj.scale, 0.05, 8, 1), x: num(adj.x, -3, 3, 0), y: num(adj.y, -3, 3, 0) } };
+    }),
+    padding: num(d?.padding, 0, 0.45, 0.08), // space around the mockup (share of the picture's short side)
+    shadow: d?.shadow !== false,
+    scale: num(d?.scale, 0.2, 2, 1),
   };
 }
 
@@ -441,9 +479,15 @@ export function normalizeMockup(m) {
   const seen = new Set();
   for (const [i, it] of items.entries()) { if (seen.has(it.id)) it.id = `d${i + 1}-${nanoid(4)}`; seen.add(it.id); }
   const main = items[0];
+  const light = m?.light && typeof m.light === 'object' ? m.light : {};
+  const cameraKeys = (Array.isArray(anim.camera) ? anim.camera : []).slice(0, 100)
+    .filter((k) => k && Number.isFinite(Number(k.t)) && vec3(k.position, null))
+    .map((k) => ({ t: num(k.t, 0, 600, 0), position: vec3(k.position, null), target: vec3(k.target, [0, 0, 0]), fov: num(k.fov, 10, 90, 30) }))
+    .sort((a, b) => a.t - b.t);
   return {
     id: str(m?.id, 40) || nanoid(10),
     name: str(m?.name, 120) || 'Untitled mockup',
+    kind: m?.kind === '2d' ? '2d' : '3d',
     items,
     // The first device, mirrored at the top for simple readers (lists, older code).
     ...Object.fromEntries(DEVICE_FIELDS.map((k) => [k, main[k]])),
@@ -455,11 +499,20 @@ export function normalizeMockup(m) {
       color2: HEX6.test(bg.color2 || '') ? bg.color2 : '#2A2A33',
     },
     shadow: m?.shadow !== false,
+    light: {
+      setup: MOCKUP_LIGHTS.includes(light.setup) ? light.setup : 'studio',
+      rotation: num(light.rotation, -360, 360, 0),
+      exposure: num(light.exposure, 0.2, 3, 1),
+      shadow: SHADOWS.includes(light.shadow) ? light.shadow : (m?.shadow === false ? 'none' : 'contact'),
+      strength: num(light.strength, 0, 1, 0.6),
+    },
     animation: {
       preset: MOCKUP_ANIMATIONS.includes(anim.preset) ? anim.preset : 'none',
-      duration: num(anim.duration, 1, 30, 6),
+      duration: num(anim.duration, 1, 60, 6),
       easing: anim.easing === 'linear' ? 'linear' : 'ease',
+      camera: cameraKeys, // camera keyframes on the timeline
     },
+    d2: m?.kind === '2d' || m?.d2 ? normalize2D(m?.d2) : null,
     thumb: mockupFile(m?.thumb),
     createdAt: num(m?.createdAt, 0, 1e14, 0),
     updatedAt: num(m?.updatedAt, 0, 1e14, 0),
@@ -475,6 +528,11 @@ export function normalizeMockupModel(m) {
     screenMesh: str(m?.screenMesh, 200),
     screenTurn: [0, 90, 180, 270].includes(Number(m?.screenTurn)) ? Number(m.screenTurn) : 0,
     screenFlip: !!m?.screenFlip,
+    // The part that opens / closes (a lid's hinge): a node of the model, the
+    // axis it turns around (in its own space) and which way is "open".
+    // null = not looked at yet (a likely hinge is picked for you), false = none.
+    hinge: m?.hinge === false ? false
+      : m?.hinge?.node ? { node: str(m.hinge.node, 200), axis: ['x', 'y', 'z'].includes(m.hinge.axis) ? m.hinge.axis : 'x', invert: !!m.hinge.invert } : null,
     createdAt: num(m?.createdAt, 0, 1e14, 0),
   };
 }

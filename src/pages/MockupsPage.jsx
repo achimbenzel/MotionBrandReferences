@@ -4,7 +4,8 @@ import { Plus, Box, MoreHorizontal, Copy, Trash2, UploadCloud, MonitorSmartphone
 import { api, mockupFileUrl } from '../lib/api.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
-import { DEVICES, DEVICE_ICON, START_FRAME } from '../lib/mockup3d/catalog.js';
+import { DEVICES, DEVICE_ICON } from '../lib/mockup3d/catalog.js';
+import { TYPES_2D, defaults2D } from '../lib/mockup2d.js';
 const fmtSize = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 const ago = (ts) => {
   const d = Math.floor((Date.now() - ts) / 86400000);
@@ -20,8 +21,9 @@ function Thumb({ src, icon: Icon, onMissing }) {
 }
 
 /**
- * Mockups: saved 3D scenes (a device with your picture or video on its
- * screen) and the 3D models you imported. New ones start from a device.
+ * Mockups: 3D scenes (your own 3D models with your picture or video on the
+ * screen) and 2D mockups (browser window, Instagram, X), plus the 3D models
+ * you imported. New 3D ones start from a model, 2D ones from a type.
  */
 export default function MockupsPage() {
   const navigate = useNavigate();
@@ -35,11 +37,19 @@ export default function MockupsPage() {
   const retried = useRef(false);
   const thumbMissing = () => { if (!retried.current) { retried.current = true; setTimeout(load, 900); } };
 
-  const create = async (device, modelId = null) => {
+  const create = async (modelId) => {
     setBusy(true);
     try {
-      const label = device === 'custom' ? (data.models.find((x) => x.id === modelId)?.name || '3D model') : DEVICES[device].label;
-      const m = await api.createMockup({ device, modelId, name: `${label} mockup`, frame: START_FRAME[device] || '16:9' });
+      const label = data.models.find((x) => x.id === modelId)?.name || '3D model';
+      const m = await api.createMockup({ device: 'custom', modelId, name: `${label} mockup`, frame: '16:9' });
+      navigate(`/mockups/${m.id}`);
+    } catch (e) { toast(`Could not create: ${e.message}`, 'error'); setBusy(false); }
+  };
+  const create2D = async (type) => {
+    setBusy(true);
+    try {
+      const t = TYPES_2D[type];
+      const m = await api.createMockup({ kind: '2d', name: t.label, frame: t.frame, d2: defaults2D(type), background: { mode: 'gradient', color: '#1C1C22', color2: '#34343E' } });
       navigate(`/mockups/${m.id}`);
     } catch (e) { toast(`Could not create: ${e.message}`, 'error'); setBusy(false); }
   };
@@ -53,7 +63,7 @@ export default function MockupsPage() {
   const importModel = async (file) => {
     if (!file) return;
     setBusy(true);
-    try { const mdl = await api.addMockupModel(file); toast(`“${mdl.name}” imported`); load(); }
+    try { const mdl = await api.addMockupModel(file); toast(`“${mdl.name}” imported`); if (modelRef.current?.dataset.open) { delete modelRef.current.dataset.open; create(mdl.id); } else load(); }
     catch (e) { toast(`Import failed: ${e.message}`, 'error'); }
     finally { setBusy(false); }
   };
@@ -64,10 +74,12 @@ export default function MockupsPage() {
     } catch (e) { toast(e.message, 'error'); }
   };
 
+  const importAndOpen = () => { modelRef.current.dataset.open = '1'; modelRef.current.click(); };
   const newItems = data ? [
-    ...Object.entries(DEVICES).map(([key, d]) => { const I = DEVICE_ICON[key]; return { label: d.label, icon: <I size={15} />, onClick: () => create(key) }; }),
-    ...(data.models.length ? [{ separator: true }] : []),
-    ...data.models.map((x) => ({ label: x.name, icon: <Box size={15} />, onClick: () => create('custom', x.id) })),
+    ...data.models.map((x) => ({ label: `3D · ${x.name}`, icon: <Box size={15} />, onClick: () => create(x.id) })),
+    { label: '3D · Import a model…', icon: <UploadCloud size={15} />, onClick: importAndOpen },
+    { separator: true },
+    ...Object.entries(TYPES_2D).map(([key, t]) => ({ label: `2D · ${t.label}`, icon: <t.icon size={15} />, onClick: () => create2D(key) })),
   ] : [];
 
   return (
@@ -75,7 +87,7 @@ export default function MockupsPage() {
       <div className="page-head-row">
         <div className="page-head">
           <h1>Mockups</h1>
-          <p>Your designs and videos on 3D devices — iPhone, iPad, MacBook, a browser window or your own 3D models. Export a PNG or save it into a plan.</p>
+          <p>Your designs and videos on your own 3D models — or in a browser window, an Instagram or X post, story or profile. Export an image or a video, or save it into a plan.</p>
         </div>
         {data && (
           <Menu align="right" title="New mockup" trigger={<button className="btn btn-primary" disabled={busy}><Plus size={16} /> New mockup</button>} items={newItems} />
@@ -87,23 +99,29 @@ export default function MockupsPage() {
 
       {data && !data.mockups.length && (
         <div className="mk-start">
-          {Object.entries(DEVICES).map(([key, d]) => {
-            const I = DEVICE_ICON[key];
-            return (
-              <button key={key} type="button" className="mk-start-card" onClick={() => create(key)} disabled={busy}>
-                <I size={30} /><span className="mk-start-title">{d.label}</span><span className="mk-start-sub">Start a mockup</span>
-              </button>
-            );
-          })}
+          {data.models.map((x) => (
+            <button key={x.id} type="button" className="mk-start-card" onClick={() => create(x.id)} disabled={busy}>
+              <Box size={30} /><span className="mk-start-title">{x.name}</span><span className="mk-start-sub">3D mockup</span>
+            </button>
+          ))}
+          <button type="button" className="mk-start-card" onClick={importAndOpen} disabled={busy}>
+            <UploadCloud size={30} /><span className="mk-start-title">Import a 3D model</span><span className="mk-start-sub">.glb · .gltf · .usdz</span>
+          </button>
+          {Object.entries(TYPES_2D).map(([key, t]) => (
+            <button key={key} type="button" className="mk-start-card" onClick={() => create2D(key)} disabled={busy}>
+              <t.icon size={30} /><span className="mk-start-title">{t.label}</span><span className="mk-start-sub">2D mockup</span>
+            </button>
+          ))}
         </div>
       )}
 
       {data && data.mockups.length > 0 && (
         <div className="grid">
           {data.mockups.map((m) => {
-            const I = DEVICE_ICON[m.device] || MonitorSmartphone;
+            const t2 = m.kind === '2d' ? TYPES_2D[m.d2?.type] || TYPES_2D.browser : null;
+            const I = t2?.icon || DEVICE_ICON[m.device] || MonitorSmartphone;
             const names = (m.items || [m]).map((it) => (it.device === 'custom' ? data.models.find((x) => x.id === it.modelId)?.name || '3D model' : DEVICES[it.device]?.label));
-            const deviceName = names.length > 2 ? `${names[0]} + ${names.length - 1} more` : names.join(' + ');
+            const deviceName = t2 ? `2D · ${t2.label}` : names.length > 2 ? `${names[0]} + ${names.length - 1} more` : names.join(' + ');
             return (
               <div key={m.id} className="card mk-card" onClick={() => navigate(`/mockups/${m.id}`)} role="link" tabIndex={0}
                 onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/mockups/${m.id}`); }}>
@@ -119,7 +137,7 @@ export default function MockupsPage() {
                       ]} />
                   </div>
                 </div>
-                <div className="card-meta"><span className="card-title">{m.name}</span><span className="card-year">{m.frame}</span></div>
+                <div className="card-meta"><span className="card-title">{m.name}</span><span className="card-year">{m.frame === 'auto' ? 'Fit' : m.frame}</span></div>
                 <div className="card-sub">{deviceName} · {ago(m.updatedAt || m.createdAt)}</div>
               </div>
             );
@@ -140,7 +158,7 @@ export default function MockupsPage() {
                   <Box size={16} />
                   <span className="mk-model-name">{x.name}</span>
                   <span className="mk-model-meta">.{x.format} · {fmtSize(x.size)}{x.screenMesh ? ` · screen: ${x.screenMesh}` : ' · no screen picked yet'}</span>
-                  <button className="btn btn-sm btn-ghost" onClick={() => create('custom', x.id)}>Use</button>
+                  <button className="btn btn-sm btn-ghost" onClick={() => create(x.id)}>Use</button>
                   <button className="icon-btn" onClick={() => removeModel(x)} aria-label={`Delete ${x.name}`}><Trash2 size={14} /></button>
                 </div>
               ))}
