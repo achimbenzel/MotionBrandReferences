@@ -60,6 +60,7 @@ export async function scanUnused() {
   for (const p of db.projects) if (p?.type && p?.id) owners.set(`${p.type}/${p.id}`, refSet(p));
   for (const p of db.plans) if (p?.id) owners.set(`plan/${p.id}`, refSet(p));
   for (const s of db.software) if (s?.id) owners.set(`software/${s.id}`, refSet(s));
+  for (const it of db.inbox || []) if (it?.id) owners.set(`inbox/${it.id}`, refSet(it));
   owners.set('dashboard', refSet(db.settings));
 
   const found = [];
@@ -71,7 +72,7 @@ export async function scanUnused() {
     found.push({ rel: `${key}/${rel}`, size: st.size });
   });
 
-  for (const root of [...TYPES, 'plan', 'software']) {
+  for (const root of [...TYPES, 'plan', 'software', 'inbox']) {
     const rootDir = path.join(DATA_DIR, root);
     const entries = await fsp.readdir(rootDir, { withFileTypes: true }).catch(() => []);
     for (const e of entries) {

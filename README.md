@@ -91,6 +91,7 @@ firewall blocks port 4300.
 | `DATA_DIR` | `./data` | Where the library lives (e.g. a mounted volume) |
 | `ALLOWED_HOSTS` | – | Extra host names to accept, comma-separated (e.g. your own domain). IPs, `localhost`, Tailscale names (`*.ts.net`, MagicDNS short names) and `*.local` / `*.lan` / `*.fritz.box` always work; `*` disables the check |
 | `MAX_UPLOAD_MB` | `1024` | Per-file upload limit (raise it for long 4K videos) |
+| `LINK_LOOKUP` | – | `off` turns off looking up YouTube / Vimeo titles, lengths and covers. When on, the server only ever contacts YouTube's / Vimeo's oEmbed addresses and their image hosts, and only when you save such a link |
 
 Caching is already handled by the app: content-hashed build assets
 (`/assets/*`) and immutable library files (moodboard / plan-block uploads) are
@@ -376,7 +377,10 @@ one stage at a time (archived plans only show under **Archived**). Each
     - **References** — attach existing items from your **Reference library**
       (projects and galleries) via a search picker; they’re shown as the **same
       cards as in the library** (three across) and **jump to that item**, so a
-      plan can point back at the work it draws on.
+      plan can point back at the work it draws on. The other way round works
+      too: every project and gallery page has **Edit → Add to plan…**, which
+      puts it into the chosen plan's References (a References block is added
+      if the plan has none; nothing is added twice).
     - **Palette** — a set of colour **swatches** (hex + optional name); add them
       by hand or **extract a palette from an uploaded image**, and copy any hex
       with one click.
@@ -389,6 +393,21 @@ one stage at a time (archived plans only show under **Archived**). Each
 
   Following the general rule below, a plan's title and each block's name are only
   editable via a **⋯** menu — there is no bare Delete button.
+
+**Archive as reference.** When a job is done, **Edit → Archive as reference…**
+turns it into references in your library, next to the work of others:
+- the **final video** — a Review version (the last approved one is picked) or a
+  video in a Files block — becomes a **Motion Design** project with a cover
+  frame, its format and length,
+- the **images and PDFs** you tick — moodboards (boards named styleframes,
+  logo, final, design, concept … are ticked from the start), PDF and Files
+  blocks; tap a picture to leave it out — become one **Branding** project,
+- the **palette** becomes a **Colors** project (with RGB, CMYK and Pantone).
+
+Title, year and tags (the client and “Own work” to start with) are set in the
+dialog, and the plan can be set to **Archived** in the same step. The files are
+**copied** — the plan keeps everything. The plan then shows **In your library**
+chips linking to the new projects, and each project says **From plan “…”**.
 
 ### Software
 A **topic per app** (After Effects, Premiere, Blender…). Add a software, give it
@@ -430,6 +449,51 @@ colour variants come along. Then:
   into a plan's moodboard (an existing one, or a new “Brand tests” board).
   Nothing else is stored; the settings are remembered for the session.
 
+### Inbox (share from your phone)
+Everything you come across on the go — a screenshot, a screen recording, an
+Instagram / Behance / YouTube link, a quick idea — goes into the **Inbox**
+(top of the sidebar, with a count of what's waiting; on a phone a dot on the
+menu button). There you sort each item:
+- **into the library** — an image becomes a new **Branding**, **Image
+  gallery**, **Logo**, **Logo No Go**, **Colors** (from the image) or **Font**
+  entry, a video or a **YouTube / Vimeo link** a **Motion** reference, a PDF a
+  **Branding** project. The usual add dialog opens with everything filled in;
+  select several pictures to make **one** Branding project (or gallery images)
+  of them,
+- **into a plan** — images go to its first moodboard, PDFs to a PDF (or Files)
+  block, other files to a Files block, links to a Links block and notes to a
+  Text block (each made when the plan has none),
+- or delete it (→ Trash, with Undo).
+
+Once sorted, an item leaves the Inbox. You can also add to it right there:
+drop files on the page, paste an image or a link (⌘V / Ctrl+V), or type a note.
+
+**Android** (and desktop Chrome / Edge): open the app over **HTTPS** (e.g.
+`tailscale serve`, see *Hosting it*) and choose ⋮ → **Install app**. After
+that, Confinium shows up in the system **share sheet** — share photos,
+screenshots, videos, PDFs or a page's link from any app and it lands in the
+Inbox.
+
+**iPhone / iPad:** iOS doesn't list web apps in the share sheet, so a
+**Shortcut** does the job (set it up once):
+1. Shortcuts app → **+** → name it “Confinium Inbox”; in its settings (ⓘ) turn
+   on **Show in Share Sheet** and let it receive *Images, Media, PDFs, URLs,
+   Text*.
+2. Add **Get Contents of URL**: URL `https://<machine>.<tailnet>.ts.net/api/inbox`,
+   Method **POST**, Headers: `X-Requested-With` = `confinium`, Request Body
+   **Form** with a field `files` (type *File*) = **Shortcut Input** — for a
+   link or text use a field `text` (type *Text*) = Shortcut Input instead
+   (an **If** on the input's type can do both in one Shortcut).
+3. Optionally add a field `via` = `shortcut` (shows “From a Shortcut”).
+
+Now **Share → Confinium Inbox** from Photos, Safari, Instagram… sends it to
+your Inbox (your phone must be in your tailnet).
+
+The share sheet posts a plain form, which can't carry the app's CSRF header;
+that one address (`/api/inbox/share`) accepts it only when the browser marks
+the request as not coming from another website — and it can only add to the
+Inbox.
+
 ## What each section does
 
 ### Branding
@@ -441,7 +505,16 @@ cover** thumbnail. Tag each project by **color scheme** and **type** (tech,
 restaurant, …) and filter the grid by those tags.
 
 ### Motion Design
-Upload a **video**; scrub to the frame you want and it becomes the cover. In the
+Upload a **video**; scrub to the frame you want and it becomes the cover. Or
+add a **YouTube / Vimeo link** instead of a file (**Video → YouTube / Vimeo**
+in the add dialog; `youtu.be`, `watch?v=`, Shorts, `vimeo.com/…` and player
+links all work). Title, channel, length and cover are looked up when you save
+(leave the title empty to use the video's own); the video then plays embedded
+(YouTube's privacy-enhanced `youtube-nocookie.com` player, Vimeo with
+do-not-track). Sections, moments, loop, speed and the Space / K play shortcut
+work on links just like on files; capturing frames and the waveform need the
+file itself. Offline, a link is still saved — just without the looked-up
+extras (a YouTube card then shows YouTube's own thumbnail). In the
 grid, resting the mouse on a card **plays a muted preview**. Besides **All**,
 **Moments** and **Galleries**, the **Structure** view compares every video that
 has sections: one bar per video on a shared **time** axis (or **proportional**,
@@ -624,7 +697,10 @@ without going back to the grid; stepping past the last one wraps to the first.
 - **Icons:** [lucide](https://lucide.dev) via `lucide-react`, bundled locally.
 - **PDF rendering:** `pdfjs-dist` with a locally-bundled worker.
 
-Nothing is fetched from a third-party CDN at runtime.
+Nothing is fetched from a third-party CDN at runtime. The one exception is
+what you ask for yourself: a **YouTube / Vimeo link** plays in their embedded
+player, and its title and cover are looked up once when you save it (turn the
+lookup off with `LINK_LOOKUP=off`).
 
 ---
 

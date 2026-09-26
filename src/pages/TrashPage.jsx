@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Trash2, RotateCcw, X, FileText, PencilRuler, FolderOpen, LayoutList, Puzzle, Sparkles } from 'lucide-react';
+import { Trash2, RotateCcw, X, FileText, PencilRuler, FolderOpen, LayoutList, Puzzle, Sparkles, Inbox } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useToast } from '../components/Toast.jsx';
 import { useConfirm } from '../components/ConfirmDialog.jsx';
@@ -108,5 +108,6 @@ function Ico({ kind }) {
   if (kind === 'block') return <LayoutList size={20} />;
   if (kind === 'software') return <Puzzle size={20} />;
   if (kind === 'orphans') return <Sparkles size={20} />;
+  if (kind === 'inbox') return <Inbox size={20} />;
   return <FileText size={20} />;
 }

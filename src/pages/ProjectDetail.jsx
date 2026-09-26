@@ -1,12 +1,13 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Trash2, Pencil, Image as ImageIcon, MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Trash2, Pencil, Image as ImageIcon, MoreHorizontal, ChevronLeft, ChevronRight, FolderInput, PencilRuler } from 'lucide-react';
 import { api, fileUrl } from '../lib/api.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
 import EditDetailsModal from '../components/EditDetailsModal.jsx';
 import LogoOptionsModal from '../components/LogoOptionsModal.jsx';
 import { coverAspect, setLastTab } from '../lib/types.js';
+import { useAddToPlan } from '../components/AddToPlan.jsx';
 
 // Per-type bodies + the (heavy, imaging-backed) thumbnail studio are split into
 // their own chunks — opening a colour project doesn't pull the branding/logo
@@ -32,6 +33,7 @@ export default function ProjectDetail() {
   const [thumbSaving, setThumbSaving] = useState(false);
   const [logoOptions, setLogoOptions] = useState(false);
   const [siblings, setSiblings] = useState([]); // ids of same-type projects, in grid order
+  const [planPicker, addToPlan] = useAddToPlan();
 
   useEffect(() => {
     let alive = true;
@@ -106,14 +108,16 @@ export default function ProjectDetail() {
   }[project.type];
 
   const isImage = project.type === 'imagegallery';
-  const canSetThumb = project.type === 'motion'
+  const canSetThumb = (project.type === 'motion' && !!project.video) // a YouTube / Vimeo link keeps its own cover
     || (project.type === 'branding' && (project.assets || []).length > 0)
     || project.type === 'color'
     || (project.type === 'font' && !!project.shot);
 
+  const toPlan = { label: 'Add to plan…', icon: <FolderInput size={15} />, onClick: () => addToPlan('project', project.id) };
   const menuItems = isImage
-    ? [{ label: 'Delete', icon: <Trash2 size={15} />, danger: true, onClick: remove }]
+    ? [toPlan, { separator: true }, { label: 'Delete', icon: <Trash2 size={15} />, danger: true, onClick: remove }]
     : [
+        toPlan,
         { label: 'Rename / edit details', icon: <Pencil size={15} />, onClick: () => setEditing(true) },
         ...(project.type === 'logo' ? [{ label: 'Logo options', icon: <ImageIcon size={15} />, onClick: () => setLogoOptions(true) }] : []),
         ...(canSetThumb ? [{ label: 'Change cover', icon: <ImageIcon size={15} />, onClick: () => setThumbing(true) }] : []),
@@ -128,6 +132,7 @@ export default function ProjectDetail() {
         <div>
           {!isImage && <h1>{project.title}</h1>}
           {!isImage && <div className="sub">{[project.category, project.year].filter(Boolean).join(' · ')}</div>}
+          {project.fromPlan && <FromPlan planId={project.fromPlan} />}
         </div>
         <div className="detail-actions">
           <Menu
@@ -180,6 +185,7 @@ export default function ProjectDetail() {
         </Suspense>
       )}
 
+      {planPicker}
       {logoOptions && (
         <LogoOptionsModal
           project={project}
@@ -196,6 +202,23 @@ function BackBtn({ to }) {
   return (
     <button className="detail-back" onClick={() => (to ? navigate(to) : navigate(-1))}>
       <ArrowLeft size={16} /> Back
+    </button>
+  );
+}
+
+// "From plan …" on references archived from a finished plan (while it exists).
+function FromPlan({ planId }) {
+  const navigate = useNavigate();
+  const [plan, setPlan] = useState(null);
+  useEffect(() => {
+    let on = true;
+    api.getPlan(planId).then((p) => { if (on) setPlan(p); }).catch(() => { if (on) setPlan(null); });
+    return () => { on = false; };
+  }, [planId]);
+  if (!plan) return null;
+  return (
+    <button className="from-plan" onClick={() => navigate(`/plan/${plan.id}`)} title="Open the plan this came from">
+      <PencilRuler size={13} /> From plan “{plan.name}”
     </button>
   );
 }

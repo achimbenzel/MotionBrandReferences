@@ -136,6 +136,36 @@ export const api = {
     const { plan } = await request('/api/plans', { method: 'POST', json: { name, client, template } });
     return plan;
   },
+  // Put a library item into a plan's References → { plan, blockId, added }.
+  async addPlanRef(planId, refKind, refId) {
+    return request(`/api/plans/${planId}/refs`, { method: 'POST', json: { refKind, refId } });
+  },
+  // --- Inbox (shared from a phone, waiting to be sorted) ---
+  async listInbox() {
+    const { items } = await request('/api/inbox');
+    return items;
+  },
+  async addToInbox({ files = [], url = '', text = '', title = '' } = {}) {
+    const fd = new FormData();
+    for (const f of files) fd.append('files', f, f.name);
+    if (url) fd.append('url', url);
+    if (text) fd.append('text', text);
+    if (title) fd.append('title', title);
+    const { items } = await request('/api/inbox', { method: 'POST', body: fd });
+    return items;
+  },
+  // `used`: it now lives in the library, so it's deleted for good (else → Trash).
+  async removeInboxItem(id, { used = false } = {}) {
+    return request(`/api/inbox/${id}${used ? '?used=1' : ''}`, { method: 'DELETE' });
+  },
+  // → { plan, blockId, blockType }
+  async inboxToPlan(id, planId) {
+    return request(`/api/inbox/${id}/to-plan`, { method: 'POST', json: { planId } });
+  },
+  // Keep a finished plan's work in the library (copies of its files) → { plan, projects }.
+  async archivePlan(planId, body) {
+    return request(`/api/plans/${planId}/archive`, { method: 'POST', json: body });
+  },
   // Plan templates: built-in ones plus those saved from plans.
   async listPlanTemplates() {
     const { templates } = await request('/api/plan-templates');

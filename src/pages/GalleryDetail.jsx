@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Pencil, Trash2, Plus, MoreHorizontal, FolderOpen } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2, Plus, MoreHorizontal, FolderOpen, FolderInput } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
@@ -8,12 +8,14 @@ import ProjectCard from '../components/ProjectCard.jsx';
 import GalleryPicker from '../components/GalleryPicker.jsx';
 import GalleryNameModal from '../components/GalleryNameModal.jsx';
 import { TABS, setLastTab } from '../lib/types.js';
+import { useAddToPlan } from '../components/AddToPlan.jsx';
 
 export default function GalleryDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
   const [gallery, setGallery] = useState(null);
+  const [planPicker, addToPlan] = useAddToPlan();
   const [projects, setProjects] = useState([]);
   const [error, setError] = useState(null);
   const [picking, setPicking] = useState(false);
@@ -79,8 +81,9 @@ export default function GalleryDetail() {
         <div className="detail-actions">
           <button className="btn btn-sm btn-primary" onClick={() => setPicking(true)}><Plus size={15} /> Projects</button>
           <Menu
-            trigger={<button className="btn btn-sm"><Pencil size={15} /> <MoreHorizontal size={15} /></button>}
+            trigger={<button className="btn btn-sm" aria-label="Gallery options" title="Gallery options"><Pencil size={15} /> <MoreHorizontal size={15} /></button>}
             items={[
+              { label: 'Add to plan…', icon: <FolderInput size={15} />, onClick: () => addToPlan('gallery', gallery.id) },
               { label: 'Rename', icon: <Pencil size={15} />, onClick: () => setRenaming(true) },
               { separator: true },
               { label: 'Delete gallery', icon: <Trash2 size={15} />, danger: true, onClick: remove },
@@ -115,6 +118,7 @@ export default function GalleryDetail() {
       {renaming && (
         <GalleryNameModal title="Rename gallery" initialName={gallery.name} submitLabel="Save" onSubmit={rename} onClose={() => setRenaming(false)} />
       )}
+      {planPicker}
     </div>
   );
 }

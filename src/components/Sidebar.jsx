@@ -2,12 +2,13 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Search, Plus, PanelLeftClose, Trash2, Settings, X,
   FileText, Film, Square, CreditCard, Palette, Images, Type, PencilRuler, FlaskConical,
-  LayoutDashboard, ListTodo, Ban, AppWindow,
+  LayoutDashboard, ListTodo, Ban, AppWindow, Inbox,
 } from 'lucide-react';
 import { TABS, WORK_TABS, isWorkPath, setLastTab } from '../lib/types.js';
 import { useActiveTab } from '../lib/useActiveTab.js';
 import ModeToggle from './ModeToggle.jsx';
 import StorageMeter from './StorageMeter.jsx';
+import { useInboxCount } from '../lib/inbox.js';
 import logoWide from '../../logo_wide_dark.svg';
 
 const ICON = {
@@ -28,10 +29,12 @@ export default function Sidebar({ onAdd, onSearch, onToggle, drawer = false, ope
   const onPlan = pathname === '/plan' || pathname.startsWith('/plan/');
   const onTrash = pathname === '/trash';
   const onSettings = pathname === '/settings';
+  const onInbox = pathname === '/inbox';
+  const inboxCount = useInboxCount(pathname);
   const active = useActiveTab(pathname);
 
   const go = (key) => { setLastTab(key); navigate(`/${key}`); };
-  const showAdd = !onTrash && (!workMode || onPlan); // nothing to "add" on the Brand Tester
+  const showAdd = !onTrash && !onInbox && (!workMode || onPlan); // nothing to "add" on the Brand Tester
 
   return (
     // A closed drawer is off-screen; `inert` keeps it out of tab order too.
@@ -46,6 +49,11 @@ export default function Sidebar({ onAdd, onSearch, onToggle, drawer = false, ope
 
         <button className="sb-search" onClick={() => onSearch?.()} title="Search (⌘K)">
           <Search size={16} /> <span>Search</span> <kbd>⌘K</kbd>
+        </button>
+
+        <button className={`sb-item sb-inbox ${onInbox ? 'active' : ''}`} onClick={() => navigate('/inbox')}>
+          <Inbox size={17} /> <span>Inbox</span>
+          {inboxCount > 0 && <span className="sb-badge" aria-label={`${inboxCount} to sort`}>{inboxCount > 99 ? '99+' : inboxCount}</span>}
         </button>
 
         <ModeToggle workMode={workMode} />
@@ -65,7 +73,7 @@ export default function Sidebar({ onAdd, onSearch, onToggle, drawer = false, ope
             TABS.map((t) => {
               const I = ICON[t.key] || FileText;
               return (
-                <button key={t.key} className={`sb-item ${active === t.key && !onTrash ? 'active' : ''}`} onClick={() => go(t.key)}>
+                <button key={t.key} className={`sb-item ${active === t.key && !onTrash && !onInbox ? 'active' : ''}`} onClick={() => go(t.key)}>
                   <I size={17} /> <span>{t.label}</span>
                 </button>
               );

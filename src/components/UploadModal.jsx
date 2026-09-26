@@ -13,6 +13,7 @@ import ColorCard from './ColorCard.jsx';
 import ThumbnailStudio from './ThumbnailStudio.jsx';
 import CropModal from './CropModal.jsx';
 import LogoRenditionsEditor from './LogoRenditionsEditor.jsx';
+import { parseVideoLink, PROVIDER_LABEL } from '../lib/videoLinks.js';
 
 const ASPECT = 16 / 10;
 const isPdf = (f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
@@ -31,9 +32,13 @@ const TYPES = [
 
 const BRANDING_SUGGESTIONS = ['Tech', 'Restaurant', 'Fashion', 'Sport', 'Finance', 'Food', 'Retail', 'Minimal', 'Colorful', 'Monochrome', 'Warm', 'Cool'];
 
-export default function UploadModal({ initialType, onClose, onCreated }) {
+/**
+ * `prefill` (e.g. from the Inbox): { type, files: [File], url, title } —
+ * the dialog opens with those already chosen.
+ */
+export default function UploadModal({ initialType, prefill = null, onClose, onCreated }) {
   const toast = useToast();
-  const [type, setType] = useState(initialType || 'branding');
+  const [type, setType] = useState(prefill?.type || initialType || 'branding');
   const [title, setTitle] = useState('');
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [category, setCategory] = useState('');
@@ -45,6 +50,9 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
   const [videoSrc, setVideoSrc] = useState(null);
   const [duration, setDuration] = useState(0);
   const [dims, setDims] = useState(null); // { w, h } of the chosen video
+  const [motionSource, setMotionSource] = useState('file'); // 'file' | 'link' (YouTube / Vimeo)
+  const [videoUrl, setVideoUrl] = useState('');
+  const videoLink = parseVideoLink(videoUrl);
   const videoRef = useRef(null);
 
   // color
@@ -185,10 +193,26 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
     setCropReq(null);
   };
 
+  // Opened with things already chosen (e.g. from the Inbox).
+  useEffect(() => {
+    if (!prefill) return;
+    const f = prefill.files || [];
+    if (prefill.title) setTitle(prefill.title);
+    if (prefill.type === 'motion' && prefill.url) { setMotionSource('link'); setVideoUrl(prefill.url); }
+    else if (prefill.type === 'motion' && f[0]) pickVideo(f[0]);
+    else if (prefill.type === 'branding') addFiles(f);
+    else if (prefill.type === 'logo' && f[0]) pickLogo(f[0]);
+    else if (prefill.type === 'logonogo' && f[0]) pickNogo(f[0]);
+    else if (prefill.type === 'imagegallery') addGalleryImages(f);
+    else if (prefill.type === 'color' && f[0]) pickExample(f[0]);
+    else if (prefill.type === 'font') { if (prefill.url) setFontUrl(prefill.url); if (f[0]) pickFontShot(f[0]); }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const isImage = type === 'imagegallery';
   const needsTitle = !isImage;
-  const canSave = (!needsTitle || title.trim()) && (
-    (type === 'motion' && videoFile) ||
+  const isLinkMotion = type === 'motion' && motionSource === 'link';
+  const canSave = (!needsTitle || title.trim() || isLinkMotion) && (
+    (type === 'motion' && (isLinkMotion ? !!videoLink : !!videoFile)) ||
     (type === 'color' && (colors.length > 0 || exampleFile)) ||
     (type === 'branding' && files.length > 0) ||
     (type === 'logo' && logoImage) ||
@@ -198,7 +222,7 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
     (type === 'logonogo' && nogoImage)
   );
 
-  const coverAvailable = (type === 'motion' && !!videoSrc)
+  const coverAvailable = (type === 'motion' && !isLinkMotion && !!videoSrc)
     || (type === 'branding' && files.length > 0)
     || (type === 'color' && !!exampleFile)
     || (type === 'font' && !!fontShot);
@@ -231,7 +255,9 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
       fd.append('category', category.trim());
       fd.append('tags', JSON.stringify(tags));
 
-      if (type === 'motion') {
+      if (isLinkMotion) {
+        fd.append('url', videoLink.url); // title, length and cover come from the site
+      } else if (type === 'motion') {
         fd.append('video', videoFile); fd.append('duration', String(duration));
         if (dims) { fd.append('width', String(dims.w)); fd.append('height', String(dims.h)); }
       }
@@ -259,7 +285,7 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
       if (coverBlob) {
         fd.append('thumb', coverBlob, 'thumb.webp');
         if (coverMeta) fd.append('thumbMeta', JSON.stringify(coverMeta));
-      } else if (type === 'motion') {
+      } else if (type === 'motion' && !isLinkMotion) {
         try { fd.append('thumb', await captureFrame(videoRef.current, 0.85), 'thumb.webp'); } catch { /* optional */ }
       } else if (type === 'branding' && !files.some((f) => !isPdf(f))) {
         try {
@@ -308,7 +334,8 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
             <>
               <div className="field">
                 <label>Title</label>
-                <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Project name" autoFocus={!isTouch()} />
+                <input className="input" value={title} onChange={(e) => setTitle(e.target.value)}
+                  placeholder={type === 'motion' && motionSource === 'link' ? 'Leave empty to use the video’s title' : 'Project name'} autoFocus={!isTouch()} />
               </div>
               <div className="row-2">
                 <div className="field">
@@ -327,8 +354,27 @@ export default function UploadModal({ initialType, onClose, onCreated }) {
           {/* ---- Motion ---- */}
           {type === 'motion' && (
             <div className="field">
-              <label>Video</label>
-              {!videoSrc ? (
+              <div className="field-head">
+                <label>Video</label>
+                <div className="segmented segmented-sm" role="group" aria-label="Video source">
+                  <button type="button" className={motionSource === 'file' ? 'on' : ''} onClick={() => setMotionSource('file')}>File</button>
+                  <button type="button" className={motionSource === 'link' ? 'on' : ''} onClick={() => setMotionSource('link')}>YouTube / Vimeo</button>
+                </div>
+              </div>
+              {motionSource === 'link' ? (
+                <div className="link-pick">
+                  <input className="input" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=…  or  https://vimeo.com/…"
+                    autoFocus={!isTouch()} inputMode="url" aria-label="Video link" />
+                  {videoLink ? (
+                    <div className="link-pick-ok">
+                      {videoLink.provider === 'youtube' && <img src={`https://i.ytimg.com/vi/${videoLink.id}/mqdefault.jpg`} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
+                      <span><b>{PROVIDER_LABEL[videoLink.provider]}</b> video · title, length and cover are fetched when you save (leave the title empty to use theirs). It plays embedded — sections, moments, loop and speed work; frame capture needs the file.</span>
+                    </div>
+                  ) : (
+                    <div className="hint">{videoUrl.trim() ? 'That isn’t a YouTube or Vimeo video link.' : 'Paste a link to a YouTube or Vimeo video.'}</div>
+                  )}
+                </div>
+              ) : !videoSrc ? (
                 <FilePick accept="video/*" onPick={(f) => pickVideo(f[0])}>
                   <UploadCloud size={22} /><div>Select a video file</div>
                   <div className="hint">It is copied into your local library folder</div>

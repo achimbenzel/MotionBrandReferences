@@ -1,4 +1,5 @@
 // Reference-library projects (all eight section types) and their files.
+import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { nanoid } from 'nanoid';
 import { DATA_DIR, TRASH_DIR, TYPES } from '../config.js';
@@ -7,6 +8,7 @@ import { moveInto, replaceImage, safeRm, moveToTrash, extOf } from '../files.js'
 import { upload, parseJSON } from '../upload.js';
 import { str, normalizeSegments, normalizeMarkers, normalizeWaveform, videoDim } from '../schema.js';
 import { createRouter, HttpError } from '../http.js';
+import { parseVideoLink, fetchVideoMeta, downloadThumb } from '../videoLinks.js';
 
 const router = createRouter();
 export default router;
@@ -53,13 +55,35 @@ router.post('/api/projects', upload.any(), async (req, res) => {
   try {
     if (type === 'motion') {
       const video = byField('video');
-      if (!video) return res.status(400).json({ error: 'video_required', message: 'Please choose a video.' });
-      project.video = await moveInto(dir, video.path, `video${extOf(video.originalname) || '.mp4'}`);
-      project.duration = Number(req.body.duration) || 0;
+      // A YouTube / Vimeo link instead of a file: played embedded.
+      const link = !video && req.body.url ? parseVideoLink(req.body.url) : null;
+      if (!video && !link) {
+        return res.status(400).json({ error: 'video_required', message: 'Please choose a video, or paste a YouTube / Vimeo link.' });
+      }
+      const dur = Number(req.body.duration);
+      project.duration = Number.isFinite(dur) && dur > 0 ? dur : 0;
       project.width = videoDim(req.body.width);
       project.height = videoDim(req.body.height);
       project.frames = [];
       project.markers = [];
+      if (video) {
+        project.video = await moveInto(dir, video.path, `video${extOf(video.originalname) || '.mp4'}`);
+      } else {
+        Object.assign(project, { source: 'link', provider: link.provider, videoId: link.id, videoHash: link.hash || null, url: link.url, channel: '' });
+        const meta = await fetchVideoMeta(link);
+        if (!String(req.body.title || '').trim()) project.title = meta.title || (link.provider === 'youtube' ? 'YouTube video' : 'Vimeo video');
+        if (meta.author) project.channel = meta.author;
+        if (!project.duration && meta.duration) project.duration = meta.duration;
+        if (!project.width && meta.width) { project.width = meta.width; project.height = meta.height; }
+        if (!byField('thumb')) {
+          const t = await downloadThumb(meta.thumbs);
+          if (t) {
+            await fsp.mkdir(dir, { recursive: true });
+            await fsp.writeFile(path.join(dir, `thumb${t.ext}`), t.buf);
+            project.thumb = `thumb${t.ext}`;
+          }
+        }
+      }
     }
 
     if (type === 'color') {

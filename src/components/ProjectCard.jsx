@@ -1,18 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Palette, Square, X, Type } from 'lucide-react';
+import { Play, Palette, Square, X, Type, Film } from 'lucide-react';
 import { fileUrl } from '../lib/api.js';
 import { fmtTime, formatOf } from '../lib/media.js';
 import { cardSize, logoSource, logoScale, logoActive, hostOf, setLastTab } from '../lib/types.js';
 import LogoImage from './LogoImage.jsx';
 import { segmentColor, segmentName } from '../lib/segments.js';
+import { PROVIDER_LABEL } from '../lib/videoLinks.js';
 
 // Hover previews only where there is a real hover (mouse / trackpad).
 const canHover = () => typeof window !== 'undefined' && !!window.matchMedia?.('(hover: hover) and (pointer: fine)').matches;
 
 export default function ProjectCard({ project, onRemove, removeTitle = 'Remove from gallery' }) {
   const navigate = useNavigate();
-  const thumb = project.thumb ? fileUrl(project, project.thumb) : null;
+  // A YouTube link saved while offline has no cover of its own yet: use YouTube's.
+  const thumb = project.thumb ? fileUrl(project, project.thumb)
+    : project.source === 'link' && project.provider === 'youtube' && project.videoId ? `https://i.ytimg.com/vi/${project.videoId}/hqdefault.jpg` : null;
   const isImage = project.type === 'imagegallery';
   const [preview, setPreview] = useState(false);
   const hoverTimer = useRef(0);
@@ -55,7 +58,7 @@ export default function ProjectCard({ project, onRemove, removeTitle = 'Remove f
           ) : project.type === 'font' ? (
             <div className="font-plate"><Type size={30} /><span>{hostOf(project.url) || 'Fonts'}</span></div>
           ) : (
-            <div className="card-thumb-empty"><Palette size={26} /></div>
+            <div className="card-thumb-empty">{project.type === 'motion' ? <Film size={26} /> : <Palette size={26} />}</div>
           )}
 
           {project.type === 'motion' && (
@@ -63,6 +66,7 @@ export default function ProjectCard({ project, onRemove, removeTitle = 'Remove f
               {preview && <HoverVideo src={fileUrl(project, project.video)} />}
               <div className="card-play"><span><Play size={20} fill="#fff" color="#fff" /></span></div>
               <span className="card-badges">
+                {project.source === 'link' && <span className="card-badge">{PROVIDER_LABEL[project.provider] || 'Link'}</span>}
                 {formatOf(project.width, project.height) && <span className="card-badge">{formatOf(project.width, project.height)}</span>}
                 {project.duration ? <span className="card-badge">{fmtTime(project.duration)}</span> : null}
               </span>

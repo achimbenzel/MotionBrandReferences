@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { Menu as MenuIcon, Search, Plus } from 'lucide-react';
 import { TABS, WORK_TABS, isWorkPath } from '../lib/types.js';
 import { useActiveTab } from '../lib/useActiveTab.js';
+import { useInboxCount } from '../lib/inbox.js';
 
 // Title for the current page, shown in the middle of the bar.
 function titleFor(pathname, tab) {
@@ -10,6 +11,7 @@ function titleFor(pathname, tab) {
   if (work) return work.label;
   if (pathname === '/settings') return 'Settings';
   if (pathname === '/trash') return 'Trash';
+  if (pathname === '/inbox') return 'Inbox';
   return TABS.find((t) => t.key === tab)?.label || 'Library';
 }
 
@@ -21,6 +23,7 @@ function titleFor(pathname, tab) {
 export default function MobileBar({ onMenu, onSearch, onAdd }) {
   const { pathname } = useLocation();
   const tab = useActiveTab(pathname);
+  const inboxCount = useInboxCount(pathname);
   const [hidden, setHidden] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const last = useRef(0);
@@ -44,13 +47,15 @@ export default function MobileBar({ onMenu, onSearch, onAdd }) {
 
   const workMode = isWorkPath(pathname);
   const onPlan = pathname === '/plan' || pathname.startsWith('/plan/');
-  const showAdd = pathname !== '/trash' && (!workMode || onPlan); // nothing to add on the Brand Tester, To-Dos…
+  const showAdd = pathname !== '/trash' && pathname !== '/inbox' && (!workMode || onPlan); // nothing to add on the Brand Tester, To-Dos…
   // Section pages have their own big title at the top; detail pages don't.
   const sectionPage = !/^\/(project|gallery|plan|software)\/./.test(pathname);
 
   return (
     <header className={`mbar ${hidden ? 'mbar-hidden' : ''}`}>
-      <button className="icon-btn mbar-btn" onClick={onMenu} aria-label="Open menu"><MenuIcon size={20} /></button>
+      <button className="icon-btn mbar-btn" onClick={onMenu} aria-label={inboxCount ? `Open menu — ${inboxCount} in the inbox` : 'Open menu'}>
+        <MenuIcon size={20} />{inboxCount > 0 && pathname !== '/inbox' && <span className="mbar-dot" />}
+      </button>
       <div className={`mbar-title ${sectionPage && !scrolled ? 'quiet' : ''}`}>{titleFor(pathname, tab)}</div>
       <button className="icon-btn mbar-btn" onClick={onSearch} aria-label="Search"><Search size={19} /></button>
       {showAdd && (

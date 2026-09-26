@@ -19,7 +19,7 @@ export const TAG_KEYS = new Set(['red', 'orange', 'yellow', 'green', 'blue', 'pu
 export const CURRENCIES = new Set(['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD']);
 
 export const emptyDB = () => ({
-  schemaVersion: SCHEMA_VERSION, projects: [], galleries: [], plans: [], planTemplates: [], software: [], trash: [],
+  schemaVersion: SCHEMA_VERSION, projects: [], galleries: [], plans: [], planTemplates: [], software: [], trash: [], inbox: [],
   settings: { storageLimitBytes: DEFAULT_STORAGE_LIMIT },
 });
 
@@ -171,6 +171,7 @@ export function normalizePlan(plan) {
   if (!('avatarEmoji' in plan)) plan.avatarEmoji = null;
   if (!PLAN_STATUSES.includes(plan.status)) plan.status = '';
   if (typeof plan.client !== 'string') plan.client = '';
+  if (!Array.isArray(plan.archivedAs)) plan.archivedAs = []; // library projects made from this plan
   return plan;
 }
 
@@ -365,6 +366,7 @@ export function normalizeDB(db) {
   if (!Array.isArray(db.software)) db.software = [];
   if (!Array.isArray(db.trash)) db.trash = [];
   if (!Array.isArray(db.planTemplates)) db.planTemplates = [];
+  if (!Array.isArray(db.inbox)) db.inbox = [];
   for (const plan of db.plans) normalizePlan(plan);
   for (const s of db.software) normalizeSoftware(s);
   for (const p of db.projects) {

@@ -7,6 +7,7 @@ import {
   Link2, Library, FolderOpen, Palette as PaletteIcon, Heading as HeadingIcon,
   Minus, Table as TableIcon, Wand2, Copy, FileText, AlertTriangle, ClipboardList,
   LayoutTemplate, Building2, Clapperboard, ScrollText, MonitorPlay, PackageCheck,
+  Archive, Film,
 } from 'lucide-react';
 import { api, planFileUrl, fileUrl } from '../lib/api.js';
 import { useSaver, useRefreshOnReturn } from '../lib/autosave.js';
@@ -27,6 +28,7 @@ import StoryboardBlock from '../components/plan/StoryboardBlock.jsx';
 import ReviewBlock from '../components/plan/ReviewBlock.jsx';
 import DeliverablesBlock, { tableToDeliverables } from '../components/plan/DeliverablesBlock.jsx';
 import PlanTodos from '../components/plan/PlanTodos.jsx';
+import ArchiveModal from '../components/plan/ArchiveModal.jsx';
 import { voEstimate } from '../lib/timing.js';
 
 const rid = () => Math.random().toString(36).slice(2, 8);
@@ -86,6 +88,7 @@ export default function PlanDetail() {
   const [emojiInput, setEmojiInput] = useState('');
   const [dragBlock, setDragBlock] = useState(null);
   const [savingTemplate, setSavingTemplate] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const [client, setClient] = useState('');
   const saver = useSaver();
   const planRef = useRef(null);
@@ -197,6 +200,17 @@ export default function PlanDetail() {
       setSavingTemplate(false);
       toast(replaced ? `Template “${template.name}” updated` : `Saved as template “${template.name}”`);
     } catch (e) { toast(`Could not save template: ${e.message}`, 'error'); }
+  };
+
+  // Finished: the final work goes to the library as references.
+  const onArchived = (res, err) => {
+    if (!res) { toast(`Could not archive: ${err?.message || 'failed'}`, 'error'); return; }
+    setArchiving(false);
+    // Only what the archive changed — edits made here stay as they are.
+    setPlan((p) => ({ ...p, archivedAs: res.plan?.archivedAs || p.archivedAs, status: res.plan?.status ?? p.status }));
+    const n = res.projects.length;
+    toast(`Added ${n} reference${n === 1 ? '' : 's'} to your library`, 'ok',
+      { label: 'Open', onClick: () => navigate(`/project/${res.projects[0].id}`) });
   };
 
   // Briefing block — copy all answers as plain text (for an email or a doc).
@@ -389,6 +403,7 @@ export default function PlanDetail() {
           items={[
             { label: 'Rename', icon: <Pencil size={15} />, onClick: () => setRenaming(true) },
             { label: 'Save as template…', icon: <LayoutTemplate size={15} />, onClick: () => setSavingTemplate(true) },
+            { label: 'Archive as reference…', icon: <Archive size={15} />, onClick: () => setArchiving(true) },
             { separator: true },
             { label: 'Delete plan', icon: <Trash2 size={15} />, danger: true, onClick: remove },
           ]}
@@ -461,6 +476,7 @@ export default function PlanDetail() {
           <input value={client} placeholder="Add client" onChange={(e) => editClient(e.target.value)} aria-label="Client" />
         </label>
       </div>
+      <LibraryChips items={plan.archivedAs} />
 
       <input ref={bannerRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { setImage('banner', e.target.files[0]); e.target.value = ''; }} />
       <input ref={avatarRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { setImage('avatar', e.target.files[0]); e.target.value = ''; }} />
@@ -947,6 +963,9 @@ export default function PlanDetail() {
       {fileModalBlock && (
         <FileAddModal onSubmit={submitFile} onClose={() => setFileModalBlock(null)} />
       )}
+      {archiving && (
+        <ArchiveModal plan={plan} client={client} flush={() => saver.flush()} onDone={onArchived} onClose={() => setArchiving(false)} />
+      )}
     </div>
   );
 }
@@ -987,6 +1006,37 @@ function PlanPdfBlock({ plan, files, onRemove }) {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+// "In your library": the references made from this plan (hidden once deleted).
+function LibraryChips({ items }) {
+  const navigate = useNavigate();
+  const [alive, setAlive] = useState({}); // project id → project | false
+  const key = (items || []).map((x) => x.id).join(',');
+  useEffect(() => {
+    let on = true;
+    for (const id of key ? key.split(',') : []) {
+      api.get(id).then((p) => { if (on) setAlive((a) => ({ ...a, [id]: p })); }).catch(() => { if (on) setAlive((a) => ({ ...a, [id]: false })); });
+    }
+    return () => { on = false; };
+  }, [key]);
+  const shown = (items || []).filter((x) => alive[x.id]);
+  if (!shown.length) return null;
+  const ICON = { motion: Film, branding: Images, color: PaletteIcon };
+  const LABEL = { motion: 'Motion', branding: 'Branding', color: 'Colors' };
+  return (
+    <div className="plan-library">
+      <span className="plan-library-label"><Library size={14} /> In your library</span>
+      {shown.map((x) => {
+        const Icon = ICON[x.type] || Library;
+        return (
+          <button key={x.id} className="plan-library-chip" onClick={() => navigate(`/project/${x.id}`)}>
+            <Icon size={13} /> <span className="plan-library-type">{LABEL[x.type] || 'Reference'}</span> {alive[x.id].title || x.title}
+          </button>
+        );
+      })}
     </div>
   );
 }

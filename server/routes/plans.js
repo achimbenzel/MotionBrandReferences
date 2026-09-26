@@ -1,14 +1,15 @@
 // Plans (Work mode) — a header + timeframe, plus a list of content blocks.
 import fs from 'node:fs';
+import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { nanoid } from 'nanoid';
-import { DATA_DIR, TRASH_DIR } from '../config.js';
+import { DATA_DIR, TRASH_DIR, TYPE_LABEL } from '../config.js';
 import { readDB, mutateDB } from '../db.js';
 import { moveInto, replaceImage, safeRm, moveToTrash, moveRelPaths, extOf } from '../files.js';
 import { upload } from '../upload.js';
 import {
   BLOCK_TYPES, BLOCK_TITLES, PLAN_STATUSES, STORYBOARD_ASPECTS, normalizeField, normalizeShot, normalizeAudio,
-  normalizeLine, normalizeTarget, normalizePace, normalizeVersion, normalizeDeliverable, str,
+  normalizeLine, normalizeTarget, normalizePace, normalizeVersion, normalizeDeliverable, normTags, str,
 } from '../schema.js';
 import { BUILTIN_TEMPLATES, builtinTemplate, planFromTemplate, templateFromPlan, templateSummary } from '../templates.js';
 import { createRouter } from '../http.js';
@@ -161,6 +162,129 @@ for (const kind of ['banner', 'avatar']) {
     res.json({ plan: updated });
   });
 }
+
+// Add a library item (project or gallery) to a plan's references: into its
+// first References block, or a new one at the end. Already there → unchanged.
+router.post('/api/plans/:id/refs', async (req, res) => {
+  const refKind = req.body.refKind === 'gallery' ? 'gallery' : 'project';
+  const refId = str(req.body.refId, 40);
+  const out = await mutateDB((db) => {
+    const p = db.plans.find((x) => x.id === req.params.id);
+    if (!p) return { status: 404 };
+    const item = refKind === 'gallery' ? db.galleries.find((g) => g.id === refId) : db.projects.find((x) => x.id === refId);
+    if (!item) return { status: 400 };
+    let b = p.blocks.find((x) => x.type === 'refs');
+    if (!b) { b = { id: nanoid(8), type: 'refs', title: 'References', items: [] }; p.blocks.push(b); }
+    if (!Array.isArray(b.items)) b.items = [];
+    if (b.items.some((r) => r.refKind === refKind && r.refId === refId)) return { plan: p, block: b, added: false };
+    b.items.push({
+      id: nanoid(6), refKind, refId, refType: item.type || null,
+      title: (refKind === 'gallery' ? item.name : item.title) || 'Untitled',
+      subtitle: refKind === 'gallery' ? `Gallery · ${TYPE_LABEL[item.type] || item.type}` : (item.category || TYPE_LABEL[item.type] || ''),
+      thumb: refKind === 'project' && item.thumb ? `/data/${item.type}/${item.id}/${item.thumb}` : null,
+    });
+    return { plan: p, block: b, added: true };
+  });
+  if (out.status === 404) return res.status(404).json({ error: 'not_found' });
+  if (out.status === 400) return res.status(400).json({ error: 'unknown_item', message: 'That item is no longer in your library.' });
+  res.status(out.added ? 201 : 200).json({ plan: out.plan, blockId: out.block.id, added: out.added });
+});
+
+// Archive a finished plan into the library: the final video becomes a Motion
+// project, chosen images / PDFs a Branding project, the palette a Colors
+// project. Files are copied — the plan keeps everything. Each new project
+// remembers its plan (fromPlan), the plan its projects (archivedAs).
+const HEX = /^#[0-9a-f]{6}$/i;
+const VIDEO_EXT = /\.(mp4|m4v|mov|webm|mkv|ogv)$/i;
+const ARCHIVE_ASSET_EXT = /\.(png|jpe?g|gif|webp|avif|svg|pdf)$/i;
+router.post('/api/plans/:id/archive', async (req, res) => {
+  const db = await readDB();
+  const plan = db.plans.find((p) => p.id === req.params.id);
+  if (!plan) return res.status(404).json({ error: 'not_found' });
+  const pdir = planDir(plan.id);
+  // Files are found by block + item id in the plan, never by a path from the request.
+  const fileOf = (blockId, itemId) => {
+    const b = findBlock(plan, blockId);
+    if (!b) return null;
+    const hit = (b.versions || []).find((x) => x.id === itemId) || (b.images || []).find((x) => x.id === itemId) || (b.files || []).find((x) => x.id === itemId);
+    const rel = hit?.file;
+    if (typeof rel !== 'string' || rel.includes('..') || !fs.existsSync(path.join(pdir, rel))) return null;
+    return { rel, name: hit.name || hit.title || path.basename(rel) };
+  };
+  const base = {
+    year: str(req.body.year || String(new Date().getFullYear()), 10),
+    tags: normTags(req.body.tags),
+    notes: `From the plan “${plan.name}”${plan.client ? ` for ${plan.client}` : ''}.`,
+    fromPlan: plan.id,
+    createdAt: Date.now(),
+  };
+  const created = [];
+  const dirs = [];
+  const newDir = async (type, id) => { const d = path.join(DATA_DIR, type, id); await fsp.mkdir(d, { recursive: true }); dirs.push(d); return d; };
+  try {
+    const m = req.body.motion;
+    if (m) {
+      const src = fileOf(m.blockId, m.itemId);
+      if (!src || !VIDEO_EXT.test(src.rel)) return res.status(400).json({ error: 'file_missing', message: 'That video is no longer in the plan.' });
+      const id = nanoid(10);
+      const ext = extOf(src.rel) || '.mp4';
+      await fsp.copyFile(path.join(pdir, src.rel), path.join(await newDir('motion', id), `video${ext}`));
+      const n = (v, max) => { const x = Number(v); return Number.isFinite(x) && x > 0 && x <= max ? x : 0; };
+      created.push({
+        id, type: 'motion', title: str(m.title, 200).trim() || plan.name, category: str(m.category, 120) || 'Own work', ...base,
+        video: `video${ext}`, duration: n(m.duration, 86400), width: Math.round(n(m.width, 20000)) || null, height: Math.round(n(m.height, 20000)) || null,
+        frames: [], markers: [], segments: [],
+      });
+    }
+    const br = req.body.branding;
+    if (br && Array.isArray(br.items) && br.items.length) {
+      const id = nanoid(10);
+      const dir = await newDir('branding', id);
+      const assets = [];
+      for (const it of br.items.slice(0, 300)) {
+        const src = fileOf(it?.blockId, it?.itemId);
+        if (!src || !ARCHIVE_ASSET_EXT.test(src.rel)) continue; // images and PDFs only
+        const ext = extOf(src.rel);
+        const assetId = nanoid(6);
+        await fsp.copyFile(path.join(pdir, src.rel), path.join(dir, `${assetId}${ext}`));
+        assets.push({ id: assetId, kind: ext === '.pdf' ? 'pdf' : 'image', file: `${assetId}${ext}`, name: str(src.name, 200) });
+      }
+      if (assets.length) {
+        created.push({
+          id, type: 'branding', title: str(br.title, 200).trim() || plan.name, category: str(br.category, 120) || 'Own work', ...base,
+          assets, thumb: assets.find((a) => a.kind === 'image')?.file || null,
+        });
+      }
+    }
+    const co = req.body.color;
+    if (co && Array.isArray(co.colors)) {
+      const colors = co.colors.filter((c) => HEX.test(c?.hex)).slice(0, 64).map((c) => ({
+        id: nanoid(6), name: str(c.name, 80) || 'Color', source: 'hex', hex: c.hex.toUpperCase(),
+        ...(c.rgb && typeof c.rgb === 'object' ? { rgb: c.rgb } : {}), ...(c.cmyk && typeof c.cmyk === 'object' ? { cmyk: c.cmyk } : {}),
+        ...(typeof c.pantone === 'string' ? { pantone: str(c.pantone, 60), pantoneApprox: true } : {}),
+      }));
+      if (colors.length) {
+        created.push({ id: nanoid(10), type: 'color', title: str(co.title, 200).trim() || `${plan.name} palette`, category: 'Palette', ...base, colors });
+      }
+    }
+  } catch (err) {
+    for (const d of dirs) await safeRm(d, { recursive: true, force: true }).catch(() => {});
+    throw err;
+  }
+  if (!created.length) {
+    for (const d of dirs) await safeRm(d, { recursive: true, force: true }).catch(() => {});
+    return res.status(400).json({ error: 'nothing_to_archive', message: 'Choose at least one thing to keep.' });
+  }
+  const updated = await mutateDB((d) => {
+    d.projects.push(...created);
+    const p = d.plans.find((x) => x.id === plan.id);
+    if (!p) return null;
+    p.archivedAs = [...(Array.isArray(p.archivedAs) ? p.archivedAs : []), ...created.map((c) => ({ id: c.id, type: c.type, title: c.title }))];
+    if (req.body.archive) p.status = 'archived';
+    return p;
+  });
+  res.status(201).json({ plan: updated, projects: created });
+});
 
 // --- Content blocks ---
 router.post('/api/plans/:id/blocks', async (req, res) => {

@@ -121,6 +121,44 @@ export function probeVideo(url, timeout = 15000) {
   });
 }
 
+/**
+ * A cover frame from a video URL (at `atFraction` of its length), at most
+ * `maxW` wide → WebP Blob, or null if the video can't be read in time.
+ */
+export function captureCover(url, atFraction = 0.25, { maxW = 1600, timeout = 20000 } = {}) {
+  return new Promise((resolve) => {
+    const v = document.createElement('video');
+    v.preload = 'auto';
+    v.muted = true;
+    v.playsInline = true;
+    let finished = false;
+    const done = (r) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      v.removeAttribute('src'); v.load();
+      resolve(r);
+    };
+    const timer = setTimeout(() => done(null), timeout);
+    v.addEventListener('error', () => done(null), { once: true });
+    v.addEventListener('loadedmetadata', async () => {
+      const d = await resolveDuration(v);
+      if (finished) return;
+      const target = d > 0 ? Math.min(d * atFraction, Math.max(0, d - 0.1)) : 0;
+      // resolveDuration may still be jumping back — wait for our own seek.
+      const onSeeked = async () => {
+        if (Math.abs(v.currentTime - target) > 0.5) return;
+        v.removeEventListener('seeked', onSeeked);
+        try { done(await captureSmallFrame(v, maxW, 0.88)); } catch { done(null); }
+      };
+      v.addEventListener('seeked', onSeeked);
+      v.currentTime = target;
+      if (target === 0 && v.readyState >= 2) onSeeked();
+    }, { once: true });
+    v.src = url;
+  });
+}
+
 /** The current frame of a <video>, scaled to at most `maxW` wide, as WebP. */
 export function captureSmallFrame(video, maxW = 480, quality = 0.82) {
   return new Promise((resolve, reject) => {

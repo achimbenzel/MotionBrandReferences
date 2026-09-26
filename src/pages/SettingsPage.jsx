@@ -27,7 +27,11 @@ const GROUPS = [
   {
     title: 'Motion video',
     rows: [
+      { keys: ['Space'], sep: ' / ', alt: ['K'], desc: 'Play / pause (also YouTube / Vimeo links)' },
       { keys: [',', '.'], sep: ' ', desc: 'Step one frame back / forward (while paused)' },
+      { keys: ['M'], desc: 'Mark a moment at the playhead' },
+      { keys: ['L'], desc: 'Loop the current section' },
+      { keys: ['<', '>'], sep: ' ', desc: 'Slower / faster' },
       { keys: ['Volume'], desc: 'Your volume is remembered across reloads' },
     ],
   },

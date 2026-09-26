@@ -24,6 +24,7 @@ const SoftwarePage = lazy(() => import('./pages/SoftwarePage.jsx'));
 const SoftwareDetail = lazy(() => import('./pages/SoftwareDetail.jsx'));
 const TrashPage = lazy(() => import('./pages/TrashPage.jsx'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage.jsx'));
+const InboxPage = lazy(() => import('./pages/InboxPage.jsx'));
 import { TABS, isWorkPath, WORK_HOME } from './lib/types.js';
 import { useMediaQuery, DESKTOP } from './lib/useMedia.js';
 
@@ -122,6 +123,7 @@ function Shell() {
                 <Route path="/software/:id" element={<SoftwareDetail />} />
                 <Route path="/board" element={<TodoBoard />} />
                 <Route path="/logo-tester" element={<LogoTester />} />
+                <Route path="/inbox" element={<InboxPage />} />
                 <Route path="/trash" element={<TrashPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="*" element={<Navigate to={WORK_HOME} replace />} />

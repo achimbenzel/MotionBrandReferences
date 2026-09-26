@@ -97,8 +97,15 @@ export function hostGuard(req, res, next) {
 // which this server never approves, so other web pages can't POST/DELETE here.
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 export const CSRF_HEADER = 'x-requested-with';
+// The one exception is the phone's share sheet ("Share → Confinium"): it can
+// only send a plain form POST. It's accepted when the browser says it didn't
+// come from another site (Sec-Fetch-Site: none / same-origin; absent on
+// browsers too old to send it) — and all it can do is add to the Inbox.
+const SHARE_PATH = '/api/inbox/share';
+const SHARE_SITES = new Set(['none', 'same-origin', undefined]);
 export function csrfGuard(req, res, next) {
   if (SAFE_METHODS.has(req.method) || req.get(CSRF_HEADER)) return next();
+  if (req.method === 'POST' && `${req.baseUrl}${req.path}` === SHARE_PATH && SHARE_SITES.has(req.get('sec-fetch-site'))) return next();
   res.status(403).json({ error: 'csrf', message: `Missing ${CSRF_HEADER} header.` });
 }
 

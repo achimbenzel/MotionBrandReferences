@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Camera, Film, Images, Tag as TagIcon, Trash2, Clock, ChevronLeft, ChevronRight, Maximize2, MoreVertical, Repeat, Crosshair, Gauge } from 'lucide-react';
+import { Camera, Film, Images, Tag as TagIcon, Trash2, Clock, ChevronLeft, ChevronRight, Maximize2, MoreVertical, Repeat, Crosshair, Gauge, ExternalLink } from 'lucide-react';
 import { api, fileUrl } from '../lib/api.js';
 import { useSaver } from '../lib/autosave.js';
 import { captureFrame, captureSmallFrame, lengthTag, fmtTime, formatOf, resolutionOf, resolveDuration, audioPeaks } from '../lib/media.js';
@@ -11,6 +11,8 @@ import Lightbox from '../components/Lightbox.jsx';
 import NotesField from '../components/NotesField.jsx';
 import DetailLayout from '../components/DetailLayout.jsx';
 import SegmentTimeline from '../components/SegmentTimeline.jsx';
+import EmbedPlayer from '../components/EmbedPlayer.jsx';
+import { PROVIDER_LABEL } from '../lib/videoLinks.js';
 import MomentsPanel from '../components/MomentsPanel.jsx';
 
 const rid = () => Math.random().toString(36).slice(2, 8);
@@ -43,6 +45,7 @@ export default function MotionDetail({ project, setProject }) {
   const frames = [...(project.frames || [])].sort((a, b) => a.t - b.t);
   const autoLen = project.duration ? lengthTag(project.duration) : null;
   const format = formatOf(project.width, project.height);
+  const isLink = project.source === 'link'; // a YouTube / Vimeo link, played embedded
   const resolution = resolutionOf(project.width, project.height);
   const selClamped = Math.min(sel, Math.max(0, frames.length - 1));
 
@@ -51,7 +54,7 @@ export default function MotionDetail({ project, setProject }) {
 
   // Remember the player volume across reloads (a global per-viewer preference).
   useEffect(() => {
-    const v = videoRef.current; if (!v) return;
+    const v = videoRef.current; if (!(v instanceof HTMLMediaElement)) return; // an embed keeps its own volume
     try {
       const vol = parseFloat(localStorage.getItem('videoVolume'));
       if (Number.isFinite(vol)) v.volume = Math.min(1, Math.max(0, vol));
@@ -65,7 +68,7 @@ export default function MotionDetail({ project, setProject }) {
   // YouTube-style frame stepping: when the video is paused, "," and "." step
   // one frame back / forward. (No universal way to read a file's fps from the
   // browser, so a frame is 1/30s — fine for grabbing an exact-ish frame.)
-  // Also: M marks a moment, L loops the current section, < / > change speed.
+  // Also: Space / K play, M marks a moment, L loops the current section, < / > change speed.
   const keys = useRef({});
   useEffect(() => {
     const FRAME = 1 / 30;
@@ -76,6 +79,12 @@ export default function MotionDetail({ project, setProject }) {
       const el = document.activeElement;
       if (el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable)) return;
       if (document.querySelector('.overlay, .lightbox, .sheet-backdrop')) return;
+      // Space / K play and pause (a focused button or the video's own controls keep theirs).
+      if ((e.key === ' ' || e.key === 'k' || e.key === 'K') && !(el && /^(BUTTON|A|VIDEO|SUMMARY)$/.test(el.tagName))) {
+        e.preventDefault();
+        if (v.paused) v.play()?.catch?.(() => {}); else v.pause();
+        return;
+      }
       if (e.key === 'm' || e.key === 'M') { e.preventDefault(); keys.current.mark?.(); return; }
       if (e.key === 'l' || e.key === 'L') { e.preventDefault(); keys.current.loop?.(); return; }
       if (e.key === '<' || e.key === '>') { e.preventDefault(); keys.current.speed?.(e.key === '>' ? 1 : -1); return; }
@@ -203,6 +212,15 @@ export default function MotionDetail({ project, setProject }) {
   const seek = (t) => { const v = videoRef.current; if (v) { v.currentTime = t; setCurrent(t); } };
   keys.current = { mark: () => addMoment(''), loop: toggleLoop, speed: changeSpeed };
 
+  // Embedded link: its length arrives from the player — store it once, jump to ?t=.
+  const onEmbedDuration = (d) => {
+    const v = videoRef.current;
+    if (v) v.playbackRate = rate;
+    if (!project.duration && d > 0) api.update(project.id, { duration: d }).then(setProject).catch(() => {});
+    const t = Number(params.get('t'));
+    if (!jumped.current && Number.isFinite(t) && t > 0 && v) { jumped.current = true; v.currentTime = t; setCurrent(t); }
+  };
+
   // First load: fill in a missing size / length, and jump to ?t= (from Moments).
   const onMeta = (e) => {
     const v = e.currentTarget;
@@ -322,17 +340,22 @@ export default function MotionDetail({ project, setProject }) {
         </>
       )}
     >
-      <div className="player-wrap">
-        <video
-          ref={videoRef}
-          src={fileUrl(project, project.video)}
-          controls
-          onPlay={() => setPaused(false)}
-          onPause={() => setPaused(true)}
-          onVolumeChange={saveVolume}
-          onTimeUpdate={(e) => setCurrent(e.target.currentTime)}
-          onLoadedMetadata={onMeta}
-        />
+      <div className="player-wrap" style={isLink ? { aspectRatio: project.width && project.height ? `${project.width} / ${project.height}` : '16 / 9' } : undefined}>
+        {isLink ? (
+          <EmbedPlayer ref={videoRef} provider={project.provider} videoId={project.videoId} hash={project.videoHash} title={project.title}
+            onPlay={() => setPaused(false)} onPause={() => setPaused(true)} onTime={setCurrent} onDuration={onEmbedDuration} />
+        ) : (
+          <video
+            ref={videoRef}
+            src={fileUrl(project, project.video)}
+            controls
+            onPlay={() => setPaused(false)}
+            onPause={() => setPaused(true)}
+            onVolumeChange={saveVolume}
+            onTimeUpdate={(e) => setCurrent(e.target.currentTime)}
+            onLoadedMetadata={onMeta}
+          />
+        )}
       </div>
 
       {/* Player tools: speed, loop, mark a moment; the video's format */}
@@ -363,6 +386,14 @@ export default function MotionDetail({ project, setProject }) {
       <MomentsPanel markers={markers} techniques={techniques} focusId={focusMarker} thumbUrl={(rel) => fileUrl(project, rel)}
         onAdd={addMoment} onPatch={patchMarker} onRemove={removeMarker} onSeek={seek} />
 
+      {isLink ? (
+        <div className="link-info">
+          <span><b>{PROVIDER_LABEL[project.provider] || 'Video'}</b>{project.channel ? ` · ${project.channel}` : ''} · {fmtTime(current)} / {fmtTime(project.duration)}</span>
+          <a className="btn btn-sm" href={project.url} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} /> Open on {PROVIDER_LABEL[project.provider] || 'the site'}</a>
+          <span className="hint">Played from {PROVIDER_LABEL[project.provider] || 'the site'} — sections, moments, loop and speed work; frames and the waveform need the video file itself.</span>
+        </div>
+      ) : (
+        <>
       <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap', alignItems: 'center' }}>
         <button className="btn btn-primary" onClick={addFrame} disabled={capturing || !!bulk}>
           <Camera size={16} /> {capturing ? 'Capturing…' : 'Add current frame'}
@@ -435,6 +466,8 @@ export default function MotionDetail({ project, setProject }) {
           </>
         )}
       </div>
+        </>
+      )}
 
       {lightbox && (
         <Lightbox items={lightboxItems} index={selClamped} onIndex={setSel} onClose={() => setLightbox(false)} />
