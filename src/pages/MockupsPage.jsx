@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Smartphone, Tablet, Laptop, AppWindow, Box, MoreHorizontal, Copy, Trash2, UploadCloud, MonitorSmartphone } from 'lucide-react';
+import { Plus, Box, MoreHorizontal, Copy, Trash2, UploadCloud, MonitorSmartphone } from 'lucide-react';
 import { api, mockupFileUrl } from '../lib/api.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
-import { DEVICES } from '../lib/mockup3d/catalog.js';
-
-const DEVICE_ICON = { iphone: Smartphone, ipad: Tablet, macbook: Laptop, browser: AppWindow, custom: Box };
+import { DEVICES, DEVICE_ICON, START_FRAME } from '../lib/mockup3d/catalog.js';
 const fmtSize = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 const ago = (ts) => {
   const d = Math.floor((Date.now() - ts) / 86400000);
@@ -41,7 +39,7 @@ export default function MockupsPage() {
     setBusy(true);
     try {
       const label = device === 'custom' ? (data.models.find((x) => x.id === modelId)?.name || '3D model') : DEVICES[device].label;
-      const m = await api.createMockup({ device, modelId, name: `${label} mockup`, frame: device === 'iphone' || device === 'ipad' ? '4:5' : '16:9' });
+      const m = await api.createMockup({ device, modelId, name: `${label} mockup`, frame: START_FRAME[device] || '16:9' });
       navigate(`/mockups/${m.id}`);
     } catch (e) { toast(`Could not create: ${e.message}`, 'error'); setBusy(false); }
   };
@@ -104,7 +102,8 @@ export default function MockupsPage() {
         <div className="grid">
           {data.mockups.map((m) => {
             const I = DEVICE_ICON[m.device] || MonitorSmartphone;
-            const deviceName = m.device === 'custom' ? data.models.find((x) => x.id === m.modelId)?.name || '3D model' : DEVICES[m.device]?.label;
+            const names = (m.items || [m]).map((it) => (it.device === 'custom' ? data.models.find((x) => x.id === it.modelId)?.name || '3D model' : DEVICES[it.device]?.label));
+            const deviceName = names.length > 2 ? `${names[0]} + ${names.length - 1} more` : names.join(' + ');
             return (
               <div key={m.id} className="card mk-card" onClick={() => navigate(`/mockups/${m.id}`)} role="link" tabIndex={0}
                 onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/mockups/${m.id}`); }}>

@@ -127,3 +127,57 @@ test('3D models: import .glb / .usdz, pick the screen mesh, delete to Trash', as
   await srv.api(`/api/trash/${del.data.trashId}/restore`, { method: 'POST' });
   assert.ok((await srv.api('/api/mockups')).data.models.some((x) => x.id === model.id));
 });
+
+test('several devices per scene: items with their own screens; older single-device scenes read as one', async () => {
+  // A scene saved before several devices existed (top-level device fields only).
+  const legacy = (await srv.api('/api/mockups', { method: 'POST', json: { device: 'ipad', color: 'silver', landscape: true } })).data.mockup;
+  assert.equal(legacy.items.length, 1);
+  assert.deepEqual([legacy.items[0].device, legacy.items[0].color, legacy.items[0].landscape], ['ipad', 'silver', true]);
+  assert.deepEqual(legacy.items[0].adjust, { scale: 1, x: 0, y: 0 });
+  assert.equal(legacy.animation.preset, 'none');
+
+  const main = legacy.items[0].id;
+  let fd = new FormData();
+  fd.append('file', new Blob([png(6, 4, [1, 2, 3])], { type: 'image/png' }), 'first.png');
+  await srv.api(`/api/mockups/${legacy.id}/content`, { method: 'POST', body: fd });
+
+  // Add a phone in front that shows the same picture, and a MacBook; content from the client is ignored.
+  let r = await srv.api(`/api/mockups/${legacy.id}`, {
+    method: 'PATCH',
+    json: {
+      items: [
+        { id: main, device: 'ipad', color: 'silver', landscape: true, x: -20, adjust: { scale: 1.5, x: 0.1, y: -9 } },
+        { id: 'p2', device: 'iphone', contentFrom: main, x: 18, z: 10, rotY: -20 },
+        { id: 'm3', device: 'macbook', content: { file: 'evil.png' }, lid: 500 },
+      ],
+      animation: { preset: 'turntable', duration: 99, easing: 'linear' },
+    },
+  });
+  let m = r.data.mockup;
+  assert.deepEqual(m.items.map((it) => it.device), ['ipad', 'iphone', 'macbook']);
+  assert.equal(m.items[1].content.file, m.items[0].content.file);
+  assert.equal(m.items[2].content, null);
+  assert.deepEqual(m.items[0].adjust, { scale: 1.5, x: 0.1, y: -3 });
+  assert.deepEqual([m.items[1].x, m.items[1].z, m.items[1].rotY, m.items[2].lid], [18, 10, -20, 180]);
+  assert.deepEqual(m.animation, { preset: 'turntable', duration: 30, easing: 'linear' });
+  assert.equal(m.device, 'ipad'); // the first device, mirrored for simple readers
+
+  // Replacing the picture on one device keeps the shared file for the other…
+  const shared = m.items[0].content.file;
+  fd = new FormData();
+  fd.append('file', new Blob([png(3, 3, [9, 9, 9])], { type: 'image/png' }), 'phone.png');
+  r = await srv.api(`/api/mockups/${legacy.id}/content?item=p2`, { method: 'POST', body: fd });
+  m = r.data.mockup;
+  assert.equal(m.items[1].content.name, 'phone.png');
+  assert.equal(m.items[0].content.file, shared);
+  assert.equal(await served(m, shared), 200);
+  // …and removing it from the last device that shows it deletes the file.
+  r = await srv.api(`/api/mockups/${legacy.id}/content?item=${main}`, { method: 'DELETE' });
+  assert.equal(r.data.mockup.items[0].content, null);
+  assert.equal(await served(m, shared), 404);
+  assert.equal((await srv.api(`/api/mockups/${legacy.id}/content?item=nope`, { method: 'DELETE' })).status, 404);
+
+  // Single-device fields still change the first device.
+  r = await srv.api(`/api/mockups/${legacy.id}`, { method: 'PATCH', json: { color: 'spacegray' } });
+  assert.deepEqual([r.data.mockup.items[0].color, r.data.mockup.items.length], ['spacegray', 3]);
+});

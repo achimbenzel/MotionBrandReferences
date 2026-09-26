@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { FlaskConical, UploadCloud, RefreshCw, X, Library, Download, FolderInput, Search, Square } from 'lucide-react';
 import { api, fileUrl } from '../lib/api.js';
 import { logoSource, logoActive, logoRenditionList } from '../lib/types.js';
-import { loadLogo, tintedCanvas, renderSheet, SQUIRCLE_MASK } from '../lib/brandSheet.js';
+import { loadLogo, tintedCanvas, renderSheet, renderLogo, sheetSize, SQUIRCLE_MASK } from '../lib/brandSheet.js';
 import { isTouch } from '../lib/useMedia.js';
 import { useToast } from '../components/Toast.jsx';
 import LogoImage from '../components/LogoImage.jsx';
 import SaveToPlanModal from '../components/SaveToPlanModal.jsx';
+import ExportDialog from '../components/ExportDialog.jsx';
 
 const BRAND_BOARD = /brand|logo|test/i;
 
@@ -52,7 +53,8 @@ export default function LogoTester() {
   const [iconPad, setIconPad] = useState(saved.current.iconPad ?? 0.62);
   const [brandColors, setBrandColors] = useState([]);
   const [picking, setPicking] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState(false);   // true, or a rendered File from the export dialog
+  const [exporting, setExporting] = useState(false);
   const [stage, setStage] = useState({ w: 0, h: 0 });
   const fileRef = useRef(null);
   const stageRef = useRef(null);
@@ -138,12 +140,44 @@ export default function LogoTester() {
     const slug = (logo?.name || 'logo').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'logo';
     return new File([blob], `brand-test-${slug}.png`, { type: 'image/png' });
   };
-  const download = async () => {
-    try {
-      const f = await sheetFile();
-      const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-    } catch (e) { toast(`Could not render: ${e.message}`, 'error'); }
+  // Export: the sheet (size, light / dark / transparent) or just the logo —
+  // as it is, as profile picture or app icon — at any size and background.
+  const slug = (logo?.name || 'logo').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'logo';
+  const stageBg = bg === 'checker' ? null : bgCss;
+  const logoTarget = (key, label, { shape, padding, sizes }) => ({
+    key, label, kind: 'image', aspect: null, sizes, defaultSize: 0,
+    backgrounds: [{ key: 'transparent', label: 'Transparent' }, ...(stageBg ? [{ key: 'stage', label: 'As on the stage', swatch: stageBg }] : []),
+      { key: 'white', label: 'White', swatch: '#fff' }, { key: 'black', label: 'Black', swatch: '#000' },
+      ...brandColors.slice(0, 4).map((hex) => ({ key: `brand:${hex}`, label: hex.toUpperCase(), swatch: hex }))],
+    defaultBackground: shape === 'none' ? 'transparent' : stageBg ? 'stage' : 'white',
+    allowColor: true, formats: ['png', 'jpg', 'webp'], maxSize: 8192,
+    options: [
+      { key: 'shape', label: 'Shape', type: 'select', default: shape, choices: [{ key: 'none', label: 'As is' }, { key: 'circle', label: 'Circle' }, { key: 'squircle', label: 'App icon' }, { key: 'rounded', label: 'Rounded' }] },
+      { key: 'padding', label: 'Space around the logo', type: 'range', min: 0, max: 40, default: padding, format: (v) => `${v}%` },
+    ],
+  });
+  const exportTargets = () => {
+    const [sw, sh] = sheetSize(brandColors.length, 1);
+    return [
+      {
+        key: 'sheet', label: 'Test sheet', kind: 'image', aspect: sw / sh, defaultSize: 1,
+        sizes: [1, 2, 3, 4].map((k) => ({ label: `${k}×`, w: sw * k, h: sh * k })),
+        backgrounds: [{ key: 'light', label: 'Light', swatch: '#f4f4f6' }, { key: 'dark', label: 'Dark', swatch: '#0f0f12' }, { key: 'transparent', label: 'Transparent' }],
+        formats: ['png', 'jpg', 'webp'], maxSize: 8192,
+      },
+      logoTarget('logo', 'Logo', { shape: 'none', padding: 8, sizes: [{ label: '512', w: 512, h: 512 }, { label: '1024', w: 1024, h: 1024 }, { label: '2048', w: 2048, h: 2048 }, { label: 'Full HD', w: 1920, h: 1080 }, { label: '4K', w: 3840, h: 2160 }] }),
+      logoTarget('avatar', 'Profile picture', { shape: 'circle', padding: 18, sizes: [{ label: '400', w: 400, h: 400 }, { label: '800', w: 800, h: 800 }, { label: '1080', w: 1080, h: 1080 }] }),
+      logoTarget('icon', 'App icon', { shape: 'squircle', padding: Math.round((1 - iconPad) * 50), sizes: [{ label: '1024', w: 1024, h: 1024 }, { label: '512', w: 512, h: 512 }, { label: '180', w: 180, h: 180 }] }),
+    ];
+  };
+  const runExport = async (target, o) => {
+    if (!art) throw new Error('No logo');
+    if (target.key === 'sheet') {
+      return renderSheet(art, { ...sheetOpts(), scale: o.width / sheetSize(brandColors.length, 1)[0], theme: o.background, type: o.mime, quality: o.quality });
+    }
+    const background = o.background === 'transparent' ? null : o.background === 'stage' ? stageBg : o.background === 'white' ? '#ffffff'
+      : o.background === 'black' ? '#000000' : o.background === 'color' ? o.color : o.background.startsWith('brand:') ? o.background.slice(6) : null;
+    return renderLogo(art, { width: o.width, height: o.height, background, shape: o.shape, padding: o.padding / 100, tint, filter: tileFilter, type: o.mime, quality: o.quality });
   };
 
   return (
@@ -168,7 +202,7 @@ export default function LogoTester() {
             <button className="btn btn-sm" onClick={() => fileRef.current?.click()}><RefreshCw size={14} /> Upload</button>
             <button className="btn btn-sm btn-ghost" onClick={clear}><X size={15} /> Clear</button>
             <div className="lt-spacer" />
-            <button className="btn btn-sm" onClick={download} disabled={!art}><Download size={14} /> Sheet (PNG)</button>
+            <button className="btn btn-sm" onClick={() => setExporting(true)} disabled={!art}><Download size={14} /> Export…</button>
             <button className="btn btn-sm btn-primary" onClick={() => setSaving(true)} disabled={!art}><FolderInput size={14} /> Save to plan…</button>
             <input ref={fileRef} type="file" accept="image/*,.svg" className="visually-hidden-input"
               onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) pick(f); }} />
@@ -329,10 +363,15 @@ export default function LogoTester() {
       )}
 
       {picking && <LogoPicker onPick={(p) => { applyProject(p); setPicking(false); }} onClose={() => setPicking(false)} />}
+      {exporting && art && (
+        <ExportDialog title="Export" storeKey="btExport" name={slug} targets={exportTargets()} onExport={runExport}
+          onSaveToPlan={(file) => { setExporting(false); setSaving(file); }}
+          onClose={() => setExporting(false)} />
+      )}
       {saving && art && (
-        <SaveToPlanModal title="Save test sheet to plan" boardName="Brand tests" boardMatch={BRAND_BOARD} submitLabel="Save sheet"
-          hint="The sheet (PNG) shows every test on one page — backgrounds, profile picture, app icon, minimum size, clear space and your colours."
-          onClose={() => setSaving(false)} makeFile={sheetFile}
+        <SaveToPlanModal title={saving instanceof File ? 'Save to plan' : 'Save test sheet to plan'} boardName="Brand tests" boardMatch={BRAND_BOARD} submitLabel={saving instanceof File ? 'Save' : 'Save sheet'}
+          hint={saving instanceof File ? `Saved as ${saving.name}.` : 'The sheet (PNG) shows every test on one page — backgrounds, profile picture, app icon, minimum size, clear space and your colours.'}
+          onClose={() => setSaving(false)} makeFile={saving instanceof File ? async () => saving : sheetFile}
           onSaved={(plan) => { setSaving(false); toast(`Test sheet saved to “${plan.name}”`, 'ok', { label: 'Open plan', onClick: () => navigate(`/plan/${plan.id}`) }); }} />
       )}
     </div>

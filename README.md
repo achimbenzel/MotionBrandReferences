@@ -42,6 +42,12 @@ npm install        # picks up new/removed packages — your data/ folder is neve
 npm run dev        # or: npm run serve
 ```
 
+If the server restarts while the app is open (for example `npm run dev` picking
+up an update), the app waits for it for a few seconds and sends the request
+again — reads and edits always, creating something only when it's certain the
+first try never arrived, so nothing is made twice. If it stays unreachable you
+get a clear message instead of a bare “500 Internal Server Error”.
+
 After an update, **Settings → Library** tells you if your library is stored in
 an older data format and offers a one-click **Migrate** (see
 [Data format & migration](#data-format--migration)). Until you click it,
@@ -466,9 +472,15 @@ colour variants come along. Then:
   **profile picture** (circle) and an **app icon** (squircle) with adjustable
   padding, a **minimum size** strip (flags sizes below your minimum; screen px
   and print mm are noted) and the logo **on your brand colours**,
-- **Sheet (PNG)** — every test on one page; **Save to plan…** puts that sheet
-  into a plan's moodboard (an existing one, or a new “Brand tests” board).
-  Nothing else is stored; the settings are remembered for the session.
+- **Export…** — the **test sheet** (every test on one page) at 1×–4×, on a
+  light, dark or **transparent** page, or just the **logo**, as a **profile
+  picture** (circle) or an **app icon** (squircle / rounded) — at preset or
+  your own sizes, with space around it, on a transparent, white, black, stage
+  or brand-colour background, as **PNG, JPG or WebP**. From there **Save to
+  plan…** puts the file into a plan; the **Save to plan…** button saves the
+  sheet (PNG) into a plan's moodboard (an existing one, or a new “Brand tests”
+  board). Nothing else is stored; the settings are remembered for the session
+  (and the export choices on this device).
 
 ### Storyboards
 **Storyboards** (sidebar, under the Brand Tester) lists the storyboards of all
@@ -519,36 +531,61 @@ the Storyboards page always show the same thing.
 **Mockups** (sidebar, under Storyboards) puts your designs and videos on 3D
 devices — rendered live in the browser (three.js), no plugins, nothing online.
 
-- **Devices**: **iPhone** (5 finishes), **iPad** (2), **MacBook** (2) and a
-  **browser window** (light / dark, with your address in the bar) — modelled
-  after the current ones, without logos. Phones and tablets turn to
-  **landscape** or **lie flat**; the MacBook's **lid** opens 40–150°.
+- **Devices**: **iPhone** (5 finishes), **Android phone** (3), **iPad** (2),
+  **MacBook** (2), **Apple Watch** (3, with band), **iMac** (5 colours), **TV**
+  (2) and a **browser window** (light / dark, with your address in the bar) —
+  modelled after the current ones, without logos, at their real sizes. Phones
+  and tablets turn to **landscape** or **lie flat**; the MacBook's **lid**
+  opens 40–150°.
+- **Several devices in one scene** — **Add** a device (e.g. a phone in front
+  of a MacBook), click one in the view or the list to select it, **drag it**
+  to move it on the floor, **Turn** it, **Duplicate** / **Remove** it (with
+  Undo), or **Arrange** them: side by side, the big one behind with the others
+  in front, or a cascade. Each device has its own finish, settings and screen.
 - **Screen**: **upload** a picture or a video (a screen recording plays on the
   device), or take one **from the app** — a plan's moodboards, files,
   storyboard frames and review renders, your Motion references (the video, its
   saved frames and moments), library images or the Inbox. **Fill screen**
   crops to fit, **Show whole** keeps it all.
+- **Position & size…** opens the screen as you see it — its real shape with
+  rounded corners, island / notch / camera hole and the **safe area** (status
+  bar, home bar, TV title-safe) — over a **grid** (thirds, fine or off). Drag
+  the picture to move it, scroll / pinch / drag a corner to resize it, nudge
+  it with the arrow keys; it **snaps** to the middle and the edges, and the 3D
+  device follows live. Fill / Fit / Centre / Reset, or type the size and
+  position in %.
 - **Camera**: drag to turn, scroll / pinch to zoom, right-drag to move — or a
-  view: **Front, ¾ left, ¾ right, Low hero, From above, Side, Back** (a device
-  lying flat gets matching views from above).
+  view: **Front, ¾ left, ¾ right, Low hero, From above, Side, Back** (devices
+  lying flat get matching views from above).
 - **Look**: format **16:9, 4:5, 1:1, 9:16, 3:2**; background **none**
   (transparent), a **colour** or a **gradient** — with your **brand colours**
   from the Colors library one click away; **shadow** on the floor on / off.
-- **Export**: **PNG** at **1× / 2× / 4×** (1920 / 3840 / 7680 px on the long
-  side, as far as the graphics card allows) — transparent if the background is
-  none. **Save to plan** puts the PNG into a “Mockups” moodboard of any plan
-  (or a new one).
+- **Animation**: **Turntable (360°)**, **Sway**, **Float**, **Camera orbit**,
+  **Push in** or **Reveal**, 1–30 s, smooth or even — **Play** previews it
+  from the view you set (turning ones loop seamlessly, and the camera steps
+  back so nothing leaves the picture).
+- **Export…**: an **image** — 1080 / Full HD / 2.5K / 4K / 8K or your own
+  size, background as in the scene, **transparent**, white, black or any
+  colour, floor shadow on / off, **PNG, JPG or WebP** (with quality) and a
+  file name — or a **video** of the animation: 720p–4K, 24 / 30 / 60 fps,
+  **MP4** (H.264) or **WebM**, rendered frame by frame so it's smooth on any
+  computer (screen videos play along; MP4 where the browser can encode it —
+  Chrome, Edge, Safari). **Save to plan** puts the file into a “Mockups”
+  moodboard of any plan (or a new one); the quick **Save to plan** button
+  saves a 4K PNG.
 - Everything **saves as you go**; the list shows a small render of each scene.
-  ⋯ **Duplicate** / **Delete** (→ Trash, with Undo).
+  ⋯ **Duplicate** / **Delete** (→ Trash, with Undo). Scenes made before
+  several devices were possible open as scenes with one device.
 
 **Your own 3D models** — import a **.glb**, a single-file **.gltf** or a
 **.usdz** (on the Mockups page or in the editor) — USDZ is the format Apple
 uses for its 3D / AR product models. Check the licence of any model you use in
-client work. In the editor, **Screen part**
-picks the part of the model that shows your picture (a part named *Screen* /
-*Display* is picked for you); **Turn picture** and **Mirror** fix its
-orientation if needed. A model is scaled to fit and stands on the floor;
-deleting it moves it to Trash.
+client work. In the editor, **Screen part** picks the part of the model that
+shows your picture (a part named *Screen* / *Display* is picked for you);
+**Turn picture** and **Mirror** fix its orientation, **Size** sets how big it
+stands (cm). **Show logo** hides / shows the model's logo parts (parts named
+like *Logo*), and **Parts** lists every part to show or hide. Deleting a model
+moves it to Trash.
 
 ### Inbox (share from your phone)
 Everything you come across on the go — a screenshot, a screen recording, an
@@ -809,7 +846,8 @@ lookup off with `LINK_LOOKUP=off`).
 ## Tech
 
 - **Frontend:** React 18 + Vite + React Router; three.js for the 3D mockups
-  (loaded only by the mockup editor).
+  (loaded only by the mockup editor) and Mediabunny to write MP4 / WebM (loaded
+  only when a video is exported).
 - **Backend:** a small Express server that stores files on disk and metadata in
   `data/db.json` (writes are serialized so nothing clobbers). Layout:
 

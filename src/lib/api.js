@@ -24,13 +24,53 @@ async function handle(res) {
   return res.json();
 }
 
+// A moment where the server can't be reached — it is (re)starting after an
+// update, or a proxy in front of it lost the connection — shows up as a
+// network error, a 502 / 503 / 504 or a bare 500 from the proxy (our own
+// errors are always JSON). Such requests are sent again a few times: reads
+// and field updates always, anything else only when the proxy says the
+// request never reached the server — so nothing is created twice.
+const RETRY_DELAYS = [300, 800, 1600, 3000];
+const REPEATABLE = new Set(['GET', 'HEAD', 'PATCH', 'PUT']);
+const wait = (ms) => new Promise((r) => { setTimeout(r, ms); });
+const UNREACHABLE = 'Can’t reach the server right now — it may be restarting after an update. Try again in a moment.';
+
+async function transientInfo(res) {
+  const json = /json/.test(res.headers.get('content-type') || '');
+  if (res.status === 500 && json) return null;                 // a real error of ours
+  if (![500, 502, 503, 504].includes(res.status)) return null;
+  const body = json ? await res.clone().json().catch(() => null) : null;
+  return { notDelivered: body?.error === 'backend_unreachable' && body.delivered === false, ours: body?.error === 'db_unavailable' };
+}
+
 // fetch() + CSRF header + JSON encoding + error handling in one place.
-function request(url, { method = 'GET', json, body } = {}) {
+async function request(url, { method = 'GET', json, body } = {}) {
   const headers = { ...BASE_HEADERS };
   let payload = body;
   if (json !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(json); }
   const keepalive = keepaliveMode && (payload == null || (typeof payload === 'string' && payload.length < 60000));
-  return fetch(url, { method, headers, body: payload, keepalive }).then(handle);
+  const repeatable = REPEATABLE.has(method) && !keepalive;
+  for (let attempt = 0; ; attempt += 1) {
+    const last = attempt >= RETRY_DELAYS.length || keepalive;
+    let res;
+    try {
+      res = await fetch(url, { method, headers, body: payload, keepalive });
+    } catch (err) {
+      if (last || !repeatable) throw new Error(err?.name === 'TypeError' ? UNREACHABLE : err.message);
+      await wait(RETRY_DELAYS[attempt]);
+      continue;
+    }
+    const t = !res.ok && !last ? await transientInfo(res) : null;
+    if (t && (t.notDelivered || (repeatable && !t.ours) || (t.ours && method === 'GET'))) {
+      await wait(RETRY_DELAYS[attempt]);
+      continue;
+    }
+    if (!res.ok && (res.status === 502 || res.status === 504 || (res.status === 500 && !/json/.test(res.headers.get('content-type') || '')))) {
+      const b = await res.clone().json().catch(() => null);
+      if (!b || b.error === 'backend_unreachable') throw new Error(UNREACHABLE);
+    }
+    return handle(res);
+  }
 }
 
 export const api = {
@@ -173,12 +213,15 @@ export const api = {
   async updateMockup(id, patch) { const { mockup } = await request(`/api/mockups/${id}`, { method: 'PATCH', json: patch }); return mockup; },
   async duplicateMockup(id) { const { mockup } = await request(`/api/mockups/${id}/duplicate`, { method: 'POST' }); return mockup; },
   async removeMockup(id) { return request(`/api/mockups/${id}`, { method: 'DELETE' }); },
-  async setMockupContent(id, file) {
-    const fd = new FormData(); fd.append('file', file, file.name || 'screen.png');
-    const { mockup } = await request(`/api/mockups/${id}/content`, { method: 'POST', body: fd }); return mockup;
+  // Screen content of one device of the scene (`item` = its id; default: the first).
+  async setMockupContent(id, file, item) {
+    const fd = new FormData();
+    fd.append('file', file, file.name || 'screen.png');
+    const { mockup } = await request(`/api/mockups/${id}/content${item ? `?item=${encodeURIComponent(item)}` : ''}`, { method: 'POST', body: fd });
+    return mockup;
   },
-  async importMockupContent(id, source) { const { mockup } = await request(`/api/mockups/${id}/content/import`, { method: 'POST', json: { source } }); return mockup; },
-  async clearMockupContent(id) { const { mockup } = await request(`/api/mockups/${id}/content`, { method: 'DELETE' }); return mockup; },
+  async importMockupContent(id, source, item) { const { mockup } = await request(`/api/mockups/${id}/content/import${item ? `?item=${encodeURIComponent(item)}` : ''}`, { method: 'POST', json: { source } }); return mockup; },
+  async clearMockupContent(id, item) { const { mockup } = await request(`/api/mockups/${id}/content${item ? `?item=${encodeURIComponent(item)}` : ''}`, { method: 'DELETE' }); return mockup; },
   async setMockupThumb(id, blob) {
     const fd = new FormData(); fd.append('thumb', blob, 'thumb.webp');
     const { mockup } = await request(`/api/mockups/${id}/thumb`, { method: 'POST', body: fd }); return mockup;

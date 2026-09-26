@@ -47,31 +47,44 @@ export function screenMaterial() {
 }
 
 /**
+ * The picture's box on a screen, before your own size / position: the screen
+ * as you see it (`viewAspect`, width / height, the picture upright) and the
+ * picture's width / height as fractions of that screen (cover: at least 1 on
+ * both sides; contain: at most 1). `turn` = quarter turns of the screen.
+ */
+export function contentBox({ screenAspect, contentAspect, turn = 0, fit = 'cover' }) {
+  const q = ((Math.round(turn) % 4) + 4) % 4;
+  const boxAspect = q % 2 ? 1 / contentAspect : contentAspect; // the picture, as it lies on the screen
+  const s = fit === 'contain' ? Math.min(screenAspect / boxAspect, 1) : Math.max(screenAspect / boxAspect, 1);
+  const bw = boxAspect * s; const bh = s;                      // in screen units (screen height = 1)
+  const cw = q % 2 ? bh : bw; const ch = q % 2 ? bw : bh;      // the same, upright
+  const vw = q % 2 ? 1 : screenAspect; const vh = q % 2 ? screenAspect : 1;
+  return { q, cw, ch, vw, vh, viewAspect: vw / vh, w: cw / vw, h: ch / vh };
+}
+
+/**
  * Point a screen material at a texture. `screenAspect` = the screen's width /
  * height (in its UV space), `contentAspect` = the picture's, `turn` = quarter
- * turns to show it upright, `fit` = 'cover' | 'contain', flipV / mirror for
- * imported models whose UVs run the other way.
+ * turns to show it upright, `fit` = 'cover' | 'contain', `adjust` = your own
+ * size (× the fitted size) and position (centre offset in screen widths /
+ * heights as you see it, y down), flipV / mirror for imported models whose
+ * UVs run the other way.
  */
-export function fitScreen(mat, texture, { screenAspect, contentAspect, turn = 0, fit = 'cover', flipV = false, mirror = false }) {
+export function fitScreen(mat, texture, { screenAspect, contentAspect, turn = 0, fit = 'cover', adjust, flipV = false, mirror = false }) {
   mat.uniforms.map.value = texture || null;
   mat.uniforms.hasMap.value = texture ? 1 : 0;
   if (!texture) return;
-  const q = ((Math.round(turn) % 4) + 4) % 4;
-  // The picture's box once turned, in screen units (screen height = 1).
-  const boxAspect = q % 2 ? 1 / contentAspect : contentAspect;
-  const s = fit === 'contain' ? Math.min(screenAspect / boxAspect, 1) : Math.max(screenAspect / boxAspect, 1);
-  const bw = boxAspect * s; const bh = s; // turned box, screen units
-  const cw = q % 2 ? bh : bw; const ch = q % 2 ? bw : bh; // picture before turning
+  const { q, cw, ch, vw, vh } = contentBox({ screenAspect, contentAspect, turn, fit });
+  const k = Math.max(0.01, adjust?.scale || 1);
+  const dx = (adjust?.x || 0) * vw; const dy = -(adjust?.y || 0) * vh;
   const a = (q * Math.PI) / 2;
   const cos = Math.cos(a); const sin = Math.sin(a);
-  // screen uv → centred screen units → turned back → picture uv
-  const m = new THREE.Matrix3().set(
-    1, 0, -0.5,
-    0, 1, -0.5,
-    0, 0, 1,
-  );
+  // screen uv → centred screen units → turned upright → minus the picture's
+  // centre → picture uv
+  const m = new THREE.Matrix3().set(1, 0, -0.5, 0, 1, -0.5, 0, 0, 1);
   const toUnits = new THREE.Matrix3().set(screenAspect, 0, 0, 0, 1, 0, 0, 0, 1);
   const rot = new THREE.Matrix3().set(cos, sin, 0, -sin, cos, 0, 0, 0, 1);
-  const toPic = new THREE.Matrix3().set((mirror ? -1 : 1) / cw, 0, 0.5, 0, (flipV ? -1 : 1) / ch, 0.5, 0, 0, 1);
-  mat.uniforms.uvT.value.copy(toPic.multiply(rot).multiply(toUnits).multiply(m));
+  const shift = new THREE.Matrix3().set(1, 0, -dx, 0, 1, -dy, 0, 0, 1);
+  const toPic = new THREE.Matrix3().set((mirror ? -1 : 1) / (cw * k), 0, 0.5, 0, (flipV ? -1 : 1) / (ch * k), 0.5, 0, 0, 1);
+  mat.uniforms.uvT.value.copy(toPic.multiply(shift).multiply(rot).multiply(toUnits).multiply(m));
 }

@@ -390,31 +390,63 @@ export const logoNeedsMigration = (p) => p.type === 'logo' && (
 // ---------------------------------------------------------------------------
 // Mockups — saved 3D device scenes, and 3D models imported by the user
 // ---------------------------------------------------------------------------
-export const MOCKUP_DEVICES = ['iphone', 'ipad', 'macbook', 'browser', 'custom'];
+export const MOCKUP_DEVICES = ['iphone', 'android', 'ipad', 'macbook', 'imac', 'watch', 'tv', 'browser', 'custom'];
 export const MOCKUP_FRAMES = ['16:9', '4:5', '1:1', '9:16', '3:2'];
+export const MOCKUP_ANIMATIONS = ['none', 'turntable', 'sway', 'float', 'orbit', 'push', 'reveal'];
 const MOCKUP_BG = ['transparent', 'color', 'gradient'];
+const MAX_MOCKUP_ITEMS = 8;
 const HEX6 = /^#[0-9a-f]{6}$/i;
 const vec3 = (v, fallback) => (Array.isArray(v) && v.length === 3 && v.every((x) => Number.isFinite(Number(x)))
   ? v.map((x) => Math.max(-1e4, Math.min(1e4, Number(x)))) : fallback);
 const mockupFile = (v) => (typeof v === 'string' && /^[\w.-]+$/.test(v) ? v : null);
+const mockupContent = (c) => (c && mockupFile(c.file)
+  ? { file: c.file, kind: c.kind === 'video' ? 'video' : 'image', name: str(c.name, 200) } : null);
+const DEVICE_FIELDS = ['device', 'modelId', 'color', 'landscape', 'lying', 'lid', 'url', 'fit', 'content', 'adjust'];
+
+// One device in a scene: what it is, how it looks, what's on its screen (and
+// how the picture sits in it), where it stands on the floor.
+export function normalizeMockupItem(it, i = 0) {
+  const adj = it?.adjust && typeof it.adjust === 'object' ? it.adjust : {};
+  return {
+    id: str(it?.id, 40) || `d${i + 1}`,
+    device: MOCKUP_DEVICES.includes(it?.device) ? it.device : 'iphone',
+    modelId: it?.modelId ? str(it.modelId, 40) : null,
+    color: str(it?.color, 40),
+    landscape: !!it?.landscape,
+    lying: !!it?.lying, // phone / tablet lying flat, screen up
+    lid: num(it?.lid, 0, 180, 112),
+    url: str(it?.url, 200),
+    fit: it?.fit === 'contain' ? 'contain' : 'cover',
+    content: mockupContent(it?.content),
+    // The picture's size (1 = filling / fitting the screen) and where its
+    // centre sits, in screen widths / heights from the middle (x → right, y → down).
+    adjust: { scale: num(adj.scale, 0.05, 8, 1), x: num(adj.x, -3, 3, 0), y: num(adj.y, -3, 3, 0) },
+    logo: it?.logo !== false,               // imported models: show their logo parts
+    hidden: Array.isArray(it?.hidden) ? it.hidden.map((x) => str(x, 200)).filter(Boolean).slice(0, 200) : [],
+    size: num(it?.size, 1, 500, 25),        // imported models: longest side in cm
+    x: num(it?.x, -1000, 1000, 0),          // position on the floor (cm)
+    z: num(it?.z, -1000, 1000, 0),
+    rotY: num(it?.rotY, -360, 360, 0),      // turned around its vertical axis (degrees)
+  };
+}
+
 export function normalizeMockup(m) {
   const cam = m?.camera && typeof m.camera === 'object' ? m.camera : null;
   const bg = m?.background && typeof m.background === 'object' ? m.background : {};
-  const content = m?.content && mockupFile(m.content.file)
-    ? { file: m.content.file, kind: m.content.kind === 'video' ? 'video' : 'image', name: str(m.content.name, 200) } : null;
+  const anim = m?.animation && typeof m.animation === 'object' ? m.animation : {};
+  // Scenes from before several devices were possible keep their one device in
+  // the top-level fields — read as the scene's only device.
+  const rawItems = Array.isArray(m?.items) && m.items.length ? m.items : [{ ...m, id: 'd1' }];
+  const items = rawItems.slice(0, MAX_MOCKUP_ITEMS).map(normalizeMockupItem);
+  const seen = new Set();
+  for (const [i, it] of items.entries()) { if (seen.has(it.id)) it.id = `d${i + 1}-${nanoid(4)}`; seen.add(it.id); }
+  const main = items[0];
   return {
     id: str(m?.id, 40) || nanoid(10),
     name: str(m?.name, 120) || 'Untitled mockup',
-    device: MOCKUP_DEVICES.includes(m?.device) ? m.device : 'iphone',
-    modelId: m?.modelId ? str(m.modelId, 40) : null,
-    color: str(m?.color, 40),
-    landscape: !!m?.landscape,
-    lying: !!m?.lying, // phone / tablet lying flat, screen up
-    lid: num(m?.lid, 0, 180, 112),
-    browserDark: !!m?.browserDark,
-    url: str(m?.url, 200),
-    fit: m?.fit === 'contain' ? 'contain' : 'cover',
-    content,
+    items,
+    // The first device, mirrored at the top for simple readers (lists, older code).
+    ...Object.fromEntries(DEVICE_FIELDS.map((k) => [k, main[k]])),
     camera: cam ? { preset: str(cam.preset, 40), position: vec3(cam.position, null), target: vec3(cam.target, [0, 0, 0]), fov: num(cam.fov, 10, 90, 30) } : null,
     frame: MOCKUP_FRAMES.includes(m?.frame) ? m.frame : '16:9',
     background: {
@@ -423,6 +455,11 @@ export function normalizeMockup(m) {
       color2: HEX6.test(bg.color2 || '') ? bg.color2 : '#2A2A33',
     },
     shadow: m?.shadow !== false,
+    animation: {
+      preset: MOCKUP_ANIMATIONS.includes(anim.preset) ? anim.preset : 'none',
+      duration: num(anim.duration, 1, 30, 6),
+      easing: anim.easing === 'linear' ? 'linear' : 'ease',
+    },
     thumb: mockupFile(m?.thumb),
     createdAt: num(m?.createdAt, 0, 1e14, 0),
     updatedAt: num(m?.updatedAt, 0, 1e14, 0),

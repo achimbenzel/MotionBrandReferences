@@ -67,7 +67,14 @@ export function squirclePath(size = 100, n = 5, steps = 72) {
 export const SQUIRCLE_MASK = `url("data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='${squirclePath()}'/></svg>`)}")`;
 
 // ---- the test sheet ---------------------------------------------------------
-const INK = '#16161a'; const MUTED = '#6b6b76'; const LINE = '#e3e3e8'; const WARN = '#e5484d'; const ACCENT = '#1fa7b3';
+const WARN = '#e5484d'; const ACCENT = '#1fa7b3';
+// The sheet's own look: light, dark, or light cards on a transparent page.
+const THEMES = {
+  light: { page: '#f4f4f6', card: '#ffffff', ink: '#16161a', muted: '#6b6b76', line: '#e3e3e8' },
+  dark: { page: '#0f0f12', card: '#1b1b20', ink: '#f2f2f4', muted: '#9a9aa3', line: '#2e2e36' },
+  transparent: { page: null, card: '#ffffff', ink: '#16161a', muted: '#6b6b76', line: '#e3e3e8' },
+};
+let T = THEMES.light; // the theme of the sheet being drawn
 
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
@@ -89,15 +96,16 @@ function drawLogo(ctx, logo, x, y, w, h, { tint, filter }) {
   const r = Math.min(w / logo.w, h / logo.h);
   const dw = logo.w * r; const dh = logo.h * r;
   const dx = x + (w - dw) / 2; const dy = y + (h - dh) / 2;
-  const src = tintedCanvas(logo.img, dw * 2, dh * 2, tint);
+  const k = Math.min(2, 8192 / Math.max(dw, dh, 1)); // sharp, within canvas limits
+  const src = tintedCanvas(logo.img, dw * k, dh * k, tint);
   ctx.save();
   if (filter && filter !== 'none') ctx.filter = filter;
   ctx.drawImage(src, dx, dy, dw, dh);
   ctx.restore();
   return { dx, dy, dw, dh };
 }
-function label(ctx, text, x, y, { size = 13, color = MUTED, weight = 500, align = 'left' } = {}) {
-  ctx.fillStyle = color; ctx.font = `${weight} ${size}px system-ui, -apple-system, Segoe UI, sans-serif`;
+function label(ctx, text, x, y, { size = 13, color, weight = 500, align = 'left' } = {}) {
+  ctx.fillStyle = color || T.muted; ctx.font = `${weight} ${size}px system-ui, -apple-system, Segoe UI, sans-serif`;
   ctx.textAlign = align; ctx.textBaseline = 'alphabetic'; ctx.fillText(text, x, y);
 }
 
@@ -107,15 +115,16 @@ function label(ctx, text, x, y, { size = 13, color = MUTED, weight = 500, align 
  * minimum-size strip, on brand colours, and the specs. → PNG Blob.
  */
 export async function renderSheet(logo, o) {
-  const W = 1600; const M = 60; const S = 2;
+  T = THEMES[o.theme] || THEMES.light;
+  const W = 1600; const M = 60; const S = Math.max(0.5, Math.min(5, o.scale || 2));
   const brand = (o.brandColors || []).slice(0, 8);
   const H = 1050 + (brand.length ? 210 : 0);
   const c = canvasOf(W * S, H * S);
   const ctx = c.getContext('2d');
   ctx.scale(S, S);
-  ctx.fillStyle = '#f4f4f6'; ctx.fillRect(0, 0, W, H);
+  if (T.page) { ctx.fillStyle = T.page; ctx.fillRect(0, 0, W, H); }
 
-  label(ctx, `Brand test — ${o.name || 'Logo'}`, M, 62, { size: 30, color: INK, weight: 700 });
+  label(ctx, `Brand test — ${o.name || 'Logo'}`, M, 62, { size: 30, color: T.ink, weight: 700 });
   label(ctx, [o.tint === 'original' ? 'Original colours' : `Colour ${o.tint}`, new Date().toLocaleDateString()].join(' · '), W - M, 62, { size: 14, align: 'right' });
 
   // Row A: on white, on black, on the chosen background
@@ -128,7 +137,7 @@ export async function renderSheet(logo, o) {
   panels.forEach(([bg, name], i) => {
     const x = M + i * (pw + 24);
     ctx.save(); roundRect(ctx, x, y, pw, ph, 14); ctx.clip(); fillBg(ctx, x, y, pw, ph, bg); ctx.restore();
-    ctx.strokeStyle = LINE; ctx.lineWidth = 1; roundRect(ctx, x + 0.5, y + 0.5, pw - 1, ph - 1, 14); ctx.stroke();
+    ctx.strokeStyle = T.line; ctx.lineWidth = 1; roundRect(ctx, x + 0.5, y + 0.5, pw - 1, ph - 1, 14); ctx.stroke();
     const at = drawLogo(ctx, logo, x + pw * 0.2, y + ph * 0.2, pw * 0.6, ph * 0.6, o);
     if (i === 0 && o.showClear) {
       const b = logo.box;
@@ -141,7 +150,7 @@ export async function renderSheet(logo, o) {
       ctx.restore();
       label(ctx, `clear space x = ${o.clearPct}% of logo height`, x + 14, y + ph - 14, { size: 12, color: WARN, weight: 600 });
     }
-    label(ctx, name, x, y + ph + 24, { size: 14, color: INK, weight: 600 });
+    label(ctx, name, x, y + ph + 24, { size: 14, color: T.ink, weight: 600 });
   });
   y += ph + 60;
 
@@ -150,9 +159,9 @@ export async function renderSheet(logo, o) {
   const iconPath = new Path2D(squirclePath());
   [['Profile picture', [120, 64, 32], 'circle'], ['App icon', [120, 60, 30], 'squircle']].forEach(([name, sizes, shape], i) => {
     const x = M + i * (bw + 24);
-    ctx.fillStyle = '#ffffff'; roundRect(ctx, x, y, bw, bh, 14); ctx.fill();
-    ctx.strokeStyle = LINE; ctx.stroke();
-    label(ctx, name, x + 20, y + 32, { size: 14, color: INK, weight: 600 });
+    ctx.fillStyle = T.card; roundRect(ctx, x, y, bw, bh, 14); ctx.fill();
+    ctx.strokeStyle = T.line; ctx.stroke();
+    label(ctx, name, x + 20, y + 32, { size: 14, color: T.ink, weight: 600 });
     let cx = x + 30;
     sizes.forEach((sz) => {
       const top = y + 60 + (120 - sz);
@@ -171,8 +180,8 @@ export async function renderSheet(logo, o) {
 
   // Row C: minimum size strip, on the chosen background
   const ch = 230;
-  ctx.fillStyle = '#ffffff'; roundRect(ctx, M, y, W - M * 2, ch, 14); ctx.fill(); ctx.strokeStyle = LINE; ctx.stroke();
-  label(ctx, `Minimum size — ${o.minPx} px wide on screen · ${o.minMm} mm in print`, M + 20, y + 32, { size: 14, color: INK, weight: 600 });
+  ctx.fillStyle = T.card; roundRect(ctx, M, y, W - M * 2, ch, 14); ctx.fill(); ctx.strokeStyle = T.line; ctx.stroke();
+  label(ctx, `Minimum size — ${o.minPx} px wide on screen · ${o.minMm} mm in print`, M + 20, y + 32, { size: 14, color: T.ink, weight: 600 });
   ctx.save(); roundRect(ctx, M + 16, y + 48, W - M * 2 - 32, 132, 10); ctx.clip(); fillBg(ctx, M + 16, y + 48, W - M * 2 - 32, 132, o.bg); ctx.restore();
   let sx = M + 30;
   const aspect = logo.h / logo.w;
@@ -181,7 +190,7 @@ export async function renderSheet(logo, o) {
     const base = y + 168;
     drawLogo(ctx, logo, sx, base - Math.min(hpx, 110), wpx, Math.min(hpx, 110), o);
     const small = wpx < o.minPx;
-    label(ctx, `${wpx}px`, sx + wpx / 2, y + 196, { size: 12, align: 'center', color: small ? WARN : MUTED, weight: small ? 700 : 500 });
+    label(ctx, `${wpx}px`, sx + wpx / 2, y + 196, { size: 12, align: 'center', color: small ? WARN : T.muted, weight: small ? 700 : 500 });
     if (small) label(ctx, 'too small', sx + wpx / 2, y + 214, { size: 11, align: 'center', color: WARN });
     sx += wpx + 44;
   });
@@ -189,7 +198,7 @@ export async function renderSheet(logo, o) {
 
   // Row D: on brand colours
   if (brand.length) {
-    label(ctx, 'On brand colours', M, y + 16, { size: 14, color: INK, weight: 600 });
+    label(ctx, 'On brand colours', M, y + 16, { size: 14, color: T.ink, weight: 600 });
     const tw = (W - M * 2 - 16 * (brand.length - 1)) / brand.length;
     brand.forEach((hex, i) => {
       const x = M + i * (tw + 16);
@@ -206,5 +215,35 @@ export async function renderSheet(logo, o) {
   ].filter(Boolean).join('   ·   '), M, H - 30, { size: 13 });
   label(ctx, 'Confinium · Brand Tester', W - M, H - 30, { size: 12, align: 'right' });
 
-  return new Promise((resolve, reject) => c.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not render the sheet'))), 'image/png'));
+  return new Promise((resolve, reject) => c.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not render the sheet'))), o.type || 'image/png', o.quality));
+}
+
+/** The sheet's size in px at `scale` (it grows by a row with brand colours). */
+export const sheetSize = (brandCount, scale = 2) => [Math.round(1600 * scale), Math.round((1050 + (brandCount ? 210 : 0)) * scale)];
+
+/**
+ * Just the logo, as a file: width × height px, on a background (null =
+ * transparent), inside a shape ('none' | 'circle' | 'squircle' | 'rounded'),
+ * with `padding` (0–0.45 of the shorter side) around it. → Blob.
+ */
+export function renderLogo(logo, { width, height, background = null, shape = 'none', padding = 0.1, tint = 'original', filter = 'none', type = 'image/png', quality } = {}) {
+  const c = canvasOf(Math.round(width), Math.round(height));
+  const ctx = c.getContext('2d');
+  ctx.save();
+  if (shape === 'circle') {
+    const r = Math.min(width, height) / 2;
+    ctx.beginPath(); ctx.arc(width / 2, height / 2, r, 0, Math.PI * 2); ctx.clip();
+  } else if (shape === 'squircle') {
+    const s = Math.min(width, height);
+    ctx.translate((width - s) / 2, (height - s) / 2); ctx.scale(s / 100, s / 100);
+    ctx.clip(new Path2D(squirclePath()));
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  } else if (shape === 'rounded') {
+    roundRect(ctx, 0, 0, width, height, Math.min(width, height) * 0.18); ctx.clip();
+  }
+  if (background) { ctx.fillStyle = background; ctx.fillRect(0, 0, width, height); }
+  const pad = Math.min(width, height) * Math.max(0, Math.min(0.45, padding));
+  drawLogo(ctx, logo, pad, pad, width - pad * 2, height - pad * 2, { tint, filter });
+  ctx.restore();
+  return new Promise((resolve, reject) => c.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not render the logo'))), type, quality));
 }

@@ -36,23 +36,43 @@ router.get('/api/mockups/:id', async (req, res) => {
   res.json({ mockup: normalizeMockup(m) });
 });
 
+// Screen content is server-owned: whatever a client sends for it is ignored.
+const withoutContent = (body) => ({
+  ...body, content: null, items: Array.isArray(body?.items) ? body.items.map((it) => ({ ...it, content: null })) : body?.items,
+});
+
 router.post('/api/mockups', async (req, res) => {
   const now = Date.now();
-  const m = normalizeMockup({ ...req.body, id: nanoid(10), content: null, thumb: null, createdAt: now, updatedAt: now });
+  const m = normalizeMockup({ ...withoutContent(req.body), id: nanoid(10), thumb: null, createdAt: now, updatedAt: now });
   await mutateDB((db) => { db.mockups.push(m); });
   res.status(201).json({ mockup: m });
 });
 
-// Settings only — the screen content and the thumbnail are changed by their own endpoints.
-const EDITABLE = ['name', 'device', 'modelId', 'color', 'landscape', 'lying', 'lid', 'browserDark', 'url', 'fit', 'camera', 'frame', 'background', 'shadow'];
+// Settings only — the screen content and the thumbnail are changed by their own
+// endpoints. `items` replaces the scene's devices (each keeps its content by
+// id; a new one can share another's with `contentFrom`); the single-device
+// fields at the top change the first device.
+const SCENE_FIELDS = ['name', 'camera', 'frame', 'background', 'shadow', 'animation'];
+const DEVICE_FIELDS = ['device', 'modelId', 'color', 'landscape', 'lying', 'lid', 'url', 'fit', 'adjust', 'logo', 'hidden', 'size', 'x', 'z', 'rotY'];
 router.patch('/api/mockups/:id', async (req, res) => {
+  const body = req.body || {};
   const updated = await mutateDB((db) => {
     const i = db.mockups.findIndex((x) => x.id === req.params.id);
     if (i === -1) return null;
-    const cur = db.mockups[i];
+    const cur = normalizeMockup(db.mockups[i]);
     const next = { ...cur };
-    for (const k of EDITABLE) if (k in req.body) next[k] = req.body[k];
-    db.mockups[i] = { ...normalizeMockup(next), content: cur.content || null, thumb: cur.thumb || null, updatedAt: Date.now() };
+    for (const k of SCENE_FIELDS) if (k in body) next[k] = body[k];
+    const contentOf = new Map(cur.items.map((it) => [it.id, it.content]));
+    if (Array.isArray(body.items) && body.items.length) {
+      next.items = body.items.map((it) => ({
+        ...it, content: contentOf.get(it?.id) ?? (it?.contentFrom ? contentOf.get(it.contentFrom) ?? null : null),
+      }));
+    } else if (DEVICE_FIELDS.some((k) => k in body)) {
+      const first = { ...cur.items[0] };
+      for (const k of DEVICE_FIELDS) if (k in body) first[k] = body[k];
+      next.items = [first, ...cur.items.slice(1)];
+    }
+    db.mockups[i] = { ...normalizeMockup(next), thumb: cur.thumb, updatedAt: Date.now() };
     return db.mockups[i];
   });
   if (!updated) return res.status(404).json({ error: 'not_found' });
@@ -85,28 +105,41 @@ router.delete('/api/mockups/:id', async (req, res) => {
   res.json({ ok: true, trashId });
 });
 
-// ---- The picture / video on the screen -----------------------------------------
-async function setContent(id, write) {
+// ---- The picture / video on a device's screen -----------------------------------
+// ?item=<device id> picks the device (default: the first one). A replaced file
+// is removed once no device of the scene shows it any more.
+async function setContent(id, itemId, write) {
   const db = await readDB();
   const m = db.mockups.find((x) => x.id === id);
   if (!m) return null;
+  const scene = normalizeMockup(m);
+  const target = itemId ? scene.items.find((it) => it.id === itemId) : scene.items[0];
+  if (!target) return null;
   const content = await write(mockupDir(id));
-  const old = m.content?.file;
+  let old = null;
   const updated = await mutateDB((d) => {
-    const x = d.mockups.find((y) => y.id === id);
-    if (!x) return null;
-    x.content = content; x.updatedAt = Date.now();
-    return x;
+    const i = d.mockups.findIndex((y) => y.id === id);
+    if (i === -1) return null;
+    const cur = normalizeMockup(d.mockups[i]);
+    const it = cur.items.find((x) => x.id === target.id);
+    if (!it) return null;
+    old = it.content?.file || null;
+    it.content = content;
+    const still = cur.items.some((x) => x.content?.file === old);
+    if (still) old = null;
+    d.mockups[i] = { ...normalizeMockup(cur), thumb: cur.thumb, updatedAt: Date.now() };
+    return d.mockups[i];
   });
   if (old && old !== content?.file) await safeRm(path.join(mockupDir(id), path.basename(old)), { force: true }).catch(() => {});
   return updated;
 }
+const itemOf = (req) => (typeof req.query.item === 'string' ? req.query.item.slice(0, 40) : null);
 
 router.post('/api/mockups/:id/content', upload.single('file'), async (req, res) => {
   const f = req.file;
   const kind = f && kindOf(f.originalname, f.mimetype);
   if (!kind) return res.status(400).json({ error: 'unsupported', message: 'Choose an image or a video.' });
-  const m = await setContent(req.params.id, async (dir) => ({
+  const m = await setContent(req.params.id, itemOf(req), async (dir) => ({
     file: await moveInto(dir, f.path, `content-${nanoid(6)}${extOf(f.originalname) || (kind === 'video' ? '.mp4' : '.png')}`),
     kind, name: str(f.originalname, 200),
   }));
@@ -115,7 +148,7 @@ router.post('/api/mockups/:id/content', upload.single('file'), async (req, res) 
 });
 
 router.delete('/api/mockups/:id/content', async (req, res) => {
-  const m = await setContent(req.params.id, async () => null);
+  const m = await setContent(req.params.id, itemOf(req), async () => null);
   if (!m) return res.status(404).json({ error: 'not_found' });
   res.json({ mockup: normalizeMockup(m) });
 });
@@ -160,7 +193,7 @@ router.post('/api/mockups/:id/content/import', async (req, res) => {
   if (!src || !kind || src.abs.includes('..') || !fs.existsSync(src.abs)) {
     return res.status(400).json({ error: 'not_found', message: 'That picture or video is no longer there.' });
   }
-  const m = await setContent(req.params.id, async (dir) => {
+  const m = await setContent(req.params.id, itemOf(req), async (dir) => {
     const file = `content-${nanoid(6)}${extOf(src.abs)}`;
     await fsp.mkdir(dir, { recursive: true });
     await fsp.copyFile(src.abs, path.join(dir, file));
