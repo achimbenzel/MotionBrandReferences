@@ -14,6 +14,7 @@ import {
 import { STORYBOARD_TEMPLATES, storyboardTemplate, templateInfo } from '../storyboards.js';
 import { BUILTIN_TEMPLATES, builtinTemplate, planFromTemplate, templateFromPlan, templateSummary } from '../templates.js';
 import { createRouter } from '../http.js';
+import { sourceAsUpload } from '../sources.js';
 
 const router = createRouter();
 export default router;
@@ -132,6 +133,7 @@ router.patch('/api/plans/:id', async (req, res) => {
 // Banner / avatar (Notion-style header images)
 for (const kind of ['banner', 'avatar']) {
   router.post(`/api/plans/:id/${kind}`, upload.single(kind), async (req, res) => {
+    await sourceAsUpload(req); // or a picture that's already in the app
     const db = await readDB();
     const plan = db.plans.find((p) => p.id === req.params.id);
     if (!plan) return res.status(404).json({ error: 'not_found' });
@@ -528,6 +530,8 @@ router.post('/api/plans/:id/blocks/:blockId/uploads', upload.array('files', 100)
 
 // Add files to a moodboard (images) or a files / pdf block.
 router.post('/api/plans/:id/blocks/:blockId/files', upload.array('files', 50), async (req, res) => {
+  // …or a picture that's already in the app (a moodboard takes it like an upload).
+  if (!req.files?.length && await sourceAsUpload(req)) req.files = [req.file];
   const db = await readDB();
   const plan = db.plans.find((p) => p.id === req.params.id);
   const b0 = findBlock(plan, req.params.blockId);

@@ -8,6 +8,7 @@ import { replaceImage, safeRm, moveToTrash } from '../files.js';
 import { upload } from '../upload.js';
 import { str, normalizeSoftware, normalizePlugin, normalizeExprGroup, normalizeTut } from '../schema.js';
 import { createRouter, HttpError } from '../http.js';
+import { sourceAsUpload } from '../sources.js';
 
 const router = createRouter();
 export default router;
@@ -93,6 +94,7 @@ async function loadSoft(id) {
 // Software banner / avatar images (like plans).
 for (const kind of ['banner', 'avatar']) {
   router.post(`/api/software/:id/${kind}`, upload.single(kind), async (req, res) => {
+    await sourceAsUpload(req); // or a picture that's already in the app
     const s = await loadSoft(req.params.id);
     if (!req.file) return res.status(400).json({ error: 'file_required' });
     const stored = await replaceImage(softDir(s.id), req.file.path, kind, req.file.originalname, s[kind], '.png');
@@ -115,6 +117,7 @@ for (const kind of ['banner', 'avatar']) {
 // Plugin installer file + preview image (one each per plugin).
 for (const [kind, prefix] of [['file', ''], ['image', 'img_']]) {
   router.post(`/api/software/:id/plugins/:pluginId/${kind}`, upload.single(kind), async (req, res) => {
+    if (kind === 'image') await sourceAsUpload(req); // or a picture that's already in the app
     const s = await loadSoft(req.params.id);
     const p = (s.plugins || []).find((x) => x.id === req.params.pluginId);
     if (!p) return res.status(404).json({ error: 'not_found' });
@@ -148,6 +151,7 @@ for (const [kind, prefix] of [['file', ''], ['image', 'img_']]) {
 
 // Expression-group preview image.
 router.post('/api/software/:id/groups/:groupId/image', upload.single('image'), async (req, res) => {
+  await sourceAsUpload(req); // or a picture that's already in the app
   const s = await loadSoft(req.params.id);
   const g = (s.expressionGroups || []).find((x) => x.id === req.params.groupId);
   if (!g) return res.status(404).json({ error: 'not_found' });

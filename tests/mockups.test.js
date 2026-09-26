@@ -338,3 +338,45 @@ test('2D branding types: app icon, profile pictures, channel, company page', asy
     assert.deepEqual([m.d2.type, m.d2.theme, m.d2.text.name], [type, 'dark', 'Acme']);
   }
 });
+
+test('pictures already in the app: banners, profile pictures and moodboards take them like uploads', async () => {
+  // A business card's back as a plan banner, a logo's dark version as its profile picture.
+  let r = await srv.api('/api/plans/plan3/banner', { method: 'POST', json: { source: { kind: 'project', projectId: 'bc1', field: 'back' } } });
+  assert.equal(r.status, 200);
+  assert.match(r.data.plan.banner, /^banner-.+\.webp$/);
+  assert.equal(r.data.plan.bannerGradient, null);
+  assert.equal((await fetch(`${srv.base}/data/plan/plan3/${r.data.plan.banner}`)).status, 200);
+  r = await srv.api('/api/plans/plan3/avatar', { method: 'POST', json: { source: { kind: 'project', projectId: 'logo2', field: 'logoDark' } } });
+  assert.match(r.data.plan.avatar, /^avatar-.+\.svg$/);
+  assert.equal(r.data.plan.avatarEmoji, null);
+  // A font's screenshot into a moodboard (and the library file stays where it is).
+  r = await srv.api('/api/plans/plan3/blocks/b3/files', { method: 'POST', json: { source: { kind: 'project', projectId: 'font1', field: 'shot' } } });
+  assert.equal(r.status, 201);
+  const imgs = r.data.plan.blocks.find((b) => b.id === 'b3').images;
+  assert.equal(imgs.length, 2);
+  assert.equal((await fetch(`${srv.base}/data/plan/plan3/${imgs[1].file}`)).status, 200);
+  assert.ok(await exists(path.join(srv.dataDir, 'font', 'font1', 'shot.png')));
+  // Another plan's banner as the dashboard banner and a software's profile picture.
+  r = await srv.api('/api/settings/dashboard-banner', { method: 'POST', json: { source: { kind: 'plan', planId: 'plan2', itemId: '@banner' } } });
+  assert.match(r.data.settings.dashboardBanner, /^banner-.+\.png$/);
+  r = await srv.api('/api/software/sw1/avatar', { method: 'POST', json: { source: { kind: 'project', projectId: 'brand1', itemId: 'a2' } } });
+  assert.match(r.data.software.avatar, /^avatar-.+\.png$/);
+  // …and back: the software's picture on a mockup screen.
+  const m = (await srv.api('/api/mockups', { method: 'POST', json: { device: 'iphone' } })).data.mockup;
+  r = await srv.api(`/api/mockups/${m.id}/content/import`, { method: 'POST', json: { source: { kind: 'software', softwareId: 'sw1', field: 'avatar' } } });
+  assert.equal(r.data.mockup.content.kind, 'image');
+
+  // Not a picture, not there, not a field that can be named, or a path: refused, nothing changes.
+  for (const source of [
+    { kind: 'project', projectId: 'mot1' },                       // a video
+    { kind: 'project', projectId: 'brand1', itemId: 'a1' },       // a pdf asset
+    { kind: 'project', projectId: 'bc1', field: 'notes' },
+    { kind: 'project', projectId: 'nope', field: 'image' },
+    { kind: 'software', softwareId: 'sw1', field: '../../db.json' },
+  ]) {
+    r = await srv.api('/api/plans/plan3/banner', { method: 'POST', json: { source } });
+    assert.equal(r.status, 400, JSON.stringify(source));
+  }
+  r = await srv.api('/api/plans/plan3');
+  assert.match(r.data.plan.banner, /^banner-.+\.webp$/);
+});

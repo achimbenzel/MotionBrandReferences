@@ -7,7 +7,8 @@ import path from 'node:path';
 import { nanoid } from 'nanoid';
 import { DATA_DIR, TRASH_DIR } from '../config.js';
 import { readDB, mutateDB } from '../db.js';
-import { moveInto, replaceImage, safeRm, moveToTrash, extOf, sniffImageExt } from '../files.js';
+import { moveInto, replaceImage, safeRm, moveToTrash, extOf } from '../files.js';
+import { resolveSource, mediaKind as kindOf } from '../sources.js';
 import { upload } from '../upload.js';
 import { str, normalizeMockup, normalizeMockupModel, normalizeMockupHdri } from '../schema.js';
 import { createRouter } from '../http.js';
@@ -19,11 +20,7 @@ export const mockupDir = (id) => path.join(DATA_DIR, 'mockup', id);
 export const modelDir = (id) => path.join(DATA_DIR, 'mockup-model', id);
 export const hdriDir = (id) => path.join(DATA_DIR, 'mockup-hdri', id);
 const HDRI_EXT = { '.hdr': 'hdr', '.exr': 'exr', '.jpg': 'jpg', '.jpeg': 'jpg', '.png': 'png', '.webp': 'webp', '.avif': 'avif' };
-const IMAGE_EXT = /\.(png|jpe?g|gif|webp|avif|svg)$/i;
-const VIDEO_EXT = /\.(mp4|m4v|mov|webm|ogv)$/i;
 const MODEL_EXT = { '.glb': 'glb', '.gltf': 'gltf', '.usdz': 'usdz' };
-const kindOf = (name, mime = '') => (VIDEO_EXT.test(name) || mime.startsWith('video/') ? 'video'
-  : IMAGE_EXT.test(name) || mime.startsWith('image/') ? 'image' : null);
 
 router.get('/api/mockups', async (_req, res) => {
   const db = await readDB();
@@ -207,56 +204,13 @@ router.delete('/api/mockups/:id/content', async (req, res) => {
   res.json({ mockup: normalizeMockup(m) });
 });
 
-// Something from the library onto the screen — named by id, never by path:
-// { kind: 'plan', planId, blockId, itemId } images / videos / storyboard frames of a plan,
-// { kind: 'plan', planId, itemId: '@avatar' | '@banner' } its profile picture / banner,
-// { kind: 'project', projectId, itemId? } a project's video / image, or one of its frames, moments or assets,
-// { kind: 'inbox', itemId } a shared file.
-function findSource(db, s) {
-  if (s?.kind === 'plan') {
-    const plan = db.plans.find((p) => p.id === s.planId);
-    // The plan's own profile picture / banner (no block).
-    if (plan && (s.itemId === '@avatar' || s.itemId === '@banner')) {
-      const rel = s.itemId === '@avatar' ? plan.avatar : plan.banner;
-      return rel ? { abs: path.join(DATA_DIR, 'plan', plan.id, rel), name: `${plan.name || 'Plan'} · ${s.itemId === '@avatar' ? 'profile picture' : 'banner'}` } : null;
-    }
-    const b = plan?.blocks?.find((x) => x.id === s.blockId);
-    if (!b) return null;
-    const hit = (b.images || []).find((x) => x.id === s.itemId) || (b.files || []).find((x) => x.id === s.itemId)
-      || (b.versions || []).find((x) => x.id === s.itemId);
-    const shot = (b.shots || []).find((x) => x.id === s.itemId);
-    const rel = hit?.file || shot?.image;
-    const label = hit?.title || hit?.name || hit?.label || (shot ? `${b.title || 'Storyboard'} · shot ${b.shots.indexOf(shot) + 1}` : `${plan.name || 'Plan'} · ${b.title || 'Moodboard'}`);
-    return rel ? { abs: path.join(DATA_DIR, 'plan', plan.id, rel), name: label } : null;
-  }
-  if (s?.kind === 'project') {
-    const p = db.projects.find((x) => x.id === s.projectId);
-    if (!p) return null;
-    let rel = null;
-    if (s.itemId) {
-      rel = (p.frames || []).find((f) => f.id === s.itemId)?.file
-        || (p.markers || []).find((f) => f.id === s.itemId)?.thumb
-        || (p.assets || []).find((a) => a.id === s.itemId && a.kind === 'image')?.file;
-    } else rel = p.video || p.image || p.thumb;
-    return rel ? { abs: path.join(DATA_DIR, p.type, p.id, rel), name: p.title || path.basename(rel) } : null;
-  }
-  if (s?.kind === 'inbox') {
-    const it = db.inbox.find((x) => x.id === s.itemId);
-    return it?.file ? { abs: path.join(DATA_DIR, 'inbox', it.id, it.file), name: it.name || it.file } : null;
-  }
-  return null;
-}
+// Something from the library onto the screen (see sources.js for what a source can name).
 router.post('/api/mockups/:id/content/import', async (req, res) => {
-  const db = await readDB();
-  const src = findSource(db, req.body?.source);
-  const there = src && !src.abs.includes('..') && fs.existsSync(src.abs);
-  // A file without a telling extension (e.g. an older plan profile picture, `.img`) is sniffed.
-  let ext = there ? extOf(src.abs) : '';
-  if (there && !kindOf(src.abs)) ext = await sniffImageExt(src.abs);
-  const kind = there && kindOf(`x${ext}`);
-  if (!kind) {
+  const src = await resolveSource(await readDB(), req.body?.source);
+  if (!src) {
     return res.status(400).json({ error: 'not_found', message: 'That picture or video is no longer there.' });
   }
+  const { ext, kind } = src;
   const m = await setContent(req.params.id, itemOf(req), async (dir) => {
     const file = `content-${nanoid(6)}${ext}`;
     await fsp.mkdir(dir, { recursive: true });

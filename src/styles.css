@@ -700,6 +700,7 @@ img { max-width: 100%; display: block; }
 .pe-img-add { width: 100%; aspect-ratio: 16 / 10; border: 1px dashed var(--border-strong); border-radius: 12px; background: transparent; color: var(--text-muted); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 13px; font-weight: 600; }
 .pe-img-add small { font-weight: 400; color: var(--text-faint); }
 .pe-img-add:hover { border-color: var(--accent); color: var(--accent); }
+.pe-img-fromapp { width: 100%; justify-content: center; margin-top: 6px; }
 .plugin-editor-fields { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .plugin-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 @media (max-width: 480px) { .plugin-row2 { grid-template-columns: 1fr; } }
@@ -730,6 +731,9 @@ img { max-width: 100%; display: block; }
 .expr-group-img-actions .btn { background: rgba(0,0,0,.55); color: #fff; border-color: transparent; backdrop-filter: blur(6px); }
 .expr-group-addimg { width: 100%; margin-bottom: 12px; border: 1px dashed var(--border-strong); border-radius: 10px; background: transparent; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px; font-size: 13px; font-weight: 600; }
 .expr-group-addimg:hover { border-color: var(--accent); color: var(--accent); }
+.expr-group-addrow { display: flex; gap: 8px; }
+.expr-group-addrow .expr-group-addimg { flex: 1; width: auto; }
+.expr-group-addrow .expr-group-fromapp { flex: 0 0 auto; padding: 12px 16px; }
 .expr-empty-add { width: 100%; border: 1px dashed var(--border); border-radius: 10px; background: transparent; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 14px; font-size: 13px; font-weight: 600; }
 .expr-empty-add:hover { border-color: var(--accent); color: var(--accent); }
 .expr-color-dot { width: 22px; height: 22px; flex-shrink: 0; border-radius: 50%; border: 1.5px solid var(--border-strong); background: transparent; color: var(--text-faint); cursor: pointer; display: grid; place-items: center; padding: 0; }
@@ -1628,11 +1632,15 @@ img { max-width: 100%; display: block; }
 .banner-swatch:hover { border-color: var(--border-strong); }
 .banner-swatch.on { border-color: #fff; box-shadow: 0 0 0 2px var(--accent); }
 .banner-picker-upload { width: 100%; justify-content: center; }
+.banner-picker-row { display: flex; gap: 8px; }
+.banner-picker-row .banner-picker-upload { flex: 1; width: auto; min-width: 0; }
 
 /* The avatar overlaps the banner by 40px; the name starts just below the
    banner's edge, so it stays readable on any banner image. */
 .plan-idrow { display: flex; align-items: flex-start; gap: 16px; margin: -40px 0 22px 24px; position: relative; z-index: 1; }
 .plan-idrow > .plan-name, .plan-idrow > .soft-idrow-main { padding-top: 52px; }
+/* While its picker is open the row sits above the sticky tabs (it's a stacking context of its own). */
+.plan-idrow.picking { z-index: 21; }
 .plan-avatar {
   width: 84px; height: 84px; border-radius: 20px;
   border: 4px solid var(--bg); background: var(--surface-3);
@@ -1690,6 +1698,7 @@ img { max-width: 100%; display: block; }
 .mb-collapse { display: flex; align-items: center; gap: 8px; background: transparent; border: 0; color: var(--text); cursor: pointer; font-size: 15px; font-weight: 600; font-family: inherit; }
 .mb-collapse .count { color: var(--text-faint); font-weight: 400; }
 .moodboard-actions { display: flex; align-items: center; gap: 8px; }
+@media (max-width: 640px) { .mb-long { display: none; } }
 .moodboard .masonry { padding: 12px; }
 .moodboard .dropzone { margin: 12px; }
 
@@ -3782,6 +3791,9 @@ img { max-width: 100%; display: block; }
 .mp-avatars { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
 .mp-avatars .mp-item { aspect-ratio: 1; border-radius: 50%; }
 .mp-avatars .mp-label { display: none; }
+/* Logos and other pictures with see-through parts: whole, on a light checker */
+.mp-logos .mp-item { background: #fff repeating-conic-gradient(#eeeef1 0% 25%, #fff 0% 50%) 0 0 / 14px 14px; }
+.mp-logos .mp-item img { object-fit: contain; padding: 12%; }
 .mp-item { position: relative; aspect-ratio: 4 / 3; padding: 0; border: 2px solid transparent; border-radius: 8px; overflow: hidden; background: var(--surface-2); cursor: pointer; }
 .mp-item img, .mp-item video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .mp-item:hover { border-color: var(--accent); }

@@ -4,7 +4,7 @@ import {
   ArrowLeft, Trash2, Pencil, MoreHorizontal, Plus, X, Check, Play,
   Puzzle, Braces, Youtube, ExternalLink, Copy, Eye, EyeOff, UploadCloud,
   Paperclip, Download, Image as ImageIcon, Camera, Circle, ChevronDown, ChevronRight,
-  ArrowUp, ArrowDown, LayoutGrid, List as ListIcon, KeyRound,
+  ArrowUp, ArrowDown, LayoutGrid, List as ListIcon, KeyRound, Library,
 } from 'lucide-react';
 import { api, softwareFileUrl } from '../lib/api.js';
 import { useSaver, useRefreshOnReturn } from '../lib/autosave.js';
@@ -12,6 +12,7 @@ import { PHONE } from '../lib/useMedia.js';
 import { CURRENCIES, currencySymbol, normalizeUrl, TAG_COLORS, tagColor, PLAN_GRADIENTS, gradientCss, youtubeThumb } from '../lib/types.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
+import MediaPicker from '../components/mockups/MediaPicker.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 
 const rid = () => Math.random().toString(36).slice(2, 10);
@@ -53,6 +54,7 @@ export default function SoftwareDetail() {
   const [editingTut, setEditingTut] = useState(null); // tutorial currently in the edit form
   const [bannerPicker, setBannerPicker] = useState(false);
   const [avatarPicker, setAvatarPicker] = useState(false);
+  const [appPick, setAppPick] = useState(null); // a picture that's in the app: { kind: 'banner' | 'avatar' | 'plugin' | 'group', id? }
   const [emojiInput, setEmojiInput] = useState('');
   const [confirm, setConfirm] = useState(null); // { title, message, confirmLabel, danger, onConfirm }
   const softRef = useRef(null); softRef.current = soft;
@@ -131,6 +133,17 @@ export default function SoftwareDetail() {
   const pickEmoji = async (raw) => { const emoji = firstEmoji(raw); if (!emoji) return; await flush(); try { if (soft.avatar) await api.removeSoftwareImage(id, 'avatar'); setSoft(await api.updateSoftware(id, { avatarEmoji: emoji })); setEmojiInput(''); setAvatarPicker(false); } catch (e) { toast(`Failed: ${e.message}`, 'error'); } };
   const removeAvatar = () => { setAvatarPicker(false); if (soft.avatar) fileOp(() => api.removeSoftwareImage(id, 'avatar')); else save({ avatarEmoji: '' }, true); };
 
+  // A picture that's already in the app (banner, profile picture, plugin / group preview).
+  const pickFromApp = (source) => {
+    const t = appPick;
+    setAppPick(null);
+    if (!t) return;
+    const pic = { source };
+    if (t.kind === 'plugin') fileOp(() => api.setPluginImage(id, t.id, pic));
+    else if (t.kind === 'group') fileOp(() => api.setGroupImage(id, t.id, pic));
+    else fileOp(() => api.setSoftwareImage(id, t.kind, pic));
+  };
+
   // Expression-group image (uses a shared hidden input + a pending group id).
   const pickGroupImage = (gid) => { pendingGroup.current = gid; groupImgRef.current?.click(); };
   const onGroupImage = (file) => { const gid = pendingGroup.current; if (file && gid) fileOp(() => api.setGroupImage(id, gid, file)); };
@@ -198,13 +211,18 @@ export default function SoftwareDetail() {
                   style={{ backgroundImage: g.css }} title={g.id} onClick={() => pickGradient(g.id)} />
               ))}
             </div>
-            <button className="btn btn-sm banner-picker-upload" onClick={() => { setBannerPicker(false); bannerRef.current?.click(); }}>
-              <UploadCloud size={14} /> Upload custom image…
-            </button>
+            <div className="banner-picker-row">
+              <button className="btn btn-sm banner-picker-upload" onClick={() => { setBannerPicker(false); bannerRef.current?.click(); }}>
+                <UploadCloud size={14} /> Upload image…
+              </button>
+              <button className="btn btn-sm banner-picker-upload" onClick={() => { setBannerPicker(false); setAppPick({ kind: 'banner' }); }}>
+                <Library size={14} /> From the app…
+              </button>
+            </div>
           </div>
         )}
       </div>
-      <div className="plan-idrow soft-idrow">
+      <div className={`plan-idrow soft-idrow ${avatarPicker ? 'picking' : ''}`}>
         <div className="plan-avatar-wrap">
           <button className="plan-avatar" onClick={() => setAvatarPicker((v) => !v)} title="Change image">
             {avatarUrl ? <img src={avatarUrl} alt="" />
@@ -224,7 +242,8 @@ export default function SoftwareDetail() {
                 onChange={(ev) => setEmojiInput(ev.target.value)}
                 onKeyDown={(ev) => { if (ev.key === 'Enter') { ev.preventDefault(); pickEmoji(emojiInput); } }} />
               <div className="ap-actions">
-                <button className="btn btn-sm" onClick={() => { setAvatarPicker(false); avatarRef.current?.click(); }}><UploadCloud size={14} /> Upload image…</button>
+                <button className="btn btn-sm" onClick={() => { setAvatarPicker(false); avatarRef.current?.click(); }}><UploadCloud size={14} /> Upload…</button>
+                <button className="btn btn-sm" onClick={() => { setAvatarPicker(false); setAppPick({ kind: 'avatar' }); }}><Library size={14} /> From the app…</button>
                 {(avatarUrl || soft.avatarEmoji) && <button className="btn btn-sm btn-ghost" onClick={removeAvatar}>Remove</button>}
               </div>
             </div>
@@ -242,6 +261,10 @@ export default function SoftwareDetail() {
       <input ref={bannerRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { setImage('banner', e.target.files?.[0]); e.target.value = ''; }} />
       <input ref={avatarRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { setImage('avatar', e.target.files?.[0]); e.target.value = ''; }} />
       <input ref={groupImgRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { onGroupImage(e.target.files?.[0]); e.target.value = ''; }} />
+      {appPick && (
+        <MediaPicker accept="image" onPick={pickFromApp} onClose={() => setAppPick(null)}
+          title={appPick.kind === 'banner' ? 'Banner from the app' : appPick.kind === 'avatar' ? 'Profile picture from the app' : 'Preview image from the app'} />
+      )}
 
       <div className="soft-tabs">
         {TABS.map((t) => (
@@ -272,6 +295,7 @@ export default function SoftwareDetail() {
           key={editingPlugin.id} soft={soft} plugin={editingPlugin} copy={copy}
           onEdit={(patch) => editPlugin(editingPlugin.id, patch)}
           onSetImage={(f) => { if (f) fileOp(() => api.setPluginImage(id, editingPlugin.id, f)); }}
+          onPickImage={() => setAppPick({ kind: 'plugin', id: editingPlugin.id })}
           onRemoveImage={() => ask({ title: 'Remove image?', message: 'Remove the preview image from this plugin?', confirmLabel: 'Remove', danger: true, onConfirm: () => fileOp(() => api.removePluginImage(id, editingPlugin.id)) })}
           onSetFile={(f) => { if (f) fileOp(() => api.setPluginFile(id, editingPlugin.id, f)); }}
           onRemoveFile={() => ask({ title: 'Remove file?', message: `Remove the installer “${editingPlugin.fileName}” from this plugin?`, confirmLabel: 'Remove', danger: true, onConfirm: () => fileOp(() => api.removePluginFile(id, editingPlugin.id)) })}
@@ -327,14 +351,20 @@ export default function SoftwareDetail() {
                       {!collapsed && (
                         <div className="expr-group-img-actions">
                           <button className="btn btn-sm" onClick={() => pickGroupImage(g.id)}><ImageIcon size={13} /> Change</button>
+                          <button className="btn btn-sm" onClick={() => setAppPick({ kind: 'group', id: g.id })} title="A picture that's already in the app"><Library size={13} /> From the app</button>
                           <button className="btn btn-sm btn-ghost" onClick={() => removeGroupImage(g.id)}>Remove</button>
                         </div>
                       )}
                     </div>
                   ) : (!collapsed && (
-                    <button className="expr-group-addimg" onClick={() => pickGroupImage(g.id)}>
-                      <ImageIcon size={16} /> Add a preview image (show what these expressions do)
-                    </button>
+                    <div className="expr-group-addrow">
+                      <button className="expr-group-addimg" onClick={() => pickGroupImage(g.id)}>
+                        <ImageIcon size={16} /> Add a preview image (show what these expressions do)
+                      </button>
+                      <button className="expr-group-addimg expr-group-fromapp" onClick={() => setAppPick({ kind: 'group', id: g.id })} title="A picture that's already in the app">
+                        <Library size={16} /> From the app
+                      </button>
+                    </div>
                   ))}
 
                   {!collapsed && (items.length ? (
@@ -471,7 +501,7 @@ function PluginRow({ soft, plugin: p, onOpen, onDelete, onDownload }) {
 }
 
 /** Full edit form for a single plugin (the “add / edit” view). */
-function PluginEditor({ soft, plugin: p, onEdit, onSetImage, onRemoveImage, onSetFile, onRemoveFile, onDelete, onDone, copy }) {
+function PluginEditor({ soft, plugin: p, onEdit, onSetImage, onPickImage, onRemoveImage, onSetFile, onRemoveFile, onDelete, onDone, copy }) {
   const [showKey, setShowKey] = useState(false);
   const imgRef = useRef(null);
   const fileRef = useRef(null);
@@ -495,13 +525,17 @@ function PluginEditor({ soft, plugin: p, onEdit, onSetImage, onRemoveImage, onSe
               <img src={imgUrl} alt="" />
               <div className="pe-img-actions">
                 <button className="btn btn-sm" onClick={() => imgRef.current?.click()}><ImageIcon size={13} /> Change</button>
+                <button className="btn btn-sm" onClick={onPickImage} title="A picture that's already in the app"><Library size={13} /> From the app</button>
                 <button className="btn btn-sm btn-ghost" onClick={onRemoveImage}>Remove</button>
               </div>
             </div>
           ) : (
-            <button className="pe-img-add" onClick={() => imgRef.current?.click()}>
-              <ImageIcon size={22} /><span>Add preview image</span><small>Shown on the plugin card</small>
-            </button>
+            <>
+              <button className="pe-img-add" onClick={() => imgRef.current?.click()}>
+                <ImageIcon size={22} /><span>Add preview image</span><small>Shown on the plugin card</small>
+              </button>
+              <button className="btn btn-sm btn-ghost pe-img-fromapp" onClick={onPickImage}><Library size={13} /> Or pick one from the app…</button>
+            </>
           )}
           <input ref={imgRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { onSetImage(e.target.files?.[0]); e.target.value = ''; }} />
         </div>

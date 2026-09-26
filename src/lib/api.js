@@ -36,6 +36,14 @@ const imageName = (kind, file) => {
   const ext = /\.(png|jpe?g|webp|gif|avif|svg)$/i.exec(file?.name || '')?.[0] || IMAGE_TYPES[file?.type] || '.png';
   return `${kind}${ext.toLowerCase()}`;
 };
+// A picture sent to the server: a file from the device, or `{ source }` — one
+// that's already in the app (the server copies it; see MediaPicker).
+const picBody = (field, pic, name) => {
+  if (pic && !(pic instanceof Blob) && pic.source) return { json: { source: pic.source } };
+  const fd = new FormData();
+  if (name) fd.append(field, pic, name); else fd.append(field, pic);
+  return { body: fd };
+};
 const slotQuery = (slot, item) => `slot=${encodeURIComponent(slot)}${item ? `&item=${encodeURIComponent(item)}` : ''}`;
 const RETRY_DELAYS = [300, 800, 1600, 3000];
 const REPEATABLE = new Set(['GET', 'HEAD', 'PATCH', 'PUT']);
@@ -294,10 +302,8 @@ export const api = {
   async removePlan(id) {
     return request(`/api/plans/${id}`, { method: 'DELETE' });
   },
-  async setPlanImage(id, kind, file) { // kind: 'banner' | 'avatar'
-    const fd = new FormData();
-    fd.append(kind, file, imageName(kind, file));
-    const { plan } = await request(`/api/plans/${id}/${kind}`, { method: 'POST', body: fd });
+  async setPlanImage(id, kind, file) { // kind: 'banner' | 'avatar'; file: a File or { source }
+    const { plan } = await request(`/api/plans/${id}/${kind}`, { method: 'POST', ...picBody(kind, file, imageName(kind, file)) });
     return plan;
   },
   async removePlanImage(id, kind) {
@@ -331,10 +337,11 @@ export const api = {
   async removeBlock(id, blockId) {
     return request(`/api/plans/${id}/blocks/${blockId}`, { method: 'DELETE' });
   },
-  async addBlockFiles(id, blockId, fileList) {
-    const fd = new FormData();
-    Array.from(fileList).forEach((f) => fd.append('files', f));
-    const { plan } = await request(`/api/plans/${id}/blocks/${blockId}/files`, { method: 'POST', body: fd });
+  async addBlockFiles(id, blockId, fileList) { // files, or { source } — a picture already in the app
+    let body;
+    if (fileList?.source) body = { json: { source: fileList.source } };
+    else { const fd = new FormData(); Array.from(fileList).forEach((f) => fd.append('files', f)); body = { body: fd }; }
+    const { plan } = await request(`/api/plans/${id}/blocks/${blockId}/files`, { method: 'POST', ...body });
     return plan;
   },
   // Add one file to a files block, with an optional example image + title.
@@ -372,8 +379,7 @@ export const api = {
   },
   // Software banner / avatar images (like plans). kind: 'banner' | 'avatar'
   async setSoftwareImage(id, kind, file) {
-    const fd = new FormData(); fd.append(kind, file, imageName(kind, file));
-    const { software } = await request(`/api/software/${id}/${kind}`, { method: 'POST', body: fd });
+    const { software } = await request(`/api/software/${id}/${kind}`, { method: 'POST', ...picBody(kind, file, imageName(kind, file)) });
     return software;
   },
   async removeSoftwareImage(id, kind) {
@@ -392,8 +398,7 @@ export const api = {
   },
   // Plugin preview image (shown in the card view)
   async setPluginImage(id, pluginId, file) {
-    const fd = new FormData(); fd.append('image', file);
-    const { software } = await request(`/api/software/${id}/plugins/${pluginId}/image`, { method: 'POST', body: fd });
+    const { software } = await request(`/api/software/${id}/plugins/${pluginId}/image`, { method: 'POST', ...picBody('image', file) });
     return software;
   },
   async removePluginImage(id, pluginId) {
@@ -402,8 +407,7 @@ export const api = {
   },
   // Expression-group preview image
   async setGroupImage(id, groupId, file) {
-    const fd = new FormData(); fd.append('image', file);
-    const { software } = await request(`/api/software/${id}/groups/${groupId}/image`, { method: 'POST', body: fd });
+    const { software } = await request(`/api/software/${id}/groups/${groupId}/image`, { method: 'POST', ...picBody('image', file) });
     return software;
   },
   async removeGroupImage(id, groupId) {
@@ -468,8 +472,7 @@ export const api = {
     return settings;
   },
   async setDashboardBanner(file) {
-    const fd = new FormData(); fd.append('banner', file, imageName('banner', file));
-    const { settings } = await request('/api/settings/dashboard-banner', { method: 'POST', body: fd });
+    const { settings } = await request('/api/settings/dashboard-banner', { method: 'POST', ...picBody('banner', file, imageName('banner', file)) });
     return settings;
   },
   async removeDashboardBanner() {

@@ -21,6 +21,7 @@ import Lightbox from '../components/Lightbox.jsx';
 import GalleryNameModal from '../components/GalleryNameModal.jsx';
 import RefPicker from '../components/RefPicker.jsx';
 import FileAddModal from '../components/FileAddModal.jsx';
+import MediaPicker from '../components/mockups/MediaPicker.jsx';
 import ProjectCard from '../components/ProjectCard.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import ScriptBlock from '../components/plan/ScriptBlock.jsx';
@@ -80,6 +81,7 @@ export default function PlanDetail() {
   const [bannerPicker, setBannerPicker] = useState(false);
   const [avatarPicker, setAvatarPicker] = useState(false);
   const [emojiInput, setEmojiInput] = useState('');
+  const [appPick, setAppPick] = useState(null); // picking a picture that's in the app: { kind: 'banner' | 'avatar' | 'moodboard', blockId? }
   const [dragBlock, setDragBlock] = useState(null);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [archiving, setArchiving] = useState(false);
@@ -170,6 +172,21 @@ export default function PlanDetail() {
 
   // Header images (banner / avatar)
   const setImage = async (kind, file) => { if (!file) return; try { setPlan(await api.setPlanImage(id, kind, file)); } catch (e) { toast(`Upload failed: ${e.message}`, 'error'); } };
+  // A picture that's already in the app, as banner / profile picture or into a moodboard.
+  const pickFromApp = async (source) => {
+    const target = appPick;
+    if (!target) return;
+    try {
+      if (target.kind === 'moodboard') {
+        const next = await api.addBlockFiles(id, target.blockId, { source });
+        setPlan((prev) => ({ ...prev, blocks: next.blocks.map((x) => (x.id === target.blockId ? x : prev.blocks.find((y) => y.id === x.id) || x)) }));
+        toast('Added to the moodboard', 'ok');
+      } else {
+        setPlan(await api.setPlanImage(id, target.kind, { source }));
+        setAppPick(null);
+      }
+    } catch (e) { toast(`Could not add it: ${e.message}`, 'error'); }
+  };
   const pickGradient = async (gid) => {
     try { if (plan.banner) await api.removePlanImage(id, 'banner'); setPlan(await api.updatePlan(id, { bannerGradient: gid })); setBannerPicker(false); }
     catch (e) { toast(`Failed: ${e.message}`, 'error'); }
@@ -540,6 +557,7 @@ export default function PlanDetail() {
             </button>
             <div className="moodboard-actions">
               <button className="btn btn-sm" onClick={() => { lastMoodboard.current = b.id; addFilesTo(b.id); }}><UploadCloud size={14} /> Add images</button>
+              <button className="btn btn-sm btn-ghost" onClick={() => { lastMoodboard.current = b.id; setAppPick({ kind: 'moodboard', blockId: b.id }); }} title="Pictures that are already in the app"><Library size={14} /><span className="mb-long"> From the app</span></button>
               {menu}
             </div>
           </div>
@@ -965,13 +983,18 @@ export default function PlanDetail() {
                   style={{ backgroundImage: g.css }} title={g.id} onClick={() => pickGradient(g.id)} />
               ))}
             </div>
-            <button className="btn btn-sm banner-picker-upload" onClick={() => { setBannerPicker(false); bannerRef.current?.click(); }}>
-              <UploadCloud size={14} /> Upload custom image…
-            </button>
+            <div className="banner-picker-row">
+              <button className="btn btn-sm banner-picker-upload" onClick={() => { setBannerPicker(false); bannerRef.current?.click(); }}>
+                <UploadCloud size={14} /> Upload image…
+              </button>
+              <button className="btn btn-sm banner-picker-upload" onClick={() => { setBannerPicker(false); setAppPick({ kind: 'banner' }); }}>
+                <Library size={14} /> From the app…
+              </button>
+            </div>
           </div>
         )}
       </div>
-      <div className="plan-idrow">
+      <div className={`plan-idrow ${avatarPicker ? 'picking' : ''}`}>
         <div className="plan-avatar-wrap">
           <button className="plan-avatar" onClick={() => setAvatarPicker((v) => !v)} title="Change profile image">
             {avatarUrl ? <img src={avatarUrl} alt="" />
@@ -991,7 +1014,8 @@ export default function PlanDetail() {
                 onChange={(ev) => setEmojiInput(ev.target.value)}
                 onKeyDown={(ev) => { if (ev.key === 'Enter') { ev.preventDefault(); pickEmoji(emojiInput); } }} />
               <div className="ap-actions">
-                <button className="btn btn-sm" onClick={() => { setAvatarPicker(false); avatarRef.current?.click(); }}><UploadCloud size={14} /> Upload image…</button>
+                <button className="btn btn-sm" onClick={() => { setAvatarPicker(false); avatarRef.current?.click(); }}><UploadCloud size={14} /> Upload…</button>
+                <button className="btn btn-sm" onClick={() => { setAvatarPicker(false); setAppPick({ kind: 'avatar' }); }}><Library size={14} /> From the app…</button>
                 {(avatarUrl || plan.avatarEmoji) && <button className="btn btn-sm btn-ghost" onClick={removeAvatar}>Remove</button>}
               </div>
             </div>
@@ -1044,6 +1068,11 @@ export default function PlanDetail() {
       )}
 
       <LibraryChips items={plan.archivedAs} />
+
+      {appPick && (
+        <MediaPicker accept="image" onPick={pickFromApp} onClose={() => setAppPick(null)}
+          title={appPick.kind === 'banner' ? 'Banner from the app' : appPick.kind === 'avatar' ? 'Profile picture from the app' : 'Add to the moodboard'} />
+      )}
 
       <input ref={bannerRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { setImage('banner', e.target.files[0]); e.target.value = ''; }} />
       <input ref={avatarRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { setImage('avatar', e.target.files[0]); e.target.value = ''; }} />

@@ -6,6 +6,7 @@ import { getUsedBytes, replaceImage, safeRm } from '../files.js';
 import { upload } from '../upload.js';
 import { str } from '../schema.js';
 import { createRouter } from '../http.js';
+import { sourceAsUpload } from '../sources.js';
 
 const router = createRouter();
 export default router;
@@ -37,6 +38,7 @@ router.patch('/api/settings', async (req, res) => {
   res.json({ settings });
 });
 router.post('/api/settings/dashboard-banner', upload.single('banner'), async (req, res) => {
+  await sourceAsUpload(req); // or a picture that's already in the app
   if (!req.file) return res.status(400).json({ error: 'file_required' });
   const db = await readDB();
   const stored = await replaceImage(dashboardDir(), req.file.path, 'banner', req.file.originalname, db.settings.dashboardBanner, '.png');
