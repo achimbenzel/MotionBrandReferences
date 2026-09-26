@@ -1063,7 +1063,9 @@ without going back to the grid; stepping past the last one wraps to the first.
 
 ## Fully local assets
 
-- **Font:** DM Sans is self-hosted via `@fontsource/dm-sans` (no Google Fonts CDN).
+- **Fonts:** DM Sans is self-hosted via `@fontsource/dm-sans` (no Google Fonts CDN);
+  running timers (focus timer, time tracker, their pills) use JetBrains Mono
+  (`@fontsource/jetbrains-mono`) so the digits don't jump as they count.
 - **Icons:** [lucide](https://lucide.dev) via `lucide-react`, bundled locally.
 - **PDF rendering:** `pdfjs-dist` with a locally-bundled worker.
 

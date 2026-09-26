@@ -5,6 +5,9 @@ import { BrowserRouter } from 'react-router-dom';
 import '@fontsource/dm-sans/400.css';
 import '@fontsource/dm-sans/500.css';
 import '@fontsource/dm-sans/700.css';
+// JetBrains Mono for running timers: every digit is the same width, so the time doesn't jump.
+import '@fontsource/jetbrains-mono/500.css';
+import '@fontsource/jetbrains-mono/700.css';
 import './styles.css';
 import App from './App.jsx';
 

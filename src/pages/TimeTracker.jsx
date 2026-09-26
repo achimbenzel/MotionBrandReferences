@@ -37,7 +37,7 @@ function ProjectPick({ plans, planId, project, onChange, compact = false }) {
   const [free, setFree] = useState(!planId && !!project); // typing another project / client
   const open = plans.filter((p) => p.status !== 'archived');
   return (
-    <span className={`tt-project ${compact ? 'compact' : ''}`}>
+    <span className={`tt-project ${compact ? 'compact' : ''} ${free ? 'free' : ''}`}>
       <select className="input" value={free ? OTHER : planId || ''} aria-label="Plan / project"
         onChange={(e) => { if (e.target.value === OTHER) { setFree(true); onChange({ planId: null, project: project || '' }); } else { setFree(false); onChange({ planId: e.target.value || null, project: '' }); } }}>
         <option value="">No project</option>

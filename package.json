@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.0.20",
+    "@fontsource/jetbrains-mono": "^5.3.0",
     "cross-env": "^7.0.3",
     "express": "^4.21.2",
     "lucide-react": "^0.462.0",

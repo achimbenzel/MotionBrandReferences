@@ -32,7 +32,7 @@ export default function PlanTime({ plan, toast }) {
   return (
     <span className={`plan-time ${mine ? 'running' : ''}`}>
       <button type="button" onClick={() => navigate(`/time?plan=${plan.id}`)} title="Tracked time — show the entries">
-        <Clock size={13} /> {mine ? fmtElapsed(t.elapsed) : `${(total / 60).toFixed(1)} h`}
+        <Clock size={13} /> {mine ? <span className="mono">{fmtElapsed(t.elapsed)}</span> : `${(total / 60).toFixed(1)} h`}
       </button>
       <button type="button" className="plan-time-go" onClick={toggle} title={mine ? 'Stop tracking' : 'Track time on this plan'} aria-label={mine ? 'Stop tracking' : 'Track time on this plan'}>
         {mine ? <Square size={11} fill="currentColor" /> : <Play size={11} fill="currentColor" />}
