@@ -89,10 +89,13 @@ router.patch('/api/mockups/:id', async (req, res) => {
     // A 2D mockup's texts and look; its pictures (slots) only change through the content routes.
     if (body.d2 && typeof body.d2 === 'object' && cur.kind === '2d') {
       next.d2 = { ...cur.d2, ...body.d2, slots: cur.d2?.slots || {} };
-      // …except their size / position on the picture.
+      // …except their size / position on the picture (and a video's sound).
       for (const [k, v] of Object.entries(body.d2.slots || {})) {
         if (next.d2.slots[k] && v && typeof v === 'object') {
-          next.d2.slots = { ...next.d2.slots, [k]: { ...next.d2.slots[k], ...(v.adjust ? { adjust: v.adjust } : {}), ...(v.fit ? { fit: v.fit } : {}) } };
+          next.d2.slots = {
+            ...next.d2.slots,
+            [k]: { ...next.d2.slots[k], ...(v.adjust ? { adjust: v.adjust } : {}), ...(v.fit ? { fit: v.fit } : {}), ...('sound' in v ? { sound: !!v.sound } : {}), ...('volume' in v ? { volume: v.volume } : {}) },
+          };
         }
       }
     }

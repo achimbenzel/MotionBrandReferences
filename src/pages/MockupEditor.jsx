@@ -75,6 +75,9 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
   const [picking, setPicking] = useState(false);
   const [fitting, setFitting] = useState(false);
   const [face, setFace] = useState('front'); // an object's printed face being edited
+  // Counts finished builds of the scene: what's put on the devices (pictures, fits, timelines)
+  // is applied again once they exist — a model loads after the page asked for its picture.
+  const [built, setBuilt] = useState(0);
   const [exporting, setExporting] = useState(null); // null | { initial, formats }
   const [planFile, setPlanFile] = useState(null);
   const [quickPlan, setQuickPlan] = useState(false);
@@ -246,6 +249,7 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
         reframe.current = false;
         lastShape.current = shapeKey;
         setParts(sel?.device === 'custom' ? st.parts(sel.id) : []);
+        setBuilt((n) => n + 1);
         refreshThumb();
       } catch (e) {
         toast(`Could not load the model: ${e.message}`, 'error');
@@ -270,13 +274,13 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
       })
       .catch((e) => toast(e.message, 'error'))
       .finally(() => setLoading(''));
-  }, [contentKey, structKey, toast, refreshThumb]);
+  }, [contentKey, structKey, built, toast, refreshThumb]);
   const fitKey = JSON.stringify(items.map((it) => [it.id, it.fit, it.adjust]));
   useEffect(() => {
     const st = stageRef.current;
     if (!st) return;
     for (const it of mRef.current.items) st.setItemFit(it.id, it.fit, it.adjust);
-  }, [fitKey, structKey]);
+  }, [fitKey, structKey, built]);
   // An object's other printed faces (a card's back, a box's sides …), each with its own picture and fit.
   const facesKey = JSON.stringify(items.map((it) => [it.id, it.faces]));
   useEffect(() => {
@@ -292,13 +296,13 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
       }
     }
     Promise.all(jobs).then(() => refreshThumb()).catch((e) => toast(e.message, 'error'));
-  }, [facesKey, structKey, toast, refreshThumb]);
+  }, [facesKey, structKey, built, toast, refreshThumb]);
   const tlKey = JSON.stringify(items.map((it) => [it.id, it.hingeAngle, it.keys, it.videoStart, it.sound, it.volume]));
   useEffect(() => {
     const st = stageRef.current;
     if (!st) return;
     for (const it of mRef.current.items) st.setItemTimeline(it.id, { hingeAngle: it.hingeAngle, hingeKeys: it.keys?.hinge || [], videoStart: it.videoStart, sound: it.sound, volume: it.volume });
-  }, [tlKey, structKey]);
+  }, [tlKey, structKey, built]);
   const animKey = JSON.stringify(anim);
   useEffect(() => { stageRef.current?.setAnimation(mRef.current.animation); }, [animKey]);
   useEffect(() => {

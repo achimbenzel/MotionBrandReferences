@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, UploadCloud, Library, X, Download, FolderInput, MoreHorizontal, Copy, Trash2, Crop, ImageIcon, ZoomIn, ZoomOut, Scan } from 'lucide-react';
+import { ArrowLeft, UploadCloud, Library, X, Download, FolderInput, MoreHorizontal, Copy, Trash2, Crop, ImageIcon, ZoomIn, ZoomOut, Scan, Play, Pause, Volume2, VolumeX } from 'lucide-react';
 import { domToBlob } from 'modern-screenshot';
 import { api, mockupFileUrl } from '../lib/api.js';
 import { useSaver } from '../lib/autosave.js';
@@ -40,6 +40,7 @@ export default function Mockup2DEditor({ initial }) {
   const saver = useSaver(500);
   const [m, setM] = useState(() => ({ ...initial, d2: initial.d2 || defaults2D('browser') }));
   const [active, setActive] = useState(null); // the picture slot being edited
+  const [paused, setPaused] = useState({});     // videos paused in the preview, by slot
   const [natural, setNatural] = useState({ w: 600, h: 600 });
   const [fit, setFit] = useState(0.5);          // the zoom that shows the whole picture
   const [zoom, setZoom] = useState(1);          // × fit: 1 = whole picture, more = zoomed in
@@ -221,7 +222,13 @@ export default function Mockup2DEditor({ initial }) {
     setLoading('Loading…');
     try { takeSlots(await api.importMockupSlot(id, active, source)); } catch (e) { toast(e.message, 'error'); } finally { setLoading(''); }
   };
-  const clearSlot = async (key) => { try { takeSlots(await api.clearMockupSlot(id, key)); } catch (e) { toast(e.message, 'error'); } };
+  // Sound and volume of the video being edited (the preview only — pictures stay silent).
+  const setVideo = (p) => {
+    const slots = mRef.current.d2.slots;
+    if (!slots[active]) return;
+    patchD({ slots: { ...slots, [active]: { ...slots[active], ...p } } });
+  };
+  const clearSlot = async (key) => { setPaused((p) => ({ ...p, [key]: false })); try { takeSlots(await api.clearMockupSlot(id, key)); } catch (e) { toast(e.message, 'error'); } };
   const slotUrl = (slot) => mockupFileUrl(m, slot.file);
   const activeDef = slots.find((s) => s.key === active);
   const activeSlot = active ? d.slots[active] : null;
@@ -318,7 +325,7 @@ export default function Mockup2DEditor({ initial }) {
                 <div className="m2c" ref={canvasRef} style={{ width: W, height: H }}>
                   <div className="m2c-bg" style={{ background: override || bgCss(bg) }} />
                   <div key={d.type} className={`m2c-item ${d.shadow ? 'shadow' : ''}`} ref={itemRef} style={{ transform: `translate(-50%, -50%) scale(${k})` }}>
-                    <Mockup2D d={d} url={slotUrl} onPick={(key) => { if (!panned.current) pick(key); }} active={active} />
+                    <Mockup2D d={d} url={slotUrl} onPick={(key) => { if (!panned.current) pick(key); }} active={active} paused={paused} />
                   </div>
                 </div>
               </div>
@@ -370,6 +377,21 @@ export default function Mockup2DEditor({ initial }) {
                   <button className="btn btn-sm" onClick={() => setPicking(true)}><Library size={14} /> From the app</button>
                 </div>
                 {activeSlot && <button type="button" className="btn btn-sm mke-fit-btn" onClick={() => setFitting(true)}><Crop size={14} /> Position &amp; size…</button>}
+                {activeSlot?.kind === 'video' && (
+                  <div className="m2e-video">
+                    <button type="button" className="icon-btn" onClick={() => setPaused((p) => ({ ...p, [active]: !p[active] }))}
+                      aria-label={paused[active] ? 'Play the video' : 'Pause the video'} title={paused[active] ? 'Play' : 'Pause'}>
+                      {paused[active] ? <Play size={15} /> : <Pause size={15} />}
+                    </button>
+                    <button type="button" className={`icon-btn ${activeSlot.sound ? 'on' : ''}`} onClick={() => setVideo({ sound: !activeSlot.sound })}
+                      aria-label={activeSlot.sound ? 'Mute the video' : 'Play the video with sound'} title={activeSlot.sound ? 'Sound on' : 'Sound off'}>
+                      {activeSlot.sound ? <Volume2 size={15} /> : <VolumeX size={15} />}
+                    </button>
+                    <Range min="0" max="1" step="0.05" value={activeSlot.volume ?? 1} disabled={!activeSlot.sound} aria-label="Volume"
+                      onChange={(e) => setVideo({ volume: Number(e.target.value) })} />
+                    <span className="m2e-video-vol">{activeSlot.sound ? `${Math.round((activeSlot.volume ?? 1) * 100)}%` : 'Muted'}</span>
+                  </div>
+                )}
               </div>
             ) : <div className="hint">Pick a picture here or in the preview.</div>}
           </section>

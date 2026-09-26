@@ -448,7 +448,10 @@ const placedContent = (v) => {
   const c = mockupContent(v);
   if (!c) return undefined;
   const adj = v.adjust && typeof v.adjust === 'object' ? v.adjust : {};
-  return { ...c, fit: v.fit === 'contain' ? 'contain' : 'cover', adjust: { scale: num(adj.scale, 0.05, 8, 1), x: num(adj.x, -3, 3, 0), y: num(adj.y, -3, 3, 0) } };
+  return {
+    ...c, fit: v.fit === 'contain' ? 'contain' : 'cover', adjust: { scale: num(adj.scale, 0.05, 8, 1), x: num(adj.x, -3, 3, 0), y: num(adj.y, -3, 3, 0) },
+    ...(c.kind === 'video' ? { sound: !!v.sound, volume: num(v.volume, 0, 1, 1) } : {}), // a video's sound (2D mockups)
+  };
 };
 // A branding object (device 'object'): business card, poster, box or mug and how it's made.
 export function normalizeObject(o) {

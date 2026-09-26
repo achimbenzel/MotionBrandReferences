@@ -4109,6 +4109,11 @@ img { max-width: 100%; display: block; }
 .m2e-slot-name { flex: 1; min-width: 0; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .m2e-slot .icon-btn { width: 26px; height: 26px; }
 .m2e-slot-actions .hint { margin: 0 0 6px; }
+.m2e-video { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2, var(--bg)); }
+.m2e-video .icon-btn.on { color: var(--accent); }
+.m2e-video .range { flex: 1; min-width: 0; }
+.m2e-video .range:disabled { opacity: 0.4; }
+.m2e-video-vol { font-size: 11.5px; color: var(--text-muted); min-width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
 .m2e-fields { display: flex; flex-direction: column; gap: 9px; }
 .m2e-fields textarea { resize: vertical; min-height: 60px; }
 .m2e-fields .mke-check { margin: 0; }

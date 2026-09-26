@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Heart, MessageCircle, Send, Bookmark, MoreHorizontal, BadgeCheck, ChevronLeft, ChevronRight, RotateCw, Lock, Plus, X as Close,
   Repeat2, BarChart2, Share, MapPin, Link as LinkIcon, CalendarDays, Grid3x3, Clapperboard, SquareUser, Menu as MenuIcon, ChevronDown, UserPlus, ImageIcon,
@@ -7,12 +7,43 @@ import {
 import { contentBox } from '../../lib/mockup3d/fit.js';
 import { TYPES_2D, values, compact, full, xMediaRatio } from '../../lib/mockup2d.js';
 
+// A slot's video: plays (or is paused) as the editor says, with sound only when
+// it's switched on — and stops for good when it leaves the page. No autoplay
+// attribute and a muted one: the thumbnail is made from a copy of the page, and
+// a copied video would otherwise start playing its sound on its own.
+function SlotVideo({ src, style, sound, volume, paused, onAspect }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    v.defaultMuted = true;
+    v.muted = !sound;
+    v.volume = Math.max(0, Math.min(1, volume ?? 1));
+    if (paused) { v.pause(); return undefined; }
+    // Browsers only allow sound after a click on the page: play muted until then.
+    let retry = null;
+    v.play().catch(() => {
+      v.muted = true;
+      v.play().catch(() => {});
+      if (!sound) return;
+      retry = () => { v.muted = false; v.play().catch(() => {}); };
+      window.addEventListener('pointerdown', retry, { once: true });
+    });
+    return () => { if (retry) window.removeEventListener('pointerdown', retry); };
+  }, [sound, volume, paused, src]);
+  useEffect(() => () => {
+    const v = ref.current;
+    if (v) { v.pause(); v.removeAttribute('src'); v.load(); }
+  }, []);
+  return <video ref={ref} src={src} style={style} loop playsInline muted onLoadedMetadata={(e) => onAspect(e.target.videoWidth / e.target.videoHeight || null)} />;
+}
+
 /**
  * A picture slot: the picture fills it (or fits in it) with your own size and
  * position (the same maths as the screens of the 3D devices), or a grey
  * placeholder. Click it in the editor to pick what goes there.
  */
-export function Slot({ d, k, ratio, round, url, onPick, active, className = '', label }) {
+export function Slot({ d, k, ratio, round, url, onPick, active, className = '', label, paused = false }) {
   const slot = d.slots?.[k];
   const [nat, setNat] = useState(null);
   const src = slot ? url(slot) : null;
@@ -24,7 +55,7 @@ export function Slot({ d, k, ratio, round, url, onPick, active, className = '', 
     <div className={`m2-slot ${round ? 'round' : ''} ${active ? 'active' : ''} ${src ? '' : 'm2-none'} ${className}`} style={{ aspectRatio: ratio }}
       data-slot={k} onClick={onPick ? (e) => { e.stopPropagation(); onPick(k); } : undefined}>
       {src && slot.kind === 'video' && (
-        <video src={src} style={pos} muted loop autoPlay playsInline onLoadedMetadata={(e) => setNat(e.target.videoWidth / e.target.videoHeight || null)} />
+        <SlotVideo src={src} style={pos} sound={!!slot.sound} volume={slot.volume} paused={paused} onAspect={setNat} />
       )}
       {src && slot.kind !== 'video' && (
         <img src={src} style={pos} alt="" draggable={false} onLoad={(e) => setNat(e.target.naturalWidth / e.target.naturalHeight || null)} />
@@ -356,13 +387,13 @@ const RENDER = {
  * file is; `onPick(slotKey)` when a picture slot is clicked; `active` = the
  * slot being edited.
  */
-export default function Mockup2D({ d, url, onPick, active }) {
+export default function Mockup2D({ d, url, onPick, active, paused = {} }) {
   const type = TYPES_2D[d.type] ? d.type : 'browser';
   const R = RENDER[type];
   const v = values(d);
   const defs = Object.fromEntries(TYPES_2D[type].slots.map((s) => [s.key, s]));
   const slot = (k, ratio, opts = {}) => (
-    <Slot d={d} k={k} url={url} onPick={onPick} active={active === k} label={defs[k]?.label}
+    <Slot d={d} k={k} url={url} onPick={onPick} active={active === k} label={defs[k]?.label} paused={!!paused[k]}
       ratio={ratio ?? defs[k]?.ratio(d, 0) ?? 1} round={opts.round ?? defs[k]?.round} className={opts.className} />
   );
   return (
