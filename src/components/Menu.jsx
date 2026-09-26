@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Check } from 'lucide-react';
 import { useMediaQuery, PHONE } from '../lib/useMedia.js';
 
 const GAP = 6;    // between the trigger and the menu
@@ -7,7 +8,10 @@ const EDGE = 8;   // kept free at the window's edges
 
 /**
  * Lightweight dropdown menu. `trigger` is the clickable element; `items` is an
- * array of { label, icon, onClick, danger } (or { separator: true }).
+ * array of { label, icon, onClick, danger } (or { separator: true }, or
+ * { heading: 'text' }). A row with `checked` (true / false) is a checkbox —
+ * with `keepOpen` the menu stays open to tick several; `hint` is a small
+ * note on its right (a count), `disabled` greys it out.
  * `align` = 'left' | 'right'. The menu floats above the page (it's placed next
  * to the trigger, never cut off by a card or a scrolling list around it) and
  * opens upwards when there's no room below. On phones it opens as a bottom
@@ -60,14 +64,21 @@ export default function Menu({ trigger, items, align = 'right', direction = 'dow
 
   const list = items.map((it, i) => it.separator ? (
     <div key={i} className="menu-sep" />
+  ) : it.heading ? (
+    <div key={i} className="menu-heading">{it.heading}</div>
   ) : (
     <button
       key={i}
-      className={`menu-item ${it.danger ? 'danger' : ''}`}
-      role="menuitem"
-      onClick={(e) => { e.stopPropagation(); setOpen(false); it.onClick(); }}
+      type="button"
+      className={`menu-item ${it.danger ? 'danger' : ''} ${it.checked !== undefined ? 'checkable' : ''} ${it.checked ? 'checked' : ''}`}
+      role={it.checked !== undefined ? 'menuitemcheckbox' : 'menuitem'}
+      aria-checked={it.checked !== undefined ? !!it.checked : undefined}
+      disabled={it.disabled}
+      onClick={(e) => { e.stopPropagation(); if (!it.keepOpen) setOpen(false); it.onClick(); }}
     >
-      {it.icon}{it.label}
+      {it.icon}<span className="menu-label">{it.label}</span>
+      {it.hint !== undefined && <span className="menu-hint">{it.hint}</span>}
+      {it.checked !== undefined && <span className="menu-check" aria-hidden="true">{it.checked && <Check size={12} strokeWidth={3} />}</span>}
     </button>
   ));
 

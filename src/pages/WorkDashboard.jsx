@@ -1,16 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   PencilRuler, ListTodo, FlaskConical, Clapperboard, Plus, ArrowRight, CalendarRange, AppWindow,
   AlertTriangle, Image as ImageIcon, UploadCloud, Database, Flag, CalendarClock, MonitorSmartphone,
   Library, Search, Sparkles, Target, CheckCircle2, Layers, Settings2, GripVertical, EyeOff, Eye, Columns2, RectangleHorizontal, Check,
+  MoreHorizontal,
 } from 'lucide-react';
 import { api, planFileUrl, dashboardFileUrl } from '../lib/api.js';
-import { gradientCss, PLAN_GRADIENTS, PLAN_STATUSES, tagColor } from '../lib/types.js';
+import { gradientCss, PLAN_GRADIENTS, PLAN_STATUSES, TABS, tagColor } from '../lib/types.js';
+import Menu from '../components/Menu.jsx';
 import { useToast } from '../components/Toast.jsx';
 import MediaPicker from '../components/mockups/MediaPicker.jsx';
 import ActivityMap from '../components/dashboard/ActivityMap.jsx';
-import Inspiration from '../components/dashboard/Inspiration.jsx';
+import Inspiration, { withCover } from '../components/dashboard/Inspiration.jsx';
 import QuickNote from '../components/dashboard/QuickNote.jsx';
 import FocusToday from '../components/dashboard/FocusToday.jsx';
 import FocusTimer from '../components/dashboard/FocusTimer.jsx';
@@ -139,6 +141,7 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
   const [software, setSoftware] = useState(null);
   const [settings, setSettings] = useState(null);
   const [mockups, setMockups] = useState([]);
+  const [refs, setRefs] = useState(null); // your references, for Inspiration
   const [needsMigration, setNeedsMigration] = useState(false);
   const [bannerPicker, setBannerPicker] = useState(false);
   const [appPick, setAppPick] = useState(false);
@@ -154,6 +157,7 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
     api.listSoftware().then((s) => { if (alive) setSoftware(s); }).catch(() => { if (alive) setSoftware([]); });
     api.getSettings().then((s) => { if (alive) setSettings(s); }).catch(() => { if (alive) setSettings({}); });
     api.listMockups().then((m) => { if (alive) setMockups(m.mockups || []); }).catch(() => {});
+    api.list().then((ps) => { if (alive) setRefs(ps); }).catch(() => { if (alive) setRefs([]); });
     api.maintenanceStatus().then((m) => { if (alive) setNeedsMigration(!!m.needsMigration); }).catch(() => {});
     return () => { alive = false; };
   }, [reloadKey]);
@@ -240,6 +244,26 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
     api.updateSettings({ dashboardLayout: next }).catch((e) => toast(`Could not save the layout: ${e.message}`, 'error'));
   };
   const setWidget = (id, patch) => saveLayout(layout.map((w) => (w.id === id ? { ...w, ...patch } : w)));
+  // Inspiration (⋯ while customizing): the Reference sections it draws from — none ticked = all of them.
+  const refCounts = useMemo(() => {
+    const n = { all: 0 };
+    for (const { p } of withCover(refs)) { n[p.type] = (n[p.type] || 0) + 1; n.all += 1; }
+    return n;
+  }, [refs]);
+  const sourceItems = (w) => {
+    const src = w.sources || [];
+    const toggle = (k) => setWidget(w.id, { sources: src.includes(k) ? src.filter((x) => x !== k) : [...src, k] });
+    return [
+      { heading: 'Inspiration from' },
+      { label: 'All sections', checked: !src.length, hint: refCounts.all, keepOpen: true, onClick: () => setWidget(w.id, { sources: [] }) },
+      { separator: true },
+      ...TABS.map((t) => ({
+        label: t.label, checked: src.includes(t.key), hint: refCounts[t.key] || 0, keepOpen: true,
+        disabled: !!refs && !refCounts[t.key] && !src.includes(t.key), // nothing with a picture there yet
+        onClick: () => toggle(t.key),
+      })),
+    ];
+  };
   const sort = useSortable({
     ids: shownW.map((w) => w.id), container: gridRef, mode: 'center',
     onMove: (from, to) => {
@@ -258,7 +282,7 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
       case 'timer': return <FocusTimer />;
       case 'continue': return <ContinueWork reloadKey={reloadKey} />;
       case 'rhythm': return <ActivityMap reloadKey={reloadKey} compact={w.size === 'half'} />;
-      case 'inspiration': return <Inspiration reloadKey={reloadKey} />;
+      case 'inspiration': return <Inspiration projects={refs} sources={w.sources} />;
       case 'note': return settings ? <QuickNote initial={settings.dashboardNote || ''} /> : null;
       case 'next': return plans === null ? null : (
           <div className="dash-focus" id="dash-next">
@@ -493,6 +517,13 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
                 <div className="dash-w-tools">
                   <button type="button" className="icon-btn dash-w-grip" {...sort.grab(w.id)} aria-label={`Move ${WIDGET[w.id].label}`} title="Drag to move"><GripVertical size={15} /></button>
                   <span className="dash-w-name">{WIDGET[w.id].label}</span>
+                  {w.id === 'inspiration' && (
+                    <Menu align="right" items={sourceItems(w)} trigger={(
+                      <button type="button" className={`icon-btn ${w.sources?.length ? 'on' : ''}`} aria-label="Where inspiration comes from" title="Where inspiration comes from">
+                        <MoreHorizontal size={15} />
+                      </button>
+                    )} />
+                  )}
                   <button type="button" className="icon-btn" onClick={() => setWidget(w.id, { size: w.size === 'full' ? 'half' : 'full' })}
                     title={w.size === 'full' ? 'Half width' : 'Full width'} aria-label={w.size === 'full' ? 'Half width' : 'Full width'}>
                     {w.size === 'full' ? <Columns2 size={15} /> : <RectangleHorizontal size={15} />}

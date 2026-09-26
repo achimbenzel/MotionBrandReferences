@@ -200,6 +200,11 @@ test('dashboard: what you changed last, focus minutes, today\'s focus, widget la
   // The layout keeps known widgets once each.
   r = await srv.api('/api/settings', { method: 'PATCH', json: { dashboardLayout: [{ id: 'timer', size: 'half' }, { id: 'timer' }, { id: 'weather' }, { id: 'rhythm', hidden: 1 }] } });
   assert.deepEqual(r.data.settings.dashboardLayout, [{ id: 'timer', hidden: false, size: 'half' }, { id: 'rhythm', hidden: true, size: 'full' }]);
+  // Inspiration remembers its sections (known ones, once each; none = all).
+  r = await srv.api('/api/settings', { method: 'PATCH', json: { dashboardLayout: [{ id: 'inspiration', size: 'half', sources: ['motion', 'nope', 'motion', 'branding'] }, { id: 'note', sources: ['motion'] }] } });
+  assert.deepEqual(r.data.settings.dashboardLayout, [{ id: 'inspiration', hidden: false, size: 'half', sources: ['motion', 'branding'] }, { id: 'note', hidden: false, size: 'full' }]);
+  r = await srv.api('/api/settings', { method: 'PATCH', json: { dashboardLayout: [{ id: 'inspiration', size: 'half', sources: ['nope'] }] } });
+  assert.deepEqual(r.data.settings.dashboardLayout, [{ id: 'inspiration', hidden: false, size: 'half' }]);
 
   // Ticking one to-do of a plan leaves the others alone.
   const todos = (await srv.api('/api/plans/plan3/blocks', { method: 'POST', json: { type: 'todos' } })).data.plan.blocks.at(-1);

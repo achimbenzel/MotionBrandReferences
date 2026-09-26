@@ -313,6 +313,11 @@ it and show it again; your layout is saved. The widgets:
   fills up from the day you update.
 - **Inspiration** — one reference from your own library at random, big;
   Motion references play on hover, **Shuffle** shows another, a click opens it.
+  While customizing, its **⋯** picks where it draws from — tick the Reference
+  sections that match your current focus (only Motion Design, or Branding &
+  Logos…; each shows how many of its references have a picture). The widget
+  then says so (“Inspiration · Motion Design”); **All sections** goes back to
+  everything. The choice is saved with your layout.
 - **Quick note** — a scratchpad for today's focus or an idea, saved as you
   type.
 

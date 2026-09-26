@@ -9,7 +9,7 @@
  *   2 — all records stored in the current shape; `schemaVersion` recorded.
  */
 import { nanoid } from 'nanoid';
-import { DEFAULT_STORAGE_LIMIT } from './config.js';
+import { DEFAULT_STORAGE_LIMIT, TYPES } from './config.js';
 
 export const SCHEMA_VERSION = 2;
 export const schemaVersionOf = (db) => (Number.isInteger(db?.schemaVersion) ? db.schemaVersion : 1);
@@ -731,7 +731,15 @@ export const DASHBOARD_WIDGETS = ['focus', 'timer', 'next', 'continue', 'urgent'
 export function normalizeDashboardLayout(v) {
   const seen = new Set();
   return (Array.isArray(v) ? v : []).filter((w) => w && DASHBOARD_WIDGETS.includes(w.id) && !seen.has(w.id) && seen.add(w.id))
-    .map((w) => ({ id: w.id, hidden: !!w.hidden, size: w.size === 'half' ? 'half' : 'full' }));
+    .map((w) => {
+      const out = { id: w.id, hidden: !!w.hidden, size: w.size === 'half' ? 'half' : 'full' };
+      // Inspiration: the Reference sections it draws from (none = all of them).
+      if (w.id === 'inspiration' && Array.isArray(w.sources)) {
+        const sources = [...new Set(w.sources.filter((t) => TYPES.has(t)))];
+        if (sources.length) out.sources = sources;
+      }
+      return out;
+    });
 }
 
 // ---------------------------------------------------------------------------

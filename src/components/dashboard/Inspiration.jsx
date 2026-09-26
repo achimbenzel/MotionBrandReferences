@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shuffle, Sparkles, ArrowUpRight } from 'lucide-react';
-import { api, fileUrl } from '../../lib/api.js';
+import { fileUrl } from '../../lib/api.js';
 import { TABS } from '../../lib/types.js';
 
 const LABEL = Object.fromEntries(TABS.map((t) => [t.key, t.label]));
@@ -12,23 +12,34 @@ function coverOf(p) {
     || (p.assets || []).find((a) => a.kind === 'image' && pic(a.file))?.file;
   return file ? { src: fileUrl(p, file), video: p.type === 'motion' && pic(p.video) ? fileUrl(p, p.video) : null } : null;
 }
+/** The references that can show up (they need a picture). */
+export const withCover = (projects) => (projects || []).map((p) => ({ p, cover: coverOf(p) })).filter((x) => x.cover);
+/** "Motion Design", "Branding & Logos", "3 sections" — or '' for all of them. */
+export function sourcesLabel(sources) {
+  const s = TABS.map((t) => t.key).filter((k) => (sources || []).includes(k)); // in the sidebar's order
+  if (s.length === 0 || s.length === TABS.length) return '';
+  return s.length <= 2 ? s.map((k) => LABEL[k]).join(' & ') : `${s.length} sections`;
+}
 
 /**
  * A reference from your own library, picked at random — a nudge when you
  * start the day. Shuffle for another; Motion references play on hover.
+ * `sources` narrows it to some Reference sections (Customize → ⋯), e.g.
+ * only Motion Design while that's your focus.
  */
-export default function Inspiration({ reloadKey }) {
+export default function Inspiration({ projects, sources }) {
   const navigate = useNavigate();
-  const [items, setItems] = useState(null);
   const [seed, setSeed] = useState(() => Math.random());
   const [hover, setHover] = useState(false);
   const last = useRef(null);
-
-  useEffect(() => {
-    let alive = true;
-    api.list().then((ps) => { if (alive) setItems(ps.map((p) => ({ p, cover: coverOf(p) })).filter((x) => x.cover)); }).catch(() => { if (alive) setItems([]); });
-    return () => { alive = false; };
-  }, [reloadKey]);
+  const from = (sources || []).join(',');
+  const all = useMemo(() => (projects ? withCover(projects) : null), [projects]);
+  const items = useMemo(() => {
+    if (!all || !from) return all;
+    const keep = new Set(from.split(','));
+    return all.filter((x) => keep.has(x.p.type));
+  }, [all, from]);
+  const fromLabel = sourcesLabel(sources);
 
   const pick = useMemo(() => {
     if (!items?.length) return null;
@@ -41,8 +52,10 @@ export default function Inspiration({ reloadKey }) {
   if (items && !items.length) {
     return (
       <section className="dash-insp is-empty">
-        <div className="dash-card-kicker"><Sparkles size={14} /> Inspiration</div>
-        <p>Your library's references show up here, one at a time — add a few in Reference mode.</p>
+        <div className="dash-card-kicker"><Sparkles size={14} /> Inspiration{fromLabel && <span className="dash-insp-from">{fromLabel}</span>}</div>
+        <p>{all.length && fromLabel
+          ? `Nothing with a picture in ${fromLabel} yet — add some there, or pick more sections under Customize → ⋯.`
+          : 'Your library\'s references show up here, one at a time — add a few in Reference mode.'}</p>
       </section>
     );
   }
@@ -55,7 +68,7 @@ export default function Inspiration({ reloadKey }) {
         </button>
       ) : <div className="dash-insp-media dash-act-skeleton" />}
       <div className="dash-insp-top">
-        <span className="dash-insp-kicker"><Sparkles size={13} /> Inspiration</span>
+        <span className="dash-insp-kicker"><Sparkles size={13} /> Inspiration{fromLabel && <span className="dash-insp-from">{fromLabel}</span>}</span>
         <button type="button" className="btn btn-sm dash-glass-btn" onClick={() => setSeed(Math.random())} disabled={!items || items.length < 2}>
           <Shuffle size={14} /> Shuffle
         </button>
