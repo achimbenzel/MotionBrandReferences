@@ -392,8 +392,8 @@ export default function StoryboardEditor() {
       <div className="sbe-top">
         <button className="detail-back" style={{ margin: 0 }} onClick={back}><ArrowLeft size={16} /> {plan.name}</button>
         <div className="sbe-actions">
-          <button className="btn btn-sm" onClick={() => setPrinting(true)} disabled={!shots.length}><Printer size={14} /> PDF</button>
-          <button className="btn btn-sm" onClick={openVideo} disabled={!playShots.length} title="The animatic as an MP4 / WebM — with the music and recorded voice-overs"><Film size={14} /> Video</button>
+          <button className="btn btn-sm" onClick={() => setPrinting(true)} disabled={!shots.length} aria-label="PDF"><Printer size={14} /><span className="sbe-long"> PDF</span></button>
+          <button className="btn btn-sm" onClick={openVideo} disabled={!playShots.length} aria-label="Video" title="The animatic as an MP4 / WebM — with the music and recorded voice-overs"><Film size={14} /><span className="sbe-long"> Video</span></button>
           <button className="btn btn-sm btn-primary" onClick={() => setAnimatic({ index: 0, autoplay: true })} disabled={!playShots.length}><Play size={14} /> Animatic</button>
           <Menu align="right" title="Storyboard"
             trigger={<button className="btn btn-sm" aria-label="Storyboard options"><MoreHorizontal size={15} /></button>}
