@@ -285,8 +285,17 @@ The Work landing page, a Notion-style overview that moves a little:
 - **Pipeline** — your plans by status as one bar and per stage (Briefing →
   Concept → Design → Production → Review → Delivered); a stage opens the plan
   list filtered to it.
-- **Recent plans**, newest first, with status, timeframe progress and to-dos
-  done, and the **latest mockups** as pictures.
+- **Your rhythm** — a GitHub-style map of the last 26 weeks (15 on a phone):
+  a square per day, dark → bright with how much you did — every save, and the
+  references, plans, mockups and Inbox shares you added. Hover a day for its
+  numbers; beside it your current **streak**, **this week** and your
+  **busiest weekday**. Saves are counted per day in `data/activity.json` (a
+  small file of its own; the library database isn't touched), so the map
+  fills up from the day you update.
+- **Inspiration** — one reference from your own library at random, big;
+  Motion references play on hover, **Shuffle** shows another, a click opens it.
+- **Quick note** — a scratchpad for today's focus or an idea, saved as you
+  type.
 
 Sections rise in one after the other; with *reduce motion* on in the system
 nothing moves.
@@ -349,8 +358,11 @@ one stage at a time (archived plans only show under **Archived**). Each
     next: Styleframes in 3 days” (with a red calendar when one is overdue);
     a click opens the dates and milestones to edit,
   - a stack of **content blocks** below the timeframe. A **new plan is empty**;
-    add blocks with **+ Add block** at the bottom, reorder them (**Move up /
-    down**), rename them, or remove them — each block has its own **⋯** menu.
+    add blocks with **+ Add block** at the bottom, **drag them into place** by
+    the handle left of each block (on a phone: the small pill on its top edge;
+    a line shows where it lands; with the handle focused, ↑ / ↓ move it too) or
+    use **Move up / down**, rename them, or remove them — each block has its
+    own **⋯** menu.
     These block types are available:
     - **Briefing** — question → answer rows (rename, add or remove questions;
       answers grow as you type). The header counts answered questions, and
@@ -935,8 +947,9 @@ it, the Work / Reference toggle, the section list (with icons, current one
 highlighted), an **Add** button, and a footer with **Settings**, **Trash** and
 the storage meter. In **Work** mode the section list is **Dashboard**,
 **Plans**, **Software**, **To-Dos** and **Brand Tester**.
-The collapse button **slides** the sidebar out for a full-width canvas; a small
-floating button slides it back in, and the collapsed state is remembered.
+The collapse button folds the sidebar into a slim **rail of icons** (names show
+as tooltips; Work and Reference stand one above the other) for a wider canvas;
+the button at its top unfolds it again, and the choice is remembered.
 
 Below 900 px (phones, tablets) the **same sidebar** becomes a **drawer**: a
 slim top bar shows **☰**, the page title, search and add; ☰ slides the sidebar
