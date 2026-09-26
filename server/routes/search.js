@@ -51,7 +51,7 @@ router.get('/api/search', async (req, res) => {
       ...(b.rows || []).flatMap((r) => Object.values(r.cells || {})),
       ...(b.fields || []).flatMap((f) => [f.label, f.value]),
       ...(b.lines || []).flatMap((l) => [l.visual, l.vo]),
-      ...(b.shots || []).flatMap((x) => [x.visual, x.vo, x.notes]),
+      ...(b.shots || []).flatMap((x) => [x.visual, x.vo, x.onscreen, x.sfx, x.notes, x.camera, x.transition]),
       ...(b.versions || []).flatMap((v) => [v.label, v.name, ...(v.comments || []).map((c) => c.text)]),
     ]);
     const hay = [pl.name, pl.client, ...(pl.milestones || []).map((m) => m.title), ...blockText]

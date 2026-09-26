@@ -249,7 +249,7 @@ A toggle switches between two modes:
 
 - **Work** — the **default** mode (left in the toggle), your working area. It
   opens on a **Dashboard** and holds **Plans**, **Software**, the **To-Do
-  board** and the **Brand Tester** (see below).
+  board**, the **Brand Tester** and **Storyboards** (see below).
 - **Reference** — the library (Branding, Motion Design, Logos, Business Cards,
   Colors, Image Gallery, Fonts, Logo No Go).
 
@@ -337,15 +337,10 @@ one stage at a time (archived plans only show under **Archived**). Each
       direction and isn't counted; `[pause 1s]` adds a pause. **Copy** puts the
       script on the clipboard; the block's ⋯ **Storyboard from script** turns
       every line into a shot, timed by its voice-over.
-    - **Storyboard** — shots with a **frame** (sketch / styleframe), a
-      **duration**, what we see and the VO / on-screen text, in **16:9, 9:16,
-      1:1 or 4:5**. **Add frames** (or drop images onto the block) makes one
-      shot per image; drop an image on a shot to replace its frame. A timing
-      strip and the total show the length against the target. **Play
-      animatic** plays the frames in time — fullscreen, VO as captions, with an
-      optional **music / voice-over track** in sync (Space play/pause, ←/→
-      shots, C captions, Esc close); click a frame or a strip cell to start
-      there.
+    - **Storyboard** — in the plan a **preview**: the frames in order (with
+      their section colour), format, length against the target, how many
+      shots are approved, and **Animatic**. **Open storyboard** (or a click on
+      a frame) opens the **storyboard editor** — see *Storyboards* below.
     - **Deliverables** — every export to hand over, with **format** (a format
       fills in the usual resolution), **resolution**, **fps**, **codec**,
       **length**, an optional note and a **status** — Open → Rendering → In
@@ -448,6 +443,51 @@ colour variants come along. Then:
 - **Sheet (PNG)** — every test on one page; **Save to plan…** puts that sheet
   into a plan's moodboard (an existing one, or a new “Brand tests” board).
   Nothing else is stored; the settings are remembered for the session.
+
+### Storyboards
+**Storyboards** (sidebar, under the Brand Tester) lists the storyboards of all
+your plans — frames, format, length, section colours and plan — searchable.
+**New storyboard** asks for the plan (or makes a new plan, with client, in the
+same step), a starting point and the format:
+- **Empty**,
+- **Launch video · 30 s** — Hook → Problem → Product reveal → Features →
+  Proof → Call to action → Logo outro, 11 shots with suggested timings,
+- **Social cut · 15 s · 9:16** and **Logo sting · 5 s**.
+
+A storyboard is stored in its plan (as its storyboard block), so the plan and
+the Storyboards page always show the same thing.
+
+**The editor** (a page of its own; ← goes back to the plan):
+- **Name, format** (16:9, 9:16, 1:1, 4:5), **target length** (or the
+  briefing's), a **music / voice-over track**, a **progress bar** by status and
+  a strip of all shots with the **sections** underneath — click a shot to jump
+  to it.
+- Per shot: the **frame**, **duration**, **section** (Hook, Problem, Reveal …
+  the same types as the sections of Motion references), **status** (Sketch →
+  Styleframe → Animated → Approved), **what we see**, **voice-over**,
+  **on-screen text**, **shot size** (wide, close-up, detail, screen / UI …),
+  **camera move** (push in, orbit, parallax …), the **transition** into the
+  next shot (cut, match cut, whip pan, morph …), **SFX / music** and **notes**.
+  Each shot's ⋯ menu: new or replaced frame, play from here, insert after,
+  duplicate, move earlier / later, delete (with Undo).
+- **Three views**: **Grid** (panels), **List** (a table with every field — good
+  for writing; cards on a phone) and **Timeline** (shots as long as they last
+  on a time axis, the sections above and the track's waveform below; **drag a
+  shot's right edge** to change its duration, zoom in / out / fit; the shot
+  you click is edited below). The view is remembered.
+- **Frames**: **Upload frames** (one shot each), **drop** images anywhere
+  (on a shot: replaces its frame), **paste** an image, or **From library**:
+  the plan's moodboard / files images or the **frames and moments saved on
+  your Motion references** (searchable; the shot's note then says where it
+  came from). Pictures are copied into the storyboard.
+- **Animatic** — as before, now also showing the on-screen text as a super.
+- **PDF** — A4 landscape for the client: **large** (three shots a page, frame
+  left, text right) or **compact** (six a page; upright formats 4 / 6), with
+  the fields you tick (voice-over, on-screen text, camera, sound, notes,
+  status), plan, client, date and page numbers. It goes through the browser's
+  print dialog — choose **Save as PDF**.
+- ⋯ **Copy as 9:16 / 1:1 / 4:5 / 16:9 version** — a copy (frames and track
+  included) to rework for another format; **Delete storyboard** (→ Trash).
 
 ### Inbox (share from your phone)
 Everything you come across on the go — a screenshot, a screen recording, an

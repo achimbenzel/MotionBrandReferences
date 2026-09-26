@@ -11,6 +11,7 @@ import {
   BLOCK_TYPES, BLOCK_TITLES, PLAN_STATUSES, STORYBOARD_ASPECTS, normalizeField, normalizeShot, normalizeAudio,
   normalizeLine, normalizeTarget, normalizePace, normalizeVersion, normalizeDeliverable, normTags, str,
 } from '../schema.js';
+import { STORYBOARD_TEMPLATES, storyboardTemplate, templateInfo } from '../storyboards.js';
 import { BUILTIN_TEMPLATES, builtinTemplate, planFromTemplate, templateFromPlan, templateSummary } from '../templates.js';
 import { createRouter } from '../http.js';
 
@@ -284,6 +285,103 @@ router.post('/api/plans/:id/archive', async (req, res) => {
     return p;
   });
   res.status(201).json({ plan: updated, projects: created });
+});
+
+// --- Storyboards ---
+router.get('/api/storyboard-templates', (_req, res) => {
+  res.json({ templates: STORYBOARD_TEMPLATES.map(templateInfo) });
+});
+
+// A new storyboard in a plan: empty, from a template, or a copy of another
+// storyboard of the plan (`from`; its frames and track are copied — e.g. to
+// make a 9:16 version). Placed after `after` / the copied one, else at the end.
+router.post('/api/plans/:id/storyboards', async (req, res) => {
+  const db = await readDB();
+  const plan = db.plans.find((p) => p.id === req.params.id);
+  if (!plan) return res.status(404).json({ error: 'not_found' });
+  const src = req.body.from ? findBlock(plan, req.body.from) : null;
+  if (req.body.from && src?.type !== 'storyboard') return res.status(404).json({ error: 'not_found' });
+  const tpl = !src && req.body.template ? storyboardTemplate(req.body.template) : null;
+  if (!src && req.body.template && !tpl) return res.status(400).json({ error: 'unknown_template' });
+
+  const id = nanoid(8);
+  const asked = STORYBOARD_ASPECTS.includes(req.body.aspect) ? req.body.aspect : null;
+  let title = str(req.body.title, 400).trim();
+  let aspect = asked || tpl?.aspect || '16:9';
+  let shots = [];
+  let target = tpl?.target ?? null;
+  let audio = null;
+  if (tpl) shots = tpl.shots.map(([section, duration, visual]) => ({ section, duration, visual }));
+  if (src) {
+    const dir = blockDir(plan.id, id);
+    const copy = async (rel) => {
+      if (typeof rel !== 'string' || !rel.startsWith(`blocks/${src.id}/`) || rel.includes('..')) return null;
+      const from = path.join(planDir(plan.id), rel);
+      if (!fs.existsSync(from)) return null;
+      const name = `${nanoid(8)}${extOf(rel)}`;
+      await fsp.mkdir(dir, { recursive: true });
+      await fsp.copyFile(from, path.join(dir, name));
+      return `blocks/${id}/${name}`;
+    };
+    for (const s of src.shots || []) shots.push({ ...s, id: nanoid(6), image: await copy(s.image) });
+    if (src.audio?.file) { const f = await copy(src.audio.file); if (f) audio = { ...src.audio, file: f }; }
+    target = src.target ?? null;
+    aspect = asked || src.aspect || '16:9';
+    title = title || `${src.title || 'Storyboard'} (${aspect})`;
+  }
+  const block = {
+    id, type: 'storyboard', title: title || tpl?.label.split(' · ')[0] || 'Storyboard', aspect,
+    shots: shots.slice(0, 500).map((s) => normalizeShot(s, id)), audio: normalizeAudio(audio, id), target: normalizeTarget(target),
+  };
+  const updated = await mutateDB((d) => {
+    const p = d.plans.find((x) => x.id === plan.id); if (!p) return null;
+    const i = p.blocks.findIndex((b) => b.id === (req.body.after || src?.id));
+    if (i === -1) p.blocks.push(block); else p.blocks.splice(i + 1, 0, block);
+    return p;
+  });
+  if (!updated) {
+    await safeRm(blockDir(plan.id, id), { recursive: true, force: true }).catch(() => {});
+    return res.status(404).json({ error: 'not_found' });
+  }
+  res.status(201).json({ plan: updated, block });
+});
+
+// Copy pictures into a storyboard's folder: images of this plan (moodboards,
+// files blocks) or frames / moments saved on Motion references. Items are
+// named by id — never by path. Like uploads, only the files are stored; the
+// page adds them to its shots. → { files: [{ file, name, label, key }] }
+const FRAME_EXT = /\.(png|jpe?g|gif|webp|avif|svg)$/i;
+const clock = (t) => { const s = Math.max(0, Math.floor(Number(t) || 0)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+router.post('/api/plans/:id/blocks/:blockId/import', async (req, res) => {
+  const db = await readDB();
+  const plan = db.plans.find((p) => p.id === req.params.id);
+  const b = findBlock(plan, req.params.blockId);
+  if (!plan || b?.type !== 'storyboard') return res.status(404).json({ error: 'not_found' });
+  const items = Array.isArray(req.body.items) ? req.body.items.slice(0, 100) : [];
+  const dir = blockDir(plan.id, b.id);
+  const files = [];
+  for (const it of items) {
+    let from = null; let name = ''; let label = '';
+    if (it?.kind === 'plan') {
+      const pb = findBlock(plan, it.blockId);
+      const hit = (pb?.images || []).find((x) => x.id === it.itemId) || (pb?.files || []).find((x) => x.id === it.itemId);
+      if (typeof hit?.file === 'string' && !hit.file.includes('..')) { from = path.join(planDir(plan.id), hit.file); name = hit.name || hit.title || ''; }
+    } else if (it?.kind === 'frame' || it?.kind === 'moment') {
+      const p = db.projects.find((x) => x.id === it.projectId && x.type === 'motion');
+      const hit = it.kind === 'frame' ? (p?.frames || []).find((x) => x.id === it.itemId) : (p?.markers || []).find((x) => x.id === it.itemId);
+      const rel = it.kind === 'frame' ? hit?.file : hit?.thumb;
+      if (typeof rel === 'string' && !rel.includes('..')) {
+        from = path.join(DATA_DIR, 'motion', p.id, rel);
+        label = `${p.title || 'Motion'} · ${clock(hit.t)}${it.kind === 'moment' && hit.label ? ` · ${hit.label}` : ''}`;
+      }
+    }
+    if (!from || !FRAME_EXT.test(from) || !fs.existsSync(from)) continue;
+    const stored = `${nanoid(8)}${extOf(from)}`;
+    await fsp.mkdir(dir, { recursive: true });
+    await fsp.copyFile(from, path.join(dir, stored));
+    files.push({ file: `blocks/${b.id}/${stored}`, name: str(name || path.basename(from), 200), label, key: `${it.kind}:${it.itemId}` });
+  }
+  res.status(201).json({ files });
 });
 
 // --- Content blocks ---

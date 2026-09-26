@@ -8,6 +8,15 @@ import { useEffect, useRef } from 'react';
 import { withKeepalive } from './api.js';
 
 const mounted = new Set();
+// Every save on the wire, from any page — so a page that opens next can wait
+// for the one it replaced (e.g. storyboard editor ↔ plan) before loading.
+const allInflight = new Set();
+/** Resolves once every save that has been sent (by any page) has finished —
+ *  or after `timeout` ms, so a hanging request never blocks a page. */
+export const whenSaved = (timeout = 4000) => Promise.race([
+  Promise.all([...allInflight]),
+  new Promise((resolve) => { setTimeout(resolve, timeout); }),
+]);
 let listening = false;
 function listen() {
   if (listening || typeof window === 'undefined') return;
@@ -23,8 +32,9 @@ function createSaver(defaultDelay) {
   const exec = (run) => {
     let p;
     try { p = Promise.resolve(run()); } catch (err) { p = Promise.reject(err); }
-    const tracked = p.catch(() => {}).finally(() => inflight.delete(tracked));
+    const tracked = p.catch(() => {}).finally(() => { inflight.delete(tracked); allInflight.delete(tracked); });
     inflight.add(tracked);
+    allInflight.add(tracked);
     return tracked;
   };
   return {

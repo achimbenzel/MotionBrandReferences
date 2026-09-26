@@ -46,6 +46,7 @@ export const WORK_TABS = [
   { key: 'software', label: 'Software', path: '/software' },
   { key: 'board', label: 'To-Dos', path: '/board' },
   { key: 'logotester', label: 'Brand Tester', path: '/logo-tester' },
+  { key: 'storyboards', label: 'Storyboards', path: '/storyboards' },
 ];
 export const WORK_HOME = '/work';
 

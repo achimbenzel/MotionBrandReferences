@@ -166,6 +166,20 @@ export const api = {
   async archivePlan(planId, body) {
     return request(`/api/plans/${planId}/archive`, { method: 'POST', json: body });
   },
+  // --- Storyboards (storyboard blocks of plans) ---
+  async listStoryboardTemplates() {
+    const { templates } = await request('/api/storyboard-templates');
+    return templates;
+  },
+  // New storyboard in a plan: { title, aspect, template } or a copy { from: blockId, aspect } → { plan, block }
+  async createStoryboard(planId, body) {
+    return request(`/api/plans/${planId}/storyboards`, { method: 'POST', json: body });
+  },
+  // Copy plan images / motion frames / moments into a storyboard's folder → [{ file, name, label, key }]
+  async importStoryboardFrames(planId, blockId, items) {
+    const { files } = await request(`/api/plans/${planId}/blocks/${blockId}/import`, { method: 'POST', json: { items } });
+    return files;
+  },
   // Plan templates: built-in ones plus those saved from plans.
   async listPlanTemplates() {
     const { templates } = await request('/api/plan-templates');

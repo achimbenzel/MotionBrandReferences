@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  PencilRuler, ListTodo, FlaskConical, Plus, ArrowRight, CalendarRange, AppWindow,
+  PencilRuler, ListTodo, FlaskConical, Clapperboard, Plus, ArrowRight, CalendarRange, AppWindow,
   AlertTriangle, Image as ImageIcon, UploadCloud, Database, Flag, CalendarClock,
 } from 'lucide-react';
 import { api, planFileUrl, dashboardFileUrl } from '../lib/api.js';
@@ -58,6 +58,7 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
   const removeBanner = async () => { try { setSettings(settings?.dashboardBanner ? await api.removeDashboardBanner() : await api.updateSettings({ dashboardBannerGradient: null })); } catch (e) { toast(`Failed: ${e.message}`, 'error'); } };
 
   const planCount = plans?.length ?? 0;
+  const sbCount = (plans || []).reduce((n, p) => n + (p.blocks || []).filter((b) => b.type === 'storyboard').length, 0);
   const boardCards = (board?.columns || []).reduce((n, c) => n + c.cards.length, 0);
   const boardLists = (board?.columns || []).length;
   const softCount = software?.length ?? 0;
@@ -95,6 +96,7 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
     { key: 'software', icon: AppWindow, title: 'Software', sub: softCount ? `${softCount} app${softCount === 1 ? '' : 's'}` : 'Plugins, scripts & more', to: '/software', accent: 'linear-gradient(120deg,#7b4397,#dc2430)' },
     { key: 'board', icon: ListTodo, title: 'To-Do Board', sub: boardCards ? `${boardCards} card${boardCards === 1 ? '' : 's'} · ${boardLists} lists` : 'Plan your to-dos', to: '/board', accent: 'linear-gradient(120deg,#00c6a7,#1e4fd6)' },
     { key: 'logotester', icon: FlaskConical, title: 'Brand Tester', sub: 'Test a logo, keep the sheet', to: '/logo-tester', accent: 'linear-gradient(120deg,#f83600,#f9d423)' },
+    { key: 'storyboards', icon: Clapperboard, title: 'Storyboards', sub: sbCount ? `${sbCount} storyboard${sbCount === 1 ? '' : 's'}` : 'Frames, timing & animatic', to: '/storyboards', accent: 'linear-gradient(120deg,#ff6a88,#6a11cb)' },
   ];
 
   return (

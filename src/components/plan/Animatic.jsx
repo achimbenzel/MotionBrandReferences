@@ -6,7 +6,8 @@ const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
 
 /**
  * Fullscreen animatic: plays the storyboard's frames for their durations, with
- * the voice-over line as a caption and an optional audio track in sync (the
+ * the voice-over line as a caption, the on-screen text as a super, and an
+ * optional audio track in sync (the
  * track leads while it plays; past its end a clock takes over).
  * Keys: Space play/pause · ←/→ previous/next shot · C captions · Esc close.
  */
@@ -134,6 +135,7 @@ export default function Animatic({ shots, ratio, audioUrl, fileUrl, startIndex =
               <p>{shot.visual || 'No frame yet'}</p>
             </div>
           )}
+        {shot.onscreen?.trim() && <div className="animatic-super">{shot.onscreen}</div>}
         {captions && shot.vo?.trim() && <div className="animatic-caption">{shot.vo}</div>}
         <span className="animatic-shotno">{idx + 1} / {shots.length}</span>
         {!playing && (

@@ -10,7 +10,7 @@ import {
   Archive, Film,
 } from 'lucide-react';
 import { api, planFileUrl, fileUrl } from '../lib/api.js';
-import { useSaver, useRefreshOnReturn } from '../lib/autosave.js';
+import { useSaver, useRefreshOnReturn, whenSaved } from '../lib/autosave.js';
 import { PLAN_GRADIENTS, PLAN_STATUSES, gradientCss, normalizeUrl, hostOf, planStatus, tagColor } from '../lib/types.js';
 import { rgbToHex, hexToRgb } from '../lib/color.js';
 import { extractPalette } from '../lib/imaging.js';
@@ -109,7 +109,8 @@ export default function PlanDetail() {
     let alive = true;
     saver.flush(); // another plan's pending edits go out before we switch
     setPlan(null); setError(null);
-    api.getPlan(id).then((p) => {
+    // Edits just made elsewhere (e.g. the storyboard editor) land first.
+    whenSaved().then(() => api.getPlan(id)).then((p) => {
       if (!alive) return;
       setPlan(p); setMilestones(p.milestones || []); setClient(p.client || '');
     }).catch((e) => { if (alive) setError(e.message); });
@@ -524,8 +525,7 @@ export default function PlanDetail() {
 
         if (b.type === 'storyboard') {
           return (
-            <StoryboardBlock key={b.id} plan={plan} block={b} menu={menu} icon={Meta.icon} editBlock={editBlock} planRef={planRef} toast={toast}
-              upload={(files) => api.uploadBlockFiles(id, b.id, files)} fileUrl={(rel) => planFileUrl(plan, rel)} />
+            <StoryboardBlock key={b.id} plan={plan} block={b} menu={menu} icon={Meta.icon} fileUrl={(rel) => planFileUrl(plan, rel)} />
           );
         }
 

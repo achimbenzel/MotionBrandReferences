@@ -47,13 +47,22 @@ const num = (v, min, max, fallback) => {
 };
 // A block's files live in its own folder; nothing else may be referenced.
 const blockFile = (blockId, v) => (typeof v === 'string' && v.startsWith(`blocks/${blockId}/`) && !v.includes('..') ? str(v, 300) : null);
+// Where a shot stands: sketch → styleframe → animated → approved ('' = not set).
+export const SHOT_STATUS = ['sketch', 'styleframe', 'animated', 'approved'];
 export const normalizeShot = (s, blockId) => ({
   id: s?.id ? str(s.id, 40) : nanoid(6),
   image: blockFile(blockId, s?.image),
   duration: num(s?.duration, 0.1, 600, 2),
   visual: str(s?.visual, 4000),
   vo: str(s?.vo, 4000),
+  onscreen: str(s?.onscreen, 2000), // on-screen text / supers
+  sfx: str(s?.sfx, 2000),           // sound effects, music cues
   notes: str(s?.notes, 4000),
+  size: str(s?.size, 40),           // shot size (wide, close-up …)
+  camera: str(s?.camera, 60),       // camera move
+  transition: str(s?.transition, 60), // into the next shot
+  section: SEGMENT_KINDS.includes(s?.section) ? s.section : '',
+  status: SHOT_STATUS.includes(s?.status) ? s.status : '',
 });
 export const normalizeAudio = (a, blockId) => {
   const file = blockFile(blockId, a?.file);
