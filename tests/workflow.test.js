@@ -443,3 +443,49 @@ test('plan tabs: templates place blocks, tab and collapsed save, moves swap with
   const fromTpl = await newPlan({ template: t.data.template.id });
   assert.deepEqual(fromTpl.blocks.map((b) => [b.type, b.tab]), [['heading', 'concept'], ['moodboard', 'concept'], ['review', 'delivery']]);
 });
+
+test('storyboard 2: frame variants and recorded voice per shot, the beat, cutdowns — sanitised, copied with a version', async () => {
+  const plan = await newPlan({ name: 'Board 2' });
+  const sb = (await srv.api(`/api/plans/${plan.id}/blocks`, { method: 'POST', json: { type: 'storyboard' } })).data.block;
+  assert.deepEqual([sb.beat, sb.cutdowns], [null, []]);
+  const fd = new FormData();
+  fd.append('files', new Blob([png(16, 9, [0, 120, 255])], { type: 'image/png' }), 'a.png');
+  fd.append('files', new Blob([png(16, 9, [255, 0, 0])], { type: 'image/png' }), 'b.png');
+  fd.append('files', new Blob([Buffer.from('OggS-fake')], { type: 'audio/webm' }), 'voice-1.webm');
+  const [a, b, voice] = (await srv.api(`/api/plans/${plan.id}/blocks/${sb.id}/uploads`, { method: 'POST', body: fd })).data.files;
+
+  let r = await srv.api(`/api/plans/${plan.id}/blocks/${sb.id}`, {
+    method: 'PATCH',
+    json: {
+      shots: [
+        { id: 's1', image: a.file, duration: 2, alts: [{ id: 'v1', image: b.file, label: 'sketch' }, { id: 'v2', image: '../../db.json' }], voice: { file: voice.file, duration: 2.6, volume: 5 } },
+        { id: 's2', duration: 3, voice: { file: 'blocks/other/x.webm' } },
+      ],
+      beat: { bpm: 999, offset: 0.25, snap: false },
+      cutdowns: [{ id: 'c1', name: '6 s cut', target: 6, skip: ['s2'], durations: { s1: 1.5, bad: 'x' } }],
+    },
+  });
+  let saved = r.data.plan.blocks.find((x) => x.id === sb.id);
+  assert.deepEqual(saved.shots[0].alts, [{ id: 'v1', image: b.file, label: 'sketch' }]);
+  assert.deepEqual(saved.shots[0].voice, { file: voice.file, duration: 2.6, volume: 1 });
+  assert.equal(saved.shots[1].voice, null);
+  assert.deepEqual(saved.beat, { bpm: 300, offset: 0.25, snap: false, auto: false });
+  assert.deepEqual(saved.cutdowns, [{ id: 'c1', name: '6 s cut', target: 6, skip: ['s2'], durations: { s1: 1.5 } }]);
+  r = await srv.api(`/api/plans/${plan.id}/blocks/${sb.id}`, { method: 'PATCH', json: { beat: null } });
+  assert.equal(r.data.plan.blocks.find((x) => x.id === sb.id).beat, null);
+  await srv.api(`/api/plans/${plan.id}/blocks/${sb.id}`, { method: 'PATCH', json: { beat: { bpm: 120, offset: 0.25 } } });
+
+  // A 9:16 copy: variants and voices copied as files, the cutdown follows the new shot ids.
+  const copy = (await srv.api(`/api/plans/${plan.id}/storyboards`, { method: 'POST', json: { from: sb.id, aspect: '9:16' } })).data.block;
+  const [c1, c2] = copy.shots;
+  assert.ok(c1.alts[0].image.startsWith(`blocks/${copy.id}/`) && c1.voice.file.startsWith(`blocks/${copy.id}/`));
+  assert.equal((await fetch(`${srv.base}/data/plan/${plan.id}/${c1.voice.file}`)).status, 200);
+  assert.equal(copy.beat.bpm, 120);
+  assert.deepEqual([copy.cutdowns[0].skip, Object.keys(copy.cutdowns[0].durations)], [[c2.id], [c1.id]]);
+
+  // Saved as a template: no frames, variants, voices or cutdowns.
+  const t = (await srv.api('/api/plan-templates', { method: 'POST', json: { planId: plan.id, name: 'Board 2 tpl' } })).data.template;
+  const fromTpl = await newPlan({ template: t.id });
+  const tb = fromTpl.blocks.find((x) => x.type === 'storyboard');
+  assert.deepEqual([tb.shots[0].image, tb.shots[0].alts, tb.shots[0].voice, tb.cutdowns], [null, [], null, []]);
+});

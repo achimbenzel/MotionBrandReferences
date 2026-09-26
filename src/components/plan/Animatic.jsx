@@ -25,6 +25,7 @@ export default function Animatic({ shots, ratio, audioUrl, fileUrl, startIndex =
   const clock = useRef({ t0: t, at: 0 }); // position t0 at performance.now() = at
   const dragging = useRef(false);
   const rootRef = useRef(null);
+  const voiceRef = useRef(null); // the recorded voice-over of the shot playing
 
   const indexAt = (time) => {
     let i = 0;
@@ -79,6 +80,20 @@ export default function Animatic({ shots, ratio, audioUrl, fileUrl, startIndex =
   }, [playing, total, pause, setPos]);
 
   useEffect(() => { if (autoplay && shots.length) play(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A shot's recorded voice-over plays from its start (joining in where the playhead is).
+  useEffect(() => {
+    const v = voiceRef.current;
+    if (!v) return;
+    const sh = shots[idx];
+    const url = sh?.voice?.file ? fileUrl(sh.voice.file) : null;
+    const off = tRef.current - starts[idx];
+    if (!playing || !url || off >= (sh.voice.duration || Infinity)) { v.pause(); return; }
+    if (v.dataset.src !== url) { v.src = url; v.dataset.src = url; }
+    v.volume = sh.voice.volume ?? 1;
+    try { v.currentTime = Math.max(0, off); } catch { /* not loaded yet */ }
+    v.play().catch(() => {});
+  }, [idx, playing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Preload every frame so cuts don't flash; lock the page behind and take
   // keyboard focus (so Space isn't sent to the button that opened the player),
@@ -168,6 +183,7 @@ export default function Animatic({ shots, ratio, audioUrl, fileUrl, startIndex =
         </div>
       </div>
       {audioUrl && <audio ref={audioRef} src={audioUrl} preload="auto" />}
+      <audio ref={voiceRef} preload="auto" />
     </div>
   );
 }

@@ -87,7 +87,29 @@ export const normalizeShot = (s, blockId) => ({
   transition: str(s?.transition, 60), // into the next shot
   section: SEGMENT_KINDS.includes(s?.section) ? s.section : '',
   status: SHOT_STATUS.includes(s?.status) ? s.status : '',
+  // Other versions of the frame (sketches, drawings, earlier frames); `image` is the one in use.
+  alts: (Array.isArray(s?.alts) ? s.alts : []).slice(0, 30)
+    .map((a) => ({ id: a?.id ? str(a.id, 40) : nanoid(6), image: blockFile(blockId, a?.image), label: str(a?.label, 80) }))
+    .filter((a) => a.image),
+  // A voice-over recorded for this shot (plays from the shot's start).
+  voice: normalizeVoice(s?.voice, blockId),
 });
+function normalizeVoice(v, blockId) {
+  const file = blockFile(blockId, v?.file);
+  return file ? { file, duration: num(v?.duration, 0, 600, 0), volume: num(v?.volume, 0, 1, 1) } : null;
+}
+// The music's beat (for cuts on the beat): tempo, where the first beat falls, snapping on / off.
+export const normalizeBeat = (b) => (b && typeof b === 'object' && Number(b.bpm) > 0
+  ? { bpm: num(b.bpm, 30, 300, 120), offset: num(b.offset, 0, 60, 0), snap: b.snap !== false, auto: !!b.auto } : null);
+// Cutdowns: shorter versions of the storyboard — the shots left out and any shorter durations.
+export const normalizeCutdowns = (list) => (Array.isArray(list) ? list : []).slice(0, 12).map((c) => ({
+  id: c?.id ? str(c.id, 40) : nanoid(6),
+  name: str(c?.name, 80) || 'Cutdown',
+  target: c?.target == null || c?.target === '' ? null : num(c.target, 1, 3600, 15),
+  skip: (Array.isArray(c?.skip) ? c.skip : []).map((x) => str(x, 40)).filter(Boolean).slice(0, 500),
+  durations: Object.fromEntries(Object.entries(c?.durations && typeof c.durations === 'object' ? c.durations : {})
+    .slice(0, 500).filter(([k, v]) => k && Number.isFinite(Number(v))).map(([k, v]) => [str(k, 40), num(v, 0.1, 600, 2)])),
+}));
 export const normalizeAudio = (a, blockId) => {
   const file = blockFile(blockId, a?.file);
   return file ? { file, name: str(a?.name, 200), size: Number.isFinite(a?.size) ? a.size : 0 } : null;
@@ -161,6 +183,8 @@ export function normalizeBlock(b, fallbackId) {
     if (!STORYBOARD_ASPECTS.includes(b.aspect)) b.aspect = '16:9';
     if (!('audio' in b)) b.audio = null;
     if (!('target' in b)) b.target = null;
+    if (!('beat' in b)) b.beat = null;
+    if (!Array.isArray(b.cutdowns)) b.cutdowns = [];
   } else if (b.type === 'review') {
     if (!Array.isArray(b.versions)) b.versions = [];
   } else if (b.type === 'deliverables') {

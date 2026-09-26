@@ -518,8 +518,35 @@ the Storyboards page always show the same thing.
   **on-screen text**, **shot size** (wide, close-up, detail, screen / UI …),
   **camera move** (push in, orbit, parallax …), the **transition** into the
   next shot (cut, match cut, whip pan, morph …), **SFX / music** and **notes**.
-  Each shot's ⋯ menu: new or replaced frame, play from here, insert after,
-  duplicate, move earlier / later, delete (with Undo).
+  Each shot's ⋯ menu: new or replaced frame, draw or sketch over, play from
+  here, insert after, duplicate, move earlier / later, delete (with Undo).
+- **Move shots by dragging** — the grip at a panel's top right (grid), next
+  to the thumbnail (list), or the shot itself on the timeline.
+- **Draw** a frame right in the app: *Draw* on an empty shot, the pencil on a
+  frame (**sketch over it**) or ⋯ → *Draw a new shot*. Pen (pressure-sensitive
+  with a stylus), marker and eraser, colours and sizes, undo / redo; the
+  frame underneath can be shown or hidden. The drawing becomes the frame.
+- **Variants**: a frame that's replaced — by an upload, a drop, the library or
+  a drawing — isn't lost: it stays with the shot as a **variant** (small
+  thumbnails under the frame; a click swaps it back in). ⋯ → *Remove frame*
+  keeps it as a variant too; *Delete the other versions* clears them.
+- **Record the voice-over** of a shot with the microphone (under its
+  voice-over text): listen, record again, remove; if it's longer than the
+  shot, **Fit shot** makes the shot as long. Recordings play in the animatic
+  from the shot's start, show as a purple bar on the timeline and go into
+  the exported video.
+- **Cuts on the beat**: with a music track, **Find the beat** reads its tempo
+  (BPM) and where the first beat falls — or type the BPM yourself. The
+  timeline shows the beats (a brighter line every bar); with the magnet on,
+  dragging a shot's edge **snaps to the beat** (Alt for free), and **Cuts on
+  the beat** moves every cut to its nearest beat.
+- **Cutdowns** — shorter versions of the same storyboard (*+ Cutdown* → 6 s,
+  10 s, 15 s … or half as long): every shot starts shortened evenly; untick
+  **In cut** to leave shots out and give the others more time, and change any
+  shot's length in the cut (its master length stays). Frames and texts are
+  shared with the master; the strip, the timeline, the target, the animatic
+  and the video follow the version you pick. Rename, duplicate or delete a
+  cutdown from its ⋯.
 - **Three views**: **Grid** (panels), **List** (a table with every field — good
   for writing; cards on a phone) and **Timeline** (shots as long as they last
   on a time axis, the sections above and the track's waveform below; **drag a
@@ -530,14 +557,22 @@ the Storyboards page always show the same thing.
   the plan's moodboard / files images or the **frames and moments saved on
   your Motion references** (searchable; the shot's note then says where it
   came from). Pictures are copied into the storyboard.
-- **Animatic** — as before, now also showing the on-screen text as a super.
+- **Animatic** — as before, now also showing the on-screen text as a super,
+  and playing the recorded voice-overs.
+- **Video** — the animatic as an **MP4** or **WebM** (720p, 1080p, 4K or your
+  size; 24 / 25 / 30 fps): every frame for its duration, a dissolve where the
+  transition is a dissolve / fade, the on-screen text (optional), the
+  voice-over as captions and shot numbers (optional), the music (with its
+  volume) and the recorded voice-overs mixed underneath — rendered frame by
+  frame, so it's smooth on any computer.
 - **PDF** — A4 landscape for the client: **large** (three shots a page, frame
   left, text right) or **compact** (six a page; upright formats 4 / 6), with
   the fields you tick (voice-over, on-screen text, camera, sound, notes,
   status), plan, client, date and page numbers. It goes through the browser's
   print dialog — choose **Save as PDF**.
-- ⋯ **Copy as 9:16 / 1:1 / 4:5 / 16:9 version** — a copy (frames and track
-  included) to rework for another format; **Delete storyboard** (→ Trash).
+- ⋯ **Copy as 9:16 / 1:1 / 4:5 / 16:9 version** — a copy (frames, variants,
+  voice-overs, track, beat and cutdowns included) to rework for another
+  format; **Delete storyboard** (→ Trash).
 
 ### Mockups
 **Mockups** (sidebar, under Storyboards) puts your designs and videos on

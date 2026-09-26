@@ -68,3 +68,41 @@ export function allStoryboards(plans) {
 }
 
 export const storyboardPath = (planId, blockId, shotId) => `/storyboards/${planId}/${blockId}${shotId ? `?shot=${shotId}` : ''}`;
+
+// ---- Cutdowns ------------------------------------------------------------------------------
+/** The shots of a cutdown (or all of them for the master): left-out ones gone, durations as cut. */
+export function shotsOf(shots, cut) {
+  if (!cut) return shots || [];
+  const skip = new Set(cut.skip || []);
+  return (shots || []).filter((s) => !skip.has(s.id)).map((s) => (cut.durations?.[s.id] != null ? { ...s, duration: cut.durations[s.id] } : s));
+}
+
+/**
+ * A new cutdown `target` seconds long from the master: every shot kept,
+ * durations scaled down evenly (none shorter than `min`). Leave shots out
+ * afterwards to give the rest more time.
+ */
+export function suggestCut(shots, target, name, min = 0.5) {
+  const { total } = timing(shots);
+  const k = total > 0 ? Math.min(1, target / total) : 1;
+  const durations = {};
+  for (const s of shots || []) {
+    const d = Math.max(min, Math.round((Number(s.duration) || 0) * k * 10) / 10);
+    if (Math.abs(d - (Number(s.duration) || 0)) > 0.01) durations[s.id] = d;
+  }
+  return { id: rid(), name: name || `${Math.round(target)} s cut`, target, skip: [], durations };
+}
+
+// ---- Variants ------------------------------------------------------------------------------
+/** Make `alt` the shot's frame; the frame it had goes to the variants (nothing is lost). */
+export function pickVariant(shot, altId) {
+  const alt = (shot.alts || []).find((a) => a.id === altId);
+  if (!alt) return shot;
+  const rest = (shot.alts || []).filter((a) => a.id !== altId);
+  return { ...shot, image: alt.image, alts: shot.image ? [{ id: rid(), image: shot.image, label: '' }, ...rest] : rest };
+}
+/** A new frame for the shot; the old one is kept as a variant. */
+export function withFrame(shot, image, keepOld = true) {
+  const alts = keepOld && shot.image && shot.image !== image ? [{ id: rid(), image: shot.image, label: '' }, ...(shot.alts || [])] : (shot.alts || []);
+  return { ...shot, image, alts: alts.slice(0, 30) };
+}

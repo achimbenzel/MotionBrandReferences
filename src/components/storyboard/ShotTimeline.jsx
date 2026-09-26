@@ -3,6 +3,7 @@ import { ZoomIn, ZoomOut, Maximize, Music } from 'lucide-react';
 import { audioPeaks } from '../../lib/media.js';
 import { fmtDur } from '../../lib/timing.js';
 import { sectionRuns, segmentColor, sectionLabel } from '../../lib/storyboard.js';
+import { beatTimes, nearestBeat } from '../../lib/beat.js';
 
 const MIN_PPS = 8;
 const MAX_PPS = 400;
@@ -14,7 +15,7 @@ const mmss = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart
  * last (drag a block's right edge to change its duration), the music track's
  * waveform and the target length. Click a shot to edit it below.
  */
-export default function ShotTimeline({ shots, starts, total, target, fileUrl, audioUrl, selectedId, onSelect, onDuration, onOpen }) {
+export default function ShotTimeline({ shots, starts, total, target, fileUrl, audioUrl, selectedId, onSelect, onDuration, onOpen, beat, sortRef, sort }) {
   const wrapRef = useRef(null);
   const [width, setWidth] = useState(800);
   const [pps, setPps] = useState(null); // null = fit to the width
@@ -50,16 +51,18 @@ export default function ShotTimeline({ shots, starts, total, target, fileUrl, au
 
   const zoom = (f) => setPps(Math.min(MAX_PPS, Math.max(MIN_PPS, scale * f)));
 
-  const startDrag = (e, s) => {
+  const startDrag = (e, s, i) => {
     e.stopPropagation();
     e.preventDefault();
     e.currentTarget.setPointerCapture?.(e.pointerId);
-    drag.current = { id: s.id, x0: e.clientX, d0: Number(s.duration) || 0, last: Number(s.duration) || 0 };
+    drag.current = { id: s.id, x0: e.clientX, d0: Number(s.duration) || 0, last: Number(s.duration) || 0, start: starts[i] };
   };
   const moveDrag = (e) => {
     const d = drag.current;
     if (!d) return;
-    const v = round(d.d0 + (e.clientX - d.x0) / scale);
+    let v = round(d.d0 + (e.clientX - d.x0) / scale);
+    // Snap the cut to the nearest beat (hold Alt to place it freely).
+    if (beat?.snap && !e.altKey) v = Math.max(0.1, Math.round((nearestBeat(beat, d.start + v) - d.start) * 100) / 100);
     if (v !== d.last) { d.last = v; onDuration(d.id, v, false); }
   };
   const endDrag = () => {
@@ -71,7 +74,7 @@ export default function ShotTimeline({ shots, starts, total, target, fileUrl, au
   return (
     <div className="sbt">
       <div className="sbt-tools">
-        <span className="hint">Drag the right edge of a shot to change how long it runs · double-click to play from there</span>
+        <span className="hint">Drag a shot's right edge to change how long it runs{beat?.snap ? ' (it snaps to the beat — Alt for free)' : ''} · drag a shot to move it · double-click to play from there</span>
         <span className="sbt-zoom">
           <button type="button" className="icon-btn" onClick={() => zoom(1 / 1.5)} aria-label="Zoom out"><ZoomOut size={15} /></button>
           <button type="button" className={`icon-btn ${pps == null ? 'on' : ''}`} onClick={() => setPps(null)} aria-label="Fit to width"><Maximize size={14} /></button>
@@ -92,19 +95,29 @@ export default function ShotTimeline({ shots, starts, total, target, fileUrl, au
               );
             })}
           </div>
-          <div className="sbt-shots">
-            {shots.map((s, i) => (
-              <div key={s.id} className={`sbt-shot ${selectedId === s.id ? 'on' : ''}`}
-                style={{ left: x(starts[i]), width: Math.max(6, x(Number(s.duration) || 0) - 2), backgroundImage: s.image ? `url("${fileUrl(s.image)}")` : undefined }}
+          {beat?.bpm > 0 && (
+            <div className="sbt-beats" aria-hidden="true">
+              {beatTimes(beat, span).map((t, k) => <i key={k} className={k % 4 === 0 ? 'bar' : ''} style={{ left: x(t) }} />)}
+            </div>
+          )}
+          <div className="sbt-shots" ref={sortRef}>
+            {shots.map((s, i) => {
+              const st = sort ? sort.itemState(s.id) : {};
+              return (
+              <div key={s.id} data-sort-id={s.id} className={`sbt-shot ${selectedId === s.id ? 'on' : ''} ${st.className || ''} ${s.voice ? 'has-voice' : ''}`}
+                {...(sort ? sort.grab(s.id) : {})}
+                style={{ left: x(starts[i]), width: Math.max(6, x(Number(s.duration) || 0) - 2), backgroundImage: s.image ? `url("${fileUrl(s.image)}")` : undefined, ...(st.style || {}) }}
                 onClick={() => onSelect(s.id)} onDoubleClick={() => onOpen(i)} role="button" tabIndex={0}
                 onKeyDown={(e) => { if (e.key === 'Enter') onSelect(s.id); }}
                 aria-label={`Shot ${i + 1}, ${fmtDur(Number(s.duration) || 0)}`}>
                 <span className="sbt-no">{i + 1}</span>
                 <span className="sbt-dur">{fmtDur(Number(s.duration) || 0)}</span>
-                <span className="sbt-handle" onPointerDown={(e) => startDrag(e, s)} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag}
+                {s.voice && <span className="sbt-voice" style={{ width: Math.min(100, ((s.voice.duration || 0) / (Number(s.duration) || 1)) * 100) + '%' }} title={`Voice-over ${s.voice.duration}s`} />}
+                <span className="sbt-handle" data-no-sort onPointerDown={(e) => startDrag(e, s, i)} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag}
                   title="Drag to change the duration" />
               </div>
-            ))}
+              );
+            })}
           </div>
           {audioUrl && (
             <div className="sbt-audio">

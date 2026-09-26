@@ -30,7 +30,9 @@ export async function videoFormats(width, height) {
 /**
  * The sound of the screen videos for the length of the animation: each from
  * its start point (looping if it's shorter), at its volume, mixed. → an
- * AudioBuffer, or null when none of them has sound.
+ * AudioBuffer, or null when none of them has sound. A source can also come
+ * in later (`at`, seconds) and play once (`loop: false`) — a voice-over on a
+ * storyboard shot.
  */
 export async function mixAudio(sources, duration, sampleRate = 48000) {
   if (!sources?.length || typeof OfflineAudioContext === 'undefined') return null;
@@ -44,11 +46,14 @@ export async function mixAudio(sources, duration, sampleRate = 48000) {
     if (!buf?.length) continue;
     any = true;
     const from = Math.floor((s.start || 0) * buf.sampleRate) % buf.length;
+    const at = Math.max(0, Math.floor((s.at || 0) * sampleRate));
+    const loop = s.loop !== false;
     const vol = s.volume ?? 1;
     for (let ch = 0; ch < 2; ch += 1) {
       const src = buf.getChannelData(Math.min(ch, buf.numberOfChannels - 1));
       const dst = out.getChannelData(ch);
-      for (let i = 0; i < length; i += 1) dst[i] += src[(from + i) % src.length] * vol;
+      if (loop) for (let i = at; i < length; i += 1) dst[i] += src[(from + i - at) % src.length] * vol;
+      else for (let i = at, k = from; i < length && k < src.length; i += 1, k += 1) dst[i] += src[k] * vol;
     }
   }
   if (!any) return null;

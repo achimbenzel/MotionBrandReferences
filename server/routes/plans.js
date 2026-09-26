@@ -9,7 +9,7 @@ import { moveInto, replaceImage, safeRm, moveToTrash, moveRelPaths, extOf } from
 import { upload } from '../upload.js';
 import {
   BLOCK_TYPES, BLOCK_TITLES, BLOCK_TABS, BLOCK_WIDTHS, PLAN_STATUSES, STORYBOARD_ASPECTS, normalizeField, normalizeShot, normalizeAudio,
-  normalizeLine, normalizeTarget, normalizePace, normalizeVersion, normalizeDeliverable, normTags, str,
+  normalizeLine, normalizeTarget, normalizePace, normalizeVersion, normalizeDeliverable, normTags, str, normalizeBeat, normalizeCutdowns,
 } from '../schema.js';
 import { STORYBOARD_TEMPLATES, storyboardTemplate, templateInfo } from '../storyboards.js';
 import { BUILTIN_TEMPLATES, builtinTemplate, planFromTemplate, templateFromPlan, templateSummary } from '../templates.js';
@@ -311,6 +311,8 @@ router.post('/api/plans/:id/storyboards', async (req, res) => {
   let shots = [];
   let target = tpl?.target ?? null;
   let audio = null;
+  let beat = null;
+  let cutdowns = [];
   if (tpl) shots = tpl.shots.map(([section, duration, visual]) => ({ section, duration, visual }));
   if (src) {
     const dir = blockDir(plan.id, id);
@@ -323,8 +325,20 @@ router.post('/api/plans/:id/storyboards', async (req, res) => {
       await fsp.copyFile(from, path.join(dir, name));
       return `blocks/${id}/${name}`;
     };
-    for (const s of src.shots || []) shots.push({ ...s, id: nanoid(6), image: await copy(s.image) });
+    const ids = {}; // old shot id → new (for the cutdowns)
+    for (const s of src.shots || []) {
+      const alts = [];
+      for (const a of s.alts || []) { const image = await copy(a.image); if (image) alts.push({ ...a, image }); }
+      const voice = s.voice?.file ? await copy(s.voice.file) : null;
+      ids[s.id] = nanoid(6);
+      shots.push({ ...s, id: ids[s.id], image: await copy(s.image), alts, voice: voice ? { ...s.voice, file: voice } : null });
+    }
     if (src.audio?.file) { const f = await copy(src.audio.file); if (f) audio = { ...src.audio, file: f }; }
+    beat = src.beat || null;
+    cutdowns = (src.cutdowns || []).map((c) => ({
+      ...c, id: nanoid(6), skip: (c.skip || []).map((x) => ids[x]).filter(Boolean),
+      durations: Object.fromEntries(Object.entries(c.durations || {}).filter(([k]) => ids[k]).map(([k, v]) => [ids[k], v])),
+    }));
     target = src.target ?? null;
     aspect = asked || src.aspect || '16:9';
     title = title || `${src.title || 'Storyboard'} (${aspect})`;
@@ -332,6 +346,7 @@ router.post('/api/plans/:id/storyboards', async (req, res) => {
   const block = {
     id, type: 'storyboard', title: title || tpl?.label.split(' · ')[0] || 'Storyboard', aspect,
     shots: shots.slice(0, 500).map((s) => normalizeShot(s, id)), audio: normalizeAudio(audio, id), target: normalizeTarget(target),
+    beat: normalizeBeat(beat), cutdowns: normalizeCutdowns(cutdowns),
   };
   const updated = await mutateDB((d) => {
     const p = d.plans.find((x) => x.id === plan.id); if (!p) return null;
@@ -396,7 +411,7 @@ router.post('/api/plans/:id/blocks', async (req, res) => {
           : type === 'divider' ? { ...base }
             : type === 'table' ? { ...base, columns: [{ id: nanoid(6), name: '' }, { id: nanoid(6), name: '' }], rows: [] }
               : type === 'briefing' ? { ...base, fields: DEFAULT_BRIEFING.map((label) => normalizeField({ label })) }
-                : type === 'storyboard' ? { ...base, aspect: '16:9', shots: [], audio: null, target: null }
+                : type === 'storyboard' ? { ...base, aspect: '16:9', shots: [], audio: null, target: null, beat: null, cutdowns: [] }
                   : type === 'script' ? { ...base, pace: 2.5, target: null, lines: [normalizeLine({})] }
                     : type === 'review' ? { ...base, versions: [] }
                       : type === 'deliverables' ? { ...base, items: [] }
@@ -414,7 +429,7 @@ router.post('/api/plans/:id/blocks', async (req, res) => {
 
 // Update only the content/label fields — never the file arrays.
 const BLOCK_EDITABLE = ['title', 'collapsed', 'content', 'items', 'columns', 'rows', 'fields',
-  'shots', 'audio', 'aspect', 'target', 'lines', 'pace', 'versions', 'tab', 'width'];
+  'shots', 'audio', 'aspect', 'target', 'lines', 'pace', 'versions', 'tab', 'width', 'beat', 'cutdowns'];
 router.patch('/api/plans/:id/blocks/:blockId', async (req, res) => {
   const updated = await mutateDB((db) => {
     const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null;
@@ -426,6 +441,8 @@ router.patch('/api/plans/:id/blocks/:blockId', async (req, res) => {
       else if (k === 'collapsed') b[k] = !!v;
       else if (k === 'tab') { if (BLOCK_TABS.includes(v)) b.tab = v; }
       else if (k === 'width') { if (BLOCK_WIDTHS.includes(v)) b.width = v; }
+      else if (k === 'beat') { if (b.type === 'storyboard') b.beat = normalizeBeat(v); }
+      else if (k === 'cutdowns') { if (b.type === 'storyboard') b.cutdowns = normalizeCutdowns(v); }
       else if (k === 'fields') { if (Array.isArray(v)) b.fields = v.slice(0, 100).map(normalizeField); }
       else if (k === 'shots') { if (Array.isArray(v)) b.shots = v.slice(0, 500).map((x) => normalizeShot(x, b.id)); }
       else if (k === 'audio') b.audio = normalizeAudio(v, b.id);

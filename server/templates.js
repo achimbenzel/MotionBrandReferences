@@ -97,7 +97,7 @@ export function cloneBlocks(blocks) {
     if (Array.isArray(b.items)) b.items = b.items.map((it) => ({ ...it, id: nanoid(6) }));
     if (Array.isArray(b.fields)) b.fields = b.fields.map((f) => ({ ...f, id: nanoid(6) }));
     if (Array.isArray(b.lines)) b.lines = b.lines.map((l) => ({ ...l, id: nanoid(6) }));
-    if (Array.isArray(b.shots)) b.shots = b.shots.map((x) => ({ ...x, id: nanoid(6), image: null }));
+    if (Array.isArray(b.shots)) b.shots = b.shots.map((x) => ({ ...x, id: nanoid(6), image: null, alts: [], voice: null }));
     if (Array.isArray(b.columns)) {
       const ids = {};
       b.columns = b.columns.map((c) => { const id = nanoid(6); ids[c?.id] = id; return { ...c, id }; });
@@ -108,7 +108,7 @@ export function cloneBlocks(blocks) {
     }
     if (b.type === 'moodboard') b.images = [];
     if (b.type === 'files' || b.type === 'pdf') b.files = [];
-    if (b.type === 'storyboard') b.audio = null;
+    if (b.type === 'storyboard') { b.audio = null; b.cutdowns = []; } // cutdowns name shots that just got new ids
     if (b.type === 'review') b.versions = [];
     return normalizeBlock(b);
   }).filter(Boolean);

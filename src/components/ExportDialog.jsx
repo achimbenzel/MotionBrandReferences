@@ -76,7 +76,7 @@ export default function ExportDialog({ title = 'Export', targets, initial, store
   };
   const pickFormat = (f) => {
     setFormat(f);
-    if ((f === 'jpg' || isVideo) && bg === 'transparent') setBg(target.backgrounds.find((b) => b.key !== 'transparent')?.key || 'color');
+    if ((f === 'jpg' || isVideo) && bg === 'transparent') setBg(target.backgrounds?.find((b) => b.key !== 'transparent')?.key || 'color');
   };
 
   const run = async () => {
@@ -164,7 +164,7 @@ export default function ExportDialog({ title = 'Export', targets, initial, store
             </div>
           ))}
 
-          <div className="xd-field">
+          {target.backgrounds?.length > 0 && <div className="xd-field">
             <span className="xd-label">Background</span>
             <div className="xd-chips">
               {target.backgrounds.map((b) => (
@@ -181,7 +181,7 @@ export default function ExportDialog({ title = 'Export', targets, initial, store
               )}
             </div>
             {isVideo && <div className="hint">Videos can’t be transparent.</div>}
-          </div>
+          </div>}
 
           <div className="xd-field">
             <span className="xd-label">Format</span>
