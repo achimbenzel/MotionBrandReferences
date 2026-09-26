@@ -7,6 +7,7 @@ import { BLOCK_TITLES } from '../schema.js';
 import { createRouter } from '../http.js';
 import { softDir } from './software.js';
 import { inboxDir } from './inbox.js';
+import { mockupDir, modelDir } from './mockups.js';
 
 const router = createRouter();
 export default router;
@@ -38,7 +39,8 @@ const trashThumb = (t) => {
         : t.kind === 'file' ? (t.data.item?.example)
           : t.kind === 'block' ? ((t.data.block?.images || [])[0]?.file || (t.data.block?.files || []).find((f) => f.example)?.example || null)
             : t.kind === 'orphans' ? firstImage(t.data.rels)
-              : t.kind === 'inbox' ? firstImage([t.data.file]) : null;
+              : t.kind === 'inbox' ? firstImage([t.data.file])
+                : t.kind === 'mockup' ? t.data.thumb : null;
   return rel ? `/data/trash/${t.trashId}/${rel}` : null;
 };
 
@@ -49,6 +51,8 @@ function describe(t) {
     case 'software': return { title: t.data.name || 'Software', subtitle: 'Software' };
     case 'file': return { title: t.data.item?.title || t.data.item?.name || 'File', subtitle: 'File' };
     case 'block': return { title: t.data.block?.title || BLOCK_TITLES[t.data.block?.type] || 'Block', subtitle: `Block · ${t.data.planName || 'Plan'}` };
+    case 'mockup': return { title: t.data.name || 'Mockup', subtitle: 'Mockup' };
+    case 'mockupModel': return { title: t.data.name || '3D model', subtitle: '3D model (mockups)' };
     case 'inbox': return { title: t.data.title || t.data.name || t.data.url || String(t.data.text || '').slice(0, 80) || 'Shared item', subtitle: 'Inbox' };
     case 'orphans': return { title: `${t.data.count} unused file${t.data.count === 1 ? '' : 's'}`, subtitle: `Cleanup · ${fmtBytes(t.data.bytes)}` };
     default: return { title: t.data.title || 'Untitled', subtitle: TYPE_LABEL[t.data.type] || t.data.type };
@@ -97,6 +101,14 @@ router.post('/api/trash/:trashId/restore', async (req, res) => {
       if (!p) { gone = true; return null; }
       if (!p.blocks.some((b) => b.id === data.block.id)) p.blocks.splice(Math.min(data.index ?? p.blocks.length, p.blocks.length), 0, data.block);
       rels = { base: path.join(DATA_DIR, 'plan', data.planId), list: data.rels };
+    } else if (entry.kind === 'mockup') {
+      if (!Array.isArray(db.mockups)) db.mockups = [];
+      db.mockups.push(data);
+      move = { from, to: mockupDir(data.id) };
+    } else if (entry.kind === 'mockupModel') {
+      if (!Array.isArray(db.mockupModels)) db.mockupModels = [];
+      db.mockupModels.push(data);
+      move = { from, to: modelDir(data.id) };
     } else if (entry.kind === 'inbox') {
       if (!Array.isArray(db.inbox)) db.inbox = [];
       db.inbox.unshift(data);

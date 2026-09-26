@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   PencilRuler, ListTodo, FlaskConical, Clapperboard, Plus, ArrowRight, CalendarRange, AppWindow,
-  AlertTriangle, Image as ImageIcon, UploadCloud, Database, Flag, CalendarClock,
+  AlertTriangle, Image as ImageIcon, UploadCloud, Database, Flag, CalendarClock, MonitorSmartphone,
 } from 'lucide-react';
 import { api, planFileUrl, dashboardFileUrl } from '../lib/api.js';
 import { gradientCss, PLAN_GRADIENTS, PLAN_STATUSES, tagColor } from '../lib/types.js';
@@ -35,6 +35,7 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
   const [board, setBoard] = useState(null);
   const [software, setSoftware] = useState(null);
   const [settings, setSettings] = useState(null);
+  const [mockupCount, setMockupCount] = useState(0);
   const [needsMigration, setNeedsMigration] = useState(false);
   const [bannerPicker, setBannerPicker] = useState(false);
   const bannerRef = useRef(null);
@@ -45,6 +46,7 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
     api.getBoard().then((b) => { if (alive) setBoard(b); }).catch(() => { if (alive) setBoard({ columns: [] }); });
     api.listSoftware().then((s) => { if (alive) setSoftware(s); }).catch(() => { if (alive) setSoftware([]); });
     api.getSettings().then((s) => { if (alive) setSettings(s); }).catch(() => { if (alive) setSettings({}); });
+    api.listMockups().then((m) => { if (alive) setMockupCount(m.mockups.length); }).catch(() => {});
     api.maintenanceStatus().then((m) => { if (alive) setNeedsMigration(!!m.needsMigration); }).catch(() => {});
     return () => { alive = false; };
   }, [reloadKey]);
@@ -97,6 +99,7 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
     { key: 'board', icon: ListTodo, title: 'To-Do Board', sub: boardCards ? `${boardCards} card${boardCards === 1 ? '' : 's'} · ${boardLists} lists` : 'Plan your to-dos', to: '/board', accent: 'linear-gradient(120deg,#00c6a7,#1e4fd6)' },
     { key: 'logotester', icon: FlaskConical, title: 'Brand Tester', sub: 'Test a logo, keep the sheet', to: '/logo-tester', accent: 'linear-gradient(120deg,#f83600,#f9d423)' },
     { key: 'storyboards', icon: Clapperboard, title: 'Storyboards', sub: sbCount ? `${sbCount} storyboard${sbCount === 1 ? '' : 's'}` : 'Frames, timing & animatic', to: '/storyboards', accent: 'linear-gradient(120deg,#ff6a88,#6a11cb)' },
+    { key: 'mockups', icon: MonitorSmartphone, title: 'Mockups', sub: mockupCount ? `${mockupCount} mockup${mockupCount === 1 ? '' : 's'}` : 'Your work on 3D devices', to: '/mockups', accent: 'linear-gradient(120deg,#434343,#8e9eab)' },
   ];
 
   return (

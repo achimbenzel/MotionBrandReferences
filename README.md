@@ -128,7 +128,9 @@ data/
     ├── banner.<ext>, avatar.<ext>  # Notion-style banner + profile image
     └── blocks/<blockId>/*          # one folder per content block
                                     # (moodboard images, files + example images)
-└── software/<id>/*                 # plugin installers + your own script files
+├── software/<id>/*                 # plugin installers + your own script files
+├── mockup/<id>/                    # a mockup's screen picture / video + thumb.webp
+└── mockup-model/<id>/model.<ext>   # an imported 3D model (.glb / .gltf / .usdz)
 ```
 
 `data/` is **git-ignored and lives outside the source code**, so you can pull
@@ -249,7 +251,7 @@ A toggle switches between two modes:
 
 - **Work** — the **default** mode (left in the toggle), your working area. It
   opens on a **Dashboard** and holds **Plans**, **Software**, the **To-Do
-  board**, the **Brand Tester** and **Storyboards** (see below).
+  board**, the **Brand Tester**, **Storyboards** and **Mockups** (see below).
 - **Reference** — the library (Branding, Motion Design, Logos, Business Cards,
   Colors, Image Gallery, Fonts, Logo No Go).
 
@@ -513,6 +515,41 @@ the Storyboards page always show the same thing.
 - ⋯ **Copy as 9:16 / 1:1 / 4:5 / 16:9 version** — a copy (frames and track
   included) to rework for another format; **Delete storyboard** (→ Trash).
 
+### Mockups
+**Mockups** (sidebar, under Storyboards) puts your designs and videos on 3D
+devices — rendered live in the browser (three.js), no plugins, nothing online.
+
+- **Devices**: **iPhone** (5 finishes), **iPad** (2), **MacBook** (2) and a
+  **browser window** (light / dark, with your address in the bar) — modelled
+  after the current ones, without logos. Phones and tablets turn to
+  **landscape** or **lie flat**; the MacBook's **lid** opens 40–150°.
+- **Screen**: **upload** a picture or a video (a screen recording plays on the
+  device), or take one **from the app** — a plan's moodboards, files,
+  storyboard frames and review renders, your Motion references (the video, its
+  saved frames and moments), library images or the Inbox. **Fill screen**
+  crops to fit, **Show whole** keeps it all.
+- **Camera**: drag to turn, scroll / pinch to zoom, right-drag to move — or a
+  view: **Front, ¾ left, ¾ right, Low hero, From above, Side, Back** (a device
+  lying flat gets matching views from above).
+- **Look**: format **16:9, 4:5, 1:1, 9:16, 3:2**; background **none**
+  (transparent), a **colour** or a **gradient** — with your **brand colours**
+  from the Colors library one click away; **shadow** on the floor on / off.
+- **Export**: **PNG** at **1× / 2× / 4×** (1920 / 3840 / 7680 px on the long
+  side, as far as the graphics card allows) — transparent if the background is
+  none. **Save to plan** puts the PNG into a “Mockups” moodboard of any plan
+  (or a new one).
+- Everything **saves as you go**; the list shows a small render of each scene.
+  ⋯ **Duplicate** / **Delete** (→ Trash, with Undo).
+
+**Your own 3D models** — import a **.glb**, a single-file **.gltf** or a
+**.usdz** (on the Mockups page or in the editor). Apple's product models come as
+USDZ (e.g. from the AR Quick Look gallery on developer.apple.com); check the
+licence of any model you use in client work. In the editor, **Screen part**
+picks the part of the model that shows your picture (a part named *Screen* /
+*Display* is picked for you); **Turn picture** and **Mirror** fix its
+orientation if needed. A model is scaled to fit and stands on the floor;
+deleting it moves it to Trash.
+
 ### Inbox (share from your phone)
 Everything you come across on the go — a screenshot, a screen recording, an
 Instagram / Behance / YouTube link, a quick idea — goes into the **Inbox**
@@ -771,7 +808,8 @@ lookup off with `LINK_LOOKUP=off`).
 
 ## Tech
 
-- **Frontend:** React 18 + Vite + React Router.
+- **Frontend:** React 18 + Vite + React Router; three.js for the 3D mockups
+  (loaded only by the mockup editor).
 - **Backend:** a small Express server that stores files on disk and metadata in
   `data/db.json` (writes are serialized so nothing clobbers). Layout:
 
@@ -788,7 +826,7 @@ lookup off with `LINK_LOOKUP=off`).
   ├── upload.js       # multer (per-request tmp folder, always cleaned up)
   ├── unused.js       # unused-file scan
   ├── zip.js          # dependency-free ZIP64 export/import
-  └── routes/         # projects, plans, software, board, trash, search, settings, library, maintenance
+  └── routes/         # projects, plans, software, board, mockups, trash, search, settings, library, maintenance
   ```
 - **Tests:** `npm test` starts the real server against throwaway data folders —
   including a library with every data shape older versions wrote — and checks

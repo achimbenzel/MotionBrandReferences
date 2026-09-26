@@ -19,7 +19,7 @@ export const TAG_KEYS = new Set(['red', 'orange', 'yellow', 'green', 'blue', 'pu
 export const CURRENCIES = new Set(['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD']);
 
 export const emptyDB = () => ({
-  schemaVersion: SCHEMA_VERSION, projects: [], galleries: [], plans: [], planTemplates: [], software: [], trash: [], inbox: [],
+  schemaVersion: SCHEMA_VERSION, projects: [], galleries: [], plans: [], planTemplates: [], software: [], trash: [], inbox: [], mockups: [], mockupModels: [],
   settings: { storageLimitBytes: DEFAULT_STORAGE_LIMIT },
 });
 
@@ -388,6 +388,61 @@ export const logoNeedsMigration = (p) => p.type === 'logo' && (
 );
 
 // ---------------------------------------------------------------------------
+// Mockups — saved 3D device scenes, and 3D models imported by the user
+// ---------------------------------------------------------------------------
+export const MOCKUP_DEVICES = ['iphone', 'ipad', 'macbook', 'browser', 'custom'];
+export const MOCKUP_FRAMES = ['16:9', '4:5', '1:1', '9:16', '3:2'];
+const MOCKUP_BG = ['transparent', 'color', 'gradient'];
+const HEX6 = /^#[0-9a-f]{6}$/i;
+const vec3 = (v, fallback) => (Array.isArray(v) && v.length === 3 && v.every((x) => Number.isFinite(Number(x)))
+  ? v.map((x) => Math.max(-1e4, Math.min(1e4, Number(x)))) : fallback);
+const mockupFile = (v) => (typeof v === 'string' && /^[\w.-]+$/.test(v) ? v : null);
+export function normalizeMockup(m) {
+  const cam = m?.camera && typeof m.camera === 'object' ? m.camera : null;
+  const bg = m?.background && typeof m.background === 'object' ? m.background : {};
+  const content = m?.content && mockupFile(m.content.file)
+    ? { file: m.content.file, kind: m.content.kind === 'video' ? 'video' : 'image', name: str(m.content.name, 200) } : null;
+  return {
+    id: str(m?.id, 40) || nanoid(10),
+    name: str(m?.name, 120) || 'Untitled mockup',
+    device: MOCKUP_DEVICES.includes(m?.device) ? m.device : 'iphone',
+    modelId: m?.modelId ? str(m.modelId, 40) : null,
+    color: str(m?.color, 40),
+    landscape: !!m?.landscape,
+    lying: !!m?.lying, // phone / tablet lying flat, screen up
+    lid: num(m?.lid, 0, 180, 112),
+    browserDark: !!m?.browserDark,
+    url: str(m?.url, 200),
+    fit: m?.fit === 'contain' ? 'contain' : 'cover',
+    content,
+    camera: cam ? { preset: str(cam.preset, 40), position: vec3(cam.position, null), target: vec3(cam.target, [0, 0, 0]), fov: num(cam.fov, 10, 90, 30) } : null,
+    frame: MOCKUP_FRAMES.includes(m?.frame) ? m.frame : '16:9',
+    background: {
+      mode: MOCKUP_BG.includes(bg.mode) ? bg.mode : 'gradient',
+      color: HEX6.test(bg.color || '') ? bg.color : '#16161A',
+      color2: HEX6.test(bg.color2 || '') ? bg.color2 : '#2A2A33',
+    },
+    shadow: m?.shadow !== false,
+    thumb: mockupFile(m?.thumb),
+    createdAt: num(m?.createdAt, 0, 1e14, 0),
+    updatedAt: num(m?.updatedAt, 0, 1e14, 0),
+  };
+}
+export function normalizeMockupModel(m) {
+  return {
+    id: str(m?.id, 40) || nanoid(10),
+    name: str(m?.name, 120) || '3D model',
+    file: mockupFile(m?.file),
+    format: ['glb', 'gltf', 'usdz'].includes(m?.format) ? m.format : 'glb',
+    size: num(m?.size, 0, 1e13, 0),
+    screenMesh: str(m?.screenMesh, 200),
+    screenTurn: [0, 90, 180, 270].includes(Number(m?.screenTurn)) ? Number(m.screenTurn) : 0,
+    screenFlip: !!m?.screenFlip,
+    createdAt: num(m?.createdAt, 0, 1e14, 0),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Whole database
 // ---------------------------------------------------------------------------
 // Read-time normalization: fills in fields newer code expects without changing
@@ -400,6 +455,8 @@ export function normalizeDB(db) {
   if (!Array.isArray(db.trash)) db.trash = [];
   if (!Array.isArray(db.planTemplates)) db.planTemplates = [];
   if (!Array.isArray(db.inbox)) db.inbox = [];
+  if (!Array.isArray(db.mockups)) db.mockups = [];
+  if (!Array.isArray(db.mockupModels)) db.mockupModels = [];
   for (const plan of db.plans) normalizePlan(plan);
   for (const s of db.software) normalizeSoftware(s);
   for (const p of db.projects) {

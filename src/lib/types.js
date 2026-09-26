@@ -38,8 +38,8 @@ export function activeTab(pathname) {
 export const isType = (t) => TYPE_KEYS.includes(t);
 
 // "Work" mode (the counterpart to Reference mode) is the default mode. It opens
-// on the Dashboard and groups the working tools: Plans, the To-Do board and the
-// Brand Tester.
+// on the Dashboard and groups the working tools: Plans, Software, the To-Do
+// board, the Brand Tester, Storyboards and Mockups.
 export const WORK_TABS = [
   { key: 'dashboard', label: 'Dashboard', path: '/work' },
   { key: 'plan', label: 'Plans', path: '/plan' },
@@ -47,6 +47,7 @@ export const WORK_TABS = [
   { key: 'board', label: 'To-Dos', path: '/board' },
   { key: 'logotester', label: 'Brand Tester', path: '/logo-tester' },
   { key: 'storyboards', label: 'Storyboards', path: '/storyboards' },
+  { key: 'mockups', label: 'Mockups', path: '/mockups' },
 ];
 export const WORK_HOME = '/work';
 

@@ -2,7 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Search, Plus, PanelLeftClose, Trash2, Settings, X,
   FileText, Film, Square, CreditCard, Palette, Images, Type, PencilRuler, FlaskConical,
-  LayoutDashboard, ListTodo, Ban, AppWindow, Inbox, Clapperboard,
+  LayoutDashboard, ListTodo, Ban, AppWindow, Inbox, Clapperboard, MonitorSmartphone,
 } from 'lucide-react';
 import { TABS, WORK_TABS, isWorkPath, setLastTab } from '../lib/types.js';
 import { useActiveTab } from '../lib/useActiveTab.js';
@@ -15,7 +15,7 @@ const ICON = {
   branding: FileText, motion: Film, logo: Square, businesscard: CreditCard,
   color: Palette, imagegallery: Images, font: Type, logonogo: Ban,
 };
-const WORK_ICON = { dashboard: LayoutDashboard, plan: PencilRuler, software: AppWindow, board: ListTodo, logotester: FlaskConical, storyboards: Clapperboard };
+const WORK_ICON = { dashboard: LayoutDashboard, plan: PencilRuler, software: AppWindow, board: ListTodo, logotester: FlaskConical, storyboards: Clapperboard, mockups: MonitorSmartphone };
 
 /**
  * Notion-style sidebar holding all navigation. Docked on desktop (collapsible);

@@ -27,6 +27,8 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage.jsx'));
 const InboxPage = lazy(() => import('./pages/InboxPage.jsx'));
 const StoryboardsPage = lazy(() => import('./pages/StoryboardsPage.jsx'));
 const StoryboardEditor = lazy(() => import('./pages/StoryboardEditor.jsx'));
+const MockupsPage = lazy(() => import('./pages/MockupsPage.jsx'));
+const MockupEditor = lazy(() => import('./pages/MockupEditor.jsx'));
 import { TABS, isWorkPath, WORK_HOME } from './lib/types.js';
 import { useMediaQuery, DESKTOP } from './lib/useMedia.js';
 
@@ -127,6 +129,8 @@ function Shell() {
                 <Route path="/logo-tester" element={<LogoTester />} />
                 <Route path="/storyboards" element={<StoryboardsPage />} />
                 <Route path="/storyboards/:planId/:blockId" element={<StoryboardEditor />} />
+                <Route path="/mockups" element={<MockupsPage />} />
+                <Route path="/mockups/:id" element={<MockupEditor />} />
                 <Route path="/inbox" element={<InboxPage />} />
                 <Route path="/trash" element={<TrashPage />} />
                 <Route path="/settings" element={<SettingsPage />} />

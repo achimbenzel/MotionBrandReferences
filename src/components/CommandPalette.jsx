@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, CornerDownLeft, FileText, Film, Square, CreditCard, Palette, Images, Type,
-  PencilRuler, FolderOpen, Trash2, LayoutGrid, FlaskConical, Ban, Settings, Inbox, Clapperboard,
+  PencilRuler, FolderOpen, Trash2, LayoutGrid, FlaskConical, Ban, Settings, Inbox, Clapperboard, MonitorSmartphone,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { TABS } from '../lib/types.js';
@@ -18,6 +18,7 @@ const NAV = [
   { kind: 'nav', title: 'Brand Tester', subtitle: 'Work mode · logo tests', to: '/logo-tester', icon: FlaskConical },
   { kind: 'nav', title: 'Storyboards', subtitle: 'Work mode · all storyboards', to: '/storyboards', icon: Clapperboard },
   { kind: 'nav', title: 'New storyboard', subtitle: 'For a plan, from a template', to: '/storyboards?new', icon: Clapperboard },
+  { kind: 'nav', title: 'Mockups', subtitle: 'Work mode · 3D device mockups', to: '/mockups', icon: MonitorSmartphone },
   { kind: 'nav', title: 'Inbox', subtitle: 'Shared from your phone', to: '/inbox', icon: Inbox },
   { kind: 'nav', title: 'Trash', subtitle: 'Deleted items', to: '/trash', icon: Trash2 },
   { kind: 'nav', title: 'Settings', subtitle: 'Shortcuts & preferences', to: '/settings', icon: Settings },

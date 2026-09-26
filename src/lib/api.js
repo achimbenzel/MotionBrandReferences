@@ -166,6 +166,30 @@ export const api = {
   async archivePlan(planId, body) {
     return request(`/api/plans/${planId}/archive`, { method: 'POST', json: body });
   },
+  // --- Mockups (3D device scenes) and imported 3D models ---
+  async listMockups() { return request('/api/mockups'); }, // → { mockups, models }
+  async getMockup(id) { const { mockup } = await request(`/api/mockups/${id}`); return mockup; },
+  async createMockup(body) { const { mockup } = await request('/api/mockups', { method: 'POST', json: body }); return mockup; },
+  async updateMockup(id, patch) { const { mockup } = await request(`/api/mockups/${id}`, { method: 'PATCH', json: patch }); return mockup; },
+  async duplicateMockup(id) { const { mockup } = await request(`/api/mockups/${id}/duplicate`, { method: 'POST' }); return mockup; },
+  async removeMockup(id) { return request(`/api/mockups/${id}`, { method: 'DELETE' }); },
+  async setMockupContent(id, file) {
+    const fd = new FormData(); fd.append('file', file, file.name || 'screen.png');
+    const { mockup } = await request(`/api/mockups/${id}/content`, { method: 'POST', body: fd }); return mockup;
+  },
+  async importMockupContent(id, source) { const { mockup } = await request(`/api/mockups/${id}/content/import`, { method: 'POST', json: { source } }); return mockup; },
+  async clearMockupContent(id) { const { mockup } = await request(`/api/mockups/${id}/content`, { method: 'DELETE' }); return mockup; },
+  async setMockupThumb(id, blob) {
+    const fd = new FormData(); fd.append('thumb', blob, 'thumb.webp');
+    const { mockup } = await request(`/api/mockups/${id}/thumb`, { method: 'POST', body: fd }); return mockup;
+  },
+  async addMockupModel(file, name) {
+    const fd = new FormData(); fd.append('model', file, file.name); if (name) fd.append('name', name);
+    const { model } = await request('/api/mockup-models', { method: 'POST', body: fd }); return model;
+  },
+  async updateMockupModel(id, patch) { const { model } = await request(`/api/mockup-models/${id}`, { method: 'PATCH', json: patch }); return model; },
+  async removeMockupModel(id) { return request(`/api/mockup-models/${id}`, { method: 'DELETE' }); },
+
   // --- Storyboards (storyboard blocks of plans) ---
   async listStoryboardTemplates() {
     const { templates } = await request('/api/storyboard-templates');
@@ -412,6 +436,9 @@ export function fileUrl(project, relPath) {
 }
 
 // Plan files live under data/plan/<id>/…
+export const mockupFileUrl = (m, rel) => (rel ? `/data/mockup/${m.id}/${rel}` : null);
+export const mockupModelUrl = (model) => (model?.file ? `/data/mockup-model/${model.id}/${model.file}` : null);
+
 export function planFileUrl(plan, relPath) {
   if (!relPath) return null;
   return `/data/plan/${plan.id}/${relPath}`;

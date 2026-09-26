@@ -7,6 +7,9 @@ import { loadLogo, tintedCanvas, renderSheet, SQUIRCLE_MASK } from '../lib/brand
 import { isTouch } from '../lib/useMedia.js';
 import { useToast } from '../components/Toast.jsx';
 import LogoImage from '../components/LogoImage.jsx';
+import SaveToPlanModal from '../components/SaveToPlanModal.jsx';
+
+const BRAND_BOARD = /brand|logo|test/i;
 
 const BGS = [
   { key: 'light', label: 'Light' },
@@ -327,7 +330,9 @@ export default function LogoTester() {
 
       {picking && <LogoPicker onPick={(p) => { applyProject(p); setPicking(false); }} onClose={() => setPicking(false)} />}
       {saving && art && (
-        <SaveToPlan onClose={() => setSaving(false)} makeFile={sheetFile}
+        <SaveToPlanModal title="Save test sheet to plan" boardName="Brand tests" boardMatch={BRAND_BOARD} submitLabel="Save sheet"
+          hint="The sheet (PNG) shows every test on one page — backgrounds, profile picture, app icon, minimum size, clear space and your colours."
+          onClose={() => setSaving(false)} makeFile={sheetFile}
           onSaved={(plan) => { setSaving(false); toast(`Test sheet saved to “${plan.name}”`, 'ok', { label: 'Open plan', onClick: () => navigate(`/plan/${plan.id}`) }); }} />
       )}
     </div>
@@ -423,86 +428,6 @@ function LogoPicker({ onPick, onClose }) {
               })}
             </div>
           ) : <div className="hint" style={{ padding: 10 }}>{logos.length ? 'No logo matches.' : 'No logos in your library yet — add some under Logos.'}</div>}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** Save the test sheet into a plan: into one of its moodboards, or a new "Brand tests" one. */
-function SaveToPlan({ makeFile, onSaved, onClose }) {
-  const toast = useToast();
-  const [plans, setPlans] = useState(null);
-  const [planId, setPlanId] = useState('');
-  const [plan, setPlan] = useState(null);
-  const [target, setTarget] = useState('new');
-  const [busy, setBusy] = useState(false);
-  useEffect(() => { api.listPlans().then((ps) => { setPlans(ps); if (ps[0]) setPlanId(ps.find((p) => p.status !== 'archived')?.id || ps[0].id); }).catch(() => setPlans([])); }, []);
-  useEffect(() => {
-    setPlan(null);
-    if (!planId) return;
-    api.getPlan(planId).then((p) => {
-      setPlan(p);
-      const boards = p.blocks.filter((b) => b.type === 'moodboard');
-      setTarget(boards.find((b) => /brand|logo|test/i.test(b.title))?.id || 'new');
-    }).catch(() => {});
-  }, [planId]);
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape' && !busy) onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, busy]);
-
-  const save = async () => {
-    if (!plan || busy) return;
-    setBusy(true);
-    try {
-      const file = await makeFile();
-      let blockId = target;
-      if (target === 'new') {
-        const before = new Set(plan.blocks.map((b) => b.id));
-        const next = await api.addBlock(plan.id, 'moodboard');
-        blockId = next.blocks.find((b) => !before.has(b.id))?.id;
-        await api.updateBlock(plan.id, blockId, { title: 'Brand tests' });
-      }
-      await api.addBlockFiles(plan.id, blockId, [file]);
-      onSaved(plan);
-    } catch (e) { toast(`Could not save: ${e.message}`, 'error'); setBusy(false); }
-  };
-
-  const boards = (plan?.blocks || []).filter((b) => b.type === 'moodboard');
-  return (
-    <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
-      <div className="modal" role="dialog" aria-modal="true" aria-label="Save test sheet to plan" style={{ maxWidth: 440 }}>
-        <div className="modal-head">
-          <h2>Save test sheet to plan</h2>
-          <button className="icon-btn" onClick={onClose} disabled={busy} aria-label="Close"><X size={18} /></button>
-        </div>
-        <div className="modal-body">
-          {plans === null ? <div className="spinner" /> : !plans.length ? (
-            <div className="hint">No plans yet — create one under Plans first.</div>
-          ) : (
-            <>
-              <div className="field">
-                <label>Plan</label>
-                <select className="input" value={planId} onChange={(e) => setPlanId(e.target.value)}>
-                  {plans.map((p) => <option key={p.id} value={p.id}>{p.avatarEmoji ? `${p.avatarEmoji} ` : ''}{p.name}{p.status === 'archived' ? ' (archived)' : ''}</option>)}
-                </select>
-              </div>
-              <div className="field" style={{ marginBottom: 0 }}>
-                <label>Moodboard</label>
-                <select className="input" value={target} onChange={(e) => setTarget(e.target.value)} disabled={!plan}>
-                  <option value="new">New moodboard “Brand tests”</option>
-                  {boards.map((b) => <option key={b.id} value={b.id}>{b.title || 'Moodboard'}</option>)}
-                </select>
-              </div>
-              <div className="hint" style={{ marginTop: 10 }}>The sheet (PNG) shows every test on one page — backgrounds, profile picture, app icon, minimum size, clear space and your colours.</div>
-            </>
-          )}
-        </div>
-        <div className="modal-foot">
-          <button className="btn btn-ghost" onClick={onClose} disabled={busy}>Cancel</button>
-          <button className="btn btn-primary" onClick={save} disabled={!plan || busy}>{busy ? 'Saving…' : 'Save sheet'}</button>
         </div>
       </div>
     </div>
