@@ -4389,3 +4389,60 @@ img { max-width: 100%; display: block; }
 /* colour field in the 2D editor */
 .m2e-color { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
 .m2e-color input[type=color] { width: 34px; height: 26px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: none; }
+
+/* ---- Plan: small blocks side by side ---- */
+@media (min-width: 900px) {
+  .block-duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 22px; align-items: start; margin-top: 30px; }
+  .block-duo > .tab-block > .section { margin-top: 0; }
+  .block-duo + .block-row { margin-top: 26px; }
+}
+
+/* ---- Plan: timeframe + milestones as one line in the header ---- */
+.plan-when {
+  display: inline-flex; align-items: center; gap: 7px; height: 30px; max-width: 100%; padding: 0 10px; border-radius: 999px;
+  border: 1px solid var(--border); background: none; color: var(--text-muted); font: inherit; font-size: 13px; cursor: pointer; min-width: 0;
+}
+.plan-when > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.plan-when:hover, .plan-when.on { color: var(--text); border-color: var(--border-strong); background: var(--surface); }
+.plan-when.none { border-style: dashed; color: var(--text-faint); }
+.plan-when.late svg:first-child { color: var(--danger); }
+.plan-when-chev { flex: none; transition: transform .15s; }
+.plan-when.on .plan-when-chev { transform: rotate(180deg); }
+.plan-when-panel { margin: -12px 0 22px 24px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.plan-when-panel .milestones { margin-top: 14px; }
+@media (max-width: 640px) {
+  .plan-meta { flex-wrap: wrap; }
+  .plan-when { flex: 1 1 100%; }
+  .plan-when-panel { margin-left: 0; }
+}
+
+/* ---- Plan: contents (right edge on wide screens, "Jump to…" otherwise) ---- */
+.plan-toc { display: none; }
+.plan-jump-icon { display: inline-flex; }
+@media (max-width: 640px) { .plan-jump-label { display: none; } }
+@media (min-width: 1440px) {
+  .detail.has-toc { position: relative; max-width: min(1000px, calc(100% - 262px)); margin-left: max(0px, calc((100% - 1000px - 262px) / 2)); }
+  .plan-toc { display: block; position: absolute; left: calc(100% + 34px); top: 0; bottom: 0; width: 228px; }
+  .plan-jump { display: none; }
+}
+.plan-toc-inner { position: sticky; top: 70px; max-height: calc(100vh - 96px); overflow-y: auto; scrollbar-width: thin; display: flex; flex-direction: column; gap: 2px; padding-bottom: 20px; }
+.plan-toc-head { display: flex; align-items: center; gap: 6px; margin: 4px 0 8px 8px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); }
+.plan-toc-tab {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; border: 0; border-radius: 8px; background: none;
+  color: var(--text-muted); font: inherit; font-size: 13px; font-weight: 600; text-align: left; cursor: pointer;
+}
+.plan-toc-tab:hover { color: var(--text); background: var(--surface); }
+.plan-toc-tab.on, .plan-toc-group.on > .plan-toc-tab { color: var(--text); }
+.plan-toc-group { margin-top: 6px; }
+.plan-toc-item {
+  display: grid; grid-template-columns: 14px minmax(0, 1fr); column-gap: 8px; width: 100%; padding: 5px 8px 5px 10px; margin-left: 4px;
+  border: 0; border-left: 2px solid var(--border); border-radius: 0 8px 8px 0; background: none; color: var(--text-muted); font: inherit; text-align: left; cursor: pointer;
+}
+.plan-toc-item svg { grid-row: 1 / 3; margin-top: 2px; color: var(--tab-fg); opacity: .8; }
+.plan-toc-title { font-size: 12.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.plan-toc-sum { font-size: 11px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plan-toc-item:hover { background: var(--surface); }
+.plan-toc-item.here { border-left-color: var(--tab-fg); background: var(--surface); }
+.plan-toc-item.empty .plan-toc-title { color: var(--text-muted); }
+.plan-toc-group.on .plan-toc-item { border-left-color: color-mix(in srgb, var(--tab-fg) 35%, var(--border)); }
+.plan-toc-group.on .plan-toc-item.here { border-left-color: var(--tab-fg); }

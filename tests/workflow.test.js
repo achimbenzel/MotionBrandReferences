@@ -421,6 +421,11 @@ test('plan tabs: templates place blocks, tab and collapsed save, moves swap with
   r = await srv.api(`/api/plans/${plan.id}/blocks/${text.id}`, { method: 'PATCH', json: { tab: 'nowhere' } });
   assert.equal(r.data.plan.blocks.find((b) => b.id === text.id).tab, 'delivery');
   assert.equal((await srv.api(`/api/plans/${plan.id}/blocks`, { method: 'POST', json: { type: 'links', tab: 'x' } })).data.block.tab, undefined);
+  // Width on the page: half / full / auto only.
+  r = await srv.api(`/api/plans/${plan.id}/blocks/${text.id}`, { method: 'PATCH', json: { width: 'half' } });
+  assert.equal(r.data.plan.blocks.find((b) => b.id === text.id).width, 'half');
+  r = await srv.api(`/api/plans/${plan.id}/blocks/${text.id}`, { method: 'PATCH', json: { width: 'huge' } });
+  assert.equal(r.data.plan.blocks.find((b) => b.id === text.id).width, 'half');
 
   // Within a tab the neighbour can be further away: swap with a given block.
   const ids = r.data.plan.blocks.map((b) => b.id);

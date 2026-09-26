@@ -329,7 +329,10 @@ one stage at a time (archived plans only show under **Archived**). Each
     or type/paste your own) or an **uploaded image**; both banner and profile
     also show on the plan's card in the grid,
   - a **timeframe** (start / end date) with **checkable milestones** — each has a
-    title, an optional date and a checkbox that strikes it through when done,
+    title, an optional date and a checkbox that strikes it through when done.
+    In the header it's **one line** — “23 Sep – 16 Oct · 1/3 milestones ·
+    next: Styleframes in 3 days” (with a red calendar when one is overdue);
+    a click opens the dates and milestones to edit,
   - a stack of **content blocks** below the timeframe. A **new plan is empty**;
     add blocks with **+ Add block** at the bottom, reorder them (**Move up /
     down**), rename them, or remove them — each block has its own **⋯** menu.
@@ -414,13 +417,21 @@ last (or its phase's, when that has blocks).
   content (its summary — “4/10 answered”, “6 images”, “2/8 done”, “v3 · 2 open
   comments”, “0/4 delivered” … — with a glimpse: thumbnails, swatches, the
   first answers, open to-dos, a progress bar) and the blocks that are still
-  empty as chips. A card or chip opens the block in its tab. The timeframe
-  with its milestones and the plan's to-dos on the board are here too.
+  empty as chips. A card or chip opens the block in its tab. The plan's to-dos
+  on the board are here too.
 - **Empty blocks are one line** (“Styleframes — empty · drop or add images”)
   until you open them, so a fresh template stays short.
 - **Every block folds** (⌃ next to its ⋯, or ⋯ → Fold) to one line with its
   summary and a glimpse of the content; **Fold all / Unfold all** does the
   whole tab. Folding is saved with the plan.
+- **Small blocks side by side**: palette, links and files stand two in a row
+  on a wide screen; ⋯ → **Half width** / **Full width** changes it for any
+  block (saved with the plan).
+- **Contents**: on a wide screen every block is listed at the right edge by
+  tab — icon, name and where it stands (“empty”, “3/10 answered”, “2/8 done”
+  …), the one in view highlighted; a click shows the block, switching tab and
+  unfolding it. On smaller screens and phones the same list is **Jump to…**
+  next to the tabs.
 
 **Archive as reference.** When a job is done, **Edit → Archive as reference…**
 turns it into references in your library, next to the work of others:

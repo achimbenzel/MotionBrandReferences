@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft, Trash2, Pencil, MoreHorizontal, CalendarRange, Images,
+  ArrowLeft, Trash2, Pencil, MoreHorizontal, Images,
   UploadCloud, X, Plus, Check, ChevronDown, ChevronRight,
   Image as ImageIcon, Camera, ArrowUp, ArrowDown, File as FileIcon, ExternalLink,
   Link2, Library, FolderOpen, Palette as PaletteIcon,
   Wand2, Copy, FileText, AlertTriangle,
   LayoutTemplate, Building2, Clapperboard, PackageCheck,
-  Archive, Film, ChevronUp, ChevronsDownUp, ChevronsUpDown,
+  Archive, Film, ChevronUp, ChevronsDownUp, ChevronsUpDown, Columns2, RectangleHorizontal,
 } from 'lucide-react';
 import { api, planFileUrl, fileUrl } from '../lib/api.js';
 import { useSaver, useRefreshOnReturn, whenSaved } from '../lib/autosave.js';
@@ -33,6 +33,8 @@ import { BLOCK_META } from '../components/plan/blockMeta.js';
 import PlanTabs from '../components/plan/PlanTabs.jsx';
 import PlanOverview from '../components/plan/PlanOverview.jsx';
 import BlockRow from '../components/plan/BlockRow.jsx';
+import PlanWhen from '../components/plan/PlanWhen.jsx';
+import { PlanToc, PlanJump } from '../components/plan/PlanToc.jsx';
 import { PLAN_TABS, BLOCK_TABS, STRUCTURAL, blockTabs, statusTab, isEmptyBlock, tabColor, planTab } from '../lib/planTabs.js';
 import { voEstimate } from '../lib/timing.js';
 
@@ -58,6 +60,10 @@ const fmtBytes = (n) => {
   return `${v.toFixed(v < 10 && i > 0 ? 1 : 0)} ${u[i]}`;
 };
 
+// Small blocks sit side by side, two in a row, unless set to full width (and any block can be set to half).
+const HALF_BY_DEFAULT = new Set(['palette', 'links', 'files']);
+const halfOf = (b) => b.width === 'half' || (b.width !== 'full' && HALF_BY_DEFAULT.has(b.type));
+
 export default function PlanDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -80,6 +86,7 @@ export default function PlanDetail() {
   const [params, setParams] = useSearchParams();
   const [tab, setTabState] = useState('overview');     // which tab shows (set when the plan loads)
   const [opened, setOpened] = useState(() => new Set()); // empty blocks opened on this visit
+  const [whenOpen, setWhenOpen] = useState(false);        // the timeframe / milestones panel under the header
   const [client, setClient] = useState('');
   const saver = useSaver();
   const planRef = useRef(null);
@@ -453,6 +460,9 @@ export default function PlanDetail() {
     ...(neighbourInTab(b, 'up') ? [{ label: 'Move up', icon: <ArrowUp size={15} />, onClick: () => moveBlock(b, 'up') }] : []),
     ...(neighbourInTab(b, 'down') ? [{ label: 'Move down', icon: <ArrowDown size={15} />, onClick: () => moveBlock(b, 'down') }] : []),
     ...(STRUCTURAL.has(b.type) ? [] : [{ label: b.collapsed ? 'Unfold' : 'Fold', icon: b.collapsed ? <ChevronDown size={15} /> : <ChevronUp size={15} />, onClick: () => editBlock(b.id, { collapsed: !b.collapsed }, true) }]),
+    ...(STRUCTURAL.has(b.type) ? [] : [halfOf(b)
+      ? { label: 'Full width', icon: <RectangleHorizontal size={15} />, onClick: () => editBlock(b.id, { width: 'full' }, true) }
+      : { label: 'Half width (side by side)', icon: <Columns2 size={15} />, onClick: () => editBlock(b.id, { width: 'half' }, true) }]),
     { separator: true },
     ...PLAN_TABS.filter((t) => t.key !== 'overview' && t.key !== blockTabs(plan.blocks)[i]).map((t) => ({
       label: `Move to ${t.label}`, icon: <span className="status-dot" style={{ background: tabColor(t.key).fg }} />, onClick: () => moveToTab(b, t.key),
@@ -883,6 +893,24 @@ export default function PlanDetail() {
 
   // A block as it shows in its tab: a slim row while empty (until opened) or
   // folded, else in full with a fold button next to its ⋯ menu.
+  const asRow = (b) => !STRUCTURAL.has(b.type) && ((isEmptyBlock(b) && !opened.has(b.id)) || b.collapsed);
+  // The tab's blocks; two half-width ones in a row sit side by side (on wide screens).
+  const renderTab = () => {
+    const out = [];
+    let wait = null; // a half-width block waiting for a partner
+    plan.blocks.forEach((b, i) => {
+      if (tabs[i] !== tab) return;
+      const el = renderBlock(b, i);
+      if (halfOf(b) && !asRow(b)) {
+        if (wait) { out.push(<div className="block-duo" key={`duo-${wait.id}`}>{wait.el}{el}</div>); wait = null; } else wait = { id: b.id, el };
+        return;
+      }
+      if (wait) { out.push(wait.el); wait = null; }
+      out.push(el);
+    });
+    if (wait) out.push(wait.el);
+    return out;
+  };
   const renderBlock = (b, i) => {
     const menuEl = <Menu align="right" trigger={<button className="icon-btn" style={{ width: 34, height: 34 }} aria-label="Block options"><MoreHorizontal size={16} /></button>} items={blockMenu(b, i)} />;
     const color = tabColor(tabs[i]).fg;
@@ -905,7 +933,8 @@ export default function PlanDetail() {
   };
 
   return (
-    <div className="detail">
+    <div className="detail has-toc">
+      <PlanToc plan={plan} tabs={tabs} tab={tab} onOpen={openBlock} onTab={setTab} />
       <div className="plan-topbar">
         <BackBtn to="/plan" label="Back to Plans" />
         <Menu
@@ -985,7 +1014,35 @@ export default function PlanDetail() {
           <Building2 size={15} />
           <input value={client} placeholder="Add client" onChange={(e) => editClient(e.target.value)} aria-label="Client" />
         </label>
+        <PlanWhen plan={plan} milestones={milestones} open={whenOpen} onToggle={() => setWhenOpen((v) => !v)} />
       </div>
+      {/* Timeframe + milestones: one line in the header, the details on click */}
+      {whenOpen && (
+        <div className="plan-when-panel">
+          <div className="row-2">
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Start</label>
+              <input type="date" className="input" value={plan.start || ''} onChange={(e) => patch({ start: e.target.value })} />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>End</label>
+              <input type="date" className="input" value={plan.end || ''} onChange={(e) => patch({ end: e.target.value })} />
+            </div>
+          </div>
+          <div className="milestones">
+            {milestones.map((m) => (
+              <div className={`milestone ${m.done ? 'done' : ''}`} key={m.id}>
+                <button className={`ms-check ${m.done ? 'on' : ''}`} onClick={() => editMilestone(m.id, { done: !m.done })} title="Toggle done">{m.done && <Check size={13} />}</button>
+                <input className="ms-title input" value={m.title} placeholder="Milestone…" onChange={(e) => editMilestone(m.id, { title: e.target.value })} />
+                <input className="ms-date input" type="date" value={m.date || ''} onChange={(e) => editMilestone(m.id, { date: e.target.value })} />
+                <button className="ms-del icon-btn" onClick={() => removeMilestone(m.id)}><X size={14} /></button>
+              </div>
+            ))}
+            <button className="btn btn-ghost btn-sm ms-add" onClick={addMilestone}><Plus size={15} /> Add milestone</button>
+          </div>
+        </div>
+      )}
+
       <LibraryChips items={plan.archivedAs} />
 
       <input ref={bannerRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { setImage('banner', e.target.files[0]); e.target.value = ''; }} />
@@ -995,47 +1052,26 @@ export default function PlanDetail() {
       <input ref={paletteRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { onExtract(e.target.files[0]); e.target.value = ''; }} />
 
       <PlanTabs active={tab} counts={tabCounts} current={statusTab(plan.status)} onPick={setTab}
-        tools={tab !== 'overview' && foldable.length > 0 ? (
-          <button type="button" className="btn btn-sm btn-ghost" onClick={foldAll} title={anyOpen ? 'Fold every block in this tab' : 'Unfold every block in this tab'}>
-            {anyOpen ? <><ChevronsDownUp size={14} /> Fold all</> : <><ChevronsUpDown size={14} /> Unfold all</>}
-          </button>
-        ) : null} />
+        tools={(
+          <>
+            <PlanJump plan={plan} tabs={tabs} onOpen={openBlock} />
+            {tab !== 'overview' && foldable.length > 0 && (
+              <button type="button" className="btn btn-sm btn-ghost" onClick={foldAll} title={anyOpen ? 'Fold every block in this tab' : 'Unfold every block in this tab'}>
+                {anyOpen ? <><ChevronsDownUp size={14} /> Fold all</> : <><ChevronsUpDown size={14} /> Unfold all</>}
+              </button>
+            )}
+          </>
+        )} />
 
       {tab === 'overview' ? (
         <>
           <PlanOverview plan={plan} tabs={tabs} onOpen={openBlock} onTab={setTab} />
-          {/* Timeframe + milestones (fixed) */}
-          <div className="section">
-            <div className="section-head"><h2><CalendarRange size={16} /> Timeframe</h2></div>
-            <div className="row-2">
-              <div className="field" style={{ marginBottom: 0 }}>
-                <label>Start</label>
-                <input type="date" className="input" value={plan.start || ''} onChange={(e) => patch({ start: e.target.value })} />
-              </div>
-              <div className="field" style={{ marginBottom: 0 }}>
-                <label>End</label>
-                <input type="date" className="input" value={plan.end || ''} onChange={(e) => patch({ end: e.target.value })} />
-              </div>
-            </div>
-            <div className="milestones">
-              {milestones.map((m) => (
-                <div className={`milestone ${m.done ? 'done' : ''}`} key={m.id}>
-                  <button className={`ms-check ${m.done ? 'on' : ''}`} onClick={() => editMilestone(m.id, { done: !m.done })} title="Toggle done">{m.done && <Check size={13} />}</button>
-                  <input className="ms-title input" value={m.title} placeholder="Milestone…" onChange={(e) => editMilestone(m.id, { title: e.target.value })} />
-                  <input className="ms-date input" type="date" value={m.date || ''} onChange={(e) => editMilestone(m.id, { date: e.target.value })} />
-                  <button className="ms-del icon-btn" onClick={() => removeMilestone(m.id)}><X size={14} /></button>
-                </div>
-              ))}
-              <button className="btn btn-ghost btn-sm ms-add" onClick={addMilestone}><Plus size={15} /> Add milestone</button>
-            </div>
-          </div>
-
           {/* The To-Do board's cards linked to this plan */}
           <PlanTodos planId={plan.id} toast={toast} />
         </>
       ) : (
         <>
-          {plan.blocks.map((b, i) => (tabs[i] === tab ? renderBlock(b, i) : null))}
+          {renderTab()}
           {!tabCounts[tab] && (
             <div className="empty-hint tab-empty">Nothing in {planTab(tab).label} yet — add a block below, or move one here with its ⋯ menu.</div>
           )}

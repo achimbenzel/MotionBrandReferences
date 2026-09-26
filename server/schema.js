@@ -37,6 +37,7 @@ export const BLOCK_TITLES = {
 // before tabs existed) go by their type; headings / dividers with the block
 // that follows them.
 export const BLOCK_TABS = ['brief', 'concept', 'production', 'delivery'];
+export const BLOCK_WIDTHS = ['auto', 'full', 'half'];
 const TYPE_TAB = {
   briefing: 'brief', text: 'brief', table: 'brief',
   moodboard: 'concept', refs: 'concept', palette: 'concept', links: 'concept',
@@ -134,6 +135,8 @@ export function normalizeBlock(b, fallbackId) {
   if (!b.id) b.id = fallbackId || nanoid(8);
   if (typeof b.title !== 'string') b.title = BLOCK_TITLES[b.type];
   if ('tab' in b && !BLOCK_TABS.includes(b.tab)) delete b.tab;
+  // Its width on the plan page: 'auto' (small blocks sit side by side), 'full' or 'half'.
+  if ('width' in b && !BLOCK_WIDTHS.includes(b.width)) delete b.width;
   if (b.type === 'moodboard') {
     if (typeof b.collapsed !== 'boolean') b.collapsed = false;
     if (!Array.isArray(b.images)) b.images = [];

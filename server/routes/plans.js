@@ -8,7 +8,7 @@ import { readDB, mutateDB } from '../db.js';
 import { moveInto, replaceImage, safeRm, moveToTrash, moveRelPaths, extOf } from '../files.js';
 import { upload } from '../upload.js';
 import {
-  BLOCK_TYPES, BLOCK_TITLES, BLOCK_TABS, PLAN_STATUSES, STORYBOARD_ASPECTS, normalizeField, normalizeShot, normalizeAudio,
+  BLOCK_TYPES, BLOCK_TITLES, BLOCK_TABS, BLOCK_WIDTHS, PLAN_STATUSES, STORYBOARD_ASPECTS, normalizeField, normalizeShot, normalizeAudio,
   normalizeLine, normalizeTarget, normalizePace, normalizeVersion, normalizeDeliverable, normTags, str,
 } from '../schema.js';
 import { STORYBOARD_TEMPLATES, storyboardTemplate, templateInfo } from '../storyboards.js';
@@ -414,7 +414,7 @@ router.post('/api/plans/:id/blocks', async (req, res) => {
 
 // Update only the content/label fields — never the file arrays.
 const BLOCK_EDITABLE = ['title', 'collapsed', 'content', 'items', 'columns', 'rows', 'fields',
-  'shots', 'audio', 'aspect', 'target', 'lines', 'pace', 'versions', 'tab'];
+  'shots', 'audio', 'aspect', 'target', 'lines', 'pace', 'versions', 'tab', 'width'];
 router.patch('/api/plans/:id/blocks/:blockId', async (req, res) => {
   const updated = await mutateDB((db) => {
     const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null;
@@ -425,6 +425,7 @@ router.patch('/api/plans/:id/blocks/:blockId', async (req, res) => {
       if (k === 'title' || k === 'content') b[k] = str(v, k === 'content' ? 200000 : 400);
       else if (k === 'collapsed') b[k] = !!v;
       else if (k === 'tab') { if (BLOCK_TABS.includes(v)) b.tab = v; }
+      else if (k === 'width') { if (BLOCK_WIDTHS.includes(v)) b.width = v; }
       else if (k === 'fields') { if (Array.isArray(v)) b.fields = v.slice(0, 100).map(normalizeField); }
       else if (k === 'shots') { if (Array.isArray(v)) b.shots = v.slice(0, 500).map((x) => normalizeShot(x, b.id)); }
       else if (k === 'audio') b.audio = normalizeAudio(v, b.id);
