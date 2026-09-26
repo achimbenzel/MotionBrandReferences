@@ -2317,6 +2317,28 @@ img { max-width: 100%; display: block; }
 .dash-timer-lengths button.on { color: var(--text); border-color: var(--tm); background: color-mix(in srgb, var(--tm) 14%, transparent); }
 .dash-timer-lengths button:disabled { opacity: .45; cursor: default; }
 .dash-timer-actions { display: flex; align-items: center; gap: 6px; }
+.dash-timer-time { border: 0; background: none; padding: 2px 6px; border-radius: 10px; color: var(--text); font: inherit; font-size: 34px; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; line-height: 1; cursor: text; }
+.dash-timer-time:not(:disabled):hover { background: rgba(255, 255, 255, .06); }
+.dash-timer-time:disabled { cursor: default; }
+.dash-timer.running .dash-timer-time { animation: dash-breathe 4s ease-in-out infinite; }
+.dash-timer-edit { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.dash-timer-edit .dash-timer-field { width: 86px; height: 40px; font-size: 22px; font-weight: 800; text-align: center; }
+.dash-timer-edit small { font-size: 10.5px; color: var(--text-faint); }
+.dash-timer-field { width: 56px; height: 28px; padding: 0 8px; border-radius: 999px; border: 1px solid var(--tm); background: var(--surface); color: var(--text); font: inherit; font-size: 12.5px; outline: none; font-variant-numeric: tabular-nums; }
+.dash-timer-field.bad { border-color: var(--danger); }
+.dash-timer-own { display: inline-flex; align-items: center; height: 28px; border-radius: 999px; border: 1px dashed var(--border-strong); overflow: hidden; }
+.dash-timer-own > button { height: 100%; border: 0; background: none; color: var(--text-muted); font: inherit; font-size: 12.5px; cursor: pointer; font-variant-numeric: tabular-nums; }
+.dash-timer-own > button:first-child { padding: 0 4px 0 11px; }
+.dash-timer-own-x { padding: 0 8px 0 3px; display: grid; place-items: center; opacity: .5; }
+.dash-timer-own-x:hover { opacity: 1; color: var(--danger) !important; }
+.dash-timer-own.on { border-style: solid; border-color: var(--tm); background: color-mix(in srgb, var(--tm) 14%, transparent); }
+.dash-timer-own.on > button:first-child { color: var(--text); }
+.dash-timer-own > button:disabled { opacity: .45; cursor: default; }
+.dash-timer-add { width: 28px; height: 28px; padding: 0; border-radius: 999px; border: 1px dashed var(--border-strong); background: none; color: var(--text-muted); display: inline-grid; place-items: center; cursor: pointer; }
+.dash-timer-add:hover:not(:disabled) { color: var(--text); border-color: var(--tm); }
+.dash-timer-add:disabled { opacity: .4; cursor: default; }
+.dash-timer-add.on { width: auto; display: inline-flex; gap: 2px; border: 0; padding: 0; }
+.dash-timer-add.on > button { width: 28px; height: 28px; border-radius: 999px; border: 0; background: var(--tm); color: #041417; display: grid; place-items: center; cursor: pointer; }
 .dash-timer-main { min-width: 110px; justify-content: center; }
 @media (max-width: 1180px) and (min-width: 901px) { .dash-w.half .dash-timer-body { flex-direction: column; align-items: stretch; } .dash-w.half .dash-timer-dial { align-self: center; } }
 @media (max-width: 460px) { .dash-timer-body { flex-direction: column; align-items: stretch; } .dash-timer-dial { align-self: center; } }
@@ -2729,7 +2751,7 @@ img { max-width: 100%; display: block; }
   .sidebar.is-rail .sb-nav { align-items: center; }
   .sidebar.is-rail .sb-footer { align-items: center; width: 100%; }
   .sidebar.is-rail .storage-pill { width: 44px; flex-direction: column; justify-content: center; gap: 5px; padding: 8px 0; border-radius: 12px; }
-  .sidebar.is-rail .storage-text { flex: none; width: 24px; }
+  .sidebar.is-rail .storage-text { flex: none; width: 24px; min-width: 0; }
   .sidebar.is-rail .storage-nums, .sidebar.is-rail .storage-dots { display: none; }
   .mode-toggle.is-rail { flex-direction: column; width: 44px; padding: 4px; gap: 3px; border-radius: 14px; margin-top: 2px; box-shadow: none; }
   .mode-toggle.is-rail .mode-btn { justify-content: center; padding: 8px 0; border-radius: 10px; }

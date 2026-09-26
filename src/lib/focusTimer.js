@@ -15,13 +15,17 @@ export const TIMER_MODES = {
 };
 const KEY = 'focusTimer';
 const today = () => new Date().toDateString();
-const DEFAULT = { mode: 'focus', minutes: 25, endsAt: null, left: 25 * 60, sessions: 0, day: today(), done: false };
+const DEFAULT = { mode: 'focus', minutes: 25, endsAt: null, left: 25 * 60, sessions: 0, day: today(), done: false, customs: { focus: [], short: [], long: [] } };
+const MAX_MIN = 240;
+const MAX_CUSTOM = 4; // own lengths per mode
+export const validMinutes = (m) => Number.isInteger(m) && m >= 1 && m <= MAX_MIN;
 
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (!s || !TIMER_MODES[s.mode]) return { ...DEFAULT };
     const st = { ...DEFAULT, ...s };
+    st.customs = Object.fromEntries(Object.keys(TIMER_MODES).map((k) => [k, (Array.isArray(s.customs?.[k]) ? s.customs[k] : []).filter(validMinutes).slice(0, MAX_CUSTOM)]));
     if (st.day !== today()) { st.sessions = 0; st.day = today(); }
     return st;
   } catch { return { ...DEFAULT }; }
@@ -75,7 +79,7 @@ function finish() {
     const m = TIMER_MODES[mode].minutes[0];
     set({ sessions, mode, minutes: m, left: m * 60, endsAt: null, done: true });
   } else {
-    const m = TIMER_MODES.focus.minutes.includes(state.lastFocus) ? state.lastFocus : 25;
+    const m = validMinutes(state.lastFocus) ? state.lastFocus : 25;
     set({ mode: 'focus', minutes: m, left: m * 60, endsAt: null, done: true });
   }
 }
@@ -112,10 +116,27 @@ export const timer = {
   reset() { set({ left: state.minutes * 60, endsAt: null, done: false }); },
   /** Straight to the end of this session (a skipped focus session doesn't count). */
   skip() {
-    if (state.mode === 'focus') { const m = TIMER_MODES.short.minutes[0]; set({ mode: 'short', minutes: m, left: m * 60, endsAt: null, done: false }); } else { set({ mode: 'focus', minutes: 25, left: 25 * 60, endsAt: null, done: false }); }
+    if (state.mode === 'focus') { const m = TIMER_MODES.short.minutes[0]; set({ mode: 'short', minutes: m, left: m * 60, endsAt: null, done: false }); } else {
+      const m = validMinutes(state.lastFocus) ? state.lastFocus : 25;
+      set({ mode: 'focus', minutes: m, left: m * 60, endsAt: null, done: false });
+    }
   },
   setMode(mode, minutes = TIMER_MODES[mode].minutes[0]) { set({ mode, minutes, left: minutes * 60, endsAt: null, done: false }); },
-  setMinutes(minutes) { set({ minutes, left: minutes * 60, endsAt: null, done: false }); },
+  setMinutes(minutes) { if (validMinutes(minutes)) set({ minutes, left: minutes * 60, endsAt: null, done: false }); },
+  /** An own length for this mode (kept as a chip, up to four), and use it now. */
+  addCustom(minutes) {
+    if (!validMinutes(minutes)) return;
+    const mode = state.mode;
+    const has = TIMER_MODES[mode].minutes.includes(minutes) || state.customs[mode].includes(minutes);
+    const list = has ? state.customs[mode] : [...state.customs[mode], minutes].sort((a, b) => a - b).slice(-MAX_CUSTOM);
+    set({ customs: { ...state.customs, [mode]: list }, minutes, left: minutes * 60, endsAt: null, done: false });
+  },
+  removeCustom(minutes) {
+    const mode = state.mode;
+    const list = state.customs[mode].filter((m) => m !== minutes);
+    const back = state.minutes === minutes && !state.endsAt ? { minutes: TIMER_MODES[mode].minutes[0], left: TIMER_MODES[mode].minutes[0] * 60 } : {};
+    set({ customs: { ...state.customs, [mode]: list }, ...back });
+  },
 };
 
 const subscribe = (f) => { subs.add(f); sync(); return () => subs.delete(f); };

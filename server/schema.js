@@ -19,7 +19,7 @@ export const TAG_KEYS = new Set(['red', 'orange', 'yellow', 'green', 'blue', 'pu
 export const CURRENCIES = new Set(['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD']);
 
 export const emptyDB = () => ({
-  schemaVersion: SCHEMA_VERSION, projects: [], galleries: [], plans: [], planTemplates: [], software: [], trash: [], inbox: [], mockups: [], mockupModels: [], mockupHdris: [],
+  schemaVersion: SCHEMA_VERSION, projects: [], galleries: [], plans: [], planTemplates: [], software: [], trash: [], inbox: [], mockups: [], mockupModels: [], mockupHdris: [], timeEntries: [],
   settings: { storageLimitBytes: DEFAULT_STORAGE_LIMIT },
 });
 
@@ -626,6 +626,8 @@ export function normalizeDB(db) {
   if (!Array.isArray(db.mockups)) db.mockups = [];
   if (!Array.isArray(db.mockupModels)) db.mockupModels = [];
   if (!Array.isArray(db.mockupHdris)) db.mockupHdris = [];
+  if (!Array.isArray(db.timeEntries)) db.timeEntries = [];           // the time tracker's entries
+  db.timeTracker = normalizeTimeTracker(db.timeTracker);              // …and what's running now
   for (const plan of db.plans) normalizePlan(plan);
   for (const s of db.software) normalizeSoftware(s);
   for (const p of db.projects) {
@@ -730,4 +732,46 @@ export function normalizeDashboardLayout(v) {
   const seen = new Set();
   return (Array.isArray(v) ? v : []).filter((w) => w && DASHBOARD_WIDGETS.includes(w.id) && !seen.has(w.id) && seen.add(w.id))
     .map((w) => ({ id: w.id, hidden: !!w.hidden, size: w.size === 'half' ? 'half' : 'full' }));
+}
+
+// ---------------------------------------------------------------------------
+// Time tracker: entries (a date, from–to, a plan or a free project / client,
+// an activity, details) and the one that's running
+// ---------------------------------------------------------------------------
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+const YMD = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+export const DEFAULT_ACTIVITIES = ['Design', 'Animation', 'Storyboard', 'After Effects', 'Website', 'Meeting', 'Research', 'Admin'];
+export const isTimeOfDay = (v) => typeof v === 'string' && HHMM.test(v);
+export const isDay = (v) => typeof v === 'string' && YMD.test(v);
+/** Minutes from start to end (an end before the start is on the next day). */
+export const entryMinutes = (e) => {
+  const [a, b] = [e.start, e.end].map((t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; });
+  return (b - a + 1440) % 1440;
+};
+const ID = /^[\w-]{1,40}$/;
+export function normalizeTimeEntry(e) {
+  return {
+    id: typeof e?.id === 'string' && ID.test(e.id) ? e.id : nanoid(10),
+    date: isDay(e?.date) ? e.date : new Date().toISOString().slice(0, 10),
+    start: isTimeOfDay(e?.start) ? e.start : '09:00',
+    end: isTimeOfDay(e?.end) ? e.end : (isTimeOfDay(e?.start) ? e.start : '09:00'),
+    planId: typeof e?.planId === 'string' && ID.test(e.planId) ? e.planId : null,
+    project: str(e?.project, 160),    // a project / client without a plan (or as it was called)
+    activity: str(e?.activity, 60),
+    details: str(e?.details, 2000),
+    createdAt: num(e?.createdAt, 0, 1e14, 0) || Date.now(),
+    updatedAt: num(e?.updatedAt, 0, 1e14, 0) || Date.now(),
+  };
+}
+export function normalizeTimeTracker(t) {
+  const r = t?.running;
+  const running = r && Number.isFinite(r.startedAt) && r.startedAt > 0 ? {
+    startedAt: Math.round(r.startedAt),
+    planId: typeof r.planId === 'string' && ID.test(r.planId) ? r.planId : null,
+    project: str(r.project, 160), activity: str(r.activity, 60), details: str(r.details, 2000),
+  } : null;
+  const seen = new Set();
+  const activities = (Array.isArray(t?.activities) ? t.activities : DEFAULT_ACTIVITIES)
+    .map((a) => str(a, 60).trim()).filter((a) => a && !seen.has(a.toLowerCase()) && seen.add(a.toLowerCase())).slice(0, 40);
+  return { running, activities };
 }

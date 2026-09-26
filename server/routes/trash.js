@@ -55,6 +55,7 @@ function describe(t) {
     case 'mockupModel': return { title: t.data.name || '3D model', subtitle: '3D model (mockups)' };
     case 'mockupHdri': return { title: t.data.name || 'HDRI', subtitle: 'HDRI (mockup light)' };
     case 'inbox': return { title: t.data.title || t.data.name || t.data.url || String(t.data.text || '').slice(0, 80) || 'Shared item', subtitle: 'Inbox' };
+    case 'timeEntry': return { title: `${t.data.date} · ${t.data.start}–${t.data.end}${t.data.activity ? ` · ${t.data.activity}` : ''}`, subtitle: `Time entry${t.data.label ? ` · ${t.data.label}` : ''}` };
     case 'orphans': return { title: `${t.data.count} unused file${t.data.count === 1 ? '' : 's'}`, subtitle: `Cleanup · ${fmtBytes(t.data.bytes)}` };
     default: return { title: t.data.title || 'Untitled', subtitle: TYPE_LABEL[t.data.type] || t.data.type };
   }
@@ -118,6 +119,10 @@ router.post('/api/trash/:trashId/restore', async (req, res) => {
       if (!Array.isArray(db.inbox)) db.inbox = [];
       db.inbox.unshift(data);
       move = { from, to: inboxDir(data.id) };
+    } else if (entry.kind === 'timeEntry') {
+      if (!Array.isArray(db.timeEntries)) db.timeEntries = [];
+      const { label: _label, ...e } = data;
+      if (!db.timeEntries.some((x) => x.id === e.id)) db.timeEntries.push(e);
     } else if (entry.kind === 'orphans') {
       rels = { base: DATA_DIR, list: data.rels };
     }
