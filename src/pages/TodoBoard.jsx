@@ -168,6 +168,8 @@ export default function TodoBoard() {
 
   const total = columns.reduce((n, c) => n + c.cards.length, 0);
   const linkedPlans = plans.filter((p) => columns.some((c) => c.cards.some((k) => k.planId === p.id)));
+  // The rest (not archived — or the one being shown).
+  const otherPlans = plans.filter((p) => !linkedPlans.includes(p) && (p.status !== 'archived' || p.id === planFilter));
 
   return (
     <div className="board-page">
@@ -176,17 +178,26 @@ export default function TodoBoard() {
           <h1>To-Dos</h1>
           <p>A general planner — add cards and move them across your lists. Link a card to a plan to see it there too.</p>
         </div>
-        {(linkedPlans.length > 0 || planFilter) && (
-          <label className="kb-filter">
+        {(plans.length > 0 || planFilter) && (
+          // Always there (also after switching to "All cards"): every plan can be picked —
+          // the ones with cards first.
+          <label className={`kb-filter ${planFilter ? 'on' : ''}`}>
             <PencilRuler size={15} />
             <select className="input" value={planFilter} onChange={(e) => setPlanFilter(e.target.value)} aria-label="Show cards of">
               <option value="">All cards</option>
-              {linkedPlans.map((p) => <option key={p.id} value={p.id}>{p.avatarEmoji ? `${p.avatarEmoji} ` : ''}{p.name}</option>)}
-              {planFilter && planFilter !== 'none' && !linkedPlans.some((p) => p.id === planFilter) && planById[planFilter] && (
-                <option value={planFilter}>{planById[planFilter].name}</option>
+              {linkedPlans.length > 0 && (
+                <optgroup label="Plans with cards">
+                  {linkedPlans.map((p) => <option key={p.id} value={p.id}>{p.avatarEmoji ? `${p.avatarEmoji} ` : ''}{p.name}</option>)}
+                </optgroup>
+              )}
+              {otherPlans.length > 0 && (
+                <optgroup label="Other plans">
+                  {otherPlans.map((p) => <option key={p.id} value={p.id}>{p.avatarEmoji ? `${p.avatarEmoji} ` : ''}{p.name}</option>)}
+                </optgroup>
               )}
               <option value="none">Not linked to a plan</option>
             </select>
+            {planFilter && <button type="button" className="icon-btn kb-filter-x" onClick={() => setPlanFilter('')} aria-label="Show all cards"><X size={14} /></button>}
           </label>
         )}
       </div>

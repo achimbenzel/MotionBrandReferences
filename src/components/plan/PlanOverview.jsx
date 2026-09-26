@@ -3,6 +3,14 @@ import { blockMeta } from './blockMeta.js';
 import BlockPeek from './BlockPeek.jsx';
 import { PLAN_TABS, STRUCTURAL, blockSummary, isEmptyBlock, tabColor } from '../../lib/planTabs.js';
 
+// On a card the glimpse below already lists a links block's links (by their
+// label) — the line above just counts them, so no link shows twice.
+const overviewSummary = (b) => {
+  if (b.type !== 'links') return blockSummary(b);
+  const k = (b.items || []).length;
+  return `${k} link${k === 1 ? '' : 's'}`;
+};
+
 /**
  * The plan at a glance: per phase a card for every block with content (its
  * summary and a glimpse), and the blocks that are still empty as chips.
@@ -36,7 +44,7 @@ export default function PlanOverview({ plan, tabs, onOpen, onTab }) {
                   return (
                     <button type="button" key={b.id} className="pov-card" onClick={() => onOpen(b.id)}>
                       <span className="pov-card-head"><Meta.icon size={14} /> <span className="pov-card-title">{b.title || Meta.label}</span></span>
-                      <span className="pov-card-sum">{blockSummary(b)}</span>
+                      <span className="pov-card-sum">{overviewSummary(b)}</span>
                       <BlockPeek plan={plan} block={b} />
                     </button>
                   );
