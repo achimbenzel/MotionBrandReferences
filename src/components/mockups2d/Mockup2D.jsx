@@ -11,11 +11,19 @@ import { TYPES_2D, values, compact, full, xMediaRatio } from '../../lib/mockup2d
 // it's switched on — and stops for good when it leaves the page. No autoplay
 // attribute and a muted one: the thumbnail is made from a copy of the page, and
 // a copied video would otherwise start playing its sound on its own.
+// The file is set and let go in one effect, so a remount (React runs effects
+// twice while developing) never leaves the video without its file.
 function SlotVideo({ src, style, sound, volume, paused, onAspect }) {
   const ref = useRef(null);
   useEffect(() => {
     const v = ref.current;
-    if (!v) return;
+    if (!v) return undefined;
+    v.src = src;
+    return () => { v.pause(); v.removeAttribute('src'); v.load(); };
+  }, [src]);
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return undefined;
     v.defaultMuted = true;
     v.muted = !sound;
     v.volume = Math.max(0, Math.min(1, volume ?? 1));
@@ -31,11 +39,7 @@ function SlotVideo({ src, style, sound, volume, paused, onAspect }) {
     });
     return () => { if (retry) window.removeEventListener('pointerdown', retry); };
   }, [sound, volume, paused, src]);
-  useEffect(() => () => {
-    const v = ref.current;
-    if (v) { v.pause(); v.removeAttribute('src'); v.load(); }
-  }, []);
-  return <video ref={ref} src={src} style={style} loop playsInline muted onLoadedMetadata={(e) => onAspect(e.target.videoWidth / e.target.videoHeight || null)} />;
+  return <video ref={ref} style={style} loop playsInline muted onLoadedMetadata={(e) => onAspect(e.target.videoWidth / e.target.videoHeight || null)} />;
 }
 
 /**

@@ -333,6 +333,12 @@ export const api = {
     const { plan } = await request(`/api/plans/${id}/blocks/${blockId}/move`, { method: 'POST', json: { dir, with: withId } });
     return plan;
   },
+  // Put a block right before / after another one (drag and drop): { before } or { after },
+  // plus `pin` ({ blockId: tab }) for blocks that only follow their neighbours.
+  async placeBlock(id, blockId, where) {
+    const { plan } = await request(`/api/plans/${id}/blocks/${blockId}/move`, { method: 'POST', json: where });
+    return plan;
+  },
   // Moves the block (and its files) to Trash → { plan, trashId }.
   async removeBlock(id, blockId) {
     return request(`/api/plans/${id}/blocks/${blockId}`, { method: 'DELETE' });

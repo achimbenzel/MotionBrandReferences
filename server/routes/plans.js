@@ -464,11 +464,30 @@ router.patch('/api/plans/:id/blocks/:blockId', async (req, res) => {
 
 // Swap a block with its neighbour (`dir`), or — within a tab, where the
 // neighbour may sit further away — with the block `with`.
+// Move a block: swap it with its neighbour (`dir`) or with the block `with`,
+// or put it right `before` / `after` another block (drag and drop). `pin`
+// ({ blockId: tab }) first fixes the tab of blocks that only follow their
+// neighbours (headings, dividers), so moving others around can't carry them off.
 router.post('/api/plans/:id/blocks/:blockId/move', async (req, res) => {
   const dir = req.body.dir === 'up' ? -1 : 1;
+  const place = typeof req.body.before === 'string' ? { id: req.body.before, after: false }
+    : typeof req.body.after === 'string' ? { id: req.body.after, after: true } : null;
   const updated = await mutateDB((db) => {
     const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null;
     const i = p.blocks.findIndex((b) => b.id === req.params.blockId); if (i === -1) return null;
+    if (req.body.pin && typeof req.body.pin === 'object') {
+      for (const [bid, t] of Object.entries(req.body.pin)) {
+        const b = p.blocks.find((x) => x.id === bid);
+        if (b && BLOCK_TABS.includes(t)) b.tab = t;
+      }
+    }
+    if (place) {
+      if (place.id === req.params.blockId || !p.blocks.some((b) => b.id === place.id)) return p;
+      const [moved] = p.blocks.splice(i, 1);
+      const k = p.blocks.findIndex((b) => b.id === place.id);
+      p.blocks.splice(place.after ? k + 1 : k, 0, moved);
+      return p;
+    }
     const j = req.body.with ? p.blocks.findIndex((b) => b.id === req.body.with) : i + dir;
     if (j < 0 || j >= p.blocks.length || j === i) return p;
     [p.blocks[i], p.blocks[j]] = [p.blocks[j], p.blocks[i]];

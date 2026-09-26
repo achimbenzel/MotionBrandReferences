@@ -3822,6 +3822,45 @@ img { max-width: 100%; display: block; }
 .block-row + .block-row { margin-top: 8px; }
 .tab-block + .block-row, .block-row + .tab-block { margin-top: 26px; }
 .block-row.is-empty { background: transparent; border-style: dashed; border-left-style: solid; }
+
+/* Drag and drop of blocks: a handle in the margin (Notion-like), a line where
+   the block lands, and its name at the pointer while it's carried. */
+.tab-block, .block-row { position: relative; }
+.block-grip {
+  position: absolute; left: -32px; top: 6px; z-index: 2; width: 32px; height: 30px; padding: 0 0 0 4px;
+  display: flex; align-items: center; justify-content: flex-start; border: 0; background: none;
+  color: var(--text-faint); cursor: grab; opacity: 0; transition: opacity .15s, color .15s; touch-action: none;
+}
+.block-grip svg { border-radius: 6px; padding: 3px; box-sizing: content-box; }
+.block-row > .block-grip { top: 50%; transform: translateY(-50%); }
+.tab-block:hover > .block-grip, .block-row:hover > .block-grip, .block-grip:focus-visible { opacity: 1; }
+.block-grip:hover { color: var(--text); }
+.block-grip:hover svg { background: var(--surface-2); }
+.tab-block.sort-before, .tab-block.sort-after, .block-row.sort-before, .block-row.sort-after { box-shadow: none !important; }
+.tab-block.sort-before::before, .block-row.sort-before::before, .tab-block.sort-after::after, .block-row.sort-after::after {
+  content: ''; position: absolute; left: 0; right: 0; height: 3px; border-radius: 3px; pointer-events: none;
+  background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.tab-block.sort-before::before { top: -16px; }
+.tab-block.sort-after::after { bottom: -16px; }
+.block-row.sort-before::before { top: -7px; }
+.block-row.sort-after::after { bottom: -7px; }
+.tab-block.sort-dragging, .block-row.sort-dragging { opacity: .35; box-shadow: none; transform: none !important; z-index: auto; }
+.block-ghost {
+  position: fixed; z-index: 200; pointer-events: none; display: inline-flex; align-items: center; gap: 7px; max-width: 280px;
+  padding: 7px 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border-strong); box-shadow: var(--shadow);
+  font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* Narrow screens and touch: no margin to put it in — a small pill on the block's top edge. */
+.block-grip .grip-h { display: none; }
+@media (max-width: 1100px), (hover: none) {
+  .block-grip, .block-row > .block-grip {
+    left: 50%; top: -10px; transform: translateX(-50%); width: 40px; height: 20px; padding: 0; justify-content: center; opacity: 1;
+  }
+  .block-row > .block-grip { top: -9px; height: 18px; }
+  .block-grip .grip-v { display: none; }
+  .block-grip .grip-h { display: block; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; }
+}
 .block-row-main {
   flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px; padding: 8px 10px; border: 0; background: none;
   color: var(--text); font: inherit; text-align: left; cursor: pointer; border-radius: 8px;
@@ -4004,6 +4043,13 @@ img { max-width: 100%; display: block; }
 .mke-swatch { width: 22px; height: 22px; border-radius: 50%; padding: 0; cursor: pointer; border: 1px solid rgba(255, 255, 255, .2); }
 .mke-swatch:hover { transform: scale(1.12); }
 .mke-panel section:last-child .hint { margin: 8px 0 0; }
+/* One rhythm in every panel section: whatever stacks in it stands 10px apart
+   (a sub-heading sits a little closer to what it names). Margins of the
+   pieces themselves don't add up here — so no two controls ever touch. */
+.mke-panel section, .m2e-slot-actions, .mke-video, .mke-model { display: flex; flex-direction: column; gap: 10px; }
+.mke-panel section > *, .m2e-slot-actions > *, .mke-video > *, .mke-model > * { margin-top: 0 !important; margin-bottom: 0 !important; }
+.mke-panel section > .mke-subhead { margin-top: 4px !important; margin-bottom: -3px !important; }
+.mke-panel section > .mke-check, .mke-panel section > label.mke-range { align-self: stretch; }
 
 /* Media picker */
 .media-picker { max-width: 760px; }

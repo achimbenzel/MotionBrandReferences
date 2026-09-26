@@ -436,6 +436,24 @@ test('plan tabs: templates place blocks, tab and collapsed save, moves swap with
   assert.equal(after.indexOf(mood), ids.indexOf(palette));
   assert.equal(after.indexOf(palette), ids.indexOf(mood));
 
+  // Drag and drop: right before / after another block, nothing lost; a heading
+  // that followed its neighbours is pinned to its tab at the same time.
+  const hd = (await srv.api(`/api/plans/${plan.id}/blocks`, { method: 'POST', json: { type: 'heading' } })).data.plan.blocks.at(-1).id;
+  r = await srv.api(`/api/plans/${plan.id}/blocks/${palette}/move`, { method: 'POST', json: { before: after[0], pin: { [hd]: 'concept', nope: 'concept' } } });
+  let order = r.data.plan.blocks.map((b) => b.id);
+  assert.equal(order[0], palette);
+  assert.equal(order.length, after.length + 1);
+  assert.deepEqual([...order].sort(), [...after, hd].sort());
+  assert.equal(r.data.plan.blocks.find((b) => b.id === hd).tab, 'concept');
+  r = await srv.api(`/api/plans/${plan.id}/blocks/${palette}/move`, { method: 'POST', json: { after: mood } });
+  order = r.data.plan.blocks.map((b) => b.id);
+  assert.equal(order.indexOf(palette), order.indexOf(mood) + 1);
+  // Onto itself or an unknown block: nothing moves.
+  for (const where of [{ after: palette }, { before: 'missing' }]) {
+    r = await srv.api(`/api/plans/${plan.id}/blocks/${palette}/move`, { method: 'POST', json: where });
+    assert.deepEqual(r.data.plan.blocks.map((b) => b.id), order);
+  }
+
   // A plan made before tabs: saved as a template, its blocks get the tab they sat in.
   const old = await newPlan({ name: 'Old style' });
   for (const type of ['heading', 'moodboard', 'review']) await srv.api(`/api/plans/${old.id}/blocks`, { method: 'POST', json: { type } });

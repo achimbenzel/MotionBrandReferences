@@ -7,7 +7,7 @@ import {
   Link2, Library, FolderOpen, Palette as PaletteIcon,
   Wand2, Copy, FileText, AlertTriangle,
   LayoutTemplate, Building2, Clapperboard, PackageCheck,
-  Archive, Film, ChevronUp, ChevronsDownUp, ChevronsUpDown, Columns2, RectangleHorizontal,
+  Archive, Film, ChevronUp, ChevronsDownUp, ChevronsUpDown, Columns2, RectangleHorizontal, GripVertical, GripHorizontal,
 } from 'lucide-react';
 import { api, planFileUrl, fileUrl } from '../lib/api.js';
 import { useSaver, useRefreshOnReturn, whenSaved } from '../lib/autosave.js';
@@ -38,6 +38,7 @@ import PlanWhen from '../components/plan/PlanWhen.jsx';
 import { PlanToc, PlanJump } from '../components/plan/PlanToc.jsx';
 import { PLAN_TABS, BLOCK_TABS, STRUCTURAL, blockTabs, statusTab, isEmptyBlock, tabColor, planTab } from '../lib/planTabs.js';
 import { voEstimate } from '../lib/timing.js';
+import { useSortable, moveItem } from '../lib/useSortable.js';
 
 const rid = () => Math.random().toString(36).slice(2, 8);
 
@@ -357,6 +358,40 @@ export default function PlanDetail() {
     for (const x of [b, other]) if (!x.tab) editBlock(x.id, { tab: tabs[plan.blocks.indexOf(x)] }, true);
     try { mergeBlocks(await api.moveBlock(id, b.id, dir, other.id)); } catch (e) { toast(`Failed: ${e.message}`, 'error'); }
   };
+  // Drag and drop: put a block right before / after another. Headings and
+  // dividers that only follow their neighbours keep the tab they're in now.
+  const placeBlock = async (movedId, where) => {
+    const all = planRef.current?.blocks || [];
+    const t = blockTabs(all);
+    const pin = {};
+    all.forEach((b, i) => { if (!b.tab && STRUCTURAL.has(b.type)) pin[b.id] = t[i]; });
+    setPlan((prev) => { // at once on screen, then saved
+      const moved = prev.blocks.find((b) => b.id === movedId);
+      const rest = prev.blocks.filter((b) => b.id !== movedId).map((b) => (pin[b.id] ? { ...b, tab: pin[b.id] } : b));
+      const k = rest.findIndex((b) => b.id === (where.after || where.before));
+      if (!moved || k === -1) return prev;
+      rest.splice(where.after ? k + 1 : k, 0, pin[movedId] ? { ...moved, tab: pin[movedId] } : moved);
+      return { ...prev, blocks: rest };
+    });
+    try { mergeBlocks(await api.placeBlock(id, movedId, { ...where, pin })); } catch (e) { toast(`Could not move it: ${e.message}`, 'error'); }
+  };
+  const tabsNow = plan ? blockTabs(plan.blocks) : [];
+  const tabIds = plan ? plan.blocks.filter((_, i) => tabsNow[i] === tab).map((b) => b.id) : [];
+  const blocksRef = useRef(null);
+  const sort = useSortable({
+    ids: tabIds, container: blocksRef, mode: 'rect', axis: 'y', threshold: 5,
+    onMove: (from, to) => {
+      const order = moveItem(tabIds, from, to);
+      placeBlock(tabIds[from], to > 0 ? { after: order[to - 1] } : { before: order[1] });
+    },
+  });
+  // The handle a block is dragged by (arrow keys move it too).
+  const gripOf = (b) => (
+    <button type="button" className="block-grip" {...sort.grab(b.id)} title="Drag to move · ↑ ↓ with the keyboard" aria-label={`Move “${b.title || 'block'}”`}
+      onKeyDown={(e) => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); moveBlock(b, e.key === 'ArrowUp' ? 'up' : 'down'); } }}>
+      <GripVertical size={15} className="grip-v" /><GripHorizontal size={15} className="grip-h" />
+    </button>
+  );
   const moveToTab = (b, key) => {
     editBlock(b.id, { tab: key }, true);
     toast(`Moved to ${planTab(key).label}`, 'ok', { label: 'Show', onClick: () => openBlockRef.current?.(b.id) });
@@ -934,17 +969,18 @@ export default function PlanDetail() {
     const color = tabColor(tabs[i]).fg;
     if (!STRUCTURAL.has(b.type)) {
       if (isEmptyBlock(b) && !opened.has(b.id)) {
-        return <BlockRow key={b.id} plan={plan} block={b} empty color={color} menu={menuEl} onOpen={() => setOpened((set) => new Set(set).add(b.id))} />;
+        return <BlockRow key={b.id} plan={plan} block={b} empty color={color} menu={menuEl} onOpen={() => setOpened((set) => new Set(set).add(b.id))} grip={gripOf(b)} sortClass={sort.itemState(b.id).className} />;
       }
       if (b.collapsed) {
-        return <BlockRow key={b.id} plan={plan} block={b} color={color} menu={menuEl} onOpen={() => editBlock(b.id, { collapsed: false }, true)} />;
+        return <BlockRow key={b.id} plan={plan} block={b} color={color} menu={menuEl} onOpen={() => editBlock(b.id, { collapsed: false }, true)} grip={gripOf(b)} sortClass={sort.itemState(b.id).className} />;
       }
     }
     const fold = STRUCTURAL.has(b.type) || b.type === 'moodboard' ? null : (
       <button className="icon-btn block-fold" style={{ width: 34, height: 34 }} onClick={() => editBlock(b.id, { collapsed: true }, true)} title="Fold" aria-label="Fold block"><ChevronUp size={16} /></button>
     );
     return (
-      <div className="tab-block" key={b.id} data-block={b.id} style={{ '--tab-fg': color }}>
+      <div className={`tab-block ${sort.itemState(b.id).className}`} key={b.id} data-block={b.id} data-sort-id={b.id} style={{ '--tab-fg': color }}>
+        {gripOf(b)}
         {renderFull(b, i, fold ? <>{fold}{menuEl}</> : menuEl)}
       </div>
     );
@@ -1100,7 +1136,12 @@ export default function PlanDetail() {
         </>
       ) : (
         <>
-          {renderTab()}
+          <div className="tab-blocks" ref={blocksRef}>{renderTab()}</div>
+          {sort.drag && (() => {
+            const b = plan.blocks.find((x) => x.id === sort.drag.id);
+            const Meta = BLOCK_META[b?.type] || BLOCK_META.text;
+            return <div className="block-ghost" style={{ left: sort.drag.x + 14, top: sort.drag.y + 12 }}><Meta.icon size={14} /> {b?.title || Meta.label}</div>;
+          })()}
           {!tabCounts[tab] && (
             <div className="empty-hint tab-empty">Nothing in {planTab(tab).label} yet — add a block below, or move one here with its ⋯ menu.</div>
           )}
