@@ -1,10 +1,18 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { X, Maximize, Minimize, Crosshair, RotateCcw, Grid3x3 } from 'lucide-react';
 import { contentBox } from '../../lib/mockup3d/fit.js';
+import Range from '../Range.jsx';
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const round = (v, d = 4) => Math.round(v * 10 ** d) / 10 ** d;
 const SNAP_PX = 7;
+// What shows behind the picture — a black logo is lost on black, a white one on white.
+const BACKDROPS = [
+  { key: 'checker', label: 'Checker', title: 'Checkerboard (transparent)' },
+  { key: 'light', label: 'Light', swatch: '#f4f4f6' },
+  { key: 'grey', label: 'Grey', swatch: '#8a8a92' },
+  { key: 'dark', label: 'Dark', swatch: '#000' },
+];
 const GRIDS = [
   { key: 'thirds', label: 'Thirds' },
   { key: 'fine', label: 'Fine' },
@@ -57,11 +65,13 @@ function viewGuide(guide, aspect, q, widthPx) {
  * scroll / pinch / corner handles to zoom; it snaps to the middle and edges.
  * Changes apply to the 3D device live.
  */
-export default function ScreenFitter({ info, src, kind, fit: fit0, adjust: adj0, onChange, onClose }) {
+export default function ScreenFitter({ info, src, kind, fit: fit0, adjust: adj0, onChange, onClose, title = 'Position & size on the screen' }) {
   const [fit, setFit] = useState(fit0 || 'cover');
   const [adj, setAdj] = useState(() => ({ scale: 1, x: 0, y: 0, ...adj0 }));
   const [grid, setGrid] = useState(() => { try { return localStorage.getItem('mkFitterGrid') || 'thirds'; } catch { return 'thirds'; } });
   const [showSafe, setShowSafe] = useState(true);
+  const [backdrop, setBackdropState] = useState(() => { try { return localStorage.getItem('mkFitterBackdrop') || 'checker'; } catch { return 'checker'; } });
+  const setBackdrop = (b) => { setBackdropState(b); try { localStorage.setItem('mkFitterBackdrop', b); } catch { /* only remembered for this visit */ } };
   const [snapped, setSnapped] = useState({ x: null, y: null });
   const [natural, setNatural] = useState(info?.contentAspect || null);
   const [box, setBox] = useState({ w: 0, h: 0 });
@@ -215,7 +225,7 @@ export default function ScreenFitter({ info, src, kind, fit: fit0, adjust: adj0,
     <div className="overlay sf-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal sf" role="dialog" aria-modal="true" aria-label="Position and size of the picture">
         <div className="modal-head">
-          <h2>Position &amp; size on the screen</h2>
+          <h2>{title}</h2>
           <button className="icon-btn" onClick={onClose} aria-label="Close"><X size={18} /></button>
         </div>
         <div className="sf-body">
@@ -224,7 +234,7 @@ export default function ScreenFitter({ info, src, kind, fit: fit0, adjust: adj0,
             <div className="sf-screen-box" style={{ width: box.w, height: box.h }}>
               {/* What falls outside the screen, faint */}
               <div className="sf-pic sf-ghost" style={pctStyle}>{media('')}</div>
-              <div className="sf-screen" style={{ borderRadius: radius }}>
+              <div className={`sf-screen bd-${backdrop}`} style={{ borderRadius: radius }}>
                 <div className="sf-pic" style={pctStyle}>{media('')}</div>
                 <svg className="sf-grid" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-hidden="true">
                   {lines.map((x) => <line key={`x${x}`} x1={x * 1000} x2={x * 1000} y1="0" y2="1000" />)}
@@ -250,7 +260,7 @@ export default function ScreenFitter({ info, src, kind, fit: fit0, adjust: adj0,
             </div>
             <label className="sf-zoom">
               Size
-              <input type="range" min={Math.log(0.1)} max={Math.log(6)} step="0.001" value={Math.log(adj.scale)} onChange={(e) => commit({ ...adj, scale: Math.exp(Number(e.target.value)) })} aria-label="Size" />
+              <Range min={Math.log(0.1)} max={Math.log(6)} step="0.001" value={Math.log(adj.scale)} onChange={(e) => commit({ ...adj, scale: Math.exp(Number(e.target.value)) })} aria-label="Size" />
               <span>{Math.round(adj.scale * 100)}%</span>
             </label>
             <div className="sf-nums">
@@ -265,6 +275,15 @@ export default function ScreenFitter({ info, src, kind, fit: fit0, adjust: adj0,
               <Grid3x3 size={14} />
               <div className="segmented segmented-sm" role="group" aria-label="Grid">
                 {GRIDS.map((x) => <button key={x.key} type="button" className={grid === x.key ? 'on' : ''} onClick={() => setGrid(x.key)}>{x.label}</button>)}
+              </div>
+            </div>
+            <div className="sf-row sf-grid-pick" title="What shows behind the picture">
+              <span className="sf-label">Behind</span>
+              <div className="sf-backdrops" role="group" aria-label="Behind the picture">
+                {BACKDROPS.map((x) => (
+                  <button key={x.key} type="button" className={`sf-bd bd-${x.key} ${backdrop === x.key ? 'on' : ''}`} onClick={() => setBackdrop(x.key)}
+                    title={x.title || x.label} aria-label={x.title || x.label} aria-pressed={backdrop === x.key} />
+                ))}
               </div>
             </div>
             {g.safe && <label className="mke-check"><input type="checkbox" checked={showSafe} onChange={(e) => setShowSafe(e.target.checked)} /> Safe area (status bar, home bar…)</label>}

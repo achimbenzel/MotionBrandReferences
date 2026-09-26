@@ -7,9 +7,9 @@ import path from 'node:path';
 import { nanoid } from 'nanoid';
 import { DATA_DIR, TRASH_DIR } from '../config.js';
 import { readDB, mutateDB } from '../db.js';
-import { moveInto, replaceImage, safeRm, moveToTrash, extOf } from '../files.js';
+import { moveInto, replaceImage, safeRm, moveToTrash, extOf, sniffImageExt } from '../files.js';
 import { upload } from '../upload.js';
-import { str, normalizeMockup, normalizeMockupModel } from '../schema.js';
+import { str, normalizeMockup, normalizeMockupModel, normalizeMockupHdri } from '../schema.js';
 import { createRouter } from '../http.js';
 
 const router = createRouter();
@@ -17,6 +17,8 @@ export default router;
 
 export const mockupDir = (id) => path.join(DATA_DIR, 'mockup', id);
 export const modelDir = (id) => path.join(DATA_DIR, 'mockup-model', id);
+export const hdriDir = (id) => path.join(DATA_DIR, 'mockup-hdri', id);
+const HDRI_EXT = { '.hdr': 'hdr', '.exr': 'exr', '.jpg': 'jpg', '.jpeg': 'jpg', '.png': 'png', '.webp': 'webp', '.avif': 'avif' };
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|avif|svg)$/i;
 const VIDEO_EXT = /\.(mp4|m4v|mov|webm|ogv)$/i;
 const MODEL_EXT = { '.glb': 'glb', '.gltf': 'gltf', '.usdz': 'usdz' };
@@ -26,7 +28,7 @@ const kindOf = (name, mime = '') => (VIDEO_EXT.test(name) || mime.startsWith('vi
 router.get('/api/mockups', async (_req, res) => {
   const db = await readDB();
   const mockups = db.mockups.map(normalizeMockup).sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
-  res.json({ mockups, models: db.mockupModels.map(normalizeMockupModel) });
+  res.json({ mockups, models: db.mockupModels.map(normalizeMockupModel), hdris: db.mockupHdris.map(normalizeMockupHdri) });
 });
 
 router.get('/api/mockups/:id', async (req, res) => {
@@ -180,11 +182,17 @@ router.delete('/api/mockups/:id/content', async (req, res) => {
 
 // Something from the library onto the screen — named by id, never by path:
 // { kind: 'plan', planId, blockId, itemId } images / videos / storyboard frames of a plan,
+// { kind: 'plan', planId, itemId: '@avatar' | '@banner' } its profile picture / banner,
 // { kind: 'project', projectId, itemId? } a project's video / image, or one of its frames, moments or assets,
 // { kind: 'inbox', itemId } a shared file.
 function findSource(db, s) {
   if (s?.kind === 'plan') {
     const plan = db.plans.find((p) => p.id === s.planId);
+    // The plan's own profile picture / banner (no block).
+    if (plan && (s.itemId === '@avatar' || s.itemId === '@banner')) {
+      const rel = s.itemId === '@avatar' ? plan.avatar : plan.banner;
+      return rel ? { abs: path.join(DATA_DIR, 'plan', plan.id, rel), name: `${plan.name || 'Plan'} · ${s.itemId === '@avatar' ? 'profile picture' : 'banner'}` } : null;
+    }
     const b = plan?.blocks?.find((x) => x.id === s.blockId);
     if (!b) return null;
     const hit = (b.images || []).find((x) => x.id === s.itemId) || (b.files || []).find((x) => x.id === s.itemId)
@@ -214,12 +222,16 @@ function findSource(db, s) {
 router.post('/api/mockups/:id/content/import', async (req, res) => {
   const db = await readDB();
   const src = findSource(db, req.body?.source);
-  const kind = src && kindOf(src.abs);
-  if (!src || !kind || src.abs.includes('..') || !fs.existsSync(src.abs)) {
+  const there = src && !src.abs.includes('..') && fs.existsSync(src.abs);
+  // A file without a telling extension (e.g. an older plan profile picture, `.img`) is sniffed.
+  let ext = there ? extOf(src.abs) : '';
+  if (there && !kindOf(src.abs)) ext = await sniffImageExt(src.abs);
+  const kind = there && kindOf(`x${ext}`);
+  if (!kind) {
     return res.status(400).json({ error: 'not_found', message: 'That picture or video is no longer there.' });
   }
   const m = await setContent(req.params.id, itemOf(req), async (dir) => {
-    const file = `content-${nanoid(6)}${extOf(src.abs)}`;
+    const file = `content-${nanoid(6)}${ext}`;
     await fsp.mkdir(dir, { recursive: true });
     await fsp.copyFile(src.abs, path.join(dir, file));
     return { file, kind, name: str(src.name, 200) };
@@ -266,6 +278,61 @@ router.patch('/api/mockup-models/:id', async (req, res) => {
   });
   if (!updated) return res.status(404).json({ error: 'not_found' });
   res.json({ model: updated });
+});
+
+// ---- Your own HDRIs (the light and reflections of a real place) --------------------
+// .hdr / .exr (true HDR) or an equirectangular .jpg / .png / .webp; a small
+// preview (made in the browser) comes separately.
+router.post('/api/mockup-hdris', upload.single('hdri'), async (req, res) => {
+  const f = req.file;
+  const format = f && HDRI_EXT[extOf(f.originalname).toLowerCase()];
+  if (!format) {
+    if (f) await safeRm(f.path, { force: true }).catch(() => {});
+    return res.status(400).json({ error: 'unsupported', message: 'Choose an .hdr or .exr file, or a panorama (.jpg / .png / .webp, 2:1).' });
+  }
+  const id = nanoid(10);
+  const file = await moveInto(hdriDir(id), f.path, `env.${format}`);
+  const hdri = normalizeMockupHdri({
+    id, file, format, size: f.size, createdAt: Date.now(),
+    name: str(req.body?.name, 120).trim() || path.basename(f.originalname, path.extname(f.originalname)),
+  });
+  await mutateDB((db) => { db.mockupHdris.push(hdri); });
+  res.status(201).json({ hdri });
+});
+
+router.post('/api/mockup-hdris/:id/thumb', upload.single('thumb'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'thumb_required' });
+  const db = await readDB();
+  const h = db.mockupHdris.find((x) => x.id === req.params.id);
+  if (!h) { await safeRm(req.file.path, { force: true }).catch(() => {}); return res.status(404).json({ error: 'not_found' }); }
+  const stored = await replaceImage(hdriDir(h.id), req.file.path, 'thumb', req.file.originalname, h.thumb, '.webp');
+  const updated = await mutateDB((d) => { const x = d.mockupHdris.find((y) => y.id === h.id); if (x) x.thumb = stored; return x; });
+  res.json({ hdri: normalizeMockupHdri(updated) });
+});
+
+router.patch('/api/mockup-hdris/:id', async (req, res) => {
+  const updated = await mutateDB((db) => {
+    const x = db.mockupHdris.find((y) => y.id === req.params.id);
+    if (!x) return null;
+    if ('name' in (req.body || {})) x.name = str(req.body.name, 120).trim() || x.name;
+    return x;
+  });
+  if (!updated) return res.status(404).json({ error: 'not_found' });
+  res.json({ hdri: normalizeMockupHdri(updated) });
+});
+
+router.delete('/api/mockup-hdris/:id', async (req, res) => {
+  const trashId = nanoid(10);
+  const h = await mutateDB((db) => {
+    const i = db.mockupHdris.findIndex((x) => x.id === req.params.id);
+    if (i === -1) return null;
+    const [gone] = db.mockupHdris.splice(i, 1);
+    db.trash.unshift({ trashId, kind: 'mockupHdri', deletedAt: Date.now(), data: gone });
+    return gone;
+  });
+  if (!h) return res.status(404).json({ error: 'not_found' });
+  await moveToTrash(hdriDir(h.id), path.join(TRASH_DIR, trashId));
+  res.json({ ok: true, trashId });
 });
 
 router.delete('/api/mockup-models/:id', async (req, res) => {

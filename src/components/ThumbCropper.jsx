@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ZoomIn } from 'lucide-react';
 import { cropToBlob, sourceSize } from '../lib/imaging.js';
+import Range from './Range.jsx';
 
 /**
  * Pan + zoom crop stage. `source` is an HTMLImageElement or canvas.
@@ -126,8 +127,7 @@ const ThumbCropper = forwardRef(function ThumbCropper({ source, aspect = 16 / 10
       </div>
       <div className="cropper-zoom">
         <ZoomIn size={15} />
-        <input
-          type="range"
+        <Range
           min="1"
           max="4"
           step="0.01"

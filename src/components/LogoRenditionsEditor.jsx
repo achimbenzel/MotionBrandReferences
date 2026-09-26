@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react';
 import LogoImage from './LogoImage.jsx';
 import LogoSwitcher from './LogoSwitcher.jsx';
 import { sameRendition } from '../lib/types.js';
+import Range from './Range.jsx';
 
 /**
  * Full logo appearance editor: a preview, the rendition switcher (colour + bg
@@ -50,7 +51,7 @@ export default function LogoRenditionsEditor({ url, renditions, setRenditions, s
 
       <div className="field" style={{ marginTop: 14, marginBottom: 0 }}>
         <label>Size · {Math.round(scale * 100)}%</label>
-        <input type="range" min="0.2" max="1" step="0.01" value={scale} style={{ width: '100%', accentColor: 'var(--accent)' }} onChange={(e) => setScale(Number(e.target.value))} />
+        <Range min="0.2" max="1" step="0.01" value={scale} style={{ width: '100%' }} onChange={(e) => setScale(Number(e.target.value))} />
       </div>
     </div>
   );

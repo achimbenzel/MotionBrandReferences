@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, UploadCloud, Library, X, Download, FolderInput, MoreHorizontal, Copy, Trash2, Crop, ImageIcon } from 'lucide-react';
+import { ArrowLeft, UploadCloud, Library, X, Download, FolderInput, MoreHorizontal, Copy, Trash2, Crop, ImageIcon, ZoomIn, ZoomOut, Scan } from 'lucide-react';
 import { domToBlob } from 'modern-screenshot';
 import { api, mockupFileUrl } from '../lib/api.js';
 import { useSaver } from '../lib/autosave.js';
@@ -13,6 +13,7 @@ import ScreenFitter from '../components/mockups/ScreenFitter.jsx';
 import Mockup2D from '../components/mockups2d/Mockup2D.jsx';
 import { TYPES_2D, fieldValue, defaults2D } from '../lib/mockup2d.js';
 import { FRAMES } from '../lib/mockup3d/catalog.js';
+import Range from '../components/Range.jsx';
 
 const MOCKUP_BOARD = /mockup/i;
 const DESIGN_LONG = 1600; // the picture's long side in CSS px (fixed formats)
@@ -35,7 +36,8 @@ export default function Mockup2DEditor({ initial }) {
   const [m, setM] = useState(() => ({ ...initial, d2: initial.d2 || defaults2D('browser') }));
   const [active, setActive] = useState(null); // the picture slot being edited
   const [natural, setNatural] = useState({ w: 600, h: 600 });
-  const [fit, setFit] = useState(0.5);          // preview zoom
+  const [fit, setFit] = useState(0.5);          // the zoom that shows the whole picture
+  const [zoom, setZoom] = useState(1);          // × fit: 1 = whole picture, more = zoomed in
   const [picking, setPicking] = useState(false);
   const [fitting, setFitting] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -133,6 +135,73 @@ export default function Mockup2DEditor({ initial }) {
     return () => ro.disconnect();
   }, [W, H]);
 
+  // ---- Zooming into the preview: − / + / 100%, ⌘ / Ctrl + scroll or pinch; drag (or scroll) to pan ----
+  const view = fit * zoom;
+  const maxZoom = Math.max(1, 4 / fit);
+  const scrollRef = useRef(null);
+  const zoomRef = useRef(null);
+  const anchor = useRef(null);
+  const zoomTo = useCallback((z, at) => {
+    const el = scrollRef.current; const zb = zoomRef.current;
+    if (!el || !zb) return;
+    const r = el.getBoundingClientRect(); const b = zb.getBoundingClientRect();
+    const px = at ? at.x - r.left : el.clientWidth / 2; const py = at ? at.y - r.top : el.clientHeight / 2;
+    // Keep the point under the cursor (or the middle) where it is.
+    anchor.current = { fx: (r.left + px - b.left) / b.width, fy: (r.top + py - b.top) / b.height, px, py };
+    setZoom(Math.min(maxZoom, Math.max(1, z)));
+  }, [maxZoom]);
+  useLayoutEffect(() => {
+    const el = scrollRef.current; const zb = zoomRef.current; const a = anchor.current;
+    if (!el || !zb || !a) return;
+    anchor.current = null;
+    el.scrollLeft = zb.offsetLeft + a.fx * zb.offsetWidth - a.px;
+    el.scrollTop = zb.offsetTop + a.fy * zb.offsetHeight - a.py;
+  }, [view]);
+  const zoomRefState = useRef(zoom); zoomRefState.current = zoom;
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return undefined;
+    const onWheel = (e) => {
+      if (!e.ctrlKey && !e.metaKey) return; // plain scrolling pans
+      e.preventDefault();
+      zoomTo(zoomRefState.current * Math.exp(-e.deltaY * 0.01), { x: e.clientX, y: e.clientY });
+    };
+    let pinch = null;
+    const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const onTouchStart = (e) => { if (e.touches.length === 2) pinch = { d: dist(e.touches), z: zoomRefState.current }; };
+    const onTouchMove = (e) => {
+      if (!pinch || e.touches.length !== 2) return;
+      e.preventDefault();
+      zoomTo(pinch.z * (dist(e.touches) / pinch.d), { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 });
+    };
+    const onTouchEnd = (e) => { if (e.touches.length < 2) pinch = null; };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd);
+    return () => {
+      el.removeEventListener('wheel', onWheel); el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove); el.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [zoomTo]);
+  // Zoomed in, drag anywhere to pan (a click without moving still picks a picture).
+  const panned = useRef(false);
+  const onPanStart = (e) => {
+    const el = scrollRef.current;
+    panned.current = false;
+    if (!el || e.pointerType === 'touch' || (e.button !== 0 && e.button !== 1)) return;
+    if (el.scrollWidth <= el.clientWidth && el.scrollHeight <= el.clientHeight) return;
+    if (e.button === 1) e.preventDefault();
+    const x0 = e.clientX; const y0 = e.clientY; const sl = el.scrollLeft; const st = el.scrollTop;
+    const move = (ev) => {
+      if (Math.abs(ev.clientX - x0) + Math.abs(ev.clientY - y0) > 3) panned.current = true;
+      el.scrollLeft = sl - (ev.clientX - x0); el.scrollTop = st - (ev.clientY - y0);
+    };
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
   // ---- Pictures ---------------------------------------------------------------------------
   const slots = type.slots.filter((s) => !s.when || fieldValue(d, type.fields.find((f) => f.key === s.when) || {}));
   const pick = (key) => { setActive(key); };
@@ -176,6 +245,7 @@ export default function Mockup2DEditor({ initial }) {
       },
     });
     setActive(null);
+    setZoom(1);
   };
 
   // ---- Export -------------------------------------------------------------------------------
@@ -234,19 +304,28 @@ export default function Mockup2DEditor({ initial }) {
       </div>
 
       <div className="mke-body">
-        <div className={`m2e-stage ${bg.mode === 'transparent' ? 'transparent' : ''}`} ref={stageRef} onClick={() => setActive(null)}>
+        <div className={`m2e-stage ${bg.mode === 'transparent' ? 'transparent' : ''} ${zoom > 1 ? 'zoomed' : ''}`} ref={stageRef}>
           {loading && <div className="mke-loading">{loading}</div>}
-          <div className="m2e-zoom" style={{ width: W * fit, height: H * fit }}>
-            <div className="m2e-scale" style={{ transform: `scale(${fit})` }}>
-            <div className="m2c" ref={canvasRef} style={{ width: W, height: H }}>
-              <div className="m2c-bg" style={{ background: override || bgCss(bg) }} />
-              <div className={`m2c-item ${d.shadow ? 'shadow' : ''}`} ref={itemRef} style={{ transform: `translate(-50%, -50%) scale(${k})` }}>
-                <Mockup2D d={d} url={slotUrl} onPick={pick} active={active} />
+          <div className="m2e-scroll" ref={scrollRef} onPointerDown={onPanStart}
+            onClick={() => { if (panned.current) { panned.current = false; return; } setActive(null); }}>
+            <div className="m2e-zoom" ref={zoomRef} style={{ width: W * view, height: H * view }}>
+              <div className="m2e-scale" style={{ transform: `scale(${view})` }}>
+                <div className="m2c" ref={canvasRef} style={{ width: W, height: H }}>
+                  <div className="m2c-bg" style={{ background: override || bgCss(bg) }} />
+                  <div key={d.type} className={`m2c-item ${d.shadow ? 'shadow' : ''}`} ref={itemRef} style={{ transform: `translate(-50%, -50%) scale(${k})` }}>
+                    <Mockup2D d={d} url={slotUrl} onPick={(key) => { if (!panned.current) pick(key); }} active={active} />
+                  </div>
+                </div>
               </div>
-            </div>
             </div>
           </div>
           <div className="m2e-hint"><ImageIcon size={12} /> Click a picture to change it</div>
+          <div className="m2e-zoombar" role="group" aria-label="Zoom">
+            <button type="button" onClick={() => zoomTo(zoom / 1.25)} disabled={zoom <= 1} aria-label="Zoom out"><ZoomOut size={15} /></button>
+            <button type="button" className="m2e-pct" onClick={() => zoomTo(Math.abs(view - 1) < 0.01 ? 1 : 1 / fit)} title="Actual size (100%) / whole picture">{Math.round(view * 100)}%</button>
+            <button type="button" onClick={() => zoomTo(zoom * 1.25)} disabled={zoom >= maxZoom} aria-label="Zoom in"><ZoomIn size={15} /></button>
+            <button type="button" onClick={() => zoomTo(1)} disabled={zoom === 1} aria-label="Show the whole picture" title="Show the whole picture"><Scan size={15} /></button>
+          </div>
         </div>
 
         <aside className="mke-panel">
@@ -329,8 +408,8 @@ export default function Mockup2DEditor({ initial }) {
                 {brand.map((hex) => <button key={hex} type="button" className="mke-swatch" style={{ background: hex }} title={hex} onClick={() => setBg({ color: hex.toUpperCase() })} />)}
               </div>
             )}
-            <label className="mke-range">Space <input type="range" min="0" max="0.3" step="0.01" value={d.padding} onChange={(e) => patchD({ padding: Number(e.target.value) })} /> <span>{Math.round(d.padding * 100)}%</span></label>
-            <label className="mke-range">Size <input type="range" min="0.4" max="1.4" step="0.01" value={d.scale} onChange={(e) => patchD({ scale: Number(e.target.value) })} /> <span>{Math.round(d.scale * 100)}%</span></label>
+            <label className="mke-range">Space <Range min="0" max="0.3" step="0.01" value={d.padding} onChange={(e) => patchD({ padding: Number(e.target.value) })} /> <span>{Math.round(d.padding * 100)}%</span></label>
+            <label className="mke-range">Size <Range min="0.4" max="1.4" step="0.01" value={d.scale} onChange={(e) => patchD({ scale: Number(e.target.value) })} /> <span>{Math.round(d.scale * 100)}%</span></label>
             <label className="mke-check"><input type="checkbox" checked={d.shadow} onChange={(e) => patchD({ shadow: e.target.checked })} /> Soft shadow</label>
             <div className="hint">{W} × {H} px at 1×</div>
           </section>
@@ -338,9 +417,9 @@ export default function Mockup2DEditor({ initial }) {
       </div>
 
       <input ref={fileRef} type="file" accept="image/*,video/*" className="visually-hidden-input" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; upload(f); }} />
-      {picking && <MediaPicker onPick={fromApp} onClose={() => setPicking(false)} />}
+      {picking && <MediaPicker title={`Pick for “${activeDef?.label || 'the picture'}”`} onPick={fromApp} onClose={() => setPicking(false)} />}
       {fitting && activeDef && activeSlot && (
-        <ScreenFitter
+        <ScreenFitter title="Position & size in the frame"
           info={{ aspect: ratioOf(activeDef), turn: 0, guide: activeDef.round ? { radius: [0.5, 0.5, 0.5, 0.5], cutouts: [], safe: null } : null }}
           src={slotUrl(activeSlot)} kind={activeSlot.kind} fit={activeSlot.fit} adjust={activeSlot.adjust}
           onChange={({ fit: f, adjust }) => patchD({ slots: { ...mRef.current.d2.slots, [active]: { ...mRef.current.d2.slots[active], fit: f, adjust } } })}

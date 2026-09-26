@@ -7,7 +7,7 @@ import { BLOCK_TITLES } from '../schema.js';
 import { createRouter } from '../http.js';
 import { softDir } from './software.js';
 import { inboxDir } from './inbox.js';
-import { mockupDir, modelDir } from './mockups.js';
+import { mockupDir, modelDir, hdriDir } from './mockups.js';
 
 const router = createRouter();
 export default router;
@@ -53,6 +53,7 @@ function describe(t) {
     case 'block': return { title: t.data.block?.title || BLOCK_TITLES[t.data.block?.type] || 'Block', subtitle: `Block · ${t.data.planName || 'Plan'}` };
     case 'mockup': return { title: t.data.name || 'Mockup', subtitle: 'Mockup' };
     case 'mockupModel': return { title: t.data.name || '3D model', subtitle: '3D model (mockups)' };
+    case 'mockupHdri': return { title: t.data.name || 'HDRI', subtitle: 'HDRI (mockup light)' };
     case 'inbox': return { title: t.data.title || t.data.name || t.data.url || String(t.data.text || '').slice(0, 80) || 'Shared item', subtitle: 'Inbox' };
     case 'orphans': return { title: `${t.data.count} unused file${t.data.count === 1 ? '' : 's'}`, subtitle: `Cleanup · ${fmtBytes(t.data.bytes)}` };
     default: return { title: t.data.title || 'Untitled', subtitle: TYPE_LABEL[t.data.type] || t.data.type };
@@ -109,6 +110,10 @@ router.post('/api/trash/:trashId/restore', async (req, res) => {
       if (!Array.isArray(db.mockupModels)) db.mockupModels = [];
       db.mockupModels.push(data);
       move = { from, to: modelDir(data.id) };
+    } else if (entry.kind === 'mockupHdri') {
+      if (!Array.isArray(db.mockupHdris)) db.mockupHdris = [];
+      db.mockupHdris.push(data);
+      move = { from, to: hdriDir(data.id) };
     } else if (entry.kind === 'inbox') {
       if (!Array.isArray(db.inbox)) db.inbox = [];
       db.inbox.unshift(data);

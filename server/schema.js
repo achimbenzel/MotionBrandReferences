@@ -19,7 +19,7 @@ export const TAG_KEYS = new Set(['red', 'orange', 'yellow', 'green', 'blue', 'pu
 export const CURRENCIES = new Set(['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD']);
 
 export const emptyDB = () => ({
-  schemaVersion: SCHEMA_VERSION, projects: [], galleries: [], plans: [], planTemplates: [], software: [], trash: [], inbox: [], mockups: [], mockupModels: [],
+  schemaVersion: SCHEMA_VERSION, projects: [], galleries: [], plans: [], planTemplates: [], software: [], trash: [], inbox: [], mockups: [], mockupModels: [], mockupHdris: [],
   settings: { storageLimitBytes: DEFAULT_STORAGE_LIMIT },
 });
 
@@ -393,7 +393,7 @@ export const logoNeedsMigration = (p) => p.type === 'logo' && (
 export const MOCKUP_DEVICES = ['iphone', 'android', 'ipad', 'macbook', 'imac', 'watch', 'tv', 'browser', 'custom'];
 export const MOCKUP_FRAMES = ['16:9', '4:5', '1:1', '9:16', '3:2', 'auto'];
 export const MOCKUP_ANIMATIONS = ['none', 'turntable', 'sway', 'float', 'orbit', 'push', 'reveal'];
-export const MOCKUP_LIGHTS = ['studio', 'product', 'daylight', 'golden', 'overcast', 'office', 'neon'];
+export const MOCKUP_LIGHTS = ['studio', 'product', 'daylight', 'golden', 'overcast', 'office', 'neon', 'hdri'];
 export const MOCKUP_2D = ['browser', 'ig-post', 'ig-story', 'ig-profile', 'x-post', 'x-profile'];
 const MOCKUP_BG = ['transparent', 'color', 'gradient', 'environment'];
 const SHADOWS = ['contact', 'sun', 'both', 'none'];
@@ -505,6 +505,8 @@ export function normalizeMockup(m) {
       exposure: num(light.exposure, 0.2, 3, 1),
       shadow: SHADOWS.includes(light.shadow) ? light.shadow : (m?.shadow === false ? 'none' : 'contact'),
       strength: num(light.strength, 0, 1, 0.6),
+      hdri: str(light.hdri, 40),         // your own HDRI (setup 'hdri')
+      blur: num(light.blur, 0, 1, 0.35), // how soft the Room background is
     },
     animation: {
       preset: MOCKUP_ANIMATIONS.includes(anim.preset) ? anim.preset : 'none',
@@ -537,6 +539,19 @@ export function normalizeMockupModel(m) {
   };
 }
 
+/** One of your own HDRIs: an .hdr / .exr or a panorama picture, with a small preview. */
+export function normalizeMockupHdri(h) {
+  return {
+    id: str(h?.id, 40) || nanoid(10),
+    name: str(h?.name, 120) || 'HDRI',
+    file: mockupFile(h?.file),
+    format: ['hdr', 'exr', 'jpg', 'png', 'webp', 'avif'].includes(h?.format) ? h.format : 'hdr',
+    size: num(h?.size, 0, 1e13, 0),
+    thumb: h?.thumb ? mockupFile(h.thumb) : null,
+    createdAt: num(h?.createdAt, 0, 1e14, 0),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Whole database
 // ---------------------------------------------------------------------------
@@ -552,6 +567,7 @@ export function normalizeDB(db) {
   if (!Array.isArray(db.inbox)) db.inbox = [];
   if (!Array.isArray(db.mockups)) db.mockups = [];
   if (!Array.isArray(db.mockupModels)) db.mockupModels = [];
+  if (!Array.isArray(db.mockupHdris)) db.mockupHdris = [];
   for (const plan of db.plans) normalizePlan(plan);
   for (const s of db.software) normalizeSoftware(s);
   for (const p of db.projects) {

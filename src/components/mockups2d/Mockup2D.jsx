@@ -211,7 +211,8 @@ export default function Mockup2D({ d, url, onPick, active }) {
       ratio={ratio ?? defs[k]?.ratio(d, 0) ?? 1} round={opts.round ?? defs[k]?.round} className={opts.className} />
   );
   return (
-    <div className={`m2 m2-theme-${d.theme}`}>
+    // Keyed by type: switching types builds the mockup fresh (nothing of the old one lingers).
+    <div key={type} className={`m2 m2-t-${type} m2-theme-${d.theme}`}>
       <R d={d} v={v} slot={slot} />
     </div>
   );

@@ -184,7 +184,7 @@ test('several devices per scene: items with their own screens; older single-devi
 
 test('timeline, hinge, sound, light: keyframes sorted and bounded, legacy shadow read as a light setting', async () => {
   const m = (await srv.api('/api/mockups', { method: 'POST', json: { device: 'custom', shadow: false } })).data.mockup;
-  assert.deepEqual(m.light, { setup: 'studio', rotation: 0, exposure: 1, shadow: 'none', strength: 0.6 });
+  assert.deepEqual(m.light, { setup: 'studio', rotation: 0, exposure: 1, shadow: 'none', strength: 0.6, hdri: '', blur: 0.35 });
   const main = m.items[0].id;
   const r = await srv.api(`/api/mockups/${m.id}`, {
     method: 'PATCH',
@@ -195,7 +195,7 @@ test('timeline, hinge, sound, light: keyframes sorted and bounded, legacy shadow
     },
   });
   const s = r.data.mockup;
-  assert.deepEqual(s.light, { setup: 'golden', rotation: 45, exposure: 3, shadow: 'both', strength: 0.6 });
+  assert.deepEqual(s.light, { setup: 'golden', rotation: 45, exposure: 3, shadow: 'both', strength: 0.6, hdri: '', blur: 0.35 });
   assert.deepEqual(s.animation.camera.map((k) => k.t), [1, 5]);
   assert.deepEqual(s.animation.camera[0], { t: 1, position: [0, 1, 9], target: [0, 1, 0], fov: 40 });
   const it = s.items[0];
@@ -239,4 +239,59 @@ test('2D mockups: texts / numbers / switches sanitised, pictures in named slots,
   r = await srv.api(`/api/mockups/${m.id}/content?slot=media-0`, { method: 'DELETE' });
   assert.deepEqual(r.data.mockup.d2.slots, {});
   assert.equal(await served(m, slot.file), 404);
+});
+
+test('your own HDRIs: .hdr / .exr / panorama imported with a preview, picked as the light, deleted to Trash', async () => {
+  let fd = new FormData();
+  fd.append('hdri', new Blob([Buffer.from('#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y 1 +X 2\n')]), 'Studio Loft 4k.hdr');
+  let r = await srv.api('/api/mockup-hdris', { method: 'POST', body: fd });
+  assert.equal(r.status, 201);
+  const h = r.data.hdri;
+  assert.deepEqual([h.name, h.file, h.format, h.thumb], ['Studio Loft 4k', 'env.hdr', 'hdr', null]);
+  assert.equal((await fetch(`${srv.base}/data/mockup-hdri/${h.id}/env.hdr`)).status, 200);
+  fd = new FormData();
+  fd.append('hdri', new Blob([png(4, 2, [200, 180, 150])], { type: 'image/png' }), 'beach.png');
+  assert.equal((await srv.api('/api/mockup-hdris', { method: 'POST', body: fd })).data.hdri.format, 'png');
+  fd = new FormData();
+  fd.append('hdri', new Blob([Buffer.from('x')]), 'room.pdf');
+  assert.equal((await srv.api('/api/mockup-hdris', { method: 'POST', body: fd })).status, 400);
+
+  fd = new FormData();
+  fd.append('thumb', new Blob([png(8, 4, [1, 2, 3])], { type: 'image/png' }), 'thumb.png');
+  r = await srv.api(`/api/mockup-hdris/${h.id}/thumb`, { method: 'POST', body: fd });
+  assert.match(r.data.hdri.thumb, /^thumb-.*\.png$/);
+  r = await srv.api(`/api/mockup-hdris/${h.id}`, { method: 'PATCH', json: { name: 'Loft', file: '../x' } });
+  assert.deepEqual([r.data.hdri.name, r.data.hdri.file], ['Loft', 'env.hdr']);
+  assert.ok((await srv.api('/api/mockups')).data.hdris.some((x) => x.id === h.id));
+
+  const scene = (await srv.api('/api/mockups', { method: 'POST', json: { light: { setup: 'hdri', hdri: h.id, blur: 0 } } })).data.mockup;
+  assert.deepEqual([scene.light.setup, scene.light.hdri, scene.light.blur], ['hdri', h.id, 0]);
+
+  const del = await srv.api(`/api/mockup-hdris/${h.id}`, { method: 'DELETE' });
+  assert.ok(!exists(path.join(srv.dataDir, 'mockup-hdri', h.id)));
+  assert.equal((await srv.api('/api/trash')).data.items.find((x) => x.trashId === del.data.trashId).subtitle, 'HDRI (mockup light)');
+  await srv.api(`/api/trash/${del.data.trashId}/restore`, { method: 'POST' });
+  assert.ok((await srv.api('/api/mockups')).data.hdris.some((x) => x.id === h.id));
+  assert.ok(exists(path.join(srv.dataDir, 'mockup-hdri', h.id, 'env.hdr')));
+});
+
+test('a plan\'s profile picture / banner onto a screen — also older ones saved as .img', async () => {
+  const plan = (await srv.api('/api/plans', { method: 'POST', json: { name: 'Avatar plan' } })).data.plan;
+  let fd = new FormData();
+  fd.append('avatar', new Blob([png(6, 6, [255, 0, 0])], { type: 'image/png' }), 'avatar.img'); // how older versions named it
+  assert.match((await srv.api(`/api/plans/${plan.id}/avatar`, { method: 'POST', body: fd })).data.plan.avatar, /\.img$/);
+  const m = (await srv.api('/api/mockups', { method: 'POST', json: { kind: '2d', d2: { type: 'ig-post' } } })).data.mockup;
+  let r = await srv.api(`/api/mockups/${m.id}/content/import?slot=avatar`, { method: 'POST', json: { source: { kind: 'plan', planId: plan.id, itemId: '@avatar' } } });
+  assert.equal(r.status, 200);
+  const slot = r.data.mockup.d2.slots.avatar;
+  assert.equal(slot.kind, 'image');
+  assert.match(slot.file, /\.png$/);
+  assert.equal(await served(m, slot.file), 200);
+  // No banner yet → refused.
+  r = await srv.api(`/api/mockups/${m.id}/content/import?slot=banner`, { method: 'POST', json: { source: { kind: 'plan', planId: plan.id, itemId: '@banner' } } });
+  assert.equal(r.status, 400);
+  // New uploads keep their real extension.
+  fd = new FormData();
+  fd.append('banner', new Blob([png(12, 4, [0, 0, 255])], { type: 'image/png' }), 'banner.png');
+  assert.match((await srv.api(`/api/plans/${plan.id}/banner`, { method: 'POST', body: fd })).data.plan.banner, /\.png$/);
 });

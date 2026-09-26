@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Box, MoreHorizontal, Copy, Trash2, UploadCloud, MonitorSmartphone } from 'lucide-react';
-import { api, mockupFileUrl } from '../lib/api.js';
+import { Plus, Box, MoreHorizontal, Copy, Trash2, UploadCloud, MonitorSmartphone, Sun } from 'lucide-react';
+import { api, mockupFileUrl, mockupHdriUrl } from '../lib/api.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
 import { DEVICES, DEVICE_ICON } from '../lib/mockup3d/catalog.js';
@@ -66,6 +66,12 @@ export default function MockupsPage() {
     try { const mdl = await api.addMockupModel(file); toast(`“${mdl.name}” imported`); if (modelRef.current?.dataset.open) { delete modelRef.current.dataset.open; create(mdl.id); } else load(); }
     catch (e) { toast(`Import failed: ${e.message}`, 'error'); }
     finally { setBusy(false); }
+  };
+  const removeHdri = async (h) => {
+    try {
+      const res = await api.removeMockupHdri(h.id); load();
+      toast(`“${h.name}” moved to Trash`, 'ok', { label: 'Undo', onClick: async () => { await api.restoreTrash(res.trashId).catch(() => {}); load(); } });
+    } catch (e) { toast(e.message, 'error'); }
   };
   const removeModel = async (mdl) => {
     try {
@@ -169,6 +175,23 @@ export default function MockupsPage() {
               In the editor you pick which part of the model is the screen.
             </div>
           )}
+        </div>
+      )}
+      {data?.hdris?.length > 0 && (
+        <div className="section mk-models">
+          <div className="section-head">
+            <h2><Sun size={16} /> Your HDRIs <span className="count">{data.hdris.length}</span></h2>
+          </div>
+          <div className="mk-model-list">
+            {data.hdris.map((h) => (
+              <div className="mk-model-row" key={h.id}>
+                {h.thumb ? <img className="mk-hdri-thumb" src={mockupHdriUrl(h, h.thumb)} alt="" /> : <Sun size={16} />}
+                <span className="mk-model-name">{h.name}</span>
+                <span className="mk-model-meta">.{h.format} · {fmtSize(h.size)} · pick it under Light in a 3D mockup</span>
+                <button className="icon-btn" onClick={() => removeHdri(h)} aria-label={`Delete ${h.name}`}><Trash2 size={14} /></button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
       <input ref={modelRef} type="file" accept=".glb,.gltf,.usdz" className="visually-hidden-input" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; importModel(f); }} />

@@ -30,6 +30,12 @@ async function handle(res) {
 // errors are always JSON). Such requests are sent again a few times: reads
 // and field updates always, anything else only when the proxy says the
 // request never reached the server — so nothing is created twice.
+// A banner / profile picture keeps its real extension (a cropped canvas blob has none → from its type).
+const IMAGE_TYPES = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 'image/gif': '.gif', 'image/avif': '.avif', 'image/svg+xml': '.svg' };
+const imageName = (kind, file) => {
+  const ext = /\.(png|jpe?g|webp|gif|avif|svg)$/i.exec(file?.name || '')?.[0] || IMAGE_TYPES[file?.type] || '.png';
+  return `${kind}${ext.toLowerCase()}`;
+};
 const RETRY_DELAYS = [300, 800, 1600, 3000];
 const REPEATABLE = new Set(['GET', 'HEAD', 'PATCH', 'PUT']);
 const wait = (ms) => new Promise((r) => { setTimeout(r, ms); });
@@ -241,6 +247,17 @@ export const api = {
   },
   async updateMockupModel(id, patch) { const { model } = await request(`/api/mockup-models/${id}`, { method: 'PATCH', json: patch }); return model; },
   async removeMockupModel(id) { return request(`/api/mockup-models/${id}`, { method: 'DELETE' }); },
+  // Your own HDRIs (.hdr / .exr / panorama picture) for the mockup light.
+  async addMockupHdri(file, name) {
+    const fd = new FormData(); fd.append('hdri', file, file.name || 'environment.hdr'); if (name) fd.append('name', name);
+    const { hdri } = await request('/api/mockup-hdris', { method: 'POST', body: fd }); return hdri;
+  },
+  async setMockupHdriThumb(id, blob) {
+    const fd = new FormData(); fd.append('thumb', blob, 'thumb.webp');
+    const { hdri } = await request(`/api/mockup-hdris/${id}/thumb`, { method: 'POST', body: fd }); return hdri;
+  },
+  async updateMockupHdri(id, patch) { const { hdri } = await request(`/api/mockup-hdris/${id}`, { method: 'PATCH', json: patch }); return hdri; },
+  async removeMockupHdri(id) { return request(`/api/mockup-hdris/${id}`, { method: 'DELETE' }); },
 
   // --- Storyboards (storyboard blocks of plans) ---
   async listStoryboardTemplates() {
@@ -277,7 +294,7 @@ export const api = {
   },
   async setPlanImage(id, kind, file) { // kind: 'banner' | 'avatar'
     const fd = new FormData();
-    fd.append(kind, file, `${kind}.img`);
+    fd.append(kind, file, imageName(kind, file));
     const { plan } = await request(`/api/plans/${id}/${kind}`, { method: 'POST', body: fd });
     return plan;
   },
@@ -353,7 +370,7 @@ export const api = {
   },
   // Software banner / avatar images (like plans). kind: 'banner' | 'avatar'
   async setSoftwareImage(id, kind, file) {
-    const fd = new FormData(); fd.append(kind, file, `${kind}.img`);
+    const fd = new FormData(); fd.append(kind, file, imageName(kind, file));
     const { software } = await request(`/api/software/${id}/${kind}`, { method: 'POST', body: fd });
     return software;
   },
@@ -449,7 +466,7 @@ export const api = {
     return settings;
   },
   async setDashboardBanner(file) {
-    const fd = new FormData(); fd.append('banner', file, 'banner.img');
+    const fd = new FormData(); fd.append('banner', file, imageName('banner', file));
     const { settings } = await request('/api/settings/dashboard-banner', { method: 'POST', body: fd });
     return settings;
   },
@@ -490,6 +507,7 @@ export function fileUrl(project, relPath) {
 // Plan files live under data/plan/<id>/…
 export const mockupFileUrl = (m, rel) => (rel ? `/data/mockup/${m.id}/${rel}` : null);
 export const mockupModelUrl = (model) => (model?.file ? `/data/mockup-model/${model.id}/${model.file}` : null);
+export const mockupHdriUrl = (h, file = h?.file) => (file ? `/data/mockup-hdri/${h.id}/${file}` : null);
 
 export function planFileUrl(plan, relPath) {
   if (!relPath) return null;

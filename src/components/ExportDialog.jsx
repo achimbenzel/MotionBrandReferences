@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { X, Download, FolderInput, Film, Image as ImageIcon } from 'lucide-react';
+import Range from './Range.jsx';
 
 const EXT = { png: 'png', jpg: 'jpg', webp: 'webp', mp4: 'mp4', webm: 'webm' };
 const MIME = { png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp', mp4: 'video/mp4', webm: 'video/webm' };
@@ -152,7 +153,7 @@ export default function ExportDialog({ title = 'Export', targets, initial, store
               <span className="xd-label">{o.label}</span>
               {o.type === 'range' ? (
                 <label className="xd-range">
-                  <input type="range" min={o.min} max={o.max} step={o.step || 1} value={opts[o.key]} onChange={(e) => setOpts({ ...opts, [o.key]: Number(e.target.value) })} />
+                  <Range min={o.min} max={o.max} step={o.step || 1} value={opts[o.key]} onChange={(e) => setOpts({ ...opts, [o.key]: Number(e.target.value) })} />
                   <span>{o.format ? o.format(opts[o.key]) : opts[o.key]}</span>
                 </label>
               ) : (
@@ -192,7 +193,7 @@ export default function ExportDialog({ title = 'Export', targets, initial, store
               {!target.formats.length && <span className="hint">This browser can’t write video — try Chrome, Edge or Safari.</span>}
             </div>
             {(format === 'jpg' || format === 'webp') && (
-              <label className="xd-range">Quality <input type="range" min="0.5" max="1" step="0.01" value={quality} onChange={(e) => setQuality(Number(e.target.value))} /><span>{Math.round(quality * 100)}%</span></label>
+              <label className="xd-range">Quality <Range min="0.5" max="1" step="0.01" value={quality} onChange={(e) => setQuality(Number(e.target.value))} /><span>{Math.round(quality * 100)}%</span></label>
             )}
           </div>
 

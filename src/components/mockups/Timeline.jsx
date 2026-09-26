@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { Play, Pause, SkipBack, Diamond, Plus, Trash2, Volume2, VolumeX, Video, Camera, DoorOpen } from 'lucide-react';
+import Range from '../Range.jsx';
 
 const fmt = (s) => {
   const v = Math.max(0, s || 0);
@@ -133,7 +134,7 @@ export default function Timeline({
                     <button type="button" className={`icon-btn ${tr.sound ? 'on' : ''}`} onClick={() => onSound(tr.id, !tr.sound)} aria-label={tr.sound ? 'Sound off' : 'Sound on'} title={tr.sound ? 'Sound on — plays and is exported' : 'Sound off'}>
                       {tr.sound ? <Volume2 size={14} /> : <VolumeX size={14} />}
                     </button>
-                    {tr.sound && <input type="range" min="0" max="1" step="0.05" value={tr.volume ?? 1} onChange={(e) => onVolume(tr.id, Number(e.target.value))} aria-label="Volume" />}
+                    {tr.sound && <Range min="0" max="1" step="0.05" value={tr.volume ?? 1} onChange={(e) => onVolume(tr.id, Number(e.target.value))} aria-label="Volume" />}
                   </span>
                 )}
               </div>

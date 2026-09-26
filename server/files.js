@@ -15,6 +15,25 @@ export const extOf = (name) => {
   return e && e.length <= 6 ? e : '';
 };
 
+// What kind of picture a file is, from its first bytes — for files saved
+// without a telling extension (older profile pictures / banners are `.img`).
+export async function sniffImageExt(abs) {
+  let fh;
+  try {
+    fh = await fsp.open(abs, 'r');
+    const buf = Buffer.alloc(512);
+    const { bytesRead } = await fh.read(buf, 0, 512, 0);
+    const b = buf.subarray(0, bytesRead);
+    if (b[0] === 0x89 && b.toString('latin1', 1, 4) === 'PNG') return '.png';
+    if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return '.jpg';
+    if (b.toString('latin1', 0, 4) === 'GIF8') return '.gif';
+    if (b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 8, 12) === 'WEBP') return '.webp';
+    if (b.toString('latin1', 4, 8) === 'ftyp' && /^avi[fs]/.test(b.toString('latin1', 8, 12))) return '.avif';
+    if (/<svg[\s>]/i.test(b.toString('utf8'))) return '.svg';
+    return '';
+  } catch { return ''; } finally { await fh?.close().catch(() => {}); }
+}
+
 // Create the folder layout (and an empty db.json on first run), and sweep
 // leftovers of an earlier crash.
 export function ensureDirs(emptyDB) {

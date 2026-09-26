@@ -299,3 +299,126 @@ export class ContactShadow {
     this.depth.dispose(); this.hBlur.dispose(); this.vBlur.dispose();
   }
 }
+
+// ---- Your own HDRIs ----------------------------------------------------------------------
+// An .hdr / .exr (true HDR) or a 2:1 panorama picture as the scene's light and
+// reflections. From the picture itself: how bright it is overall (so any HDRI
+// lands at a sensible exposure) and where its brightest light is (the sun, a
+// window) — the key light and its shadow come from there.
+
+/** Load an HDRI → an equirectangular texture. `format`: hdr | exr | jpg | png | webp | avif */
+export async function loadHdriTexture(url, format) {
+  if (format === 'hdr') {
+    const { HDRLoader } = await import('three/examples/jsm/loaders/HDRLoader.js');
+    const t = await new HDRLoader().setDataType(THREE.HalfFloatType).loadAsync(url);
+    t.mapping = THREE.EquirectangularReflectionMapping;
+    return t;
+  }
+  if (format === 'exr') {
+    const { EXRLoader } = await import('three/examples/jsm/loaders/EXRLoader.js');
+    const t = await new EXRLoader().setDataType(THREE.HalfFloatType).loadAsync(url);
+    t.mapping = THREE.EquirectangularReflectionMapping;
+    return t;
+  }
+  const t = await new THREE.TextureLoader().loadAsync(url);
+  t.mapping = THREE.EquirectangularReflectionMapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+// Read the picture as linear RGB: sample(u, v) with u across (0 → 1), v from the top (0 → 1).
+function sampler(tex) {
+  const img = tex.image;
+  if (img?.data) { // HDR / EXR data
+    const { width: w, height: h, data } = img;
+    const ch = Math.round(data.length / (w * h)) || 4;
+    const half = tex.type === THREE.HalfFloatType;
+    const val = half ? (k) => THREE.DataUtils.fromHalfFloat(data[k]) : (k) => data[k];
+    const fromTop = tex.flipY; // .hdr rows run top-down, .exr bottom-up
+    return (u, v) => {
+      const i = Math.min(w - 1, Math.floor(u * w)); let j = Math.min(h - 1, Math.floor(v * h));
+      if (!fromTop) j = h - 1 - j;
+      const k = (j * w + i) * ch;
+      return [val(k), val(k + (ch > 1 ? 1 : 0)), val(k + (ch > 2 ? 2 : 0))];
+    };
+  }
+  // A picture: read a small copy, sRGB → linear.
+  const W = 512; const H = 256;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d', { willReadFrequently: true });
+  x.drawImage(img, 0, 0, W, H);
+  const px = x.getImageData(0, 0, W, H).data;
+  const lin = (b) => Math.pow(b / 255, 2.2);
+  return (u, v) => {
+    const k = (Math.min(H - 1, Math.floor(v * H)) * W + Math.min(W - 1, Math.floor(u * W))) * 4;
+    return [lin(px[k]), lin(px[k + 1]), lin(px[k + 2])];
+  };
+}
+
+/**
+ * Look at an HDRI: its average brightness (→ `intensity`, to bring it to a
+ * studio-like level) and its brightest spot (→ one key light from there,
+ * brighter the more it stands out; a hazy sky gets a soft one).
+ */
+export function analyseHdri(tex) {
+  const get = sampler(tex);
+  const GW = 64; const GH = 32; const S = 3;
+  let sum = 0; let wsum = 0; let best = { l: -1 };
+  for (let gj = 0; gj < GH; gj += 1) {
+    const v0 = gj / GH;
+    const el = (0.5 - (gj + 0.5) / GH) * Math.PI;
+    const wgt = Math.cos(el); // cells near the poles cover less of the sphere
+    for (let gi = 0; gi < GW; gi += 1) {
+      const u0 = gi / GW;
+      const c = [0, 0, 0];
+      for (let a = 0; a < S; a += 1) {
+        for (let b = 0; b < S; b += 1) {
+          const p = get(u0 + (a + 0.5) / (S * GW), v0 + (b + 0.5) / (S * GH));
+          c[0] += p[0]; c[1] += p[1]; c[2] += p[2];
+        }
+      }
+      const n = S * S; c[0] /= n; c[1] /= n; c[2] /= n;
+      const l = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+      if (!Number.isFinite(l)) continue;
+      sum += l * wgt; wsum += wgt;
+      if (l > best.l) best = { l, c, u: (gi + 0.5) / GW, el };
+    }
+  }
+  const mean = Math.max(1e-4, sum / Math.max(1e-6, wsum));
+  const intensity = Math.min(20, Math.max(0.03, 0.55 / mean));
+  // Pixel → direction (three's equirect layout) → the azimuth / elevation of `dir()`.
+  const phi = (best.u - 0.5) * Math.PI * 2;
+  const x = Math.cos(best.el) * Math.cos(phi); const z = Math.cos(best.el) * Math.sin(phi);
+  const az = Math.atan2(x, z) / D;
+  const ratio = best.l / mean;
+  const m = Math.max(...best.c, 1e-6);
+  const color = best.c.map((v) => 0.55 + 0.45 * (v / m)); // its tint, kept gentle
+  const key = Math.min(3.2, Math.max(0.35, 0.3 + 0.42 * Math.log2(Math.max(1, ratio))));
+  return {
+    intensity,
+    lights: [
+      { az, el: Math.max(8, Math.min(80, best.el / D)), color, intensity: key, shadow: true },
+      { az: az + 180, el: 25, color: [1, 1, 1], intensity: 0.15 },
+    ],
+    contact: { opacity: ratio > 30 ? 0.45 : 0.6, blur: ratio > 30 ? 2.6 : 3.4 },
+  };
+}
+
+/** A small tone-mapped picture of an HDRI (for its button). */
+export function hdriPreview(tex, intensity = 1, width = 256) {
+  const get = sampler(tex);
+  const W = width; const H = width / 2;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  const im = x.createImageData(W, H);
+  const tm = (v) => Math.round(255 * Math.pow(Math.max(0, v * intensity) / (1 + Math.max(0, v * intensity)), 1 / 2.2) * 1.15);
+  for (let j = 0; j < H; j += 1) {
+    for (let i = 0; i < W; i += 1) {
+      const p = get((i + 0.5) / W, (j + 0.5) / H);
+      const k = (j * W + i) * 4;
+      im.data[k] = Math.min(255, tm(p[0])); im.data[k + 1] = Math.min(255, tm(p[1])); im.data[k + 2] = Math.min(255, tm(p[2])); im.data[k + 3] = 255;
+    }
+  }
+  x.putImageData(im, 0, 0);
+  return c;
+}

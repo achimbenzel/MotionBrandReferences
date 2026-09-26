@@ -225,6 +225,7 @@ export class MockupStage {
     const scene = new THREE.Scene();
     this.pmrem = new THREE.PMREMGenerator(r);
     this.envCache = new Map(); // setup → { equirect, pmrem }
+    this.hdris = new Map();    // your HDRI id → { equirect, pmrem, info }
     // Direct lights of the light setup (the first with `shadow` casts the hard shadow).
     this.lights = [0, 1, 2].map(() => {
       const l = new THREE.DirectionalLight(0xffffff, 0);
@@ -644,10 +645,11 @@ export class MockupStage {
     this.scene.backgroundBlurriness = 0;
     this.scene.backgroundIntensity = 1;
     if (mode === 'environment') {
-      // The light setup's own room / sky, softly out of focus.
-      const env = this.envCache.get(this.light.setup);
+      // The light setup's own room / sky (or your HDRI), softly out of focus.
+      const env = this.currentEnv();
       if (env) { env.equirect.userData.env = true; this.scene.background = env.equirect; }
-      this.scene.backgroundBlurriness = 0.35;
+      this.scene.backgroundBlurriness = this.light?.blur ?? 0.35;
+      this.scene.backgroundIntensity = env?.info?.intensity ?? 1;
     } else if (mode === 'color') this.scene.background = new THREE.Color(color);
     else if (mode === 'gradient') {
       const c = document.createElement('canvas');
@@ -667,14 +669,10 @@ export class MockupStage {
   /** { setup, rotation (°), exposure, shadow: 'contact' | 'sun' | 'both' | 'none', strength 0–1 } */
   setLight(light) {
     this.light = { ...this.light, ...light };
-    const setup = LIGHT_SETUPS[this.light.setup] || LIGHT_SETUPS.studio;
-    let env = this.envCache.get(this.light.setup);
-    if (!env) {
-      const equirect = makeEnvironment(this.light.setup);
-      env = { equirect, pmrem: this.pmrem.fromEquirectangular(equirect).texture };
-      this.envCache.set(this.light.setup, env);
-    }
+    const setup = this.currentSetup();
+    const env = this.currentEnv();
     this.scene.environment = env.pmrem;
+    this.scene.environmentIntensity = env.info?.intensity ?? 1;
     const rot = THREE.MathUtils.degToRad(this.light.rotation || 0);
     this.scene.environmentRotation.set(0, rot, 0);
     this.scene.backgroundRotation.set(0, rot, 0);
@@ -690,8 +688,40 @@ export class MockupStage {
     this.dirty = true;
   }
 
+  /** The environment in use: a built-in setup's (made on first use) or your HDRI once it's loaded. */
+  currentEnv() {
+    if (this.light.setup === 'hdri') {
+      const h = this.hdris.get(this.light.hdri);
+      if (h) return h;
+    }
+    const key = LIGHT_SETUPS[this.light.setup] ? this.light.setup : 'studio';
+    let env = this.envCache.get(key);
+    if (!env) {
+      const equirect = makeEnvironment(key);
+      env = { equirect, pmrem: this.pmrem.fromEquirectangular(equirect).texture };
+      this.envCache.set(key, env);
+    }
+    return env;
+  }
+
+  /** The direct lights, exposure and contact shadow of the setup in use (your HDRI: read from it). */
+  currentSetup() {
+    if (this.light?.setup === 'hdri') {
+      const h = this.hdris.get(this.light.hdri);
+      if (h) return { exposure: 1, lights: h.info.lights, contact: h.info.contact };
+    }
+    return LIGHT_SETUPS[this.light?.setup] || LIGHT_SETUPS.studio;
+  }
+
+  /** Hand over one of your HDRIs (loaded by the editor): `texture` from loadHdriTexture. */
+  addHdri(id, texture, info) {
+    if (this.hdris.has(id)) return;
+    this.hdris.set(id, { equirect: texture, pmrem: this.pmrem.fromEquirectangular(texture).texture, info });
+    if (this.light.setup === 'hdri' && this.light.hdri === id) this.setLight({});
+  }
+
   placeLights() {
-    const setup = LIGHT_SETUPS[this.light.setup] || LIGHT_SETUPS.studio;
+    const setup = this.currentSetup();
     const c = this.center || new THREE.Vector3();
     const r = this.radius || 20;
     const castSun = this.light.shadow === 'sun' || this.light.shadow === 'both';
@@ -982,7 +1012,7 @@ export class MockupStage {
     for (const it of this.items.values()) { this.dropContent(it); disposeObject(it.group, new Set()); }
     this.items.clear();
     if (this.scene.background?.isTexture && !this.scene.background.userData.env) this.scene.background.dispose();
-    for (const env of this.envCache.values()) { env.equirect.dispose(); env.pmrem.dispose(); }
+    for (const env of [...this.envCache.values(), ...this.hdris.values()]) { env.equirect.dispose(); env.pmrem.dispose(); }
     this.contact.dispose();
     this.pmrem.dispose();
     this.renderer.dispose();

@@ -9,6 +9,7 @@ import { useToast } from '../components/Toast.jsx';
 import LogoImage from '../components/LogoImage.jsx';
 import SaveToPlanModal from '../components/SaveToPlanModal.jsx';
 import ExportDialog from '../components/ExportDialog.jsx';
+import Range from '../components/Range.jsx';
 
 const BRAND_BOARD = /brand|logo|test/i;
 
@@ -240,16 +241,16 @@ export default function LogoTester() {
 
           <div className="lt-sliders">
             <label className="lt-slider">Scale <span>{Math.round(scale * 100)}%</span>
-              <input type="range" min="0.1" max="1" step="0.01" value={scale} onChange={(e) => setScale(+e.target.value)} />
+              <Range min="0.1" max="1" step="0.01" value={scale} onChange={(e) => setScale(+e.target.value)} />
             </label>
             <label className="lt-slider">Blur <span>{blur}px</span>
-              <input type="range" min="0" max="24" step="1" value={blur} onChange={(e) => setBlur(+e.target.value)} />
+              <Range min="0" max="24" step="1" value={blur} onChange={(e) => setBlur(+e.target.value)} />
             </label>
             <label className="lt-slider">Pixelate <span>{pixel ? `${pixel}px` : 'off'}</span>
-              <input type="range" min="0" max="24" step="1" value={pixel} onChange={(e) => setPixel(+e.target.value)} />
+              <Range min="0" max="24" step="1" value={pixel} onChange={(e) => setPixel(+e.target.value)} />
             </label>
             <label className="lt-slider"><input type="checkbox" checked={showClear} onChange={(e) => setShowClear(e.target.checked)} /> Clear space <span>{clearPct}%</span>
-              <input type="range" min="5" max="100" step="5" value={clearPct} onChange={(e) => setClearPct(+e.target.value)} disabled={!showClear} />
+              <Range min="5" max="100" step="5" value={clearPct} onChange={(e) => setClearPct(+e.target.value)} disabled={!showClear} />
             </label>
           </div>
 
@@ -321,7 +322,7 @@ export default function LogoTester() {
                 ))}
               </div>
               <label className="lt-slider bt-pad">Padding <span>{Math.round((1 - iconPad) * 50)}%</span>
-                <input type="range" min="0.3" max="0.95" step="0.01" value={iconPad} onChange={(e) => setIconPad(+e.target.value)} />
+                <Range min="0.3" max="0.95" step="0.01" value={iconPad} onChange={(e) => setIconPad(+e.target.value)} />
               </label>
             </div>
 

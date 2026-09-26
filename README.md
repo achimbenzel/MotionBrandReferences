@@ -136,7 +136,8 @@ data/
                                     # (moodboard images, files + example images)
 ├── software/<id>/*                 # plugin installers + your own script files
 ├── mockup/<id>/                    # a mockup's screen pictures / videos, 2D pictures + thumb.webp
-└── mockup-model/<id>/model.<ext>   # an imported 3D model (.glb / .gltf / .usdz)
+├── mockup-model/<id>/model.<ext>   # an imported 3D model (.glb / .gltf / .usdz)
+└── mockup-hdri/<id>/env.<ext>      # your own HDRI (.hdr / .exr / panorama) + thumb
 ```
 
 `data/` is **git-ignored and lives outside the source code**, so you can pull
@@ -556,29 +557,38 @@ Instagram and X posts, stories and profiles. **New mockup** offers both:
   **Arrange** them: side by side, the big one behind with the others in
   front, or a cascade.
 - **Screen**: **upload** a picture or a video, or take one **from the app** —
-  a plan's moodboards, files, storyboard frames and review renders, your
-  Motion references (the video, its saved frames and moments), library images
-  or the Inbox. **Fill screen** crops to fit, **Show whole** keeps it all.
+  your plans' **profile pictures and banners**, a plan's moodboards, files,
+  storyboard frames and review renders, your Motion references (the video,
+  its saved frames and moments), library images or the Inbox. **Fill screen**
+  crops to fit, **Show whole** keeps it all.
   For a video, **Starts at** picks the part that plays (also by dragging its
   clip in the timeline) and **Sound on** plays its sound — in the preview and
   in the exported video, with its own volume.
 - **Position & size…** opens the screen as you see it — its real shape, over a
   **grid** (thirds, fine or off). Drag the picture to move it, scroll / pinch /
   drag a corner to resize it, nudge it with the arrow keys; it **snaps** to the
-  middle and the edges, and the 3D view follows live.
+  middle and the edges, and the 3D view follows live. **Behind** puts a
+  checkerboard, light, grey or dark backdrop behind the picture — a black logo
+  on transparent stays visible.
 - **Light**: seven setups, each a studio-made **environment** (a soft-box
   studio, a dark product stage, a daylight room with windows, a golden-hour
   terrace, an overcast sky, an office with ceiling panels, a neon-lit night
   street — all generated in the app, nothing downloaded) that the models
-  reflect, plus matching key / fill / rim lights. **Turn light** rotates it
-  around the scene, **Brightness** sets the exposure. **Shadow**: **Soft**
+  reflect, plus matching key / fill / rim lights. **Import HDRI…** adds your
+  own: an **.hdr** or **.exr**, or a 2:1 panorama picture (.jpg / .png /
+  .webp). It's read in the browser first — its overall brightness is levelled
+  to a studio-like exposure and its brightest spot (the sun, a window) becomes
+  the key light that casts the sun shadow — then kept in your library with a
+  small preview (Mockups page → *Your HDRIs*, delete → Trash). **Turn light**
+  rotates it around the scene, **Brightness** sets the exposure. **Shadow**: **Soft**
   (a contact shadow as under a soft box), **Sun** (a sharp one from the key
   light), **Both** or **None**, with its **Strength**.
 - **Camera**: drag to turn, scroll / pinch to zoom, right-drag to move — or a
   view: **Front, ¾ left, ¾ right, Low hero, From above, Side, Back**.
 - **Look**: format **16:9, 4:5, 1:1, 9:16, 3:2**; background **none**
   (transparent), a **colour**, a **gradient** — with your **brand colours**
-  from the Colors library one click away — or the **Room** of the light setup.
+  from the Colors library one click away — or the **Room** of the light setup
+  (your HDRI too), with **Room blur** from sharp to soft.
 - **Timeline** (under the view): **Play** / pause (Space), scrub, **Length**
   1–60 s. **Camera**: set a view, press ◆+ to keep it as a key, move the
   playhead, change the view, press it again — the camera glides between the
@@ -615,8 +625,11 @@ Instagram and X posts, stories and profiles. **New mockup** offers both:
   These are look-alikes drawn by this app for presentations; nothing is
   posted anywhere.
 - **Click a picture** in the preview (or in the **Pictures** list) to upload
-  one or take it **from the app**; **Position & size…** places it in its
-  frame over a grid, as for the 3D screens. Texts, numbers and switches are
+  one or take it **from the app** (a plan's profile picture fits a profile
+  picture slot); **Position & size…** places it in its frame over a grid, as
+  for the 3D screens.
+- **Zoom** into the preview: − / + / 100 % at the bottom right, ⌘ / Ctrl +
+  scroll or pinch; zoomed in, drag (or scroll) to move around. Texts, numbers and switches are
   in **Content**; switching the type keeps what you typed.
 - **Look**: format **Fit** (the mockup with space around it) or 16:9, 4:5,
   1:1, 9:16, 3:2; background none / colour / gradient (brand colours at

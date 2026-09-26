@@ -44,4 +44,4 @@ export const TYPE_LABEL = {
 };
 // Top-level folders under data/ that hold library files (everything else —
 // db.json, backups/, tmp/ — is internal and never served).
-export const ENTITY_ROOTS = [...TYPES, 'plan', 'software', 'dashboard', 'inbox', 'mockup', 'mockup-model'];
+export const ENTITY_ROOTS = [...TYPES, 'plan', 'software', 'dashboard', 'inbox', 'mockup', 'mockup-model', 'mockup-hdri'];

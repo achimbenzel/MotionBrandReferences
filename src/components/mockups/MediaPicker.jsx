@@ -30,7 +30,7 @@ function Tile({ src, video, label, onClick }) {
  * references (the video, saved frames, moments); library images; the Inbox.
  * onPick(source) with a source the server understands.
  */
-export default function MediaPicker({ onPick, onClose }) {
+export default function MediaPicker({ onPick, onClose, title = 'Put on the screen' }) {
   const [tab, setTab] = useState('plans');
   const [plans, setPlans] = useState(null);
   const [planId, setPlanId] = useState('');
@@ -65,6 +65,14 @@ export default function MediaPicker({ onPick, onClose }) {
     return { id: b.id, title: b.title || 'Block', items };
   }).filter((g) => g.items.length), [plan]);
 
+  // Every plan's profile picture, and the chosen plan's own banner + profile picture.
+  // (always pictures — older ones were saved as `.img`, so no extension check here)
+  const avatars = (plans || []).filter((p) => p.avatar);
+  const planOwn = plan ? [
+    ...(plan.avatar ? [{ id: '@avatar', file: plan.avatar, name: 'Profile picture' }] : []),
+    ...(plan.banner ? [{ id: '@banner', file: plan.banner, name: 'Banner' }] : []),
+  ] : [];
+
   const pick = (source) => onPick(source);
   const match = (s) => !t || String(s || '').toLowerCase().includes(t);
 
@@ -72,7 +80,7 @@ export default function MediaPicker({ onPick, onClose }) {
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal media-picker" role="dialog" aria-modal="true" aria-label="Pick for the screen">
         <div className="modal-head">
-          <h2>Put on the screen</h2>
+          <h2>{title}</h2>
           <button className="icon-btn" onClick={onClose} aria-label="Close"><X size={18} /></button>
         </div>
         <div className="modal-body">
@@ -92,10 +100,26 @@ export default function MediaPicker({ onPick, onClose }) {
 
           {tab === 'plans' && (!plans ? <div className="spinner" /> : !plans.length ? <div className="empty-hint">No plans yet.</div> : (
             <>
+              {avatars.length > 0 && (
+                <div className="fp-group">
+                  <div className="fp-group-head">Profile pictures of your plans <span className="count">{avatars.length}</span></div>
+                  <div className="mp-grid mp-avatars">
+                    {avatars.map((p) => <Tile key={p.id} src={planFileUrl(p, p.avatar)} label={p.name} onClick={() => pick({ kind: 'plan', planId: p.id, itemId: '@avatar' })} />)}
+                  </div>
+                </div>
+              )}
               <select className="input mp-plan" value={planId} onChange={(e) => setPlanId(e.target.value)} aria-label="Plan">
                 {plans.map((p) => <option key={p.id} value={p.id}>{p.avatarEmoji ? `${p.avatarEmoji} ` : ''}{p.name}</option>)}
               </select>
-              {!planGroups.length && <div className="empty-hint">No pictures or videos in this plan yet.</div>}
+              {planOwn.length > 0 && (
+                <div className="fp-group">
+                  <div className="fp-group-head">Profile picture &amp; banner</div>
+                  <div className="mp-grid">
+                    {planOwn.map((x) => <Tile key={x.id} src={planFileUrl(plan, x.file)} label={x.name} onClick={() => pick({ kind: 'plan', planId: plan.id, itemId: x.id })} />)}
+                  </div>
+                </div>
+              )}
+              {!planGroups.length && !planOwn.length && <div className="empty-hint">No pictures or videos in this plan yet.</div>}
               {planGroups.map((g) => (
                 <div className="fp-group" key={g.id}>
                   <div className="fp-group-head">{g.title} <span className="count">{g.items.length}</span></div>

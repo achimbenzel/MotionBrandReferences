@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, UploadCloud, Library, X, Download, FolderInput, MoreHorizontal, Copy, Trash2, Play, Box, RotateCw,
-  FlipHorizontal, Camera, Plus, Move, Crop, LayoutGrid, Volume2, VolumeX, Sun, DoorOpen,
+  FlipHorizontal, Camera, Plus, Move, Crop, LayoutGrid, Volume2, VolumeX, Sun, DoorOpen, ImagePlus,
 } from 'lucide-react';
-import { api, mockupFileUrl, mockupModelUrl } from '../lib/api.js';
+import { api, mockupFileUrl, mockupModelUrl, mockupHdriUrl } from '../lib/api.js';
 import { useSaver } from '../lib/autosave.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
@@ -16,10 +16,11 @@ import Timeline from '../components/mockups/Timeline.jsx';
 import {
   MockupStage, FRAMES, VIEW_LABELS, MOTIONS_LABELS, CAMERA_MOVES, LOOPING, loadModel, guessScreen, buildModel, modelJoints, guessHinge, valueAt,
 } from '../lib/mockup3d/stage.js';
-import { LIGHT_SETUPS } from '../lib/mockup3d/lighting.js';
+import { LIGHT_SETUPS, loadHdriTexture, analyseHdri, hdriPreview } from '../lib/mockup3d/lighting.js';
 import { buildDevice } from '../lib/mockup3d/devices.js';
 import { recordVideo, videoFormats } from '../lib/mockup3d/video.js';
 import { DEVICES, DEVICE_ICON, exportSize } from '../lib/mockup3d/catalog.js';
+import Range from '../components/Range.jsx';
 
 const MOCKUP_BOARD = /mockup/i;
 const IMAGE_SIZES = [
@@ -54,13 +55,14 @@ const putKey = (keys, key) => [...keys.filter((k) => Math.abs(k.t - key.t) > 0.0
  * and the hinges and the part of each screen video that plays (with sound).
  * Export an image or a video, or save into a plan. Settings save as you go.
  */
-export default function MockupEditor({ initial, initialModels }) {
+export default function MockupEditor({ initial, initialModels, initialHdris }) {
   const id = initial.id;
   const navigate = useNavigate();
   const toast = useToast();
   const saver = useSaver(600);
   const [m, setM] = useState(initial);
   const [models, setModels] = useState(initialModels || []);
+  const [hdris, setHdris] = useState(initialHdris || []);
   const [selId, setSelId] = useState(initial.items[0]?.id || null);
   const [parts, setParts] = useState([]);          // parts of the selected imported model
   const [info, setInfo] = useState({});            // model id → { meshes, joints }
@@ -278,6 +280,21 @@ export default function MockupEditor({ initial, initialModels }) {
   useEffect(() => { stageRef.current?.setBackground(mRef.current.background); }, [bgKey]);
   const lightKey = JSON.stringify(m.light);
   useEffect(() => { stageRef.current?.setLight(mRef.current.light); }, [lightKey]);
+  // Your HDRI: loaded when it's picked (the stage keeps it; until then the studio light stands in).
+  const hdriId = m.light.setup === 'hdri' ? m.light.hdri : '';
+  const hdriLoads = useRef(new Map());
+  useEffect(() => {
+    const st = stageRef.current;
+    const h = hdris.find((x) => x.id === hdriId);
+    if (!st || !h || st.hdris.has(h.id)) return;
+    if (!hdriLoads.current.has(h.id)) {
+      setLoading('Loading the HDRI…');
+      hdriLoads.current.set(h.id, loadHdriTexture(mockupHdriUrl(h), h.format)
+        .then((tex) => { st.addHdri(h.id, tex, analyseHdri(tex)); })
+        .catch((e) => { hdriLoads.current.delete(h.id); toast(`Couldn’t load the HDRI: ${e.message}`, 'error'); })
+        .finally(() => setLoading('')));
+    }
+  }, [hdriId, hdris, toast]);
   useEffect(() => {
     const st = stageRef.current; const cur = mRef.current;
     if (!st) return;
@@ -456,6 +473,31 @@ export default function MockupEditor({ initial, initialModels }) {
   };
   const logoParts = parts.filter((p) => p.logo);
 
+  // ---- Your own HDRIs ------------------------------------------------------------------
+  const hdriInput = useRef(null);
+  const importHdri = async (file) => {
+    if (!file) return;
+    const format = { hdr: 'hdr', exr: 'exr', jpg: 'jpg', jpeg: 'jpg', png: 'png', webp: 'webp', avif: 'avif' }[(file.name.split('.').pop() || '').toLowerCase()];
+    if (!format) { toast('Choose an .hdr or .exr file, or a panorama picture (.jpg / .png / .webp, 2:1).', 'error'); return; }
+    setLoading('Reading the HDRI…');
+    const local = URL.createObjectURL(file);
+    try {
+      // Read it here first: a broken file never gets uploaded, and the preview comes for free.
+      const tex = await loadHdriTexture(local, format);
+      const info = analyseHdri(tex);
+      const thumb = await new Promise((r) => { hdriPreview(tex, info.intensity).toBlob(r, 'image/webp', 0.85); });
+      setLoading('Uploading the HDRI…');
+      let h = await api.addMockupHdri(file);
+      if (thumb) h = await api.setMockupHdriThumb(h.id, thumb).catch(() => h);
+      stageRef.current?.addHdri(h.id, tex, info);
+      setHdris((hs) => [...hs, h]);
+      setLight({ setup: 'hdri', hdri: h.id });
+      toast(`“${h.name}” imported — it lights the scene now`);
+    } catch (e) {
+      toast(`Couldn’t use that HDRI: ${e.message}`, 'error');
+    } finally { URL.revokeObjectURL(local); setLoading(''); }
+  };
+
   // ---- Export -------------------------------------------------------------------------
   const openExport = async (initialTarget = 'image') => {
     const [w, h] = exportSize(mRef.current.frame, 1920);
@@ -633,7 +675,7 @@ export default function MockupEditor({ initial, initialModels }) {
                       </label>
                       {hinge && (
                         <>
-                          <label className="mke-range">Open <input type="range" min="-150" max="150" value={Math.round(hingeValue(sel))} onChange={(e) => setHinge(sel, Number(e.target.value))} /> <span>{Math.round(hingeValue(sel))}°</span></label>
+                          <label className="mke-range">Open <Range min="-150" max="150" value={Math.round(hingeValue(sel))} onChange={(e) => setHinge(sel, Number(e.target.value))} /> <span>{Math.round(hingeValue(sel))}°</span></label>
                           <div className="mke-row mke-axis">
                             <span className="hint">Axis</span>
                             <div className="segmented segmented-sm">
@@ -656,7 +698,7 @@ export default function MockupEditor({ initial, initialModels }) {
                     <button type="button" className="btn btn-sm" onClick={() => patchModel({ screenTurn: ((model.screenTurn || 0) + 90) % 360 })}><RotateCw size={14} /> Turn picture</button>
                     <button type="button" className={`btn btn-sm ${model.screenFlip ? 'btn-on' : ''}`} onClick={() => patchModel({ screenFlip: !model.screenFlip })}><FlipHorizontal size={14} /> Mirror</button>
                   </div>
-                  <label className="mke-range">Size <input type="range" min="2" max="200" value={sel.size} onChange={(e) => patchItem(sel.id, { size: Number(e.target.value) })} /> <span>{sel.size} cm</span></label>
+                  <label className="mke-range">Size <Range min="2" max="200" value={sel.size} onChange={(e) => patchItem(sel.id, { size: Number(e.target.value) })} /> <span>{sel.size} cm</span></label>
                   <label className="mke-check" title={logoParts.length ? logoParts.map((p) => p.name).join(', ') : 'No part of this model is named like a logo — hide it under Parts'}>
                     <input type="checkbox" checked={sel.logo && logoParts.length > 0} disabled={!logoParts.length} onChange={(e) => patchItem(sel.id, { logo: e.target.checked })} /> Show logo {logoParts.length ? '' : '(no logo part found)'}
                   </label>
@@ -675,7 +717,7 @@ export default function MockupEditor({ initial, initialModels }) {
               )}
               {sel.device === 'custom' && !model && <div className="hint">This model is gone (see Trash) — pick another one.</div>}
               {items.length > 1 && (
-                <label className="mke-range">Turn <input type="range" min="-180" max="180" value={sel.rotY} onChange={(e) => patchItem(sel.id, { rotY: Number(e.target.value) })} /> <span>{sel.rotY}°</span></label>
+                <label className="mke-range">Turn <Range min="-180" max="180" value={sel.rotY} onChange={(e) => patchItem(sel.id, { rotY: Number(e.target.value) })} /> <span>{sel.rotY}°</span></label>
               )}
             </section>
           )}
@@ -705,14 +747,14 @@ export default function MockupEditor({ initial, initialModels }) {
               {sel.content?.kind === 'video' && (
                 <div className="mke-video">
                   <label className="mke-range">Starts at
-                    <input type="range" min="0" max={Math.max(0.1, vlen || 0)} step="0.1" value={Math.min(sel.videoStart, vlen || sel.videoStart)} onChange={(e) => { const s = Number(e.target.value); patchItem(sel.id, { videoStart: s }); stageRef.current?.setItemTimeline(sel.id, { videoStart: s }); stageRef.current?.syncVideos(time, playing); }} />
+                    <Range min="0" max={Math.max(0.1, vlen || 0)} step="0.1" value={Math.min(sel.videoStart, vlen || sel.videoStart)} onChange={(e) => { const s = Number(e.target.value); patchItem(sel.id, { videoStart: s }); stageRef.current?.setItemTimeline(sel.id, { videoStart: s }); stageRef.current?.syncVideos(time, playing); }} />
                     <span>{sel.videoStart.toFixed(1)} s</span>
                   </label>
                   <div className="mke-row">
                     <button type="button" className={`btn btn-sm ${sel.sound ? 'btn-on' : ''}`} onClick={() => { patchItem(sel.id, { sound: !sel.sound }); stageRef.current?.setItemTimeline(sel.id, { sound: !sel.sound }); }}>
                       {sel.sound ? <Volume2 size={14} /> : <VolumeX size={14} />} Sound {sel.sound ? 'on' : 'off'}
                     </button>
-                    {sel.sound && <input className="mke-vol" type="range" min="0" max="1" step="0.05" value={sel.volume} onChange={(e) => patchItem(sel.id, { volume: Number(e.target.value) })} aria-label="Volume" />}
+                    {sel.sound && <Range className="mke-vol" min="0" max="1" step="0.05" value={sel.volume} onChange={(e) => patchItem(sel.id, { volume: Number(e.target.value) })} aria-label="Volume" />}
                   </div>
                   <div className="hint">The part from {sel.videoStart.toFixed(1)} s plays on the screen during the timeline{sel.sound ? ' — with its sound, also in the exported video' : ''}.</div>
                 </div>
@@ -728,15 +770,24 @@ export default function MockupEditor({ initial, initialModels }) {
                   <i style={{ background: LIGHT_SWATCH[k] }} /><span>{s.label}</span>
                 </button>
               ))}
+              {hdris.map((h) => (
+                <button key={h.id} type="button" className={light.setup === 'hdri' && light.hdri === h.id ? 'on' : ''} onClick={() => setLight({ setup: 'hdri', hdri: h.id })} title={`${h.name} — your HDRI`}>
+                  <i style={h.thumb ? { backgroundImage: `url(${mockupHdriUrl(h, h.thumb)})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { background: '#444' }} /><span>{h.name}</span>
+                </button>
+              ))}
+              <button type="button" className="mke-light-add" onClick={() => hdriInput.current?.click()} title="Your own .hdr / .exr, or a 2:1 panorama picture">
+                <i><ImagePlus size={14} /></i><span>Import HDRI…</span>
+              </button>
             </div>
-            <label className="mke-range">Turn light <input type="range" min="-180" max="180" value={light.rotation} onChange={(e) => setLight({ rotation: Number(e.target.value) })} /> <span>{light.rotation}°</span></label>
-            <label className="mke-range">Brightness <input type="range" min="0.3" max="2.5" step="0.05" value={light.exposure} onChange={(e) => setLight({ exposure: Number(e.target.value) })} /> <span>{Math.round(light.exposure * 100)}%</span></label>
+            <input ref={hdriInput} type="file" accept=".hdr,.exr,.jpg,.jpeg,.png,.webp,.avif" className="visually-hidden-input" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; importHdri(f); }} />
+            <label className="mke-range">Turn light <Range min="-180" max="180" value={light.rotation} onChange={(e) => setLight({ rotation: Number(e.target.value) })} /> <span>{light.rotation}°</span></label>
+            <label className="mke-range">Brightness <Range min="0.3" max="2.5" step="0.05" value={light.exposure} onChange={(e) => setLight({ exposure: Number(e.target.value) })} /> <span>{Math.round(light.exposure * 100)}%</span></label>
             <div className="mke-subhead">Shadow</div>
             <div className="segmented mke-seg" role="group" aria-label="Shadow">
               {SHADOW_MODES.map(([k, label]) => <button key={k} type="button" className={light.shadow === k ? 'on' : ''} onClick={() => setLight({ shadow: k })}>{label}</button>)}
             </div>
             {light.shadow !== 'none' && (
-              <label className="mke-range">Strength <input type="range" min="0" max="1" step="0.05" value={light.strength} onChange={(e) => setLight({ strength: Number(e.target.value) })} /> <span>{Math.round(light.strength * 100)}%</span></label>
+              <label className="mke-range">Strength <Range min="0" max="1" step="0.05" value={light.strength} onChange={(e) => setLight({ strength: Number(e.target.value) })} /> <span>{Math.round(light.strength * 100)}%</span></label>
             )}
           </section>
 
@@ -744,9 +795,12 @@ export default function MockupEditor({ initial, initialModels }) {
             <h3>Background &amp; format</h3>
             <div className="segmented mke-seg" role="group" aria-label="Background">
               {[['transparent', 'None'], ['color', 'Colour'], ['gradient', 'Gradient'], ['environment', 'Room']].map(([k, label]) => (
-                <button key={k} type="button" className={bg.mode === k ? 'on' : ''} onClick={() => setBg({ mode: k })} title={k === 'environment' ? 'The light setup’s room / sky, out of focus' : undefined}>{label}</button>
+                <button key={k} type="button" className={bg.mode === k ? 'on' : ''} onClick={() => setBg({ mode: k })} title={k === 'environment' ? 'The light setup’s room / sky (or your HDRI) behind the scene' : undefined}>{label}</button>
               ))}
             </div>
+            {bg.mode === 'environment' && (
+              <label className="mke-range">Room blur <Range min="0" max="1" step="0.05" value={light.blur ?? 0.35} onChange={(e) => setLight({ blur: Number(e.target.value) })} /> <span>{Math.round((light.blur ?? 0.35) * 100)}%</span></label>
+            )}
             {(bg.mode === 'color' || bg.mode === 'gradient') && (
               <div className="mke-colors">
                 <label title="Colour"><input type="color" value={bg.color.toLowerCase()} onChange={(e) => setBg({ color: e.target.value.toUpperCase() })} /></label>

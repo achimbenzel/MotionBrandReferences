@@ -17,7 +17,7 @@ export default function MockupOpen() {
     let on = true;
     setData(null); setError(null);
     Promise.all([api.getMockup(id), api.listMockups()])
-      .then(([mockup, list]) => { if (on) setData({ mockup, models: list.models || [] }); })
+      .then(([mockup, list]) => { if (on) setData({ mockup, models: list.models || [], hdris: list.hdris || [] }); })
       .catch((e) => { if (on) setError(e.message); });
     return () => { on = false; };
   }, [id]);
@@ -25,5 +25,5 @@ export default function MockupOpen() {
   if (!data) return <div className="spinner" />;
   return data.mockup.kind === '2d'
     ? <Mockup2D key={id} initial={data.mockup} />
-    : <Mockup3D key={id} initial={data.mockup} initialModels={data.models} />;
+    : <Mockup3D key={id} initial={data.mockup} initialModels={data.models} initialHdris={data.hdris} />;
 }
