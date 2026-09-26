@@ -542,9 +542,9 @@ devices — rendered live in the browser (three.js), no plugins, nothing online.
   ⋯ **Duplicate** / **Delete** (→ Trash, with Undo).
 
 **Your own 3D models** — import a **.glb**, a single-file **.gltf** or a
-**.usdz** (on the Mockups page or in the editor). Apple's product models come as
-USDZ (e.g. from the AR Quick Look gallery on developer.apple.com); check the
-licence of any model you use in client work. In the editor, **Screen part**
+**.usdz** (on the Mockups page or in the editor) — USDZ is the format Apple
+uses for its 3D / AR product models. Check the licence of any model you use in
+client work. In the editor, **Screen part**
 picks the part of the model that shows your picture (a part named *Screen* /
 *Display* is picked for you); **Turn picture** and **Mirror** fix its
 orientation if needed. A model is scaled to fit and stands on the floor;
