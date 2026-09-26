@@ -477,6 +477,11 @@ export const api = {
     const { settings } = await request('/api/settings', { method: 'PATCH', json: patch });
     return settings;
   },
+  // Saves and what was added per day (the dashboard's activity map) → [{ date, saves, refs, plans, mockups, inbox }].
+  async getActivity(days = 182) {
+    const { days: list } = await request(`/api/activity?days=${days}`);
+    return list;
+  },
   async setDashboardBanner(file) {
     const { settings } = await request('/api/settings/dashboard-banner', { method: 'POST', ...picBody('banner', file, imageName('banner', file)) });
     return settings;

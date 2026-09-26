@@ -7,6 +7,7 @@ import path from 'node:path';
 import express from 'express';
 import { DATA_DIR, DIST_DIR, IS_PROD } from './config.js';
 import { cleanupTmpOnClose } from './upload.js';
+import { countActivity } from './activity.js';
 import { hostGuard, csrfGuard, dataGuard, dataHeaders, errorHandler } from './http.js';
 import projects from './routes/projects.js';
 import plans from './routes/plans.js';
@@ -27,6 +28,7 @@ export function createApp() {
   app.use('/api', csrfGuard);
   app.use(express.json({ limit: '10mb' }));
   app.use(cleanupTmpOnClose);
+  app.use('/api', countActivity); // the dashboard's activity map
 
   // The content library. express.static supports HTTP range requests, which
   // the video player needs for seeking. Only library folders are exposed.

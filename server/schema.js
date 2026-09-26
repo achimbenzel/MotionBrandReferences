@@ -637,6 +637,7 @@ export function normalizeDB(db) {
   if (db.settings.storageLimitBytes == null) db.settings.storageLimitBytes = DEFAULT_STORAGE_LIMIT;
   if (!('dashboardBanner' in db.settings)) db.settings.dashboardBanner = null;
   if (!('dashboardBannerGradient' in db.settings)) db.settings.dashboardBannerGradient = null;
+  if (typeof db.settings.dashboardNote !== 'string') db.settings.dashboardNote = ''; // the dashboard's quick note
   return db;
 }
 

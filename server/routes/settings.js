@@ -7,6 +7,7 @@ import { upload } from '../upload.js';
 import { str } from '../schema.js';
 import { createRouter } from '../http.js';
 import { sourceAsUpload } from '../sources.js';
+import { activityDays } from '../activity.js';
 
 const router = createRouter();
 export default router;
@@ -33,9 +34,15 @@ router.get('/api/settings', async (_req, res) => {
 router.patch('/api/settings', async (req, res) => {
   const settings = await mutateDB((db) => {
     if ('dashboardBannerGradient' in req.body) db.settings.dashboardBannerGradient = req.body.dashboardBannerGradient == null ? null : str(req.body.dashboardBannerGradient, 40);
+    if ('dashboardNote' in req.body) db.settings.dashboardNote = str(req.body.dashboardNote, 8000);
     return db.settings;
   });
   res.json({ settings });
+});
+// The dashboard's activity map: saves and what was added, per day.
+router.get('/api/activity', async (req, res) => {
+  const db = await readDB();
+  res.json({ days: await activityDays(db, Number(req.query.days) || 182) });
 });
 router.post('/api/settings/dashboard-banner', upload.single('banner'), async (req, res) => {
   await sourceAsUpload(req); // or a picture that's already in the app

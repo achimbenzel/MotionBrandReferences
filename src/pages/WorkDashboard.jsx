@@ -5,13 +5,14 @@ import {
   AlertTriangle, Image as ImageIcon, UploadCloud, Database, Flag, CalendarClock, MonitorSmartphone,
   Library, Search, Sparkles, Target, CheckCircle2, Layers,
 } from 'lucide-react';
-import { api, planFileUrl, dashboardFileUrl, mockupFileUrl } from '../lib/api.js';
+import { api, planFileUrl, dashboardFileUrl } from '../lib/api.js';
 import { gradientCss, PLAN_GRADIENTS, PLAN_STATUSES, tagColor } from '../lib/types.js';
 import { useToast } from '../components/Toast.jsx';
-import StatusBadge from '../components/StatusBadge.jsx';
 import MediaPicker from '../components/mockups/MediaPicker.jsx';
+import ActivityMap from '../components/dashboard/ActivityMap.jsx';
+import Inspiration from '../components/dashboard/Inspiration.jsx';
+import QuickNote from '../components/dashboard/QuickNote.jsx';
 
-const fmtRange = (s, e) => (s && e ? `${s} – ${e}` : s || e || '');
 const DEFAULT_BANNER = 'linear-gradient(120deg,#6a11cb,#2575fc)';
 const DAY = 86400000;
 
@@ -142,8 +143,6 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
   const boardCards = (board?.columns || []).reduce((n, c) => n + c.cards.length, 0);
   const boardLists = (board?.columns || []).length;
   const softCount = software?.length ?? 0;
-  // The API lists plans newest first; archived ones stay off the dashboard.
-  const recent = (plans || []).filter((p) => p.status !== 'archived').slice(0, 6);
 
   // Urgent to-dos, gathered from the board and every plan's to-do blocks.
   const planName = (id) => (plans || []).find((p) => p.id === id)?.name;
@@ -204,7 +203,6 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
     { key: 'logotester', icon: FlaskConical, title: 'Brand Tester', sub: 'Test a logo, keep the sheet', to: '/logo-tester', accent: 'linear-gradient(120deg,#f83600,#f9d423)', glow: '#ff8a1f' },
     { key: 'software', icon: AppWindow, title: 'Software', sub: softCount ? plural(softCount, 'app') : 'Plugins, scripts & more', to: '/software', accent: 'linear-gradient(120deg,#7b4397,#dc2430)', glow: '#dc2430' },
   ];
-  const latest = mockups.filter((m) => m.thumb).slice(0, 6);
   const openSearch = () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, metaKey: true, bubbles: true }));
   // The sections rise in one after the other.
   const rise = (i, extra = '') => ({ className: `dash-rise ${extra}`.trim(), style: { '--i': i } });
@@ -418,63 +416,14 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
         </section>
       )}
 
-      <section {...rise(4)}>
-        <div className="dash-section-head">
-          <h2>Recent plans</h2>
-          <button className="btn btn-sm" onClick={onNewPlan}><Plus size={15} /> New plan</button>
+      {/* Your rhythm over the last months, a reference to start from, a note to self */}
+      <section {...rise(4)} className="dash-rise dash-more">
+        <ActivityMap reloadKey={reloadKey} />
+        <div className="dash-duo">
+          <Inspiration reloadKey={reloadKey} />
+          {settings && <QuickNote initial={settings.dashboardNote || ''} />}
         </div>
-        {plans === null ? (
-          <div className="spinner" />
-        ) : recent.length ? (
-          <div className="dash-recent">
-            {recent.map((p) => {
-              const banner = p.banner ? planFileUrl(p, p.banner) : null;
-              const grad = !banner ? gradientCss(p.bannerGradient) : null;
-              const bg = banner ? `url("${banner}")` : grad || null;
-              const el = elapsed(p);
-              const td = todoCount(p);
-              return (
-                <button key={p.id} className="dash-plan" onClick={() => navigate(`/plan/${p.id}`)}>
-                  <span className="dash-plan-bannerwrap"><span className={`dash-plan-banner ${bg ? '' : 'empty'}`} style={bg ? { backgroundImage: bg } : undefined} /></span>
-                  <span className="dash-plan-avatar"><PlanAvatar plan={p} /></span>
-                  <StatusBadge status={p.status} className="dash-plan-status" />
-                  <span className="dash-plan-name">{p.name}</span>
-                  <span className="dash-plan-meta">
-                    {fmtRange(p.start, p.end) && <span className="dash-plan-range"><CalendarRange size={12} /> {fmtRange(p.start, p.end)}</span>}
-                    {td.all > 0 && <span className="dash-plan-todos"><CheckCircle2 size={12} /> {td.done}/{td.all}</span>}
-                  </span>
-                  {el != null && <span className="dash-progress dash-plan-progress" title={`${Math.round(el * 100)}% of the timeframe`}><span style={{ width: `${el * 100}%` }} /></span>}
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="empty" style={{ marginTop: 8 }}>
-            <PencilRuler size={28} />
-            <h3>No plans yet</h3>
-            <p>Start planning a new project — moodboard, notes, files and a timeframe.</p>
-            <button className="btn btn-primary" onClick={onNewPlan}><Plus size={16} /> New plan</button>
-          </div>
-        )}
       </section>
-
-      {/* The latest mockups, as a strip of pictures */}
-      {latest.length > 0 && (
-        <section {...rise(5)}>
-          <div className="dash-section-head">
-            <h2><MonitorSmartphone size={16} /> Latest mockups</h2>
-            <button className="btn btn-sm btn-ghost" onClick={() => navigate('/mockups')}>All mockups <ArrowRight size={14} /></button>
-          </div>
-          <div className="dash-shots">
-            {latest.map((m) => (
-              <button key={m.id} type="button" className="dash-shot" onClick={() => navigate(`/mockups/${m.id}`)} title={m.name}>
-                <img src={mockupFileUrl(m, m.thumb)} alt="" />
-                <span className="dash-shot-name">{m.name}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
     </div>
   );
 }

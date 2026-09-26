@@ -143,3 +143,25 @@ test('export → import round-trip restores the library', async () => {
     assert.ok(db.software.some((s) => s.id === 'sw1'));
   } finally { await other.stop(); }
 });
+
+test('dashboard: activity per day (saves + what was added) and the quick note', async () => {
+  let r = await srv.api('/api/activity?days=14');
+  assert.equal(r.status, 200);
+  assert.equal(r.data.days.length, 14);
+  const today = r.data.days.at(-1);
+  const d = new Date();
+  assert.equal(today.date, `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+  const before = today.saves;
+  const plan = (await srv.api('/api/plans', { method: 'POST', json: { name: 'Activity' } })).data.plan;
+  await srv.api(`/api/plans/${plan.id}`, { method: 'PATCH', json: { client: 'Acme' } });
+  await srv.api(`/api/plans/${plan.id}`, { method: 'PATCH', json: { status: 'nope' } }); // refused → not counted
+  r = await srv.api('/api/activity?days=7');
+  const now = r.data.days.at(-1);
+  assert.ok(now.plans >= 1);
+  assert.ok(now.saves >= before + 2);
+  assert.equal((await srv.api('/api/activity?days=5000')).data.days.length, 400);
+
+  r = await srv.api('/api/settings', { method: 'PATCH', json: { dashboardNote: `Call the client\n${'x'.repeat(9000)}` } });
+  assert.equal(r.data.settings.dashboardNote.length, 8000);
+  assert.ok(r.data.settings.dashboardNote.startsWith('Call the client'));
+});
