@@ -672,8 +672,9 @@ without going back to the grid; stepping past the last one wraps to the first.
   the current level. On touch screens: **swipe** left / right to browse,
   **pinch** to zoom, **double-tap** to toggle zoom, **swipe down** to close.
   PDFs turn pages with a swipe, too.
-- **Wide screens** (≥ 1280 px) show a project's **tags and notes beside** the
-  work (sticky) instead of below it.
+- **Layout:** a project page is one centred column — the work first, then
+  **tags and notes side by side** (stacked on a phone). On Motion Design
+  pages they sit between the player tools and the saved frames.
 - **Crop & zoom the cover:** when you set a thumbnail — a Motion frame, a
   Branding PDF page or image, a Color image, or a Font screenshot — drag to
   reposition and use the zoom slider to frame exactly what shows on the card.

@@ -9,7 +9,7 @@ import TagInput from '../components/TagInput.jsx';
 import Menu from '../components/Menu.jsx';
 import Lightbox from '../components/Lightbox.jsx';
 import NotesField from '../components/NotesField.jsx';
-import DetailLayout from '../components/DetailLayout.jsx';
+import DetailLayout, { DetailSide } from '../components/DetailLayout.jsx';
 import SegmentTimeline from '../components/SegmentTimeline.jsx';
 import EmbedPlayer from '../components/EmbedPlayer.jsx';
 import { PROVIDER_LABEL } from '../lib/videoLinks.js';
@@ -324,22 +324,20 @@ export default function MotionDetail({ project, setProject }) {
   const step = (d) => setSel(() => (selClamped + d + frames.length) % frames.length);
   const lightboxItems = frames.map((f) => ({ src: fileUrl(project, f.file), caption: fmtTime(f.t) }));
 
-  return (
-    <DetailLayout
-      side={(
-        <>
-          {/* Tags */}
-          <div className="section">
-            <div className="section-head"><h2><TagIcon size={16} /> Tags</h2></div>
-            <TagInput tags={project.tags || []} onChange={saveTags} autoTags={[autoLen, format].filter(Boolean)} placeholder="Add a tag…" />
-            <div className="hint" style={{ marginTop: 8 }}>Length{format ? ' and format' : ''} tags are added automatically and used for filtering.</div>
-          </div>
+  // Tags + notes: between the work on the video and the saved frames.
+  const details = (
+    <DetailSide>
+      <div className="section">
+        <div className="section-head"><h2><TagIcon size={16} /> Tags</h2></div>
+        <TagInput tags={project.tags || []} onChange={saveTags} autoTags={[autoLen, format].filter(Boolean)} placeholder="Add a tag…" />
+        <div className="hint" style={{ marginTop: 8 }}>Length{format ? ' and format' : ''} tags are added automatically and used for filtering.</div>
+      </div>
+      <NotesField project={project} setProject={setProject} />
+    </DetailSide>
+  );
 
-          {/* Notes */}
-          <NotesField project={project} setProject={setProject} />
-        </>
-      )}
-    >
+  return (
+    <DetailLayout>
       <div className="player-wrap" style={isLink ? { aspectRatio: project.width && project.height ? `${project.width} / ${project.height}` : '16 / 9' } : undefined}>
         {isLink ? (
           <EmbedPlayer ref={videoRef} provider={project.provider} videoId={project.videoId} hash={project.videoHash} title={project.title}
@@ -392,7 +390,8 @@ export default function MotionDetail({ project, setProject }) {
           <a className="btn btn-sm" href={project.url} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} /> Open on {PROVIDER_LABEL[project.provider] || 'the site'}</a>
           <span className="hint">Played from {PROVIDER_LABEL[project.provider] || 'the site'} — sections, moments, loop and speed work; frames and the waveform need the video file itself.</span>
         </div>
-      ) : (
+      ) : null}
+      {isLink ? details : (
         <>
       <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap', alignItems: 'center' }}>
         <button className="btn btn-primary" onClick={addFrame} disabled={capturing || !!bulk}>
@@ -407,6 +406,7 @@ export default function MotionDetail({ project, setProject }) {
         </span>
       </div>
 
+      {details}
 
       {/* Frames */}
       <div className="section">

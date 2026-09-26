@@ -135,12 +135,13 @@ img { max-width: 100%; display: block; }
 /* -------------------------------------------------------------- Card grid */
 .grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* minmax(0, 1fr): every column the same width, whatever a card holds */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 30px 28px;
 }
-@media (max-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 900px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 620px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 12px; } }
-@media (max-width: 340px) { .grid { grid-template-columns: 1fr; } }
+@media (max-width: 340px) { .grid { grid-template-columns: minmax(0, 1fr); } }
 
 .card { cursor: pointer; }
 .card-thumb {
@@ -1265,6 +1266,10 @@ img { max-width: 100%; display: block; }
 .gallery-new {
   appearance: none;
   aspect-ratio: 16 / 10;
+  /* As tall as a card's picture — stretched to the row, the aspect ratio
+     would make it (and its column) wider than the others. */
+  align-self: start;
+  min-width: 0;
   border: 1.5px dashed var(--border-strong);
   border-radius: var(--radius);
   background: transparent;
@@ -2013,6 +2018,7 @@ img { max-width: 100%; display: block; }
 
 /* Plan grid card (Notion-style) */
 .plan-card-head { position: relative; margin-bottom: 24px; }
+.plan-card ~ .gallery-new { aspect-ratio: 16 / 9; } /* matches the plan banners */
 .plan-card-banner { aspect-ratio: 16 / 9; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface-2) center/cover no-repeat; }
 .plan-card-banner.empty { background: linear-gradient(120deg, var(--surface-3), var(--surface)); }
 .plan-card-avatar {
@@ -2487,14 +2493,11 @@ img { max-width: 100%; display: block; }
   .soft-toolbar .btn-primary { margin-left: auto; }
 }
 
-/* Project detail: work in the main column, tags + notes beside it on wide
-   screens (sticky). Narrower screens stack them below, as before. */
-@media (min-width: 1280px) {
-  .detail:has(.dl-has-side) { max-width: var(--maxw); }
-  .dl-has-side { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 36px; align-items: start; }
-  .dl-side { position: sticky; top: 24px; }
-  .dl-side > .section:first-child { margin-top: 0; }
-  .dl-side .notes-textarea { font-size: 17px; min-height: 220px; }
+/* Project detail: one centred column; tags + notes sit side by side in a
+   row below the work (stacked on narrow screens). */
+.pd-details { display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 28px; align-items: start; }
+@media (min-width: 900px) {
+  .pd-details:has(> :nth-child(2)) { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
 }
 @media (pointer: coarse) { .seg-toggle button { width: 40px; height: 36px; } }
 
@@ -3257,3 +3260,5 @@ img { max-width: 100%; display: block; }
   .inbox-selbar { gap: 6px; }
   .inbox-selbar > span { flex-basis: 100%; }
 }
+/* Saved frames on a phone: three across instead of one huge frame per row. */
+@media (max-width: 640px) { .frames-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; } }
