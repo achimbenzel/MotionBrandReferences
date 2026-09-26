@@ -274,6 +274,22 @@ The Work landing page, a Notion-style overview that moves a little:
   are done; cards in a list called *Done* count as done) and **urgent**. A
   gradient banner drifts slowly, a picture banner zooms in very slowly. The
   banner is a preset gradient, an upload or a picture **from the app**.
+Below it come **widgets you arrange yourself** — **Customize** (right above
+them) lets you drag each one by its handle, make it half or full width, hide
+it and show it again; your layout is saved. The widgets:
+- **Today’s focus** — pin up to five to-dos (board cards or a plan's to-dos)
+  or write a new one (it becomes a card on the board) and tick them off right
+  there: a card moves to your *Done* list, a plan to-do gets its tick. A ring
+  shows how far you are; ticked ones stay struck through until the next day.
+- **Focus timer** — 25, 50 or 90 minutes of focus, then a short break (a long
+  one after four sessions). It's one timer for the whole app: it keeps
+  running when you go elsewhere, shows in the sidebar (the top bar on a
+  phone) and in the tab's title, and chimes (plus a notification when the
+  tab is in the background) when it's done. Finished sessions add focus
+  minutes to *Your rhythm*.
+- **Continue where you left off** — the last plans, storyboards, mockups and
+  references you changed, with a picture; a plan opens at the block you
+  edited.
 - **Next up** — a big countdown to the next milestone or deadline (from every
   plan that isn't delivered or archived), with its plan and how far the plan's
   timeframe has run; the following dates below. Next to it **Two weeks**: this
@@ -288,8 +304,8 @@ The Work landing page, a Notion-style overview that moves a little:
 - **Your rhythm** — a GitHub-style map of the last 26 weeks (15 on a phone):
   a square per day, dark → bright with how much you did — every save, and the
   references, plans, mockups and Inbox shares you added. Hover a day for its
-  numbers; beside it your current **streak**, **this week** and your
-  **busiest weekday**. Saves are counted per day in `data/activity.json` (a
+  numbers (and focus minutes); beside it your current **streak**, **this
+  week** and your **busiest weekday**. Saves are counted per day in `data/activity.json` (a
   small file of its own; the library database isn't touched), so the map
   fills up from the day you update.
 - **Inspiration** — one reference from your own library at random, big;
