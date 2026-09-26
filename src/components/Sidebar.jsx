@@ -9,6 +9,7 @@ import {
 import { TABS, WORK_TABS, isWorkPath, setLastTab } from '../lib/types.js';
 import { useActiveTab } from '../lib/useActiveTab.js';
 import ModeToggle from './ModeToggle.jsx';
+import FocusPill from './FocusPill.jsx';
 import StorageMeter from './StorageMeter.jsx';
 import { useInboxCount } from '../lib/inbox.js';
 import logoWide from '../../logo_wide_dark.svg';
@@ -63,6 +64,8 @@ export default function Sidebar({ onAdd, onSearch, onToggle, drawer = false, ope
         <button className="sb-search" onClick={() => onSearch?.()} title={rail ? undefined : 'Search (⌘K)'} data-tip="Search ⌘K" aria-label="Search">
           <Search size={16} /> <span>Search</span> <kbd>⌘K</kbd>
         </button>
+
+        <FocusPill compact={rail} />
 
         <button className={`sb-item sb-inbox ${onInbox ? 'active' : ''}`} onClick={() => navigate('/inbox')} data-tip={inboxCount ? `Inbox · ${inboxCount} to sort` : 'Inbox'}>
           <Inbox size={17} /> <span>Inbox</span>

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   PencilRuler, ListTodo, FlaskConical, Clapperboard, Plus, ArrowRight, CalendarRange, AppWindow,
   AlertTriangle, Image as ImageIcon, UploadCloud, Database, Flag, CalendarClock, MonitorSmartphone,
-  Library, Search, Sparkles, Target, CheckCircle2, Layers,
+  Library, Search, Sparkles, Target, CheckCircle2, Layers, Settings2, GripVertical, EyeOff, Eye, Columns2, RectangleHorizontal, Check,
 } from 'lucide-react';
 import { api, planFileUrl, dashboardFileUrl } from '../lib/api.js';
 import { gradientCss, PLAN_GRADIENTS, PLAN_STATUSES, tagColor } from '../lib/types.js';
@@ -12,8 +12,32 @@ import MediaPicker from '../components/mockups/MediaPicker.jsx';
 import ActivityMap from '../components/dashboard/ActivityMap.jsx';
 import Inspiration from '../components/dashboard/Inspiration.jsx';
 import QuickNote from '../components/dashboard/QuickNote.jsx';
+import FocusToday from '../components/dashboard/FocusToday.jsx';
+import FocusTimer from '../components/dashboard/FocusTimer.jsx';
+import ContinueWork from '../components/dashboard/ContinueWork.jsx';
+import { useSortable, moveItem } from '../lib/useSortable.js';
 
 const DEFAULT_BANNER = 'linear-gradient(120deg,#6a11cb,#2575fc)';
+// The widgets below the hero, in their first order and size (yours is saved in settings).
+const WIDGETS = [
+  { id: 'focus', label: 'Today’s focus', size: 'half' },
+  { id: 'timer', label: 'Focus timer', size: 'half' },
+  { id: 'next', label: 'Next up & two weeks', size: 'full' },
+  { id: 'continue', label: 'Continue where you left off', size: 'full' },
+  { id: 'urgent', label: 'Urgent', size: 'full' },
+  { id: 'tools', label: 'Your tools', size: 'full' },
+  { id: 'pipeline', label: 'Pipeline', size: 'full' },
+  { id: 'rhythm', label: 'Your rhythm', size: 'full' },
+  { id: 'inspiration', label: 'Inspiration', size: 'half' },
+  { id: 'note', label: 'Quick note', size: 'half' },
+];
+const WIDGET = Object.fromEntries(WIDGETS.map((w) => [w.id, w]));
+// Your saved order first; widgets added since then join at the end.
+function layoutOf(saved) {
+  const list = (Array.isArray(saved) ? saved : []).filter((w) => WIDGET[w.id]);
+  const have = new Set(list.map((w) => w.id));
+  return [...list, ...WIDGETS.filter((w) => !have.has(w.id)).map((w) => ({ id: w.id, hidden: false, size: w.size }))];
+}
 const DAY = 86400000;
 
 // A yyyy-mm-dd date as a local Date (midnight).
@@ -103,8 +127,9 @@ const spotlight = (e) => {
 
 /**
  * Work-mode landing: a greeting over your banner with the numbers that matter,
- * what's next (countdown, the next two weeks), your tools, urgent to-dos, the
- * pipeline, recent plans and the latest mockups.
+ * then widgets you arrange yourself (Customize: drag, half / full width, hide) —
+ * today's focus, the focus timer, what's next, where you left off, urgent
+ * to-dos, your tools, the pipeline, your rhythm, inspiration and a note.
  */
 export default function WorkDashboard({ reloadKey, onNewPlan }) {
   const navigate = useNavigate();
@@ -117,7 +142,9 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
   const [needsMigration, setNeedsMigration] = useState(false);
   const [bannerPicker, setBannerPicker] = useState(false);
   const [appPick, setAppPick] = useState(false);
+  const [editing, setEditing] = useState(false); // arranging the widgets
   const bannerRef = useRef(null);
+  const gridRef = useRef(null);
   const [now] = useState(() => new Date());
 
   useEffect(() => {
@@ -204,8 +231,174 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
     { key: 'software', icon: AppWindow, title: 'Software', sub: softCount ? plural(softCount, 'app') : 'Plugins, scripts & more', to: '/software', accent: 'linear-gradient(120deg,#7b4397,#dc2430)', glow: '#dc2430' },
   ];
   const openSearch = () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, metaKey: true, bubbles: true }));
-  // The sections rise in one after the other.
-  const rise = (i, extra = '') => ({ className: `dash-rise ${extra}`.trim(), style: { '--i': i } });
+  // ---- The widgets: your layout, arranging, and what each one shows ----
+  const layout = layoutOf(settings?.dashboardLayout);
+  const shownW = layout.filter((w) => !w.hidden);
+  const hiddenW = layout.filter((w) => w.hidden);
+  const saveLayout = (next) => {
+    setSettings((st) => ({ ...st, dashboardLayout: next }));
+    api.updateSettings({ dashboardLayout: next }).catch((e) => toast(`Could not save the layout: ${e.message}`, 'error'));
+  };
+  const setWidget = (id, patch) => saveLayout(layout.map((w) => (w.id === id ? { ...w, ...patch } : w)));
+  const sort = useSortable({
+    ids: shownW.map((w) => w.id), container: gridRef, mode: 'center',
+    onMove: (from, to) => {
+      const order = moveItem(shownW, from, to);
+      saveLayout([...order, ...hiddenW]);
+    },
+  });
+  const EMPTY_HINT = {
+    urgent: 'Shows up when a to-do is flagged urgent.',
+    pipeline: 'Shows up once your plans have a status.',
+    next: 'Loading your dates…',
+  };
+  const renderWidget = (w) => {
+    switch (w.id) {
+      case 'focus': return <FocusToday board={board} setBoard={setBoard} plans={plans} setPlans={setPlans} settings={settings} setSettings={setSettings} />;
+      case 'timer': return <FocusTimer />;
+      case 'continue': return <ContinueWork reloadKey={reloadKey} />;
+      case 'rhythm': return <ActivityMap reloadKey={reloadKey} compact={w.size === 'half'} />;
+      case 'inspiration': return <Inspiration reloadKey={reloadKey} />;
+      case 'note': return settings ? <QuickNote initial={settings.dashboardNote || ''} /> : null;
+      case 'next': return plans === null ? null : (
+          <div className="dash-focus" id="dash-next">
+            <div className={`dash-next ${next ? '' : 'is-free'} ${next && next.days < 0 ? 'overdue' : ''}`}
+              style={next ? { '--tone': tagColor(PLAN_STATUSES.find((s) => s.key === next.plan.status)?.color || 'blue').fg } : undefined}>
+              <div className="dash-card-kicker"><Target size={14} /> Next up</div>
+              {next ? (
+                <>
+                  <button type="button" className="dash-next-main" onClick={() => navigate(`/plan/${next.plan.id}`)}>
+                    <span className={`dash-count ${next.days === 0 ? 'word' : ''}`}>
+                      <b>{next.days === 0 ? 'Today' : Math.abs(next.days)}</b>
+                      {next.days !== 0 && <span>{next.days < 0 ? `day${next.days === -1 ? '' : 's'} late` : `day${next.days === 1 ? '' : 's'} to go`}</span>}
+                    </span>
+                    <span className="dash-next-what">
+                      <span className="dash-next-label">{next.end ? <Flag size={15} /> : <CalendarClock size={15} />} {next.label}</span>
+                      <span className="dash-next-plan"><PlanAvatar plan={next.plan} size="sm" /> {next.plan.name}{next.plan.client ? ` · ${next.plan.client}` : ''}</span>
+                      <span className="dash-next-date">{fmtDay(next.date)}</span>
+                      {elapsed(next.plan) != null && (
+                        <span className="dash-progress" title={`${Math.round(elapsed(next.plan) * 100)}% of the timeframe`}>
+                          <span style={{ width: `${elapsed(next.plan) * 100}%` }} />
+                        </span>
+                      )}
+                    </span>
+                    <ArrowRight className="dash-next-go" size={18} />
+                  </button>
+                  {later.length > 0 && (
+                    <div className="dash-later">
+                      {later.map((d) => (
+                        <button key={d.id} type="button" className={`dash-later-row ${d.days < 0 ? 'overdue' : d.days <= 1 ? 'soon' : ''}`} onClick={() => navigate(`/plan/${d.plan.id}`)}>
+                          <span className="dash-later-when">{whenLabel(d.days)}</span>
+                          <span className="dash-later-label">{d.end ? <Flag size={12} /> : null}{d.label}</span>
+                          <span className="dash-later-plan">{d.plan.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="dash-free">
+                  <span className="dash-free-ico"><CalendarRange size={22} /></span>
+                  <b>Nothing due in the next two weeks</b>
+                  <span>Add milestones or a timeframe to a plan and they count down here.</span>
+                </div>
+              )}
+            </div>
+            <div className="dash-cal" aria-label="The next two weeks">
+              <div className="dash-card-kicker"><CalendarRange size={14} /> Two weeks</div>
+              <div className="dash-cal-grid">
+                {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((w, i) => <span key={`w${i}`} className="dash-cal-wd">{w}</span>)}
+                {days.map((d) => {
+                  const tip = d.items.map((x) => `${x.label} — ${x.plan.name}`).join('\n');
+                  return (
+                    <button key={d.iso} type="button" disabled={!d.items.length}
+                      className={`dash-cal-day ${d.today ? 'today' : ''} ${d.past ? 'past' : ''} ${d.items.length ? 'has' : ''} ${d.dt.getDay() % 6 === 0 ? 'weekend' : ''}`}
+                      title={tip || undefined} onClick={() => d.items[0] && navigate(`/plan/${d.items[0].plan.id}`)}>
+                      <span className="dash-cal-num">{d.dt.getDate()}</span>
+                      <span className="dash-cal-dots">
+                        {d.items.slice(0, 3).map((x) => <i key={x.id} className={x.end ? 'end' : ''} style={{ background: tagColor(PLAN_STATUSES.find((s) => s.key === x.plan.status)?.color || 'blue').fg }} />)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="dash-cal-legend"><span><i /> Milestone</span><span><i className="end" /> Deadline</span><span><i className="today" /> Today</span></div>
+            </div>
+          </div>
+      );
+      case 'urgent': return urgent.length > 0 ? (
+          <section id="dash-urgent">
+            <div className="dash-section-head">
+              <h2><AlertTriangle size={17} className="dash-urgent-head-ico" /> Urgent <span className="count">{urgent.length}</span></h2>
+            </div>
+            <div className="dash-urgent">
+              {urgent.map((u) => (
+                <div key={`${u.kind}-${u.id}`} className="dash-urgent-row">
+                  <span className="dash-urgent-pulse" aria-hidden="true"><AlertTriangle className="dash-urgent-ico" size={15} /></span>
+                  <span className="dash-urgent-label">{u.label}</span>
+                  <span className="dash-urgent-ctx">
+                    {u.kind === 'plan' ? <PencilRuler size={12} /> : <ListTodo size={12} />} {u.context}
+                  </span>
+                  <button className="btn btn-sm dash-urgent-go" onClick={() => navigate(u.to)}>
+                    {u.kind === 'plan' ? 'Open plan' : 'Open to-dos'} <ArrowRight size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+      ) : null;
+      case 'tools': return (
+        <section>
+          <div className="dash-section-head"><h2><Layers size={16} /> Your tools</h2></div>
+          <div className="dash-grid">
+            {tools.map((t) => (
+              <button key={t.key} className="dash-card" style={{ '--glow': t.glow }} onClick={() => navigate(t.to)} onPointerMove={spotlight}>
+                <span className="dash-card-icon" style={{ backgroundImage: t.accent }}><t.icon size={22} /></span>
+                <span className="dash-card-body">
+                  <span className="dash-card-title">{t.title}</span>
+                  <span className="dash-card-sub">{t.sub}</span>
+                </span>
+                <ArrowRight className="dash-card-go" size={18} />
+              </button>
+            ))}
+          </div>
+        </section>
+      );
+      case 'pipeline': return staged > 0 ? (
+          <section>
+            <div className="dash-section-head">
+              <h2>Pipeline</h2>
+              <button className="btn btn-sm btn-ghost" onClick={() => navigate('/plan')}>All plans <ArrowRight size={14} /></button>
+            </div>
+            <div className="dash-flow" role="img" aria-label={pipeline.filter((st) => st.plans.length).map((st) => `${st.label}: ${st.plans.length}`).join(', ')}>
+              {pipeline.filter((st) => st.plans.length).map((st) => (
+                <span key={st.key} className="dash-flow-seg" style={{ flexGrow: st.plans.length, background: tagColor(st.color).fg }} title={`${st.label}: ${st.plans.length}`} />
+              ))}
+            </div>
+            <div className="dash-pipeline">
+              {pipeline.map((st) => {
+                const c = tagColor(st.color);
+                return (
+                  <button key={st.key} className={`dash-stage ${st.plans.length ? '' : 'is-empty'}`} style={{ '--tone': c.fg }} onClick={() => navigate(`/plan?status=${st.key}`)}>
+                    <span className="dash-stage-head">
+                      <span className="status-dot" style={{ background: c.fg }} />
+                      <span className="dash-stage-name">{st.label}</span>
+                      <span className="dash-stage-count" style={st.plans.length ? { background: c.bg, color: c.fg } : undefined}>{st.plans.length}</span>
+                    </span>
+                    <span className="dash-stage-plans">
+                      {st.plans.slice(0, 3).map((p) => <span key={p.id} className="dash-stage-plan">{p.name}</span>)}
+                      {st.plans.length > 3 && <span className="dash-stage-more">+{st.plans.length - 3} more</span>}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+      ) : null;
+      default: return null;
+    }
+  };
+
 
   return (
     <div className="dashboard dash-wow">
@@ -275,155 +468,44 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
         </button>
       )}
 
-      {/* What's next: a countdown to the next date, and the next two weeks */}
-      {plans !== null && (
-        <div {...rise(0, 'dash-focus')} id="dash-next">
-          <div className={`dash-next ${next ? '' : 'is-free'} ${next && next.days < 0 ? 'overdue' : ''}`}
-            style={next ? { '--tone': tagColor(PLAN_STATUSES.find((s) => s.key === next.plan.status)?.color || 'blue').fg } : undefined}>
-            <div className="dash-card-kicker"><Target size={14} /> Next up</div>
-            {next ? (
-              <>
-                <button type="button" className="dash-next-main" onClick={() => navigate(`/plan/${next.plan.id}`)}>
-                  <span className={`dash-count ${next.days === 0 ? 'word' : ''}`}>
-                    <b>{next.days === 0 ? 'Today' : Math.abs(next.days)}</b>
-                    {next.days !== 0 && <span>{next.days < 0 ? `day${next.days === -1 ? '' : 's'} late` : `day${next.days === 1 ? '' : 's'} to go`}</span>}
-                  </span>
-                  <span className="dash-next-what">
-                    <span className="dash-next-label">{next.end ? <Flag size={15} /> : <CalendarClock size={15} />} {next.label}</span>
-                    <span className="dash-next-plan"><PlanAvatar plan={next.plan} size="sm" /> {next.plan.name}{next.plan.client ? ` · ${next.plan.client}` : ''}</span>
-                    <span className="dash-next-date">{fmtDay(next.date)}</span>
-                    {elapsed(next.plan) != null && (
-                      <span className="dash-progress" title={`${Math.round(elapsed(next.plan) * 100)}% of the timeframe`}>
-                        <span style={{ width: `${elapsed(next.plan) * 100}%` }} />
-                      </span>
-                    )}
-                  </span>
-                  <ArrowRight className="dash-next-go" size={18} />
-                </button>
-                {later.length > 0 && (
-                  <div className="dash-later">
-                    {later.map((d) => (
-                      <button key={d.id} type="button" className={`dash-later-row ${d.days < 0 ? 'overdue' : d.days <= 1 ? 'soon' : ''}`} onClick={() => navigate(`/plan/${d.plan.id}`)}>
-                        <span className="dash-later-when">{whenLabel(d.days)}</span>
-                        <span className="dash-later-label">{d.end ? <Flag size={12} /> : null}{d.label}</span>
-                        <span className="dash-later-plan">{d.plan.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="dash-free">
-                <span className="dash-free-ico"><CalendarRange size={22} /></span>
-                <b>Nothing due in the next two weeks</b>
-                <span>Add milestones or a timeframe to a plan and they count down here.</span>
-              </div>
-            )}
-          </div>
-          <div className="dash-cal" aria-label="The next two weeks">
-            <div className="dash-card-kicker"><CalendarRange size={14} /> Two weeks</div>
-            <div className="dash-cal-grid">
-              {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((w, i) => <span key={`w${i}`} className="dash-cal-wd">{w}</span>)}
-              {days.map((d) => {
-                const tip = d.items.map((x) => `${x.label} — ${x.plan.name}`).join('\n');
-                return (
-                  <button key={d.iso} type="button" disabled={!d.items.length}
-                    className={`dash-cal-day ${d.today ? 'today' : ''} ${d.past ? 'past' : ''} ${d.items.length ? 'has' : ''} ${d.dt.getDay() % 6 === 0 ? 'weekend' : ''}`}
-                    title={tip || undefined} onClick={() => d.items[0] && navigate(`/plan/${d.items[0].plan.id}`)}>
-                    <span className="dash-cal-num">{d.dt.getDate()}</span>
-                    <span className="dash-cal-dots">
-                      {d.items.slice(0, 3).map((x) => <i key={x.id} className={x.end ? 'end' : ''} style={{ background: tagColor(PLAN_STATUSES.find((s) => s.key === x.plan.status)?.color || 'blue').fg }} />)}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="dash-cal-legend"><span><i /> Milestone</span><span><i className="end" /> Deadline</span><span><i className="today" /> Today</span></div>
-          </div>
-        </div>
-      )}
-
-      {/* Urgent to-dos across the board and all plans */}
-      {urgent.length > 0 && (
-        <section {...rise(1)} id="dash-urgent">
-          <div className="dash-section-head">
-            <h2><AlertTriangle size={17} className="dash-urgent-head-ico" /> Urgent <span className="count">{urgent.length}</span></h2>
-          </div>
-          <div className="dash-urgent">
-            {urgent.map((u) => (
-              <div key={`${u.kind}-${u.id}`} className="dash-urgent-row">
-                <span className="dash-urgent-pulse" aria-hidden="true"><AlertTriangle className="dash-urgent-ico" size={15} /></span>
-                <span className="dash-urgent-label">{u.label}</span>
-                <span className="dash-urgent-ctx">
-                  {u.kind === 'plan' ? <PencilRuler size={12} /> : <ListTodo size={12} />} {u.context}
-                </span>
-                <button className="btn btn-sm dash-urgent-go" onClick={() => navigate(u.to)}>
-                  {u.kind === 'plan' ? 'Open plan' : 'Open to-dos'} <ArrowRight size={14} />
-                </button>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Your tools */}
-      <section {...rise(2)}>
-        <div className="dash-section-head"><h2><Layers size={16} /> Your tools</h2></div>
-        <div className="dash-grid">
-          {tools.map((t) => (
-            <button key={t.key} className="dash-card" style={{ '--glow': t.glow }} onClick={() => navigate(t.to)} onPointerMove={spotlight}>
-              <span className="dash-card-icon" style={{ backgroundImage: t.accent }}><t.icon size={22} /></span>
-              <span className="dash-card-body">
-                <span className="dash-card-title">{t.title}</span>
-                <span className="dash-card-sub">{t.sub}</span>
+      {/* The widgets: yours to arrange (Customize) — order, size and which ones show */}
+      <div className={`dash-w-bar ${editing ? 'editing' : ''}`}>
+        {editing ? (
+          <>
+            <span className="dash-w-hint"><Settings2 size={14} /> Drag widgets by their handle, make them half or full width, hide what you don’t need.</span>
+            {hiddenW.length > 0 && (
+              <span className="dash-w-hidden">
+                {hiddenW.map((w) => <button key={w.id} type="button" className="btn btn-sm btn-ghost" onClick={() => setWidget(w.id, { hidden: false })}><Eye size={13} /> {WIDGET[w.id].label}</button>)}
               </span>
-              <ArrowRight className="dash-card-go" size={18} />
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {/* Pipeline: plans by status, as one bar and per stage */}
-      {staged > 0 && (
-        <section {...rise(3)}>
-          <div className="dash-section-head">
-            <h2>Pipeline</h2>
-            <button className="btn btn-sm btn-ghost" onClick={() => navigate('/plan')}>All plans <ArrowRight size={14} /></button>
-          </div>
-          <div className="dash-flow" role="img" aria-label={pipeline.filter((st) => st.plans.length).map((st) => `${st.label}: ${st.plans.length}`).join(', ')}>
-            {pipeline.filter((st) => st.plans.length).map((st) => (
-              <span key={st.key} className="dash-flow-seg" style={{ flexGrow: st.plans.length, background: tagColor(st.color).fg }} title={`${st.label}: ${st.plans.length}`} />
-            ))}
-          </div>
-          <div className="dash-pipeline">
-            {pipeline.map((st) => {
-              const c = tagColor(st.color);
-              return (
-                <button key={st.key} className={`dash-stage ${st.plans.length ? '' : 'is-empty'}`} style={{ '--tone': c.fg }} onClick={() => navigate(`/plan?status=${st.key}`)}>
-                  <span className="dash-stage-head">
-                    <span className="status-dot" style={{ background: c.fg }} />
-                    <span className="dash-stage-name">{st.label}</span>
-                    <span className="dash-stage-count" style={st.plans.length ? { background: c.bg, color: c.fg } : undefined}>{st.plans.length}</span>
-                  </span>
-                  <span className="dash-stage-plans">
-                    {st.plans.slice(0, 3).map((p) => <span key={p.id} className="dash-stage-plan">{p.name}</span>)}
-                    {st.plans.length > 3 && <span className="dash-stage-more">+{st.plans.length - 3} more</span>}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {/* Your rhythm over the last months, a reference to start from, a note to self */}
-      <section {...rise(4)} className="dash-rise dash-more">
-        <ActivityMap reloadKey={reloadKey} />
-        <div className="dash-duo">
-          <Inspiration reloadKey={reloadKey} />
-          {settings && <QuickNote initial={settings.dashboardNote || ''} />}
-        </div>
-      </section>
+            )}
+            <button type="button" className="btn btn-sm btn-primary" onClick={() => setEditing(false)}><Check size={14} /> Done</button>
+          </>
+        ) : <button type="button" className="btn btn-sm btn-ghost dash-w-edit" onClick={() => setEditing(true)}><Settings2 size={14} /> Customize</button>}
+      </div>
+      <div className={`dash-widgets ${editing ? 'editing' : ''}`} ref={gridRef}>
+        {shownW.map((w, i) => {
+          const content = renderWidget(w);
+          if (!content && !editing) return null;
+          const st = sort.itemState(w.id);
+          return (
+            <div key={w.id} data-sort-id={w.id} className={`dash-w ${w.size} dash-rise ${st.className}`} style={{ '--i': i }}>
+              {editing && (
+                <div className="dash-w-tools">
+                  <button type="button" className="icon-btn dash-w-grip" {...sort.grab(w.id)} aria-label={`Move ${WIDGET[w.id].label}`} title="Drag to move"><GripVertical size={15} /></button>
+                  <span className="dash-w-name">{WIDGET[w.id].label}</span>
+                  <button type="button" className="icon-btn" onClick={() => setWidget(w.id, { size: w.size === 'full' ? 'half' : 'full' })}
+                    title={w.size === 'full' ? 'Half width' : 'Full width'} aria-label={w.size === 'full' ? 'Half width' : 'Full width'}>
+                    {w.size === 'full' ? <Columns2 size={15} /> : <RectangleHorizontal size={15} />}
+                  </button>
+                  <button type="button" className="icon-btn" onClick={() => setWidget(w.id, { hidden: true })} title="Hide" aria-label={`Hide ${WIDGET[w.id].label}`}><EyeOff size={15} /></button>
+                </div>
+              )}
+              <div className="dash-w-body">{content || <div className="dash-w-empty">{EMPTY_HINT[w.id] || 'Nothing to show right now.'}</div>}</div>
+            </div>
+          );
+        })}
+      </div>
+      {sort.drag && <div className="block-ghost" style={{ left: sort.drag.x + 14, top: sort.drag.y + 12 }}><Layers size={14} /> {WIDGET[sort.drag.id]?.label}</div>}
     </div>
   );
 }

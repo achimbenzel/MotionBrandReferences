@@ -10,11 +10,12 @@ const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const dateOf = (iso) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d); };
 // One number per day: everything saved plus what was added.
 const added = (d) => d.refs + d.plans + d.mockups + d.inbox;
-const total = (d) => d.saves + added(d);
+// (a focus session counts like a few saves: 10 minutes ≈ 1)
+const total = (d) => d.saves + added(d) + Math.round((d.focus || 0) / 10);
 function breakdown(d) {
   return [
     d.refs && plural(d.refs, 'reference'), d.plans && plural(d.plans, 'plan'), d.mockups && plural(d.mockups, 'mockup'),
-    d.inbox && `${d.inbox} into the Inbox`, d.saves && plural(d.saves, 'save'),
+    d.inbox && `${d.inbox} into the Inbox`, d.saves && plural(d.saves, 'save'), d.focus && `${d.focus} min of focus`,
   ].filter(Boolean).join(' · ') || 'Nothing that day';
 }
 
@@ -24,9 +25,9 @@ function breakdown(d) {
  * references, plans, mockups and Inbox shares added. Hover a day for its
  * numbers; streak, this week and your busiest weekday on the side.
  */
-export default function ActivityMap({ reloadKey }) {
+export default function ActivityMap({ reloadKey, compact = false }) {
   const phone = useMediaQuery(PHONE);
-  const weeks = phone ? 15 : 26;
+  const weeks = phone || compact ? 15 : 26; // a quarter when it's half wide
   const [days, setDays] = useState(null);
   const [tip, setTip] = useState(null);
 

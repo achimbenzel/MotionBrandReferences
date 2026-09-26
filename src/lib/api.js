@@ -482,6 +482,20 @@ export const api = {
     const { days: list } = await request(`/api/activity?days=${days}`);
     return list;
   },
+  // A finished focus-timer session → today's focus minutes.
+  async addFocusMinutes(minutes) {
+    return request('/api/activity/focus', { method: 'POST', json: { minutes } });
+  },
+  // What you changed last → [{ key, kind, title, sub, href, thumb, gradient, emoji, avatar, t }].
+  async recent(limit = 8) {
+    const { items } = await request(`/api/recent?limit=${limit}`);
+    return items;
+  },
+  // Tick / untick one to-do of a plan's to-do block → plan.
+  async setTodoDone(planId, blockId, itemId, done) {
+    const { plan } = await request(`/api/plans/${planId}/blocks/${blockId}/items/${itemId}`, { method: 'PATCH', json: { done } });
+    return plan;
+  },
   async setDashboardBanner(file) {
     const { settings } = await request('/api/settings/dashboard-banner', { method: 'POST', ...picBody('banner', file, imageName('banner', file)) });
     return settings;
