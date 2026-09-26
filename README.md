@@ -286,7 +286,10 @@ it and show it again; your layout is saved. The widgets:
   running when you go elsewhere, shows in the sidebar (the top bar on a
   phone) and in the tab's title, and chimes (plus a notification when the
   tab is in the background) when it's done. Finished sessions add focus
-  minutes to *Your rhythm*.
+  minutes to *Your rhythm*. Your own lengths: **+** next to the presets
+  takes minutes (`45`, `1:30`, `1h 30`) and adds a chip (up to four, × to
+  remove, remembered per browser); or click the big time and type how long
+  this round should be.
 - **Continue where you left off** — the last plans, storyboards, mockups and
   references you changed, with a picture; a plan opens at the block you
   edited.
@@ -372,7 +375,10 @@ one stage at a time (archived plans only show under **Archived**). Each
     title, an optional date and a checkbox that strikes it through when done.
     In the header it's **one line** — “23 Sep – 16 Oct · 1/3 milestones ·
     next: Styleframes in 3 days” (with a red calendar when one is overdue);
-    a click opens the dates and milestones to edit,
+    a click opens the dates and milestones to edit. Next to it a small
+    **clock chip** shows the hours tracked on the plan (a click opens the
+    Time Tracker filtered to it) and ▶ / ■ starts or stops tracking time on
+    this plan (see [Time Tracker](#time-tracker)),
   - a stack of **content blocks** below the timeframe. A **new plan is empty**;
     add blocks with **+ Add block** at the bottom, **drag them into place** by
     the handle left of each block (on a phone: the small pill on its top edge;
@@ -771,6 +777,44 @@ looks printed.
 Everything **saves as you go**; the list shows a small picture of each mockup.
 ⋯ **Duplicate** / **Delete** (→ Trash, with Undo).
 
+### Time Tracker
+**Time Tracker** (sidebar, under Mockups) logs your working hours per project.
+
+- **Live tracking** — pick a **plan** (shown as “Client · Plan”) or type any
+  other project / client, an **activity** (Design, Animation, Storyboard,
+  After Effects, Website, Meeting, Research, Admin — add your own with **+**)
+  and what you're doing, then **Start**. While it runs a pill with the time
+  shows in the sidebar (the top bar on a phone) on every page; project,
+  activity, details and even the **start time** (forgot to press start?) can
+  be changed on the way. **Stop** saves an entry, **✕** throws it away, and
+  anything under a minute isn't saved. The running tracker lives on the
+  server, so it keeps going when you close the tab or switch devices.
+  Times are your browser's local time; a session over midnight is fine.
+- **From the plan** — the clock chip in a plan's header starts / stops the
+  tracker for that plan and shows its hours.
+- **Entries** — grouped by day with a daily total. **+ Add entry** for time
+  you didn't track live; every entry can be edited in place (date, from, to
+  with the duration shown as you go, project, activity, details), **Again
+  today** copies it to today to adjust, **Open the plan** jumps to its plan,
+  and **Delete** goes to the Trash (Undo).
+- **Overview** — today, this week, this month and the filtered total; filter
+  by **period** (this / last week, this / last month, all, or your own dates),
+  **plan** and **activity**, with bars per project and a split by activity.
+- **Export to Excel** — a real `.xlsx` like a classic time sheet:
+  Date, Start, End, Duration (h), Project / Client, Activity, Details &
+  results. The header is **frozen** and has **filter buttons**; project and
+  activity cells have **drop-downs** (from a hidden list sheet) so new rows
+  can be typed in Excel; durations are **formulas** (overnight works) and
+  the total at the bottom follows the filter (`SUBTOTAL`). A second
+  **Summary** sheet sums the hours per project, per activity and per month
+  (formulas, so edits in the log update it). Headings in **German** or
+  **English**; the look **like the app** (dark header, teal line) or
+  **classic blue**. The export takes the current filters, and your choices
+  are remembered. Opens in Excel, Numbers, LibreOffice and Google Sheets.
+
+Entries are stored in `data/db.json` (`timeEntries`), so they're part of the
+library export / import.
+
 ### Inbox (share from your phone)
 Everything you come across on the go — a screenshot, a screen recording, an
 Instagram / Behance / YouTube link, a quick idea — goes into the **Inbox**
@@ -962,7 +1006,9 @@ everything: the **logo** and a collapse button at the top, search (⌘K) below
 it, the Work / Reference toggle, the section list (with icons, current one
 highlighted), an **Add** button, and a footer with **Settings**, **Trash** and
 the storage meter. In **Work** mode the section list is **Dashboard**,
-**Plans**, **Software**, **To-Dos** and **Brand Tester**.
+**Plans**, **Software**, **To-Dos**, **Brand Tester**, **Storyboards**,
+**Mockups** and **Time Tracker**; a running focus timer or time tracker shows
+as a small pill under the search.
 The collapse button folds the sidebar into a slim **rail of icons** (names show
 as tooltips; Work and Reference stand one above the other) for a wider canvas;
 the button at its top unfolds it again, and the choice is remembered.
@@ -1050,7 +1096,8 @@ lookup off with `LINK_LOOKUP=off`).
   ├── upload.js       # multer (per-request tmp folder, always cleaned up)
   ├── unused.js       # unused-file scan
   ├── zip.js          # dependency-free ZIP64 export/import
-  └── routes/         # projects, plans, software, board, mockups, trash, search, settings, library, maintenance
+  ├── xlsx.js         # dependency-free .xlsx writer (time sheet export)
+  └── routes/         # projects, plans, software, board, mockups, time, trash, search, settings, library, maintenance
   ```
 - **Tests:** `npm test` starts the real server against throwaway data folders —
   including a library with every data shape older versions wrote — and checks
