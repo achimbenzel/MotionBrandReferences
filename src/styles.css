@@ -2478,14 +2478,25 @@ img { max-width: 100%; display: block; }
     display: flex; flex-direction: column; gap: 8px; padding: 14px 12px;
     transition: opacity .2s ease, transform .24s ease;
   }
-  .app[data-sidebar="collapsed"] .sidebar { width: 0; border-right-color: transparent; }
-  .app[data-sidebar="collapsed"] .sb-inner { opacity: 0; transform: translateX(-14px); }
-  .app[data-sidebar="collapsed"] .sb-reopen {
-    display: grid; position: fixed; top: 16px; left: 16px; z-index: 45;
-    background: rgba(20, 20, 22, 0.82); backdrop-filter: blur(14px); box-shadow: var(--shadow);
+  /* Folded: a slim rail of icons (names show as tooltips). */
+  .sidebar.is-rail { width: 64px; }
+  .sidebar.is-rail .sb-inner { width: 64px; padding: 14px 10px; align-items: center; gap: 6px; }
+  .sidebar.is-rail .sb-logo { display: none; }
+  .sidebar.is-rail .sb-brand { justify-content: center; padding: 0 0 4px; }
+  .sidebar.is-rail .sb-search, .sidebar.is-rail .sb-item, .sidebar.is-rail .sb-add {
+    position: relative; width: 44px; height: 40px; padding: 0; justify-content: center; gap: 0; flex: none;
   }
-  /* Give the floating reopen button its own row so it never overlaps the title. */
-  .app[data-sidebar="collapsed"] .main-inner { padding-top: 66px; }
+  .sidebar.is-rail .sb-search > span, .sidebar.is-rail .sb-search kbd,
+  .sidebar.is-rail .sb-item > span:not(.sb-badge), .sidebar.is-rail .sb-add > span { display: none; }
+  .sidebar.is-rail .sb-badge { position: absolute; top: 3px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; font-size: 10px; margin: 0; }
+  .sidebar.is-rail .sb-nav { align-items: center; }
+  .sidebar.is-rail .sb-footer { align-items: center; width: 100%; }
+  .sidebar.is-rail .storage-pill { width: 44px; flex-direction: column; justify-content: center; gap: 5px; padding: 8px 0; border-radius: 12px; }
+  .sidebar.is-rail .storage-text { flex: none; width: 24px; }
+  .sidebar.is-rail .storage-nums, .sidebar.is-rail .storage-dots { display: none; }
+  .mode-toggle.is-rail { flex-direction: column; width: 44px; padding: 4px; gap: 3px; border-radius: 14px; margin-top: 2px; box-shadow: none; }
+  .mode-toggle.is-rail .mode-btn { justify-content: center; padding: 8px 0; border-radius: 10px; }
+  .mode-toggle.is-rail .mode-label { display: none; }
 
   /* Full-bleed pages (the To-Do board) use the whole width right of the sidebar
      so extra lists can run past the usual content margins left and right. */
@@ -2537,6 +2548,12 @@ img { max-width: 100%; display: block; }
 
 .sb-grow { flex: 1; min-height: 12px; }
 .sb-footer { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--border); padding-top: 10px; }
+.sb-tip {
+  position: fixed; z-index: 190; transform: translateY(-50%); pointer-events: none; white-space: nowrap;
+  padding: 5px 9px; border-radius: 7px; background: var(--surface-3); border: 1px solid var(--border-strong);
+  color: var(--text); font-size: 12.5px; font-weight: 600; box-shadow: var(--shadow); animation: sb-tip-in .12s ease-out;
+}
+@keyframes sb-tip-in { from { opacity: 0; transform: translate(-4px, -50%); } to { opacity: 1; transform: translateY(-50%); } }
 .sidebar .storage-pill { width: 100%; background: var(--surface-2); box-shadow: none; }
 .sidebar .storage-text { flex: 1; }
 

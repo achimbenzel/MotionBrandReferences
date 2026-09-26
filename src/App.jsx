@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { ToastProvider, useToast } from './components/Toast.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
-import { PanelLeft } from 'lucide-react';
 import MobileBar from './components/MobileBar.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import UploadModal from './components/UploadModal.jsx';
@@ -103,11 +102,9 @@ function Shell() {
         onToggle={isDesktop ? () => setCollapsed((c) => !c) : () => setDrawer(false)}
         drawer={!isDesktop}
         open={drawer}
+        rail={isDesktop && collapsed}
       />
       {!isDesktop && <div className="drawer-backdrop" onClick={() => setDrawer(false)} aria-hidden="true" />}
-      <button className="sb-reopen icon-btn" onClick={() => setCollapsed(false)} title="Open sidebar" aria-label="Open sidebar">
-        <PanelLeft size={17} />
-      </button>
       <MobileBar onMenu={() => setDrawer(true)} onSearch={openSearch} onAdd={onAdd} />
       <main className="main">
         <div className={`main-inner${wide ? ' wide' : ''}`}>
