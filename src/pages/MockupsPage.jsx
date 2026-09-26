@@ -4,7 +4,7 @@ import { Plus, Box, MoreHorizontal, Copy, Trash2, UploadCloud, MonitorSmartphone
 import { api, mockupFileUrl, mockupHdriUrl } from '../lib/api.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
-import { DEVICES, DEVICE_ICON } from '../lib/mockup3d/catalog.js';
+import { DEVICES, itemIcon, OBJECTS, OBJECT_ICON, defaultObject } from '../lib/mockup3d/catalog.js';
 import { TYPES_2D, defaults2D } from '../lib/mockup2d.js';
 const fmtSize = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 const ago = (ts) => {
@@ -42,6 +42,18 @@ export default function MockupsPage() {
     try {
       const label = data.models.find((x) => x.id === modelId)?.name || '3D model';
       const m = await api.createMockup({ device: 'custom', modelId, name: `${label} mockup`, frame: '16:9' });
+      navigate(`/mockups/${m.id}`);
+    } catch (e) { toast(`Could not create: ${e.message}`, 'error'); setBusy(false); }
+  };
+  // A branding object (business card, poster, box, mug) on its own, in a fitting format and light.
+  const createObject = async (type) => {
+    setBusy(true);
+    try {
+      const frame = { card: '16:9', poster: '4:5', box: '4:5', mug: '1:1' }[type] || '16:9';
+      const m = await api.createMockup({
+        name: `${OBJECTS[type].label} mockup`, frame, items: [{ id: 'd1', device: 'object', obj: defaultObject(type), fit: 'contain' }],
+        background: { mode: 'color', color: '#EFEEEB', color2: '#FFFFFF' }, light: { setup: 'daylight', shadow: 'contact' },
+      });
       navigate(`/mockups/${m.id}`);
     } catch (e) { toast(`Could not create: ${e.message}`, 'error'); setBusy(false); }
   };
@@ -85,6 +97,8 @@ export default function MockupsPage() {
     ...data.models.map((x) => ({ label: `3D · ${x.name}`, icon: <Box size={15} />, onClick: () => create(x.id) })),
     { label: '3D · Import a model…', icon: <UploadCloud size={15} />, onClick: importAndOpen },
     { separator: true },
+    ...Object.entries(OBJECTS).map(([k, o]) => { const I = OBJECT_ICON[k]; return { label: `3D · ${o.label}`, icon: <I size={15} />, onClick: () => createObject(k) }; }),
+    { separator: true },
     ...Object.entries(TYPES_2D).map(([key, t]) => ({ label: `2D · ${t.label}`, icon: <t.icon size={15} />, onClick: () => create2D(key) })),
   ] : [];
 
@@ -93,7 +107,7 @@ export default function MockupsPage() {
       <div className="page-head-row">
         <div className="page-head">
           <h1>Mockups</h1>
-          <p>Your designs and videos on your own 3D models — or in a browser window, an Instagram or X post, story or profile. Export an image or a video, or save it into a plan.</p>
+          <p>Your designs and videos on your own 3D models, on business cards, posters, boxes and mugs — or in a browser window, an app icon, social posts and profiles. Export an image or a video, or save it into a plan.</p>
         </div>
         {data && (
           <Menu align="right" title="New mockup" trigger={<button className="btn btn-primary" disabled={busy}><Plus size={16} /> New mockup</button>} items={newItems} />
@@ -113,6 +127,14 @@ export default function MockupsPage() {
           <button type="button" className="mk-start-card" onClick={importAndOpen} disabled={busy}>
             <UploadCloud size={30} /><span className="mk-start-title">Import a 3D model</span><span className="mk-start-sub">.glb · .gltf · .usdz</span>
           </button>
+          {Object.entries(OBJECTS).map(([k, o]) => {
+            const I = OBJECT_ICON[k];
+            return (
+              <button key={k} type="button" className="mk-start-card" onClick={() => createObject(k)} disabled={busy}>
+                <I size={30} /><span className="mk-start-title">{o.label}</span><span className="mk-start-sub">3D branding mockup</span>
+              </button>
+            );
+          })}
           {Object.entries(TYPES_2D).map(([key, t]) => (
             <button key={key} type="button" className="mk-start-card" onClick={() => create2D(key)} disabled={busy}>
               <t.icon size={30} /><span className="mk-start-title">{t.label}</span><span className="mk-start-sub">2D mockup</span>
@@ -125,8 +147,9 @@ export default function MockupsPage() {
         <div className="grid">
           {data.mockups.map((m) => {
             const t2 = m.kind === '2d' ? TYPES_2D[m.d2?.type] || TYPES_2D.browser : null;
-            const I = t2?.icon || DEVICE_ICON[m.device] || MonitorSmartphone;
-            const names = (m.items || [m]).map((it) => (it.device === 'custom' ? data.models.find((x) => x.id === it.modelId)?.name || '3D model' : DEVICES[it.device]?.label));
+            const I = t2?.icon || itemIcon(m.items?.[0] || m) || MonitorSmartphone;
+            const names = (m.items || [m]).map((it) => (it.device === 'custom' ? data.models.find((x) => x.id === it.modelId)?.name || '3D model'
+              : it.device === 'object' ? OBJECTS[it.obj?.type]?.label || 'Object' : DEVICES[it.device]?.label));
             const deviceName = t2 ? `2D · ${t2.label}` : names.length > 2 ? `${names[0]} + ${names.length - 1} more` : names.join(' + ');
             return (
               <div key={m.id} className="card mk-card" onClick={() => navigate(`/mockups/${m.id}`)} role="link" tabIndex={0}

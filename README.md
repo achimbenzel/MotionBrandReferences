@@ -530,10 +530,12 @@ the Storyboards page always show the same thing.
 
 ### Mockups
 **Mockups** (sidebar, under Storyboards) puts your designs and videos on
-**your own 3D models** — rendered live in the browser (three.js), no plugins,
-nothing online — or into **2D mockups**: a browser window and look-alikes of
-Instagram and X posts, stories and profiles. **New mockup** offers both:
-*3D · ‹your model›*, *3D · Import a model…* or *2D · ‹type›*.
+**your own 3D models** and on **branding objects** (business card, poster,
+box, mug) — rendered live in the browser (three.js), no plugins, nothing
+online — or into **2D mockups**: a browser window, an app icon, profile
+pictures and look-alikes of Instagram, X, YouTube and LinkedIn pages.
+**New mockup** offers all of them: *3D · ‹your model›*, *3D · Import a
+model…*, *3D · Business card / Poster / Box / Mug* or *2D · ‹type›*.
 
 #### 3D mockups
 - **Your models**: import a **.glb**, a single-file **.gltf** or a **.usdz**
@@ -613,6 +615,26 @@ Instagram and X posts, stories and profiles. **New mockup** offers both:
   pick one of your models for it; nothing in the scene is lost. Their old
   animations (orbit, push in, reveal) became camera keys.
 
+#### Branding objects (3D)
+Plain shapes at their real sizes, lit by the same light setups / HDRIs and
+shadows as the models; **Add** puts one next to your devices, or start a
+mockup with one. Under **Print** each object lists its printed faces — click
+one, then **Upload** / **From the app**, **Position & size…**, **Fill** or
+**Show whole** (the default, so a logo isn't cropped). A PNG with
+transparency prints straight onto the paper / ceramic colour — a logo alone
+looks printed.
+- **Business card**: 85 × 55 mm, 3.5 × 2 in or square, landscape or portrait,
+  square or rounded corners; *One card*, *Front + back* side by side, or a
+  *Stack* with one card turned over; matte, silk or gloss; any card colour.
+- **Poster**: A4–A1, 50 × 70, 18 × 24 in or 24 × 36 in, portrait or
+  landscape; no frame or a black, white, oak or aluminium frame with glass
+  and an optional passe-partout; hanging *on the wall*, *leaning* against it
+  or *standing*; wall and paper colours.
+- **Box**: your width × height × depth in cm; front, sides, top and back
+  printed separately; white card, kraft or black board; matte, silk or gloss.
+- **Mug**: a print on the front or all round (but the handle); mug and
+  inside colours; glossy glaze.
+
 #### 2D mockups
 - **Browser window** (light / dark: tab with your title and icon, the address
   bar, the page in 16:10, 16:9, 4:3 or 3:2), **Instagram post** (square,
@@ -622,6 +644,15 @@ Instagram and X posts, stories and profiles. **New mockup** offers both:
   3:4 or square), **X post** (1–4 pictures laid out like X does, replies /
   reposts / likes / views) and **X profile** (header, bio, location, website,
   joined, follower counts) — light, dim and dark where the app has them.
+- **App icon**: your icon on a phone home screen among neutral stand-ins
+  (app name, notification badge, in the dock too, your own wallpaper or a
+  soft gradient) — or *at every size* it's shown (180 → 29 px, and round).
+- **Profile pictures**: your logo as a profile picture from big to tiny
+  (feed, comment, mention, 16 px), round and as rounded squares, on white,
+  black, your colour or nothing, with a story ring if you like.
+- **YouTube channel** (banner, profile picture, name, handle, subscribers,
+  description, four video thumbnails with titles) and **LinkedIn page**
+  (cover, logo, tagline, industry, followers, a post with a picture).
   These are look-alikes drawn by this app for presentations; nothing is
   posted anywhere.
 - **Click a picture** in the preview (or in the **Pictures** list) to upload

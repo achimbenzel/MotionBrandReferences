@@ -2,7 +2,7 @@
 // Instagram and X. Each type lists its texts, numbers and switches (with
 // defaults) and its picture slots. These are independent look-alikes drawn by
 // this app for presentations — nothing is posted anywhere.
-import { AppWindow, Instagram, Twitter } from 'lucide-react';
+import { AppWindow, Instagram, Twitter, Smartphone, CircleUser, Youtube, Linkedin } from 'lucide-react';
 
 const IG_ASPECTS = { '1:1': 1, '4:5': 4 / 5, '1.91:1': 1.91 };
 const PAGE_ASPECTS = { '16:10': 16 / 10, '16:9': 16 / 9, '4:3': 4 / 3, '3:2': 3 / 2 };
@@ -118,6 +118,69 @@ export const TYPES_2D = {
       { key: 'avatar', label: 'Profile picture', ratio: () => 1, round: true, small: true },
     ],
   },
+  'app-icon': {
+    label: 'App icon', icon: Smartphone, frame: 'auto', themes: ['light', 'dark'],
+    fields: [
+      { key: 'name', label: 'App name', type: 'text', def: 'Your App' },
+      { key: 'layout', label: 'Show', type: 'select', def: 'home', choices: [['home', 'On the home screen'], ['sizes', 'At every size']] },
+      { key: 'time', label: 'Time', type: 'text', def: '9:41', when: 'layout=home' },
+      { key: 'badge', label: 'Notification badge', type: 'number', def: 0, min: 0, max: 99, when: 'layout=home' },
+      { key: 'dock', label: 'Also in the dock', type: 'flag', def: true, when: 'layout=home' },
+    ],
+    slots: [
+      { key: 'icon', label: 'App icon (square)', ratio: () => 1 },
+      { key: 'wallpaper', label: 'Wallpaper', ratio: () => 390 / 844, when: 'layout=home' },
+    ],
+  },
+  avatars: {
+    label: 'Profile pictures', icon: CircleUser, frame: 'auto', themes: ['light', 'dark'],
+    fields: [
+      { key: 'name', label: 'Name', type: 'text', def: 'Your Brand' },
+      { key: 'handle', label: 'Handle', type: 'text', def: 'yourbrand' },
+      { key: 'fill', label: 'Behind the logo', type: 'select', def: 'white', choices: [['white', 'White'], ['black', 'Black'], ['brand', 'Colour below'], ['none', 'Nothing']] },
+      { key: 'color', label: 'Colour', type: 'color', def: '#2EC5D3', when: 'fill=brand' },
+      { key: 'squares', label: 'Rounded squares too', type: 'flag', def: true },
+      { key: 'ring', label: 'Story ring', type: 'flag', def: false },
+    ],
+    slots: [{ key: 'avatar', label: 'Logo / picture (square)', ratio: () => 1 }],
+  },
+  'yt-channel': {
+    label: 'YouTube channel', icon: Youtube, frame: 'auto', themes: ['light', 'dark'],
+    fields: [
+      { key: 'name', label: 'Channel name', type: 'text', def: 'Your Brand' },
+      { key: 'handle', label: 'Handle', type: 'text', def: 'yourbrand' },
+      { key: 'about', label: 'Description', type: 'textarea', def: 'Brands that move — design, motion and launch films.' },
+      { key: 'subs', label: 'Subscribers', type: 'number', def: 48200 },
+      { key: 'videos', label: 'Videos', type: 'number', def: 126 },
+      { key: 'verified', label: 'Verified', type: 'flag', def: true },
+      ...[0, 1, 2, 3].map((i) => ({ key: `t${i}`, label: `Video ${i + 1} title`, type: 'text', def: ['Our new brand, explained', 'Behind the scenes: the launch film', 'Designing the logo in 60 seconds', 'Brand motion toolkit — walkthrough'][i] })),
+    ],
+    slots: [
+      { key: 'banner', label: 'Channel banner', ratio: () => 6.2 },
+      { key: 'avatar', label: 'Profile picture', ratio: () => 1, round: true, small: true },
+      ...[0, 1, 2, 3].map((i) => ({ key: `video-${i}`, label: `Video ${i + 1} thumbnail`, ratio: () => 16 / 9 })),
+    ],
+  },
+  'li-page': {
+    label: 'LinkedIn page', icon: Linkedin, frame: 'auto', themes: ['light', 'dark'],
+    fields: [
+      { key: 'name', label: 'Company', type: 'text', def: 'Your Brand' },
+      { key: 'tagline', label: 'Tagline', type: 'text', def: 'Brands that move' },
+      { key: 'industry', label: 'Industry', type: 'text', def: 'Design Services' },
+      { key: 'location', label: 'Location', type: 'text', def: 'Berlin, Germany' },
+      { key: 'followers', label: 'Followers', type: 'number', def: 8400 },
+      { key: 'size', label: 'Company size', type: 'text', def: '11-50 employees' },
+      { key: 'post', label: 'Post', type: 'textarea', def: 'Meet our new identity — designed to move with us. ✨' },
+      { key: 'reactions', label: 'Reactions', type: 'number', def: 312 },
+      { key: 'comments', label: 'Comments', type: 'number', def: 24 },
+      { key: 'showPost', label: 'Show a post', type: 'flag', def: true },
+    ],
+    slots: [
+      { key: 'banner', label: 'Cover (≈ 6:1)', ratio: () => 5.9 },
+      { key: 'logo', label: 'Logo (square)', ratio: () => 1, small: true },
+      { key: 'post', label: 'Post picture', ratio: () => 1.91, when: 'showPost' },
+    ],
+  },
 };
 
 // X shows 1–4 pictures: one wide, two side by side, three (one tall + two), four in a grid.
@@ -126,6 +189,17 @@ export function xMediaRatio(count, i) {
   if (count === 2) return 8 / 9;
   if (count === 3) return i === 0 ? 8 / 9 : 16 / 9;
   return 16 / 9;
+}
+
+/** Is a field / slot shown? `when` = 'flag' (a switch is on) or 'key=value' (a choice is made). */
+export function shown(d, x) {
+  if (!x.when) return true;
+  const t = TYPES_2D[d.type] || TYPES_2D.browser;
+  const [key, want] = x.when.split('=');
+  const f = t.fields.find((y) => y.key === key);
+  if (!f) return true;
+  const v = fieldValue(d, f);
+  return want === undefined ? !!v : String(v) === want;
 }
 
 /** The value of a field (the saved one, or its default). */

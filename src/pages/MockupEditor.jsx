@@ -19,7 +19,10 @@ import {
 import { LIGHT_SETUPS, loadHdriTexture, analyseHdri, hdriPreview } from '../lib/mockup3d/lighting.js';
 import { buildDevice } from '../lib/mockup3d/devices.js';
 import { recordVideo, videoFormats } from '../lib/mockup3d/video.js';
-import { DEVICES, DEVICE_ICON, exportSize } from '../lib/mockup3d/catalog.js';
+import {
+  DEVICES, exportSize, itemIcon, OBJECTS, OBJECT_ICON, CARD_SIZES, POSTER_SIZES, FINISHES, POSTER_FRAMES, BOX_MATERIALS, OBJECT_COLORS, defaultObject,
+} from '../lib/mockup3d/catalog.js';
+import { buildObject } from '../lib/mockup3d/objects.js';
 import Range from '../components/Range.jsx';
 
 const MOCKUP_BOARD = /mockup/i;
@@ -43,7 +46,8 @@ const LIGHT_SWATCH = {
 
 const safeName = (s) => String(s || 'mockup').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'mockup';
 const newId = () => `d${Math.random().toString(36).slice(2, 8)}`;
-const itemLabel = (it, models) => (it.device === 'custom' ? models.find((x) => x.id === it.modelId)?.name || '3D model' : DEVICES[it.device]?.label || 'Device');
+const itemLabel = (it, models) => (it.device === 'custom' ? models.find((x) => x.id === it.modelId)?.name || '3D model'
+  : it.device === 'object' ? OBJECTS[it.obj?.type]?.label || 'Object' : DEVICES[it.device]?.label || 'Device');
 const r2 = (v) => Math.round(v * 100) / 100;
 // Put a keyframe at t (replacing one that is already there).
 const putKey = (keys, key) => [...keys.filter((k) => Math.abs(k.t - key.t) > 0.05), key].sort((a, b) => a.t - b.t);
@@ -70,6 +74,7 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
   const [loading, setLoading] = useState('');
   const [picking, setPicking] = useState(false);
   const [fitting, setFitting] = useState(false);
+  const [face, setFace] = useState('front'); // an object's printed face being edited
   const [exporting, setExporting] = useState(null); // null | { initial, formats }
   const [planFile, setPlanFile] = useState(null);
   const [quickPlan, setQuickPlan] = useState(false);
@@ -131,7 +136,11 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
   const patchAnim = useCallback((p) => patch({ animation: { ...mRef.current.animation, ...p } }), [patch]);
   const takeContent = (server) => {
     changed.current = true;
-    const next = { ...mRef.current, items: mRef.current.items.map((it) => ({ ...it, content: server.items.find((x) => x.id === it.id)?.content ?? null })), thumb: server.thumb };
+    const next = {
+      ...mRef.current,
+      items: mRef.current.items.map((it) => { const x = server.items.find((y) => y.id === it.id); return { ...it, content: x?.content ?? null, faces: x?.faces || {} }; }),
+      thumb: server.thumb,
+    };
     mRef.current = next;
     setM(next);
   };
@@ -168,9 +177,10 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
   const sel = items.find((it) => it.id === selId) || items[0] || null;
   const anim = m.animation;
   // What is built, and where it stands (not the pictures on the screens).
-  const structKey = JSON.stringify([items.map((it) => [it.id, it.device, it.modelId, it.landscape, it.lying, it.size, it.x, it.z, it.rotY, it.logo, it.hidden]),
+  const structKey = JSON.stringify([items.map((it) => [it.id, it.device, it.modelId, it.landscape, it.lying, it.size, it.x, it.z, it.rotY, it.logo, it.hidden, it.obj]),
     models.map((x) => [x.id, x.screenMesh, x.screenTurn, x.screenFlip, x.hinge])]);
-  const shapeKey = items.map((it) => `${it.id}:${it.device}:${it.modelId}:${it.landscape}:${it.lying}:${it.size}`).join('|');
+  const objShape = (o) => (o ? [o.type, o.size, o.landscape, o.layout, o.placement, o.frame, o.mat, o.w, o.h, o.d].join(',') : '');
+  const shapeKey = items.map((it) => `${it.id}:${it.device}:${it.modelId}:${it.landscape}:${it.lying}:${it.size}:${objShape(it.obj)}`).join('|');
   useEffect(() => {
     const st = stageRef.current;
     const cur = mRef.current;
@@ -181,6 +191,10 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
         st.keep(cur.items.map((it) => it.id));
         for (const it of cur.items) {
           const pos = { x: it.x, z: it.z, rotY: it.rotY };
+          if (it.device === 'object') {
+            st.setItem(it.id, { key: JSON.stringify(['obj', it.obj]), build: () => buildObject(it.obj), ...pos, screenOpts: {} });
+            continue;
+          }
           if (it.device !== 'custom') {
             st.setItem(it.id, { key: JSON.stringify(['old', it.device, it.landscape, it.lying]), build: () => buildDevice(it.device, it), ...pos, screenOpts: {} });
             continue;
@@ -263,6 +277,22 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
     if (!st) return;
     for (const it of mRef.current.items) st.setItemFit(it.id, it.fit, it.adjust);
   }, [fitKey, structKey]);
+  // An object's other printed faces (a card's back, a box's sides …), each with its own picture and fit.
+  const facesKey = JSON.stringify(items.map((it) => [it.id, it.faces]));
+  useEffect(() => {
+    const st = stageRef.current; const cur = mRef.current;
+    if (!st) return;
+    const jobs = [];
+    for (const it of cur.items) {
+      if (it.device !== 'object') continue;
+      for (const [face] of OBJECTS[it.obj?.type]?.faces || []) {
+        if (face === 'front') continue;
+        const f = it.faces?.[face];
+        jobs.push(st.setItemFace(it.id, face, f ? { url: mockupFileUrl(cur, f.file), kind: f.kind, fit: f.fit, adjust: f.adjust } : null));
+      }
+    }
+    Promise.all(jobs).then(() => refreshThumb()).catch((e) => toast(e.message, 'error'));
+  }, [facesKey, structKey, toast, refreshThumb]);
   const tlKey = JSON.stringify(items.map((it) => [it.id, it.hingeAngle, it.keys, it.videoStart, it.sound, it.volume]));
   useEffect(() => {
     const st = stageRef.current;
@@ -435,22 +465,46 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
     patch({ items: next }, true);
   };
 
-  // ---- Screen content -----------------------------------------------------------------
-  const upload = async (file) => {
+  // ---- Screen content (an object: its printed faces) ---------------------------------------
+  // The front is the device's content; an object's other faces go into its own slots.
+  const objFaces = sel?.device === 'object' ? OBJECTS[sel.obj?.type]?.faces || [] : [];
+  const curFace = objFaces.some(([k]) => k === face) ? face : 'front';
+  const faceOf = (it, f = curFace) => (it?.device === 'object' && f !== 'front' ? f : null);
+  const upload = async (file, f = curFace) => {
     if (!file || !sel) return;
     setLoading('Uploading…');
-    try { takeContent(await api.setMockupContent(id, file, sel.id)); } catch (e) { toast(`Upload failed: ${e.message}`, 'error'); setLoading(''); }
+    const slot = faceOf(sel, f);
+    try { takeContent(await (slot ? api.setMockupSlot(id, slot, file, sel.id) : api.setMockupContent(id, file, sel.id))); } catch (e) { toast(`Upload failed: ${e.message}`, 'error'); setLoading(''); }
   };
   const fromApp = async (source) => {
     setPicking(false);
     if (!sel) return;
     setLoading('Loading…');
-    try { takeContent(await api.importMockupContent(id, source, sel.id)); } catch (e) { toast(e.message, 'error'); setLoading(''); }
+    const slot = faceOf(sel);
+    try { takeContent(await (slot ? api.importMockupSlot(id, slot, source, sel.id) : api.importMockupContent(id, source, sel.id))); } catch (e) { toast(e.message, 'error'); setLoading(''); }
   };
-  const clearContent = async () => {
+  const clearContent = async (f = curFace) => {
     if (!sel) return;
-    try { takeContent(await api.clearMockupContent(id, sel.id)); } catch (e) { toast(e.message, 'error'); }
+    const slot = faceOf(sel, f);
+    try { takeContent(await (slot ? api.clearMockupSlot(id, slot, sel.id) : api.clearMockupContent(id, sel.id))); } catch (e) { toast(e.message, 'error'); }
   };
+  // What's on a face, and how it fits: { content, fit, adjust }.
+  const faceInfo = (it, f) => (faceOf(it, f) ? { content: it.faces?.[f] || null, fit: it.faces?.[f]?.fit || 'cover', adjust: it.faces?.[f]?.adjust }
+    : { content: it?.content || null, fit: it?.fit, adjust: it?.adjust });
+  const setFaceFit = (it, f, fit, adjust) => {
+    if (faceOf(it, f)) patchItem(it.id, { faces: { ...it.faces, [f]: { ...it.faces[f], fit, adjust } } });
+    else patchItem(it.id, { fit, adjust });
+  };
+  const addObject = (type) => {
+    const b = stageRef.current?.bounds;
+    const x = b && items.length ? b.max.x + 15 : 0;
+    const it = { id: newId(), device: 'object', obj: defaultObject(type), x: Math.round(x * 10) / 10, z: 0, rotY: 0, fit: 'contain', adjust: { scale: 1, x: 0, y: 0 } };
+    reframe.current = true;
+    patchItems((list) => [...list, it], true);
+    setSelId(it.id);
+    setFace('front');
+  };
+  const setObj = (p) => { if (sel?.device === 'object') patchItem(sel.id, { obj: { ...sel.obj, ...p } }); };
 
   // ---- Imported models ------------------------------------------------------------------
   const model = sel?.device === 'custom' ? models.find((x) => x.id === sel.modelId) || null : null;
@@ -562,6 +616,8 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
   const addItems = [
     ...models.map((x) => ({ label: x.name, icon: <Box size={15} />, onClick: () => addModel(x.id) })),
     ...(models.length ? [{ separator: true }] : []),
+    ...Object.entries(OBJECTS).map(([k, o]) => { const I = OBJECT_ICON[k]; return { label: o.label, icon: <I size={15} />, onClick: () => addObject(k) }; }),
+    { separator: true },
     { label: 'Import a 3D model…', icon: <UploadCloud size={15} />, onClick: () => { modelRef.current.dataset.add = '1'; modelRef.current.click(); } },
   ];
   const hinge = sel ? hingeOf(sel) : null;
@@ -592,7 +648,7 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
             {loading && <div className="mke-loading">{loading}</div>}
             {sel && !sel.content && !loading && !playing && (
               <div className="mke-empty">
-                <button type="button" className="btn btn-sm" onClick={() => fileRef.current?.click()}><UploadCloud size={14} /> Upload a picture or video</button>
+                <button type="button" className="btn btn-sm" onClick={() => { setFace('front'); fileRef.current?.click(); }}><UploadCloud size={14} /> {sel.device === 'object' ? 'Upload your design' : 'Upload a picture or video'}</button>
                 <button type="button" className="btn btn-sm" onClick={() => setPicking(true)}><Library size={14} /> From the app</button>
               </div>
             )}
@@ -618,14 +674,14 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
             <h3>Scene <span className="mke-count">{items.length} {items.length === 1 ? 'device' : 'devices'}</span></h3>
             <div className="mke-items">
               {items.map((it) => {
-                const I = DEVICE_ICON[it.device] || Box;
+                const I = itemIcon(it);
                 return (
                   <button key={it.id} type="button" className={`mke-item ${sel?.id === it.id ? 'on' : ''}`} onClick={() => setSelId(it.id)}>
                     <I size={15} /><span>{itemLabel(it, models)}</span>{it.content && <i className="mke-item-dot" title="Has a picture" />}
                   </button>
                 );
               })}
-              <Menu title="Add a device" trigger={<button type="button" className="mke-item mke-add" aria-label="Add a device"><Plus size={15} /><span>Add</span></button>} items={addItems} />
+              <Menu title="Add" trigger={<button type="button" className="mke-item mke-add" aria-label="Add a device or object"><Plus size={15} /><span>Add</span></button>} items={addItems} />
             </div>
             {items.length > 1 ? (
               <>
@@ -646,19 +702,20 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
 
           {sel && (
             <section>
-              <h3>{items.length > 1 ? `Device · ${itemLabel(sel, models)}` : 'Device'}</h3>
-              {sel.device !== 'custom' && (
+              <h3>{sel.device === 'object' ? itemLabel(sel, models) : items.length > 1 ? `Device · ${itemLabel(sel, models)}` : 'Device'}</h3>
+              {sel.device === 'object' && <ObjectSettings o={sel.obj} set={setObj} brand={brand} />}
+              {sel.device !== 'custom' && sel.device !== 'object' && (
                 <div className="mke-legacy">
                   The built-in devices were removed — this one stays as a plain screen until you pick one of your 3D models.
                   {!models.length && <> Import one first.</>}
                 </div>
               )}
-              <div className="mke-models">
+              {sel.device !== 'object' && <div className="mke-models">
                 {models.map((x) => (
                   <button key={x.id} type="button" className={sel.device === 'custom' && sel.modelId === x.id ? 'on' : ''} onClick={() => pickModel(x.id)} title={x.name}><Box size={16} /><span>{x.name}</span></button>
                 ))}
                 <button type="button" className="mke-import" onClick={() => { delete modelRef.current.dataset.add; modelRef.current.click(); }}><UploadCloud size={16} /><span>Import 3D…</span></button>
-              </div>
+              </div>}
               {sel.device === 'custom' && model && (
                 <div className="mke-model">
                   {modelInfo?.joints?.length > 0 && (
@@ -722,7 +779,42 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
             </section>
           )}
 
-          {sel && (
+          {sel?.device === 'object' && (
+            <section>
+              <h3>Print</h3>
+              <div className="m2e-slots">
+                {objFaces.map(([k, label]) => {
+                  const c = faceInfo(sel, k).content;
+                  return (
+                    <div key={k} className={`m2e-slot ${curFace === k ? 'on' : ''}`} onClick={() => setFace(k)}>
+                      <span className="m2e-thumb">{c ? (c.kind === 'video' ? <video src={mockupFileUrl(m, c.file)} muted /> : <img src={mockupFileUrl(m, c.file)} alt="" />) : <ImagePlus size={14} />}</span>
+                      <span className="m2e-slot-name">{label}</span>
+                      {c && <button type="button" className="icon-btn" onClick={(e) => { e.stopPropagation(); clearContent(k); }} aria-label={`Remove from ${label}`}><X size={13} /></button>}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="m2e-slot-actions">
+                {objFaces.length > 1 && <div className="hint">{objFaces.find(([k]) => k === curFace)?.[1]}</div>}
+                <div className="mke-row">
+                  <button className="btn btn-sm" onClick={() => fileRef.current?.click()}><UploadCloud size={14} /> Upload</button>
+                  <button className="btn btn-sm" onClick={() => setPicking(true)}><Library size={14} /> From the app</button>
+                </div>
+                {faceInfo(sel, curFace).content && (
+                  <>
+                    <button type="button" className="btn btn-sm mke-fit-btn" onClick={() => setFitting(true)}><Crop size={14} /> Position &amp; size…</button>
+                    <div className="segmented mke-seg" role="group" aria-label="Fit">
+                      <button type="button" className={faceInfo(sel, curFace).fit === 'cover' ? 'on' : ''} onClick={() => setFaceFit(sel, curFace, 'cover', { scale: 1, x: 0, y: 0 })}>Fill</button>
+                      <button type="button" className={faceInfo(sel, curFace).fit === 'contain' ? 'on' : ''} onClick={() => setFaceFit(sel, curFace, 'contain', { scale: 1, x: 0, y: 0 })}>Show whole</button>
+                    </div>
+                  </>
+                )}
+                <div className="hint">A PNG with transparency prints on the {sel.obj?.type === 'mug' ? 'mug' : 'paper'} colour — a logo alone looks printed.</div>
+              </div>
+            </section>
+          )}
+
+          {sel && sel.device !== 'object' && (
             <section>
               <h3>Screen</h3>
               {sel.content ? (
@@ -825,15 +917,18 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
           try { const mdl = await api.addMockupModel(f); setModels((ms) => [...ms, mdl]); addModel(mdl.id); } catch (err) { toast(`Import failed: ${err.message}`, 'error'); } finally { setLoading(''); }
         } else importModel(f);
       }} />
-      {picking && <MediaPicker onPick={fromApp} onClose={() => setPicking(false)} />}
-      {fitting && sel?.content && (
-        <ScreenFitter
-          info={stageRef.current?.screenInfo(sel.id)}
-          src={mockupFileUrl(m, sel.content.file)} kind={sel.content.kind}
-          fit={sel.fit} adjust={sel.adjust}
-          onChange={({ fit, adjust }) => patchItem(sel.id, { fit, adjust })}
-          onClose={() => setFitting(false)} />
-      )}
+      {picking && <MediaPicker title={sel?.device === 'object' ? 'Print on it' : undefined} onPick={fromApp} onClose={() => setPicking(false)} />}
+      {fitting && sel && faceInfo(sel, curFace).content && (() => {
+        const fi = faceInfo(sel, curFace);
+        return (
+          <ScreenFitter title={sel.device === 'object' ? `Position & size · ${objFaces.find(([k]) => k === curFace)?.[1] || 'Print'}` : undefined}
+            info={stageRef.current?.screenInfo(sel.id, curFace)}
+            src={mockupFileUrl(m, fi.content.file)} kind={fi.content.kind}
+            fit={fi.fit} adjust={fi.adjust}
+            onChange={({ fit, adjust }) => setFaceFit(sel, curFace, fit, adjust)}
+            onClose={() => setFitting(false)} />
+        );
+      })()}
       {exporting && (
         <ExportDialog title="Export mockup" storeKey="mkExport" initial={exporting.initial} name={safeName(m.name)}
           targets={exportTargets(exporting.formats)} onExport={runExport}
@@ -847,6 +942,84 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
           onClose={() => { setPlanFile(null); setQuickPlan(false); }}
           onSaved={(plan) => { setPlanFile(null); setQuickPlan(false); toast(`Mockup saved to “${plan.name}”`, 'ok', { label: 'Open plan', onClick: () => navigate(`/plan/${plan.id}`) }); }} />
       )}
+    </div>
+  );
+}
+
+const SWATCHES = (set, key, current, brand) => (
+  <div className="mke-colors">
+    <label title="Colour"><input type="color" value={(current || '#ffffff').toLowerCase()} onChange={(e) => set({ [key]: e.target.value.toUpperCase() })} /></label>
+    {[...OBJECT_COLORS, ...brand.filter((h) => !OBJECT_COLORS.includes(h.toUpperCase()))].slice(0, 14).map((hex) => (
+      <button key={hex} type="button" className={`mke-swatch ${current?.toUpperCase() === hex.toUpperCase() ? 'on' : ''}`} style={{ background: hex }} title={hex} onClick={() => set({ [key]: hex.toUpperCase() })} />
+    ))}
+  </div>
+);
+const Seg = ({ label, value, options, onChange }) => (
+  <div className="mke-optrow">
+    {label && <span className="mke-optlabel">{label}</span>}
+    <div className="segmented segmented-sm mke-seg" role="group" aria-label={label}>
+      {options.map(([k, l]) => <button key={k} type="button" className={value === k ? 'on' : ''} onClick={() => onChange(k)}>{l}</button>)}
+    </div>
+  </div>
+);
+
+/** The settings of a branding object: size, paper, finish, frame, box size, mug colours. */
+function ObjectSettings({ o, set, brand }) {
+  if (!o) return null;
+  const finish = <Seg label="Finish" value={o.finish} options={Object.entries(FINISHES).map(([k, f]) => [k, f.label])} onChange={(v) => set({ finish: v })} />;
+  if (o.type === 'card') {
+    return (
+      <div className="mke-obj">
+        <Seg label="Size" value={o.size} options={Object.entries(CARD_SIZES).map(([k, c]) => [k, c.label])} onChange={(v) => set({ size: v })} />
+        <Seg label="Shows" value={o.layout} options={[['single', 'One card'], ['pair', 'Front + back'], ['stack', 'Stack']]} onChange={(v) => set({ layout: v })} />
+        <Seg label="Format" value={o.landscape ? 'l' : 'p'} options={[['l', 'Landscape'], ['p', 'Portrait']]} onChange={(v) => set({ landscape: v === 'l' })} />
+        <Seg label="Corners" value={o.radius > 0 ? 'r' : 's'} options={[['s', 'Square'], ['r', 'Rounded']]} onChange={(v) => set({ radius: v === 'r' ? 3 : 0 })} />
+        {finish}
+        <div className="mke-subhead">Card colour</div>
+        {SWATCHES(set, 'color', o.color, brand)}
+      </div>
+    );
+  }
+  if (o.type === 'poster') {
+    return (
+      <div className="mke-obj">
+        <label className="mke-field">Size
+          <select className="input" value={o.size} onChange={(e) => set({ size: e.target.value })}>
+            {Object.entries(POSTER_SIZES).map(([k, x]) => <option key={k} value={k}>{x.label} · {x.w} × {x.h} cm</option>)}
+          </select>
+        </label>
+        <Seg label="Format" value={o.landscape ? 'l' : 'p'} options={[['p', 'Portrait'], ['l', 'Landscape']]} onChange={(v) => set({ landscape: v === 'l' })} />
+        <Seg label="Frame" value={o.frame} options={Object.entries(POSTER_FRAMES).map(([k, f]) => [k, k === 'none' ? 'None' : f.label])} onChange={(v) => set({ frame: v })} />
+        {o.frame !== 'none' && <label className="mke-check"><input type="checkbox" checked={o.mat} onChange={(e) => set({ mat: e.target.checked })} /> Passe-partout</label>}
+        <Seg label="Hangs" value={o.placement} options={[['wall', 'On the wall'], ['lean', 'Leaning'], ['free', 'Standing']]} onChange={(v) => set({ placement: v })} />
+        {o.placement !== 'free' && (<><div className="mke-subhead">Wall</div>{SWATCHES(set, 'color2', o.color2, brand)}</>)}
+        <div className="mke-subhead">Paper</div>
+        {SWATCHES(set, 'color', o.color, brand)}
+      </div>
+    );
+  }
+  if (o.type === 'box') {
+    const dim = (k, label) => (
+      <label className="mke-field m2e-num">{label}
+        <input className="input" type="number" min="1" max="200" step="0.5" value={o[k]} onChange={(e) => set({ [k]: Math.max(0.5, Math.min(200, Number(e.target.value) || 1)) })} />
+      </label>
+    );
+    return (
+      <div className="mke-obj">
+        <div className="mke-dims">{dim('w', 'Width cm')}{dim('h', 'Height cm')}{dim('d', 'Depth cm')}</div>
+        <Seg label="Board" value={o.material} options={Object.entries(BOX_MATERIALS).map(([k, x]) => [k, x.label])} onChange={(v) => set({ material: v })} />
+        {finish}
+      </div>
+    );
+  }
+  return ( // mug
+    <div className="mke-obj">
+      <Seg label="Print" value={o.wrap} options={[['front', 'Front'], ['full', 'All round']]} onChange={(v) => set({ wrap: v })} />
+      {finish}
+      <div className="mke-subhead">Mug</div>
+      {SWATCHES(set, 'color', o.color, brand)}
+      <div className="mke-subhead">Inside</div>
+      {SWATCHES(set, 'color2', o.color2, brand)}
     </div>
   );
 }

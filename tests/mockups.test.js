@@ -295,3 +295,46 @@ test('a plan\'s profile picture / banner onto a screen — also older ones saved
   fd.append('banner', new Blob([png(12, 4, [0, 0, 255])], { type: 'image/png' }), 'banner.png');
   assert.match((await srv.api(`/api/plans/${plan.id}/banner`, { method: 'POST', body: fd })).data.plan.banner, /\.png$/);
 });
+
+test('branding objects: settings sanitised, printed faces in their own slots (server-owned, fit / position editable)', async () => {
+  let r = await srv.api('/api/mockups', { method: 'POST', json: { items: [{ id: 'd1', device: 'object', obj: { type: 'card', layout: 'stack', radius: 99, color: 'red', frame: 'gold' }, faces: { back: { file: 'x.png' } } }] } });
+  const m = r.data.mockup;
+  const it = m.items[0];
+  assert.deepEqual([it.device, it.obj.type, it.obj.layout, it.obj.radius, it.obj.color, it.obj.frame, it.faces], ['object', 'card', 'stack', 10, '#F4F2EE', 'black', {}]);
+
+  // The front is the item's content; the back goes into faces.back.
+  let fd = new FormData();
+  fd.append('file', new Blob([png(8, 5, [10, 20, 30])], { type: 'image/png' }), 'front.png');
+  r = await srv.api(`/api/mockups/${m.id}/content?item=d1`, { method: 'POST', body: fd });
+  assert.equal(r.data.mockup.items[0].content.name, 'front.png');
+  fd = new FormData();
+  fd.append('file', new Blob([png(8, 5, [200, 20, 30])], { type: 'image/png' }), 'back.png');
+  r = await srv.api(`/api/mockups/${m.id}/content?item=d1&slot=back`, { method: 'POST', body: fd });
+  const back = r.data.mockup.items[0].faces.back;
+  assert.deepEqual([back.name, back.fit, back.kind], ['back.png', 'contain', 'image']);
+  assert.equal(await served(m, back.file), 200);
+
+  // A PATCH can't swap the file, only fit / position; other settings save.
+  r = await srv.api(`/api/mockups/${m.id}`, { method: 'PATCH', json: { items: [{ ...r.data.mockup.items[0], obj: { type: 'mug', wrap: 'full' }, faces: { back: { file: 'evil.png', fit: 'cover', adjust: { scale: 2, x: 0.1, y: 0 } }, side: { file: 'y.png' } } }] } });
+  const p = r.data.mockup.items[0];
+  assert.deepEqual([p.obj.type, p.obj.wrap, p.faces.back.file, p.faces.back.fit, p.faces.back.adjust.scale, p.faces.side], ['mug', 'full', back.file, 'cover', 2, undefined]);
+
+  // A device that isn't an object has no faces; bad slot names are refused.
+  const dev = (await srv.api('/api/mockups', { method: 'POST', json: { device: 'custom' } })).data.mockup;
+  assert.equal((await srv.api(`/api/mockups/${dev.id}/content?slot=back`, { method: 'POST', body: fd })).status, 404);
+  assert.equal((await srv.api(`/api/mockups/${m.id}/content?item=d1&slot=Bad!`, { method: 'DELETE' })).status, 404);
+
+  // Removing the back deletes its file; duplicating keeps the faces.
+  const dup = (await srv.api(`/api/mockups/${m.id}/duplicate`, { method: 'POST' })).data.mockup;
+  assert.equal(dup.items[0].faces.back.file, back.file);
+  r = await srv.api(`/api/mockups/${m.id}/content?item=d1&slot=back`, { method: 'DELETE' });
+  assert.equal(r.data.mockup.items[0].faces.back, undefined);
+  assert.equal(await served(m, back.file), 404);
+});
+
+test('2D branding types: app icon, profile pictures, channel, company page', async () => {
+  for (const type of ['app-icon', 'avatars', 'yt-channel', 'li-page']) {
+    const m = (await srv.api('/api/mockups', { method: 'POST', json: { kind: '2d', d2: { type, theme: 'dark', text: { name: 'Acme' } } } })).data.mockup;
+    assert.deepEqual([m.d2.type, m.d2.theme, m.d2.text.name], [type, 'dark', 'Acme']);
+  }
+});

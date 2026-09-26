@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   Heart, MessageCircle, Send, Bookmark, MoreHorizontal, BadgeCheck, ChevronLeft, ChevronRight, RotateCw, Lock, Plus, X as Close,
   Repeat2, BarChart2, Share, MapPin, Link as LinkIcon, CalendarDays, Grid3x3, Clapperboard, SquareUser, Menu as MenuIcon, ChevronDown, UserPlus, ImageIcon,
+  Globe, ThumbsUp, MessageSquare,
 } from 'lucide-react';
 import { contentBox } from '../../lib/mockup3d/fit.js';
 import { TYPES_2D, values, compact, full, xMediaRatio } from '../../lib/mockup2d.js';
@@ -194,7 +195,161 @@ function XProfile({ v, slot }) {
   );
 }
 
-const RENDER = { browser: Browser, 'ig-post': IgPost, 'ig-story': IgStory, 'ig-profile': IgProfile, 'x-post': XPost, 'x-profile': XProfile };
+// ---- App icon: on a home screen, or at every size it's shown ----------------------------
+// Neutral stand-ins for the other apps (no real apps' icons).
+const OTHER_APPS = ['#6f7cf7', '#43c59e', '#f59f45', '#e8617a', '#4bb3f0', '#9a78e8', '#f2c94c', '#56ccf2', '#eb5757', '#27ae60', '#bb6bd9', '#f2994a', '#2d9cdb', '#6fcf97', '#f78fb3', '#7f8c8d', '#e0a458', '#5c7cfa', '#20c997', '#ff8787'];
+function StatusBar({ time }) {
+  const c = '#fff';
+  return (
+    <div className="m2a-status" style={{ color: c }}>
+      <b>{time}</b>
+      <span className="m2a-ind">
+        <svg width="18" height="11" viewBox="0 0 18 11" fill={c}><rect x="0" y="7" width="3" height="4" rx="1" /><rect x="5" y="5" width="3" height="6" rx="1" /><rect x="10" y="2.5" width="3" height="8.5" rx="1" /><rect x="15" y="0" width="3" height="11" rx="1" /></svg>
+        <svg width="16" height="11" viewBox="0 0 16 11" fill="none" stroke={c} strokeWidth="1.9" strokeLinecap="round"><path d="M1.5 4.2a9.5 9.5 0 0 1 13 0" /><path d="M4.2 6.9a5.6 5.6 0 0 1 7.6 0" /><circle cx="8" cy="9.4" r="1" fill={c} stroke="none" /></svg>
+        <svg width="26" height="12" viewBox="0 0 26 12" fill="none"><rect x="0.5" y="0.5" width="22" height="11" rx="3.5" stroke={c} opacity=".45" /><rect x="2" y="2" width="17" height="8" rx="2" fill={c} /><rect x="23.6" y="4" width="1.8" height="4" rx="1" fill={c} opacity=".5" /></svg>
+      </span>
+    </div>
+  );
+}
+function AppIcon({ d, v, slot }) {
+  if (v.layout === 'sizes') {
+    const sizes = [[180, 'Home screen · 60 pt @3×'], [120, '@2×'], [87, 'Settings'], [60, 'Spotlight'], [40, 'Notifications'], [29, 'Small']];
+    return (
+      <div className="m2-appsizes">
+        <div className="m2a-hero">{slot('icon', 1, { className: 'm2a-icon m2a-big' })}<div><b>{v.name}</b><span>Your app icon at the sizes people see it</span></div></div>
+        <div className="m2a-row">
+          {sizes.map(([px, label]) => (
+            <div key={px} className="m2a-size">
+              <div style={{ width: px }}>{slot('icon', 1, { className: 'm2a-icon' })}</div>
+              <b>{px} px</b><span>{label}</span>
+            </div>
+          ))}
+        </div>
+        <div className="m2a-row m2a-round">
+          {[108, 72, 48].map((px) => (
+            <div key={px} className="m2a-size">
+              <div style={{ width: px }}>{slot('icon', 1, { round: true, className: 'm2a-icon' })}</div>
+              <b>{px} px</b><span>Round (Android)</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  const mine = <div className="m2a-app">{slot('icon', 1, { className: 'm2a-icon' })}{v.badge > 0 && <i className="m2a-badge">{Math.min(99, v.badge)}</i>}<span>{v.name}</span></div>;
+  const other = (i) => <div key={i} className="m2a-app"><div className="m2a-icon m2a-other" style={{ background: OTHER_APPS[i % OTHER_APPS.length] }} /><span className="m2a-label" /></div>;
+  return (
+    <div className={`m2-apphome ${d.theme === 'dark' ? 'dark' : ''}`}>
+      {slot('wallpaper', 390 / 844, { className: 'm2a-wall' })}
+      <div className="m2a-overlay">
+        <StatusBar time={v.time} />
+        <div className="m2a-grid">
+          {Array.from({ length: 20 }, (_, i) => (i === 5 ? <div key="mine">{mine}</div> : other(i)))}
+        </div>
+        <div className="m2a-dots"><i className="on" /><i /><i /></div>
+        <div className="m2a-dock">
+          {v.dock ? <div className="m2a-app m2a-docked">{slot('icon', 1, { className: 'm2a-icon' })}</div> : other(20)}
+          {[21, 22, 23].map(other)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- Profile pictures: your logo as a profile picture, big to tiny ----------------------
+function Avatars({ d, v, slot }) {
+  const fill = { white: '#fff', black: '#000', brand: v.color, none: 'transparent' }[v.fill] || '#fff';
+  const av = (px, round, extra = '') => (
+    <div className={`m2v-av ${round ? 'round' : 'square'} ${v.ring && round ? 'ring' : ''} ${extra}`} style={{ width: px, background: fill }}>
+      {slot('avatar', 1, { round, className: 'm2v-pic' })}
+    </div>
+  );
+  return (
+    <div className={`m2-avatars ${d.theme === 'dark' ? 'dark' : ''}`}>
+      <div className="m2v-top">
+        {av(168, true)}
+        <div className="m2v-who"><b>{v.name}</b><span>@{v.handle}</span></div>
+      </div>
+      <div className="m2v-rows">
+        <div className="m2v-row">{av(44, true)}<div className="m2v-lines"><b>{v.name}</b><i style={{ width: '70%' }} /><i style={{ width: '45%' }} /></div><small>In a feed · 44</small></div>
+        <div className="m2v-row">{av(32, true)}<div className="m2v-lines"><b>{v.handle}</b><i style={{ width: '60%' }} /></div><small>A comment · 32</small></div>
+        <div className="m2v-row">{av(24, true)}<div className="m2v-lines"><i style={{ width: '50%' }} /></div><small>A mention · 24</small></div>
+        <div className="m2v-row m2v-tiny">{av(16, true)}<div className="m2v-lines"><i style={{ width: '35%' }} /></div><small>Tiny · 16</small></div>
+      </div>
+      {v.squares && (
+        <div className="m2v-squares">
+          {[[120, 'Company page · 120'], [64, 'App / channel list · 64'], [36, 'Small · 36']].map(([px, label]) => (
+            <div key={px} className="m2v-sq">{av(px, false)}<small>{label}</small></div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- A video channel page ---------------------------------------------------------------
+function YtChannel({ v, slot }) {
+  return (
+    <div className="m2-yt">
+      {slot('banner', 6.2, { className: 'm2y-banner' })}
+      <div className="m2y-head">
+        {slot('avatar', 1, { round: true, className: 'm2y-av' })}
+        <div className="m2y-info">
+          <h2>{v.name}{v.verified && <BadgeCheck size={20} className="m2y-check" />}</h2>
+          <div className="m2y-meta"><b>@{v.handle}</b> · {compact(v.subs)} subscribers · {full(v.videos)} videos</div>
+          {v.about && <p>{v.about} <b>…more</b></p>}
+          <div className="m2y-buttons"><span className="primary">Subscribe</span><span>Join</span></div>
+        </div>
+      </div>
+      <div className="m2y-tabs"><span className="on">Home</span><span>Videos</span><span>Shorts</span><span>Playlists</span><span>Posts</span></div>
+      <div className="m2y-grid">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="m2y-video">
+            <div className="m2y-thumb">{slot(`video-${i}`, 16 / 9, { className: 'm2y-pic' })}<i>{['12:04', '4:31', '1:00', '8:47'][i]}</i></div>
+            <b>{v[`t${i}`]}</b>
+            <span>{compact([184000, 52300, 910000, 23800][i])} views · {['3 days', '2 weeks', '1 month', '2 months'][i]} ago</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---- A company page ---------------------------------------------------------------------
+function LiPage({ v, slot }) {
+  return (
+    <div className="m2-li">
+      <div className="m2l-card">
+        {slot('banner', 5.9, { className: 'm2l-banner' })}
+        <div className="m2l-body">
+          {slot('logo', 1, { className: 'm2l-logo' })}
+          <h2>{v.name}</h2>
+          {v.tagline && <p className="m2l-tag">{v.tagline}</p>}
+          <p className="m2l-meta">{[v.industry, v.location, `${compact(v.followers)} followers`, v.size].filter(Boolean).join(' · ')}</p>
+          <div className="m2l-buttons"><span className="primary"><Plus size={16} /> Follow</span><span>Visit website</span><span className="icon"><MoreHorizontal size={16} /></span></div>
+        </div>
+        <div className="m2l-tabs"><span className="on">Home</span><span>About</span><span>Posts</span><span>Jobs</span><span>People</span></div>
+      </div>
+      {v.showPost && (
+        <div className="m2l-card m2l-post">
+          <div className="m2l-phead">
+            {slot('logo', 1, { className: 'm2l-plogo' })}
+            <div><b>{v.name}</b><span>{compact(v.followers)} followers</span><span>2d · <Globe size={11} /></span></div>
+          </div>
+          {v.post && <p className="m2l-ptext">{v.post}</p>}
+          {slot('post', 1.91, { className: 'm2l-pic' })}
+          <div className="m2l-counts"><span className="m2l-reacts"><i className="a" /><i className="b" /><i className="c" /> {full(v.reactions)}</span><span>{full(v.comments)} comments</span></div>
+          <div className="m2l-actions"><span><ThumbsUp size={18} /> Like</span><span><MessageSquare size={18} /> Comment</span><span><Repeat2 size={18} /> Repost</span><span><Send size={18} /> Send</span></div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const RENDER = {
+  browser: Browser, 'ig-post': IgPost, 'ig-story': IgStory, 'ig-profile': IgProfile, 'x-post': XPost, 'x-profile': XProfile,
+  'app-icon': AppIcon, avatars: Avatars, 'yt-channel': YtChannel, 'li-page': LiPage,
+};
 
 /**
  * One 2D mockup at its natural size (in CSS px). `url(slot)` = where a slot's

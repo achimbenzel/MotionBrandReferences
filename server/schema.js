@@ -390,11 +390,12 @@ export const logoNeedsMigration = (p) => p.type === 'logo' && (
 // ---------------------------------------------------------------------------
 // Mockups — saved 3D device scenes, and 3D models imported by the user
 // ---------------------------------------------------------------------------
-export const MOCKUP_DEVICES = ['iphone', 'android', 'ipad', 'macbook', 'imac', 'watch', 'tv', 'browser', 'custom'];
+export const MOCKUP_DEVICES = ['iphone', 'android', 'ipad', 'macbook', 'imac', 'watch', 'tv', 'browser', 'custom', 'object'];
+export const MOCKUP_OBJECTS = ['card', 'poster', 'box', 'mug'];
 export const MOCKUP_FRAMES = ['16:9', '4:5', '1:1', '9:16', '3:2', 'auto'];
 export const MOCKUP_ANIMATIONS = ['none', 'turntable', 'sway', 'float', 'orbit', 'push', 'reveal'];
 export const MOCKUP_LIGHTS = ['studio', 'product', 'daylight', 'golden', 'overcast', 'office', 'neon', 'hdri'];
-export const MOCKUP_2D = ['browser', 'ig-post', 'ig-story', 'ig-profile', 'x-post', 'x-profile'];
+export const MOCKUP_2D = ['browser', 'ig-post', 'ig-story', 'ig-profile', 'x-post', 'x-profile', 'app-icon', 'avatars', 'yt-channel', 'li-page'];
 const MOCKUP_BG = ['transparent', 'color', 'gradient', 'environment'];
 const SHADOWS = ['contact', 'sun', 'both', 'none'];
 const KEY_NAME = /^[a-zA-Z][\w-]{0,30}$/;
@@ -412,6 +413,37 @@ const mockupFile = (v) => (typeof v === 'string' && /^[\w.-]+$/.test(v) ? v : nu
 const mockupContent = (c) => (c && mockupFile(c.file)
   ? { file: c.file, kind: c.kind === 'video' ? 'video' : 'image', name: str(c.name, 200) } : null);
 const DEVICE_FIELDS = ['device', 'modelId', 'color', 'landscape', 'lying', 'lid', 'url', 'fit', 'content', 'adjust'];
+
+const mapOf = (o, pick) => Object.fromEntries(Object.entries(o && typeof o === 'object' && !Array.isArray(o) ? o : {})
+  .filter(([k]) => KEY_NAME.test(k)).slice(0, 80).map(([k, v]) => [k, pick(v)]).filter(([, v]) => v !== undefined));
+// A picture with its own fit / size / position (a 2D slot, an object's printed face).
+const placedContent = (v) => {
+  const c = mockupContent(v);
+  if (!c) return undefined;
+  const adj = v.adjust && typeof v.adjust === 'object' ? v.adjust : {};
+  return { ...c, fit: v.fit === 'contain' ? 'contain' : 'cover', adjust: { scale: num(adj.scale, 0.05, 8, 1), x: num(adj.x, -3, 3, 0), y: num(adj.y, -3, 3, 0) } };
+};
+// A branding object (device 'object'): business card, poster, box or mug and how it's made.
+export function normalizeObject(o) {
+  if (!o || typeof o !== 'object') return null;
+  const pick = (v, list, d) => (list.includes(v) ? v : d);
+  return {
+    type: pick(o.type, MOCKUP_OBJECTS, 'card'),
+    size: str(o.size, 20),                  // card: eu | us | square; poster: a4 … a1, 50x70, 18x24, 24x36
+    landscape: !!o.landscape,
+    color: HEX6.test(o.color || '') ? o.color : '#F4F2EE',   // paper / card / mug
+    color2: HEX6.test(o.color2 || '') ? o.color2 : '#E9E7E2', // poster wall / mug inside
+    finish: pick(o.finish, ['matte', 'silk', 'gloss'], 'matte'),
+    radius: num(o.radius, 0, 10, 0),        // card corners (mm)
+    layout: pick(o.layout, ['single', 'pair', 'stack'], 'pair'),
+    frame: pick(o.frame, ['none', 'black', 'white', 'oak', 'alu'], 'black'),
+    mat: o.mat !== false,                   // poster passe-partout
+    placement: pick(o.placement, ['wall', 'lean', 'free'], 'wall'),
+    w: num(o.w, 1, 200, 12), h: num(o.h, 1, 200, 18), d: num(o.d, 0.5, 200, 5), // box (cm)
+    material: pick(o.material, ['white', 'kraft', 'black'], 'white'),
+    wrap: pick(o.wrap, ['front', 'full'], 'front'), // mug print
+  };
+}
 
 // One device in a scene: what it is, how it looks, what's on its screen (and
 // how the picture sits in it), where it stands on the floor.
@@ -442,13 +474,14 @@ export function normalizeMockupItem(it, i = 0) {
     videoStart: num(it?.videoStart, 0, 86400, 0), // a screen video: where in it the animation starts (s)
     sound: !!it?.sound,                     // play / export the screen video's sound
     volume: num(it?.volume, 0, 1, 1),
+    obj: it?.device === 'object' ? normalizeObject(it?.obj) || normalizeObject({ type: 'card' }) : null,
+    // An object's other printed faces (back, sides, top …); its front is `content`.
+    faces: mapOf(it?.faces, placedContent),
   };
 }
 
 // A 2D mockup (browser window, social posts / profiles): what it is, its
 // texts, numbers and switches, and the pictures in its slots.
-const mapOf = (o, pick) => Object.fromEntries(Object.entries(o && typeof o === 'object' && !Array.isArray(o) ? o : {})
-  .filter(([k]) => KEY_NAME.test(k)).slice(0, 80).map(([k, v]) => [k, pick(v)]).filter(([, v]) => v !== undefined));
 export function normalize2D(d) {
   return {
     type: MOCKUP_2D.includes(d?.type) ? d.type : 'browser',
@@ -456,12 +489,7 @@ export function normalize2D(d) {
     text: mapOf(d?.text, (v) => (typeof v === 'string' ? v.slice(0, 4000) : undefined)),
     nums: mapOf(d?.nums, (v) => (Number.isFinite(Number(v)) ? Math.max(-1e12, Math.min(1e12, Number(v))) : undefined)),
     flags: mapOf(d?.flags, (v) => (typeof v === 'boolean' ? v : undefined)),
-    slots: mapOf(d?.slots, (v) => {
-      const c = mockupContent(v);
-      if (!c) return undefined;
-      const adj = v.adjust && typeof v.adjust === 'object' ? v.adjust : {};
-      return { ...c, fit: v.fit === 'contain' ? 'contain' : 'cover', adjust: { scale: num(adj.scale, 0.05, 8, 1), x: num(adj.x, -3, 3, 0), y: num(adj.y, -3, 3, 0) } };
-    }),
+    slots: mapOf(d?.slots, placedContent),
     padding: num(d?.padding, 0, 0.45, 0.08), // space around the mockup (share of the picture's short side)
     shadow: d?.shadow !== false,
     scale: num(d?.scale, 0.2, 2, 1),

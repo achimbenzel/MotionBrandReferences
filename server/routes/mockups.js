@@ -40,7 +40,7 @@ router.get('/api/mockups/:id', async (req, res) => {
 
 // Screen content is server-owned: whatever a client sends for it is ignored.
 const withoutContent = (body) => ({
-  ...body, content: null, items: Array.isArray(body?.items) ? body.items.map((it) => ({ ...it, content: null })) : body?.items,
+  ...body, content: null, items: Array.isArray(body?.items) ? body.items.map((it) => ({ ...it, content: null, faces: {} })) : body?.items,
   d2: body?.d2 && typeof body.d2 === 'object' ? { ...body.d2, slots: {} } : body?.d2,
 });
 
@@ -57,7 +57,7 @@ router.post('/api/mockups', async (req, res) => {
 // fields at the top change the first device.
 const SCENE_FIELDS = ['name', 'camera', 'frame', 'background', 'shadow', 'light', 'animation'];
 const DEVICE_FIELDS = ['device', 'modelId', 'color', 'landscape', 'lying', 'lid', 'url', 'fit', 'adjust', 'logo', 'hidden', 'size', 'x', 'z', 'rotY',
-  'hingeAngle', 'keys', 'videoStart', 'sound', 'volume'];
+  'hingeAngle', 'keys', 'videoStart', 'sound', 'volume', 'obj'];
 router.patch('/api/mockups/:id', async (req, res) => {
   const body = req.body || {};
   const updated = await mutateDB((db) => {
@@ -67,9 +67,19 @@ router.patch('/api/mockups/:id', async (req, res) => {
     const next = { ...cur };
     for (const k of SCENE_FIELDS) if (k in body) next[k] = body[k];
     const contentOf = new Map(cur.items.map((it) => [it.id, it.content]));
+    const facesOf = new Map(cur.items.map((it) => [it.id, it.faces]));
+    // An object's printed faces are server-owned like the screen — only their fit / size / position change here.
+    const faces = (it) => {
+      const own = facesOf.get(it?.id) ?? (it?.contentFrom ? facesOf.get(it.contentFrom) : null) ?? {};
+      const out = { ...own };
+      for (const [k, v] of Object.entries(it?.faces && typeof it.faces === 'object' ? it.faces : {})) {
+        if (out[k] && v && typeof v === 'object') out[k] = { ...out[k], ...(v.adjust ? { adjust: v.adjust } : {}), ...(v.fit ? { fit: v.fit } : {}) };
+      }
+      return out;
+    };
     if (Array.isArray(body.items) && body.items.length) {
       next.items = body.items.map((it) => ({
-        ...it, content: contentOf.get(it?.id) ?? (it?.contentFrom ? contentOf.get(it.contentFrom) ?? null : null),
+        ...it, content: contentOf.get(it?.id) ?? (it?.contentFrom ? contentOf.get(it.contentFrom) ?? null : null), faces: faces(it),
       }));
     } else if (DEVICE_FIELDS.some((k) => k in body)) {
       const first = { ...cur.items[0] };
@@ -121,29 +131,43 @@ router.delete('/api/mockups/:id', async (req, res) => {
 
 // ---- The picture / video on a device's screen (or in a 2D mockup's slot) --------
 // ?item=<device id> picks the device (default: the first one); a 2D mockup
-// takes ?slot=<name> (avatar, banner, media-0 …). A replaced file is removed
-// once nothing in the scene shows it any more.
+// takes ?slot=<name> (avatar, banner, media-0 …), and so does an object's
+// printed face other than its front (?item=…&slot=back / side / top). A
+// replaced file is removed once nothing in the scene shows it any more.
 const SLOT = /^[a-z][a-z0-9-]{0,30}$/;
-const filesIn = (scene) => [...scene.items.map((x) => x.content?.file), ...Object.values(scene.d2?.slots || {}).map((x) => x?.file)].filter(Boolean);
+const filesIn = (scene) => [
+  ...scene.items.flatMap((x) => [x.content?.file, ...Object.values(x.faces || {}).map((f) => f?.file)]),
+  ...Object.values(scene.d2?.slots || {}).map((x) => x?.file),
+].filter(Boolean);
 async function setContent(id, { item: itemId, slot }, write) {
   const db = await readDB();
   const m = db.mockups.find((x) => x.id === id);
   if (!m) return null;
   const scene = normalizeMockup(m);
-  if (slot && (scene.kind !== '2d' || !SLOT.test(slot))) return null;
-  const target = slot ? null : itemId ? scene.items.find((it) => it.id === itemId) : scene.items[0];
-  if (!slot && !target) return null;
+  if (slot && !SLOT.test(slot)) return null;
+  const flat = scene.kind === '2d';
+  const target = slot && flat ? null : itemId ? scene.items.find((it) => it.id === itemId) : scene.items[0];
+  if (!(slot && flat) && !target) return null;
+  if (slot && !flat && target.device !== 'object') return null;
   const content = await write(mockupDir(id));
   let old = null;
   const updated = await mutateDB((d) => {
     const i = d.mockups.findIndex((y) => y.id === id);
     if (i === -1) return null;
     const cur = normalizeMockup(d.mockups[i]);
-    if (slot) {
+    if (slot && flat) {
       old = cur.d2.slots[slot]?.file || null;
       const slots = { ...cur.d2.slots };
       if (content) slots[slot] = { ...content, adjust: { scale: 1, x: 0, y: 0 } }; else delete slots[slot];
       cur.d2 = { ...cur.d2, slots };
+    } else if (slot) {
+      const it = cur.items.find((x) => x.id === target.id);
+      if (!it) return null;
+      old = it.faces?.[slot]?.file || null;
+      const faces = { ...it.faces };
+      // Printed: shown whole at first (a logo isn't cropped); Fill is a click away.
+      if (content) faces[slot] = { ...content, fit: 'contain', adjust: { scale: 1, x: 0, y: 0 } }; else delete faces[slot];
+      it.faces = faces;
     } else {
       const it = cur.items.find((x) => x.id === target.id);
       if (!it) return null;

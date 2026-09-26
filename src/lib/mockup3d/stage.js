@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { clone as cloneWithSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { screenMaterial, fitScreen } from './screen.js';
+import { fitPrint, releasePrint } from './print.js';
 import { LIGHT_SETUPS, makeEnvironment, lightDir, ContactShadow } from './lighting.js';
 import { FRAMES } from './catalog.js';
 
@@ -295,7 +296,7 @@ export class MockupStage {
 
   /** Render a frame (the contact shadow first). */
   draw() {
-    if (this.contact.group.visible) this.contact.update(this.renderer, this.scene, [this.floor, this.selBox]);
+    if (this.contact.group.visible) this.contact.update(this.renderer, this.scene, [this.floor, this.selBox, ...this.backdrops()]);
     this.renderer.render(this.scene, this.camera);
     this.dirty = false;
   }
@@ -373,7 +374,7 @@ export class MockupStage {
     return { w: s.x, d: s.z, h: s.y };
   }
 
-  contentTextures() { return new Set([...this.items.values()].map((it) => it.content?.texture).filter(Boolean)); }
+  contentTextures() { return new Set(this.allMedia().map((c) => c.texture).filter(Boolean)); }
 
   /** Where things are: bounds, the points views frame, the pivot, light and shadow reach. */
   layout() {
@@ -385,9 +386,10 @@ export class MockupStage {
     const points = [];
     for (const it of this.items.values()) {
       if (!it.group) continue;
-      box.expandByObject(it.group);
+      // A backdrop (a poster's wall) is left out: views frame the object, not the wall.
+      it.group.traverse((o) => { if (o.isMesh && o.visible && !o.userData.backdrop) box.expandByObject(o, false); });
       it.group.traverse((o) => {
-        if (!o.isMesh || !o.visible || points.length > 12000) return;
+        if (!o.isMesh || !o.visible || o.userData.backdrop || points.length > 12000) return;
         if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
         const b = o.geometry.boundingBox;
         for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) points.push(new THREE.Vector3(x, y, z).applyMatrix4(o.matrixWorld));
@@ -426,7 +428,11 @@ export class MockupStage {
     const it = this.selected ? this.items.get(this.selected) : null;
     const show = !!it?.group && this.items.size > 1 && !this.exporting && !this.playing;
     this.selBox.visible = show;
-    if (show) { this.scene.updateMatrixWorld(true); this.selBox.box.setFromObject(it.group); }
+    if (show) {
+      this.scene.updateMatrixWorld(true);
+      this.selBox.box.makeEmpty();
+      it.group.traverse((o) => { if (o.isMesh && o.visible && !o.userData.backdrop) this.selBox.box.expandByObject(o, false); });
+    }
     this.dirty = true;
   }
 
@@ -488,13 +494,85 @@ export class MockupStage {
   }
 
   // ---- Screen content --------------------------------------------------------------
+  /** Every picture / video in use (screens and printed faces). */
+  allMedia() {
+    const out = [];
+    for (const it of this.items.values()) {
+      if (it.content) out.push(it.content);
+      for (const f of Object.values(it.faces || {})) if (f?.media) out.push(f.media);
+    }
+    return out;
+  }
+
+  backdrops() {
+    const out = [];
+    for (const it of this.items.values()) it.group?.traverse((o) => { if (o.userData.backdrop) out.push(o); });
+    return out;
+  }
+
+  releaseMedia(c) {
+    if (!c || this.allMedia().includes(c)) return; // still shown elsewhere
+    c.texture?.dispose();
+    if (c.video) { c.video.pause(); c.video.removeAttribute('src'); c.video.load(); }
+  }
+
   dropContent(it) {
     const c = it.content;
     it.content = null; it.contentUrl = null;
-    if (!c) return;
-    if ([...this.items.values()].some((x) => x !== it && x.content === c)) return; // still shown elsewhere
-    c.texture?.dispose();
-    if (c.video) { c.video.pause(); c.video.removeAttribute('src'); c.video.load(); }
+    const faces = Object.values(it.faces || {}).map((f) => f.media);
+    it.faces = {};
+    for (const s of it.screens || []) if (s.print) releasePrint(s.material || s.mesh.material);
+    for (const x of [c, ...faces]) this.releaseMedia(x);
+  }
+
+  /** A picture / video → { texture, video?, aspect } (shared with another device showing the same file). */
+  async loadMedia(content) {
+    const url = content.url;
+    const same = [...this.items.values()].flatMap((x) => [[x.contentUrl, x.content], ...Object.values(x.faces || {}).map((f) => [f.url, f.media])])
+      .find(([u, m]) => u === url && m);
+    if (same) return same[1];
+    if (content.kind === 'video') {
+      const video = document.createElement('video');
+      Object.assign(video, { src: url, muted: true, loop: true, playsInline: true, crossOrigin: 'anonymous', preload: 'auto' });
+      await new Promise((resolve, reject) => {
+        video.addEventListener('loadeddata', resolve, { once: true });
+        video.addEventListener('error', () => reject(new Error('The video can’t be played here')), { once: true });
+      });
+      if (!this.paused) video.play().catch(() => {});
+      const texture = new THREE.VideoTexture(video);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      return { texture, video, aspect: (video.videoWidth || 16) / (video.videoHeight || 9) };
+    }
+    const texture = await new THREE.TextureLoader().loadAsync(url);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+    return { texture, aspect: (texture.image?.width || 16) / (texture.image?.height || 9) };
+  }
+
+  /**
+   * A printed face of an object other than its front (a card's back, a box's
+   * sides …): { url, kind } or null, with its own fit / adjust.
+   */
+  async setItemFace(id, face, content) {
+    const it = this.items.get(id);
+    if (!it) return;
+    it.faces = it.faces || {};
+    const cur = it.faces[face];
+    const url = content?.url || null;
+    if (cur) { cur.fit = content?.fit || 'cover'; cur.adjust = content?.adjust || null; }
+    if ((cur?.url || null) === url) { this.applyItem(it); return; }
+    const old = cur?.media;
+    const token = (it.faceToken = (it.faceToken || 0) + 1);
+    if (!url) { delete it.faces[face]; this.releaseMedia(old); this.applyItem(it); return; }
+    it.faces[face] = { url, media: null, fit: content.fit || 'cover', adjust: content.adjust || null };
+    it.loading = true;
+    try {
+      const media = await this.loadMedia(content);
+      if (!this.items.has(id) || it.faces[face]?.url !== url) { this.releaseMedia(media); return; }
+      it.faces[face].media = media;
+      this.releaseMedia(old);
+      this.applyItem(it);
+    } finally { if (token === it.faceToken) it.loading = false; }
   }
 
   /** Show a picture / video ({ url, kind }) on a device, or nothing (null). Resolves once loaded. */
@@ -507,30 +585,10 @@ export class MockupStage {
     it.contentUrl = url;
     const token = (it.contentToken = (it.contentToken || 0) + 1);
     if (!url) { this.applyItem(it); return; }
-    // The same file on another device: share its texture.
-    const same = [...this.items.values()].find((x) => x !== it && x.contentUrl === url && x.content);
-    if (same) { it.content = same.content; this.applyItem(it); return; }
     it.loading = true;
     try {
-      let next;
-      if (content.kind === 'video') {
-        const video = document.createElement('video');
-        Object.assign(video, { src: url, muted: true, loop: true, playsInline: true, crossOrigin: 'anonymous', preload: 'auto' });
-        await new Promise((resolve, reject) => {
-          video.addEventListener('loadeddata', resolve, { once: true });
-          video.addEventListener('error', () => reject(new Error('The video can’t be played here')), { once: true });
-        });
-        if (!this.paused) video.play().catch(() => {});
-        const texture = new THREE.VideoTexture(video);
-        texture.colorSpace = THREE.SRGBColorSpace;
-        next = { texture, video, aspect: (video.videoWidth || 16) / (video.videoHeight || 9) };
-      } else {
-        const texture = await new THREE.TextureLoader().loadAsync(url);
-        texture.colorSpace = THREE.SRGBColorSpace;
-        texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
-        next = { texture, aspect: (texture.image?.width || 16) / (texture.image?.height || 9) };
-      }
-      if (token !== it.contentToken || !this.items.has(id)) { next.texture.dispose(); next.video?.pause(); return; }
+      const next = await this.loadMedia(content);
+      if (token !== it.contentToken || !this.items.has(id)) { this.releaseMedia(next); return; }
       it.content = next;
       this.applyItem(it);
     } finally { if (token === it.contentToken) it.loading = false; }
@@ -548,22 +606,28 @@ export class MockupStage {
 
   applyItem(it) {
     for (const s of it.screens || []) {
-      fitScreen(s.mesh.material, it.content?.texture || null, {
-        screenAspect: s.aspect, contentAspect: it.content?.aspect || 1, turn: s.turn + (it.screenOpts?.turn || 0),
-        fit: it.fit, adjust: it.adjust, flipV: it.screenOpts?.flipV, mirror: it.screenOpts?.mirror,
-      });
+      // A screen / print shows the item's content ("front"), a printed face its own picture.
+      const f = s.face && s.face !== 'front' ? it.faces?.[s.face] : null;
+      const media = s.face && s.face !== 'front' ? f?.media : it.content;
+      const opts = {
+        screenAspect: s.aspect, contentAspect: media?.aspect || 1, turn: s.turn + (it.screenOpts?.turn || 0),
+        fit: f ? f.fit : it.fit, adjust: f ? f.adjust : it.adjust, flipV: it.screenOpts?.flipV, mirror: it.screenOpts?.mirror,
+      };
+      if (s.print) fitPrint(s.material || s.mesh.material, media?.texture || null, opts);
+      else fitScreen(s.mesh.material, media?.texture || null, opts);
     }
     this.dirty = true;
   }
 
-  /** What the fitter needs to know about a device's screen. */
-  screenInfo(id) {
+  /** What the fitter needs to know about a device's screen (or an object's printed face). */
+  screenInfo(id, face = 'front') {
     const it = this.items.get(id);
-    const s = it?.screens?.[0];
+    const s = (it?.screens || []).find((x) => (x.face || 'front') === face);
     if (!s) return null;
+    const media = face === 'front' ? it.content : it.faces?.[face]?.media;
     return {
       aspect: s.aspect, turn: s.turn + (it.screenOpts?.turn || 0), guide: s.guide || null,
-      contentAspect: it.content?.aspect || null,
+      contentAspect: media?.aspect || null,
     };
   }
 
@@ -630,7 +694,7 @@ export class MockupStage {
     this.dirty = true;
   }
 
-  get videos() { return [...new Set([...this.items.values()].map((it) => it.content?.video).filter(Boolean))]; }
+  get videos() { return [...new Set(this.allMedia().map((c) => c.video).filter(Boolean))]; }
 
   setPaused(paused) {
     this.paused = paused;
@@ -987,7 +1051,9 @@ export class MockupStage {
           v.addEventListener('seeked', done);
           v.currentTime = at;
         })));
-        for (const it of this.items.values()) if (it.content?.video) it.content.texture.needsUpdate = true;
+        for (const c of this.allMedia()) if (c.video) c.texture.needsUpdate = true;
+        // Printed faces show their own copies of a video texture.
+        for (const it of this.items.values()) for (const sc of it.screens || []) { const mp = (sc.material || sc.mesh.material).map; if (sc.print && mp?.isVideoTexture) mp.needsUpdate = true; }
         this.draw();
         await onFrame(this.renderer.domElement, t, i, frames);
       }

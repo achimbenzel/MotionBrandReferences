@@ -36,6 +36,7 @@ const imageName = (kind, file) => {
   const ext = /\.(png|jpe?g|webp|gif|avif|svg)$/i.exec(file?.name || '')?.[0] || IMAGE_TYPES[file?.type] || '.png';
   return `${kind}${ext.toLowerCase()}`;
 };
+const slotQuery = (slot, item) => `slot=${encodeURIComponent(slot)}${item ? `&item=${encodeURIComponent(item)}` : ''}`;
 const RETRY_DELAYS = [300, 800, 1600, 3000];
 const REPEATABLE = new Set(['GET', 'HEAD', 'PATCH', 'PUT']);
 const wait = (ms) => new Promise((r) => { setTimeout(r, ms); });
@@ -229,14 +230,15 @@ export const api = {
   async importMockupContent(id, source, item) { const { mockup } = await request(`/api/mockups/${id}/content/import${item ? `?item=${encodeURIComponent(item)}` : ''}`, { method: 'POST', json: { source } }); return mockup; },
   async clearMockupContent(id, item) { const { mockup } = await request(`/api/mockups/${id}/content${item ? `?item=${encodeURIComponent(item)}` : ''}`, { method: 'DELETE' }); return mockup; },
   // A picture in a 2D mockup's slot (avatar, banner, media-0 …).
-  async setMockupSlot(id, slot, file) {
+  // (a 3D object's printed face: pass the device as `item`)
+  async setMockupSlot(id, slot, file, item) {
     const fd = new FormData();
     fd.append('file', file, file.name || 'picture.png');
-    const { mockup } = await request(`/api/mockups/${id}/content?slot=${encodeURIComponent(slot)}`, { method: 'POST', body: fd });
+    const { mockup } = await request(`/api/mockups/${id}/content?${slotQuery(slot, item)}`, { method: 'POST', body: fd });
     return mockup;
   },
-  async importMockupSlot(id, slot, source) { const { mockup } = await request(`/api/mockups/${id}/content/import?slot=${encodeURIComponent(slot)}`, { method: 'POST', json: { source } }); return mockup; },
-  async clearMockupSlot(id, slot) { const { mockup } = await request(`/api/mockups/${id}/content?slot=${encodeURIComponent(slot)}`, { method: 'DELETE' }); return mockup; },
+  async importMockupSlot(id, slot, source, item) { const { mockup } = await request(`/api/mockups/${id}/content/import?${slotQuery(slot, item)}`, { method: 'POST', json: { source } }); return mockup; },
+  async clearMockupSlot(id, slot, item) { const { mockup } = await request(`/api/mockups/${id}/content?${slotQuery(slot, item)}`, { method: 'DELETE' }); return mockup; },
   async setMockupThumb(id, blob) {
     const fd = new FormData(); fd.append('thumb', blob, 'thumb.webp');
     const { mockup } = await request(`/api/mockups/${id}/thumb`, { method: 'POST', body: fd }); return mockup;

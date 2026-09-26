@@ -11,7 +11,7 @@ import ExportDialog from '../components/ExportDialog.jsx';
 import MediaPicker from '../components/mockups/MediaPicker.jsx';
 import ScreenFitter from '../components/mockups/ScreenFitter.jsx';
 import Mockup2D from '../components/mockups2d/Mockup2D.jsx';
-import { TYPES_2D, fieldValue, defaults2D } from '../lib/mockup2d.js';
+import { TYPES_2D, fieldValue, defaults2D, shown } from '../lib/mockup2d.js';
 import { FRAMES } from '../lib/mockup3d/catalog.js';
 import Range from '../components/Range.jsx';
 
@@ -21,6 +21,11 @@ const FORMATS = ['auto', ...Object.keys(FRAMES)];
 const safeName = (s) => String(s || 'mockup').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'mockup';
 // The picture's own size — the preview is zoomed out, and the screenshot would otherwise use the zoomed size.
 const ownSize = (el) => ({ width: el.offsetWidth, height: el.offsetHeight });
+// Capture the picture without the editor's marks (the highlight of the picture being edited).
+async function capture(el, opts) {
+  el.classList.add('capturing');
+  try { return await domToBlob(el, { ...ownSize(el), ...opts }); } finally { el.classList.remove('capturing'); }
+}
 const bgCss = (bg) => (bg.mode === 'color' ? bg.color : bg.mode === 'gradient' || bg.mode === 'environment' ? `linear-gradient(180deg, ${bg.color2}, ${bg.color})` : 'transparent');
 
 /**
@@ -70,7 +75,7 @@ export default function Mockup2DEditor({ initial }) {
     const el = canvasRef.current;
     if (!el) return;
     try {
-      const blob = await domToBlob(el, { ...ownSize(el), scale: 640 / el.offsetWidth, type: 'image/webp', quality: 0.85 });
+      const blob = await capture(el, { scale: 640 / el.offsetWidth, type: 'image/webp', quality: 0.85 });
       if (blob) await api.setMockupThumb(id, blob);
     } catch { /* the list shows an icon instead */ }
   }, [id]);
@@ -203,7 +208,7 @@ export default function Mockup2DEditor({ initial }) {
   };
 
   // ---- Pictures ---------------------------------------------------------------------------
-  const slots = type.slots.filter((s) => !s.when || fieldValue(d, type.fields.find((f) => f.key === s.when) || {}));
+  const slots = type.slots.filter((s) => shown(d, s));
   const pick = (key) => { setActive(key); };
   const upload = async (file, key = active) => {
     if (!file || !key) return;
@@ -255,7 +260,7 @@ export default function Mockup2DEditor({ initial }) {
     const bg = background === 'transparent' ? 'transparent' : background === 'white' ? '#FFFFFF' : background === 'black' ? '#000000' : background === 'color' ? color : null;
     if (bg) { setOverride(bg); await new Promise((r) => { requestAnimationFrame(() => requestAnimationFrame(r)); }); }
     try {
-      return await domToBlob(el, { ...ownSize(el), scale: width / el.offsetWidth, type: mime, quality, backgroundColor: null });
+      return await capture(el, { scale: width / el.offsetWidth, type: mime, quality, backgroundColor: null });
     } finally { if (bg) setOverride(null); }
   };
   const targets = () => {
@@ -284,7 +289,7 @@ export default function Mockup2DEditor({ initial }) {
 
   const bg = m.background;
   const setBg = (p) => patch({ background: { ...bg, ...p } });
-  const visibleFields = type.fields.filter((f) => !f.when || fieldValue(d, type.fields.find((x) => x.key === f.when) || {}));
+  const visibleFields = type.fields.filter((f) => shown(d, f));
 
   return (
     <div className="mke m2e">
@@ -379,6 +384,15 @@ export default function Mockup2DEditor({ initial }) {
                   return (
                     <label key={f.key} className="mke-field">{f.label}
                       <select className="input" value={val} onChange={(e) => setField(f, e.target.value)}>{f.choices.map(([k2, l]) => <option key={k2} value={k2}>{l}</option>)}</select>
+                    </label>
+                  );
+                }
+                if (f.type === 'color') {
+                  return (
+                    <label key={f.key} className="mke-field">{f.label}
+                      <span className="m2e-color"><input type="color" value={/^#[0-9a-f]{6}$/i.test(val) ? val.toLowerCase() : '#000000'} onChange={(e) => setField(f, e.target.value.toUpperCase())} />
+                        {brand.slice(0, 8).map((hex) => <button key={hex} type="button" className="mke-swatch" style={{ background: hex }} title={hex} onClick={() => setField(f, hex.toUpperCase())} />)}
+                      </span>
                     </label>
                   );
                 }

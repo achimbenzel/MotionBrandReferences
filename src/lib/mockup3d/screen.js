@@ -57,10 +57,15 @@ export { contentBox };
  * heights as you see it, y down), flipV / mirror for imported models whose
  * UVs run the other way.
  */
-export function fitScreen(mat, texture, { screenAspect, contentAspect, turn = 0, fit = 'cover', adjust, flipV = false, mirror = false }) {
+export function fitScreen(mat, texture, opts) {
   mat.uniforms.map.value = texture || null;
   mat.uniforms.hasMap.value = texture ? 1 : 0;
   if (!texture) return;
+  mat.uniforms.uvT.value.copy(fitMatrix(opts));
+}
+
+/** The screen-uv → picture-uv transform behind fitScreen (also used for printed surfaces). */
+export function fitMatrix({ screenAspect, contentAspect, turn = 0, fit = 'cover', adjust, flipV = false, mirror = false }) {
   const { q, cw, ch, vw, vh } = contentBox({ screenAspect, contentAspect, turn, fit });
   const k = Math.max(0.01, adjust?.scale || 1);
   const dx = (adjust?.x || 0) * vw; const dy = -(adjust?.y || 0) * vh;
@@ -73,5 +78,5 @@ export function fitScreen(mat, texture, { screenAspect, contentAspect, turn = 0,
   const rot = new THREE.Matrix3().set(cos, sin, 0, -sin, cos, 0, 0, 0, 1);
   const shift = new THREE.Matrix3().set(1, 0, -dx, 0, 1, -dy, 0, 0, 1);
   const toPic = new THREE.Matrix3().set((mirror ? -1 : 1) / (cw * k), 0, 0.5, 0, (flipV ? -1 : 1) / (ch * k), 0.5, 0, 0, 1);
-  mat.uniforms.uvT.value.copy(toPic.multiply(shift).multiply(rot).multiply(toUnits).multiply(m));
+  return toPic.multiply(shift).multiply(rot).multiply(toUnits).multiply(m);
 }
