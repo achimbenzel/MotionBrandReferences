@@ -404,3 +404,37 @@ test('board cards can belong to a plan; single-card add / move / unlink leave th
   assert.equal(linked.planId, plan.id);
   assert.equal('junk' in linked, false);
 });
+
+test('plan tabs: templates place blocks, tab and collapsed save, moves swap within a tab, templates keep tabs', async () => {
+  const plan = await newPlan({ name: 'Tabs', template: 'launch' });
+  const tabOf = (p, title) => p.blocks.find((b) => b.title === title).tab;
+  assert.deepEqual(['Briefing', 'Moodboard', 'Script & voice-over', 'Review'].map((t) => tabOf(plan, t)), ['brief', 'concept', 'production', 'delivery']);
+  assert.ok(!plan.blocks.some((b) => b.type === 'heading'), 'tabs replace the launch headings');
+
+  // Adding into a tab, moving to another tab, collapsing any block.
+  let r = await srv.api(`/api/plans/${plan.id}/blocks`, { method: 'POST', json: { type: 'text', tab: 'concept' } });
+  const text = r.data.block;
+  assert.equal(text.tab, 'concept');
+  r = await srv.api(`/api/plans/${plan.id}/blocks/${text.id}`, { method: 'PATCH', json: { tab: 'delivery', collapsed: true } });
+  let saved = r.data.plan.blocks.find((b) => b.id === text.id);
+  assert.deepEqual([saved.tab, saved.collapsed], ['delivery', true]);
+  r = await srv.api(`/api/plans/${plan.id}/blocks/${text.id}`, { method: 'PATCH', json: { tab: 'nowhere' } });
+  assert.equal(r.data.plan.blocks.find((b) => b.id === text.id).tab, 'delivery');
+  assert.equal((await srv.api(`/api/plans/${plan.id}/blocks`, { method: 'POST', json: { type: 'links', tab: 'x' } })).data.block.tab, undefined);
+
+  // Within a tab the neighbour can be further away: swap with a given block.
+  const ids = r.data.plan.blocks.map((b) => b.id);
+  const mood = plan.blocks.find((b) => b.title === 'Moodboard').id;
+  const palette = plan.blocks.find((b) => b.title === 'Palette').id;
+  r = await srv.api(`/api/plans/${plan.id}/blocks/${mood}/move`, { method: 'POST', json: { with: palette } });
+  const after = r.data.plan.blocks.map((b) => b.id);
+  assert.equal(after.indexOf(mood), ids.indexOf(palette));
+  assert.equal(after.indexOf(palette), ids.indexOf(mood));
+
+  // A plan made before tabs: saved as a template, its blocks get the tab they sat in.
+  const old = await newPlan({ name: 'Old style' });
+  for (const type of ['heading', 'moodboard', 'review']) await srv.api(`/api/plans/${old.id}/blocks`, { method: 'POST', json: { type } });
+  const t = await srv.api('/api/plan-templates', { method: 'POST', json: { planId: old.id, name: 'Old style tpl' } });
+  const fromTpl = await newPlan({ template: t.data.template.id });
+  assert.deepEqual(fromTpl.blocks.map((b) => [b.type, b.tab]), [['heading', 'concept'], ['moodboard', 'concept'], ['review', 'delivery']]);
+});

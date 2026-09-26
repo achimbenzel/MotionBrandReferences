@@ -389,6 +389,30 @@ one stage at a time (archived plans only show under **Archived**). Each
   Following the general rule below, a plan's title and each block's name are only
   editable via a **⋯** menu — there is no bare Delete button.
 
+**Tabs.** A plan's blocks are grouped by phase in tabs under its header —
+**Briefing**, **Concept**, **Production**, **Delivery** — each in its own
+colour, with the number of blocks it holds; a dot marks the tab of the phase
+the plan's status says it's in. The Launch video template, for example, puts
+the briefing in Briefing; moodboard, references, styleframes, palette and
+links in Concept; script, storyboard and the checklist in Production; review,
+deliverables and files in Delivery. Blocks made before tabs existed are placed
+by their type (a heading goes with the block below it); **Move to …** in a
+block's ⋯ menu puts it in another tab, **Move up / down** works within the tab,
+and **Add block to …** adds to the open tab. A plan opens on the tab you used
+last (or its phase's, when that has blocks).
+
+- **Overview** — the plan at a glance: per phase a card for every block with
+  content (its summary — “4/10 answered”, “6 images”, “2/8 done”, “v3 · 2 open
+  comments”, “0/4 delivered” … — with a glimpse: thumbnails, swatches, the
+  first answers, open to-dos, a progress bar) and the blocks that are still
+  empty as chips. A card or chip opens the block in its tab. The timeframe
+  with its milestones and the plan's to-dos on the board are here too.
+- **Empty blocks are one line** (“Styleframes — empty · drop or add images”)
+  until you open them, so a fresh template stays short.
+- **Every block folds** (⌃ next to its ⋯, or ⋯ → Fold) to one line with its
+  summary and a glimpse of the content; **Fold all / Unfold all** does the
+  whole tab. Folding is saved with the plan.
+
 **Archive as reference.** When a job is done, **Edit → Archive as reference…**
 turns it into references in your library, next to the work of others:
 - the **final video** — a Review version (the last approved one is picked) or a

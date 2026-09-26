@@ -8,7 +8,7 @@ import { readDB, mutateDB } from '../db.js';
 import { moveInto, replaceImage, safeRm, moveToTrash, moveRelPaths, extOf } from '../files.js';
 import { upload } from '../upload.js';
 import {
-  BLOCK_TYPES, BLOCK_TITLES, PLAN_STATUSES, STORYBOARD_ASPECTS, normalizeField, normalizeShot, normalizeAudio,
+  BLOCK_TYPES, BLOCK_TITLES, BLOCK_TABS, PLAN_STATUSES, STORYBOARD_ASPECTS, normalizeField, normalizeShot, normalizeAudio,
   normalizeLine, normalizeTarget, normalizePace, normalizeVersion, normalizeDeliverable, normTags, str,
 } from '../schema.js';
 import { STORYBOARD_TEMPLATES, storyboardTemplate, templateInfo } from '../storyboards.js';
@@ -388,7 +388,7 @@ router.post('/api/plans/:id/blocks/:blockId/import', async (req, res) => {
 router.post('/api/plans/:id/blocks', async (req, res) => {
   const type = req.body.type;
   if (!BLOCK_TYPES.has(type)) return res.status(400).json({ error: 'invalid_block_type' });
-  const base = { id: nanoid(8), type, title: BLOCK_TITLES[type] };
+  const base = { id: nanoid(8), type, title: BLOCK_TITLES[type], ...(BLOCK_TABS.includes(req.body.tab) ? { tab: req.body.tab } : {}) };
   const block = type === 'moodboard' ? { ...base, collapsed: false, images: [] }
     : type === 'text' ? { ...base, content: '' }
       : (type === 'todos' || type === 'links' || type === 'refs' || type === 'palette') ? { ...base, items: [] }
@@ -414,7 +414,7 @@ router.post('/api/plans/:id/blocks', async (req, res) => {
 
 // Update only the content/label fields — never the file arrays.
 const BLOCK_EDITABLE = ['title', 'collapsed', 'content', 'items', 'columns', 'rows', 'fields',
-  'shots', 'audio', 'aspect', 'target', 'lines', 'pace', 'versions'];
+  'shots', 'audio', 'aspect', 'target', 'lines', 'pace', 'versions', 'tab'];
 router.patch('/api/plans/:id/blocks/:blockId', async (req, res) => {
   const updated = await mutateDB((db) => {
     const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null;
@@ -424,6 +424,7 @@ router.patch('/api/plans/:id/blocks/:blockId', async (req, res) => {
       const v = req.body[k];
       if (k === 'title' || k === 'content') b[k] = str(v, k === 'content' ? 200000 : 400);
       else if (k === 'collapsed') b[k] = !!v;
+      else if (k === 'tab') { if (BLOCK_TABS.includes(v)) b.tab = v; }
       else if (k === 'fields') { if (Array.isArray(v)) b.fields = v.slice(0, 100).map(normalizeField); }
       else if (k === 'shots') { if (Array.isArray(v)) b.shots = v.slice(0, 500).map((x) => normalizeShot(x, b.id)); }
       else if (k === 'audio') b.audio = normalizeAudio(v, b.id);
@@ -441,12 +442,15 @@ router.patch('/api/plans/:id/blocks/:blockId', async (req, res) => {
   res.json({ plan: updated });
 });
 
+// Swap a block with its neighbour (`dir`), or — within a tab, where the
+// neighbour may sit further away — with the block `with`.
 router.post('/api/plans/:id/blocks/:blockId/move', async (req, res) => {
   const dir = req.body.dir === 'up' ? -1 : 1;
   const updated = await mutateDB((db) => {
     const p = db.plans.find((x) => x.id === req.params.id); if (!p) return null;
     const i = p.blocks.findIndex((b) => b.id === req.params.blockId); if (i === -1) return null;
-    const j = i + dir; if (j < 0 || j >= p.blocks.length) return p;
+    const j = req.body.with ? p.blocks.findIndex((b) => b.id === req.body.with) : i + dir;
+    if (j < 0 || j >= p.blocks.length || j === i) return p;
     [p.blocks[i], p.blocks[j]] = [p.blocks[j], p.blocks[i]];
     return p;
   });

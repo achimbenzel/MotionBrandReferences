@@ -211,8 +211,8 @@ export const api = {
   },
   // --- Plan content blocks (moodboard / text / todos / files) ---
   // `after`: insert right after that block (default: at the end). → plan
-  async addBlock(id, type, { after } = {}) {
-    const { plan } = await request(`/api/plans/${id}/blocks`, { method: 'POST', json: { type, after } });
+  async addBlock(id, type, { after, tab } = {}) {
+    const { plan } = await request(`/api/plans/${id}/blocks`, { method: 'POST', json: { type, after, tab } });
     return plan;
   },
   // Store files in a storyboard's folder → [{ file, name, size }] (the block
@@ -227,8 +227,9 @@ export const api = {
     const { plan } = await request(`/api/plans/${id}/blocks/${blockId}`, { method: 'PATCH', json: patch });
     return plan;
   },
-  async moveBlock(id, blockId, dir) {
-    const { plan } = await request(`/api/plans/${id}/blocks/${blockId}/move`, { method: 'POST', json: { dir } });
+  // Swap with the neighbour (`dir`: 'up' | 'down'), or with the block `withId`.
+  async moveBlock(id, blockId, dir, withId) {
+    const { plan } = await request(`/api/plans/${id}/blocks/${blockId}/move`, { method: 'POST', json: { dir, with: withId } });
     return plan;
   },
   // Moves the block (and its files) to Trash → { plan, trashId }.

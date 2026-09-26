@@ -4,19 +4,20 @@
  * blocks, milestone names, status, emoji — without files, dates or answers.
  */
 import { nanoid } from 'nanoid';
-import { normalizeBlock, BLOCK_TITLES, str } from './schema.js';
+import { normalizeBlock, inferTabs, BLOCK_TITLES, str } from './schema.js';
 
 // Built-in blocks are written with short placeholder ids (table columns are
 // referenced by the row cells); every instance gets fresh ones.
-const todos = (title, texts) => ({ type: 'todos', title, items: texts.map((text) => ({ text, done: false, urgent: false })) });
-const fields = (title, labels) => ({ type: 'briefing', title, fields: labels.map((label) => ({ label, value: '' })) });
-const table = (title, columns, rows) => ({
-  type: 'table', title,
+// `tab`: which tab of the plan the block sits in (brief / concept / production / delivery).
+const todos = (title, texts, tab = 'production') => ({ type: 'todos', title, tab, items: texts.map((text) => ({ text, done: false, urgent: false })) });
+const fields = (title, labels) => ({ type: 'briefing', title, tab: 'brief', fields: labels.map((label) => ({ label, value: '' })) });
+const table = (title, columns, rows, tab = 'brief') => ({
+  type: 'table', title, tab,
   columns: columns.map((name, i) => ({ id: `c${i}`, name })),
   rows: rows.map((cells) => ({ cells: Object.fromEntries(cells.map((v, i) => [`c${i}`, v])) })),
 });
-const heading = (title, content = '') => ({ type: 'heading', title, content });
-const block = (type, title, extra = {}) => ({ type, title, ...extra });
+const heading = (title, content = '', tab) => ({ type: 'heading', title, content, ...(tab ? { tab } : {}) });
+const block = (type, title, tab, extra = {}) => ({ type, title, tab, ...extra });
 
 export const BUILTIN_TEMPLATES = [
   {
@@ -30,28 +31,26 @@ export const BUILTIN_TEMPLATES = [
     blocks: [
       fields('Briefing', ['Product', 'Target audience', 'Key message', 'Call to action', 'Target length', 'Formats',
         'Tone & style', 'Music & voice-over', 'Must-haves / no-gos', 'Budget']),
-      heading('Concept', 'Idea, script and look'),
-      block('script', 'Script & voice-over', {
+      block('moodboard', 'Moodboard', 'concept'),
+      block('refs', 'References', 'concept', { items: [] }),
+      block('moodboard', 'Styleframes', 'concept'),
+      block('palette', 'Palette', 'concept', { items: [] }),
+      block('links', 'Links', 'concept', { items: [] }),
+      block('script', 'Script & voice-over', 'production', {
         pace: 2.5, target: null,
         lines: ['Hook', 'Problem', 'Product reveal', 'Features', 'Call to action', 'Logo outro'].map((visual) => ({ visual, vo: '' })),
       }),
-      block('moodboard', 'Moodboard'),
-      block('refs', 'References', { items: [] }),
-      block('moodboard', 'Styleframes'),
-      block('palette', 'Palette', { items: [] }),
-      block('storyboard', 'Storyboard', { aspect: '16:9', shots: [], audio: null, target: null }),
-      heading('Production'),
+      block('storyboard', 'Storyboard', 'production', { aspect: '16:9', shots: [], audio: null, target: null }),
       todos('Production checklist', ['Script approved', 'Styleframes approved', 'Storyboard / animatic approved',
         'Music & voice-over licensed', 'Animation', 'Sound design & mix', 'Final review', 'Exports delivered']),
-      block('review', 'Review', { versions: [] }),
-      block('deliverables', 'Deliverables', { items: [
+      block('review', 'Review', 'delivery', { versions: [] }),
+      block('deliverables', 'Deliverables', 'delivery', { items: [
         { name: 'Master', aspect: '16:9', resolution: '3840 × 2160', codec: 'H.264' },
         { name: 'Social vertical', aspect: '9:16', resolution: '1080 × 1920', codec: 'H.264' },
         { name: 'Feed square', aspect: '1:1', resolution: '1080 × 1080', codec: 'H.264' },
         { name: 'Feed portrait', aspect: '4:5', resolution: '1080 × 1350', codec: 'H.264' },
       ].map((d) => ({ fps: '', length: '', status: 'open', notes: '', ...d })) }),
-      block('links', 'Links', { items: [] }),
-      block('files', 'Files'),
+      block('files', 'Files', 'delivery'),
     ],
   },
   {
@@ -65,14 +64,14 @@ export const BUILTIN_TEMPLATES = [
     blocks: [
       fields('Briefing', ['Company / product', 'What they do', 'Target audience', 'Values & personality',
         'Competitors', 'Deliverables', 'Must-haves / no-gos', 'Budget']),
-      heading('Research'),
-      block('refs', 'References', { items: [] }),
-      block('links', 'Competitors', { items: [] }),
-      block('moodboard', 'Moodboard'),
-      heading('Design'),
-      block('moodboard', 'Logo concepts'),
-      block('palette', 'Colour palette', { items: [] }),
-      block('text', 'Typography', { content: '' }),
+      heading('Research', '', 'concept'),
+      block('refs', 'References', 'concept', { items: [] }),
+      block('links', 'Competitors', 'concept', { items: [] }),
+      block('moodboard', 'Moodboard', 'concept'),
+      heading('Design', '', 'concept'),
+      block('moodboard', 'Logo concepts', 'concept'),
+      block('palette', 'Colour palette', 'concept', { items: [] }),
+      block('text', 'Typography', 'concept', { content: '' }),
       todos('Checklist', ['Research & moodboard', 'Logo concepts', 'Colour & type system',
         'Applications (cards, social, signage)', 'Brand guidelines', 'Final files exported (SVG, PNG, PDF)']),
       table('Deliverables', ['Asset', 'Formats', 'Status'], [
@@ -81,9 +80,9 @@ export const BUILTIN_TEMPLATES = [
         ['Brand guidelines', 'PDF', 'Open'],
         ['Business cards', 'Print PDF', 'Open'],
         ['Social templates', 'PNG', 'Open'],
-      ]),
-      block('pdf', 'Brand guidelines'),
-      block('files', 'Files'),
+      ], 'delivery'),
+      block('pdf', 'Brand guidelines', 'delivery'),
+      block('files', 'Files', 'delivery'),
     ],
   },
 ];
@@ -128,7 +127,9 @@ export function planFromTemplate(t) {
 
 /** Save a plan as a template: structure and reusable text, no files, dates or answers. */
 export function templateFromPlan(plan, name) {
-  const blocks = cloneBlocks(plan.blocks).map((b) => {
+  const tabs = inferTabs(plan.blocks); // every block keeps the tab it sits in
+  const blocks = cloneBlocks(plan.blocks).map((b, i) => {
+    b.tab = tabs[i];
     if (b.type === 'todos') b.items = b.items.map((t) => ({ ...t, done: false, urgent: false }));
     if (b.type === 'briefing') b.fields = b.fields.map((f) => ({ ...f, value: '' }));
     if (b.type === 'deliverables') b.items = b.items.map((d) => ({ ...d, status: 'open' }));

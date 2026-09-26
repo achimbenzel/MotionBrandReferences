@@ -33,6 +33,29 @@ export const BLOCK_TITLES = {
   briefing: 'Briefing', storyboard: 'Storyboard', script: 'Script', review: 'Review', deliverables: 'Deliverables',
 };
 
+// A plan's blocks are grouped in tabs by phase. Blocks without one (made
+// before tabs existed) go by their type; headings / dividers with the block
+// that follows them.
+export const BLOCK_TABS = ['brief', 'concept', 'production', 'delivery'];
+const TYPE_TAB = {
+  briefing: 'brief', text: 'brief', table: 'brief',
+  moodboard: 'concept', refs: 'concept', palette: 'concept', links: 'concept',
+  script: 'production', storyboard: 'production', todos: 'production',
+  review: 'delivery', deliverables: 'delivery', files: 'delivery', pdf: 'delivery',
+};
+const STRUCTURAL = new Set(['heading', 'divider']);
+/** The tab of every block, in order. */
+export function inferTabs(blocks) {
+  const list = Array.isArray(blocks) ? blocks : [];
+  const own = list.map((b) => (BLOCK_TABS.includes(b?.tab) ? b.tab : STRUCTURAL.has(b?.type) ? null : TYPE_TAB[b?.type] || 'brief'));
+  return own.map((t, i) => {
+    if (t) return t;
+    for (let j = i + 1; j < own.length; j += 1) if (own[j] && !STRUCTURAL.has(list[j]?.type)) return own[j];
+    for (let j = i - 1; j >= 0; j -= 1) if (own[j]) return own[j];
+    return 'brief';
+  });
+}
+
 // Where a plan stands. '' = no status (every plan made before statuses existed).
 export const PLAN_STATUSES = ['briefing', 'concept', 'design', 'production', 'review', 'delivered', 'archived'];
 
@@ -110,6 +133,7 @@ export function normalizeBlock(b, fallbackId) {
   if (!BLOCK_TYPES.has(b.type)) return null;
   if (!b.id) b.id = fallbackId || nanoid(8);
   if (typeof b.title !== 'string') b.title = BLOCK_TITLES[b.type];
+  if ('tab' in b && !BLOCK_TABS.includes(b.tab)) delete b.tab;
   if (b.type === 'moodboard') {
     if (typeof b.collapsed !== 'boolean') b.collapsed = false;
     if (!Array.isArray(b.images)) b.images = [];
