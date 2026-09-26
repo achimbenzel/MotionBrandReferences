@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Activity, Flame, CalendarDays, TrendingUp } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { useMediaQuery, PHONE } from '../../lib/useMedia.js';
@@ -124,13 +125,13 @@ export default function ActivityMap({ reloadKey }) {
           <div className="dash-act-note">{plural(model.addedSum, 'thing')} added, {plural(model.active, 'active day')}</div>
         </div>
       )}
-      {tip && (
+      {tip && createPortal(( // on the page itself: the section's entrance animation would otherwise be its frame
         <div className="dash-act-tip" style={{ left: tip.x, top: tip.y }} role="tooltip">
           <b>{plural(tip.c.v, 'thing')}</b>
           <span className="dash-act-tip-date">{dateOf(tip.c.date).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
           <span className="dash-act-tip-what">{breakdown(tip.c)}</span>
         </div>
-      )}
+      ), document.body)}
     </section>
   );
 }

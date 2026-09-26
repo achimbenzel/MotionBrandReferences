@@ -165,3 +165,46 @@ test('dashboard: activity per day (saves + what was added) and the quick note', 
   assert.equal(r.data.settings.dashboardNote.length, 8000);
   assert.ok(r.data.settings.dashboardNote.startsWith('Call the client'));
 });
+
+test('dashboard: what you changed last, focus minutes, today\'s focus, widget layout, ticking one to-do', async () => {
+  // Changes are remembered newest first; a plan's blocks count as the plan, a storyboard on its own.
+  await srv.api('/api/plans/plan3', { method: 'PATCH', json: { client: 'Acme' } });
+  await srv.api('/api/projects/brand1', { method: 'PATCH', json: { notes: 'More notes' } });
+  await srv.api('/api/plans/plan3/blocks/b1', { method: 'PATCH', json: { content: 'Hello again' } });
+  let r = await srv.api('/api/recent?limit=5');
+  assert.deepEqual(r.data.items.slice(0, 2).map((x) => [x.kind, x.title]), [['plan', 'Current plan'], ['project', 'Acme Brand']]);
+  assert.equal(r.data.items[0].href, '/plan/plan3?block=b1');
+  assert.equal(r.data.items.filter((x) => x.key === 'plan:plan3').length, 1);
+  assert.equal(r.data.items[1].thumb, '/data/branding/brand1/a2.png');
+  // A deleted plan drops out.
+  const tmp = (await srv.api('/api/plans', { method: 'POST', json: { name: 'Gone soon' } })).data.plan;
+  await srv.api(`/api/plans/${tmp.id}`, { method: 'PATCH', json: { client: 'x' } });
+  assert.equal((await srv.api('/api/recent')).data.items[0].title, 'Gone soon');
+  await srv.api(`/api/plans/${tmp.id}`, { method: 'DELETE' });
+  assert.ok(!(await srv.api('/api/recent')).data.items.some((x) => x.title === 'Gone soon'));
+
+  // Focus minutes land on today; nonsense is refused.
+  r = await srv.api('/api/activity/focus', { method: 'POST', json: { minutes: 25 } });
+  assert.equal(r.status, 200);
+  assert.equal((await srv.api('/api/activity/focus', { method: 'POST', json: { minutes: 999 } })).status, 400);
+  assert.ok((await srv.api('/api/activity?days=7')).data.days.at(-1).focus >= 25);
+
+  // Today's focus: board cards and plan to-dos, at most 5, duplicates and junk dropped.
+  r = await srv.api('/api/settings', { method: 'PATCH', json: { dashboardFocus: { items: [
+    { kind: 'card', id: 'k1' }, { kind: 'card', id: 'k1' }, { kind: 'todo', planId: 'plan2', blockId: 'todos-legacy', itemId: 't1', doneOn: '2026-09-26' },
+    { kind: 'card', id: '../x' }, { kind: 'nope' }, { kind: 'card', id: 'a' }, { kind: 'card', id: 'b' }, { kind: 'card', id: 'c' }, { kind: 'card', id: 'd' },
+  ] } } });
+  const items = r.data.settings.dashboardFocus.items;
+  assert.equal(items.length, 5);
+  assert.deepEqual(items[1], { kind: 'todo', planId: 'plan2', blockId: 'todos-legacy', itemId: 't1', doneOn: '2026-09-26' });
+  // The layout keeps known widgets once each.
+  r = await srv.api('/api/settings', { method: 'PATCH', json: { dashboardLayout: [{ id: 'timer', size: 'half' }, { id: 'timer' }, { id: 'weather' }, { id: 'rhythm', hidden: 1 }] } });
+  assert.deepEqual(r.data.settings.dashboardLayout, [{ id: 'timer', hidden: false, size: 'half' }, { id: 'rhythm', hidden: true, size: 'full' }]);
+
+  // Ticking one to-do of a plan leaves the others alone.
+  const todos = (await srv.api('/api/plans/plan3/blocks', { method: 'POST', json: { type: 'todos' } })).data.plan.blocks.at(-1);
+  await srv.api(`/api/plans/plan3/blocks/${todos.id}`, { method: 'PATCH', json: { items: [{ id: 'x1', text: 'One', done: false }, { id: 'x2', text: 'Two', done: false }] } });
+  r = await srv.api(`/api/plans/plan3/blocks/${todos.id}/items/x2`, { method: 'PATCH', json: { done: true } });
+  assert.deepEqual(r.data.plan.blocks.find((b) => b.id === todos.id).items.map((t) => t.done), [false, true]);
+  assert.equal((await srv.api(`/api/plans/plan3/blocks/${todos.id}/items/zz`, { method: 'PATCH', json: { done: true } })).status, 404);
+});

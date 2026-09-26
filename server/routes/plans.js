@@ -464,6 +464,21 @@ router.patch('/api/plans/:id/blocks/:blockId', async (req, res) => {
 
 // Swap a block with its neighbour (`dir`), or — within a tab, where the
 // neighbour may sit further away — with the block `with`.
+// Tick (or untick) one to-do of a to-do block — e.g. from the dashboard's
+// focus list — without sending the whole list.
+router.patch('/api/plans/:id/blocks/:blockId/items/:itemId', async (req, res) => {
+  const updated = await mutateDB((db) => {
+    const p = db.plans.find((x) => x.id === req.params.id);
+    const b = findBlock(p, req.params.blockId);
+    const it = b?.type === 'todos' ? (b.items || []).find((x) => x.id === req.params.itemId) : null;
+    if (!it) return null;
+    if ('done' in req.body) it.done = !!req.body.done;
+    return p;
+  });
+  if (!updated) return res.status(404).json({ error: 'not_found' });
+  res.json({ plan: updated });
+});
+
 // Move a block: swap it with its neighbour (`dir`) or with the block `with`,
 // or put it right `before` / `after` another block (drag and drop). `pin`
 // ({ blockId: tab }) first fixes the tab of blocks that only follow their

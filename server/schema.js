@@ -638,6 +638,8 @@ export function normalizeDB(db) {
   if (!('dashboardBanner' in db.settings)) db.settings.dashboardBanner = null;
   if (!('dashboardBannerGradient' in db.settings)) db.settings.dashboardBannerGradient = null;
   if (typeof db.settings.dashboardNote !== 'string') db.settings.dashboardNote = ''; // the dashboard's quick note
+  db.settings.dashboardFocus = normalizeDashboardFocus(db.settings.dashboardFocus);
+  db.settings.dashboardLayout = normalizeDashboardLayout(db.settings.dashboardLayout);
   return db;
 }
 
@@ -702,4 +704,30 @@ export function migrateDB(db) {
   db.schemaVersion = SCHEMA_VERSION;
   db.migratedAt = Date.now();
   return db;
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard: today's focus (pinned to-dos) and the widget layout
+// ---------------------------------------------------------------------------
+const DASH_ID = /^[\w-]{1,40}$/;
+const DASH_DAY = /^\d{4}-\d{2}-\d{2}$/;
+/** Up to 5 pinned to-dos: a board card { kind: 'card', id } or a plan to-do { kind: 'todo', planId, blockId, itemId }. */
+export function normalizeDashboardFocus(v) {
+  const items = (Array.isArray(v?.items) ? v.items : []).map((it) => {
+    const doneOn = typeof it?.doneOn === 'string' && DASH_DAY.test(it.doneOn) ? { doneOn: it.doneOn } : {};
+    if (it?.kind === 'card' && DASH_ID.test(it.id || '')) return { kind: 'card', id: it.id, ...doneOn };
+    if (it?.kind === 'todo' && [it.planId, it.blockId, it.itemId].every((x) => DASH_ID.test(x || ''))) {
+      return { kind: 'todo', planId: it.planId, blockId: it.blockId, itemId: it.itemId, ...doneOn };
+    }
+    return null;
+  }).filter(Boolean);
+  const seen = new Set();
+  return { items: items.filter((it) => { const k = JSON.stringify([it.kind, it.id, it.itemId]); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 5) };
+}
+export const DASHBOARD_WIDGETS = ['focus', 'timer', 'next', 'continue', 'urgent', 'tools', 'pipeline', 'rhythm', 'inspiration', 'note'];
+/** The dashboard's widgets in your order: [{ id, hidden, size: 'full' | 'half' }] (unknown ones dropped; [] = the default). */
+export function normalizeDashboardLayout(v) {
+  const seen = new Set();
+  return (Array.isArray(v) ? v : []).filter((w) => w && DASHBOARD_WIDGETS.includes(w.id) && !seen.has(w.id) && seen.add(w.id))
+    .map((w) => ({ id: w.id, hidden: !!w.hidden, size: w.size === 'half' ? 'half' : 'full' }));
 }

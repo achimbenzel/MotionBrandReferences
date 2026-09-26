@@ -4,10 +4,10 @@ import { DATA_DIR } from '../config.js';
 import { readDB, mutateDB } from '../db.js';
 import { getUsedBytes, replaceImage, safeRm } from '../files.js';
 import { upload } from '../upload.js';
-import { str } from '../schema.js';
+import { str, normalizeDashboardFocus, normalizeDashboardLayout } from '../schema.js';
 import { createRouter } from '../http.js';
 import { sourceAsUpload } from '../sources.js';
-import { activityDays } from '../activity.js';
+import { activityDays, noteFocus, recentItems } from '../activity.js';
 
 const router = createRouter();
 export default router;
@@ -35,9 +35,22 @@ router.patch('/api/settings', async (req, res) => {
   const settings = await mutateDB((db) => {
     if ('dashboardBannerGradient' in req.body) db.settings.dashboardBannerGradient = req.body.dashboardBannerGradient == null ? null : str(req.body.dashboardBannerGradient, 40);
     if ('dashboardNote' in req.body) db.settings.dashboardNote = str(req.body.dashboardNote, 8000);
+    if ('dashboardFocus' in req.body) db.settings.dashboardFocus = normalizeDashboardFocus(req.body.dashboardFocus);
+    if ('dashboardLayout' in req.body) db.settings.dashboardLayout = normalizeDashboardLayout(req.body.dashboardLayout);
     return db.settings;
   });
   res.json({ settings });
+});
+// What you changed last (the dashboard's "Continue where you left off").
+router.get('/api/recent', async (req, res) => {
+  const db = await readDB();
+  res.json({ items: await recentItems(db, Math.max(1, Math.min(20, Number(req.query.limit) || 8))) });
+});
+// A finished focus-timer session: its minutes count on today.
+router.post('/api/activity/focus', async (req, res) => {
+  const minutes = Math.round(Number(req.body?.minutes));
+  if (!(minutes >= 1 && minutes <= 240)) return res.status(400).json({ error: 'invalid_minutes' });
+  res.json({ today: await noteFocus(minutes) });
 });
 // The dashboard's activity map: saves and what was added, per day.
 router.get('/api/activity', async (req, res) => {

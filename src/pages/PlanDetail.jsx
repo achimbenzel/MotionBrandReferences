@@ -117,7 +117,9 @@ export default function PlanDetail() {
     whenSaved().then(() => api.getPlan(id)).then((p) => {
       if (!alive) return;
       setPlan(p); setMilestones(p.milestones || []); setClient(p.client || '');
+      const askedBlock = params.get('block'); // a link to one block (e.g. from the dashboard)
       setTabState(firstTab(p));
+      if (askedBlock && (p.blocks || []).some((b) => b.id === askedBlock)) setTimeout(() => openBlockRef.current?.(askedBlock), 80);
     }).catch((e) => { if (alive) setError(e.message); });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- firstTab reads ?tab= once per plan
