@@ -266,22 +266,36 @@ The app starts in Work, and switching from Reference back to Work always returns
 to the Dashboard.
 
 ### Dashboard
-The Work landing page: a Notion-style **card view** of your tools — **Plans**
-(with the plan count), the **To-Do Board** (open cards / lists) and the **Logo
-Tester** — each opening its tool, plus:
-- **Coming up** — milestones and plan deadlines of the next two weeks (and
-  anything overdue), soonest first, from every plan that isn't delivered or
-  archived,
-- **Pipeline** — your plans by status (Briefing → Concept → Design →
-  Production → Review → Delivered); a stage opens the plan list filtered to it
-  (shown once any plan has a status),
-- **Recent plans**, newest first, with their status.
+The Work landing page, a Notion-style overview that moves a little:
+- **Hero** over your banner — a greeting for the time of day, the date and a
+  one-line summary, quick actions (**New plan**, **To-dos**, **Search ⌘K**)
+  and four glass tiles that count up: **open plans**, **dates in the next 7
+  days**, **open to-dos** (plan to-dos + board cards, with a ring for how many
+  are done; cards in a list called *Done* count as done) and **urgent**. A
+  gradient banner drifts slowly, a picture banner zooms in very slowly. The
+  banner is a preset gradient, an upload or a picture **from the app**.
+- **Next up** — a big countdown to the next milestone or deadline (from every
+  plan that isn't delivered or archived), with its plan and how far the plan's
+  timeframe has run; the following dates below. Next to it **Two weeks**: this
+  week and the next as a calendar, a dot per milestone (◆ for a deadline); a
+  day opens its plan.
+- **Urgent** to-dos from the board and every plan.
+- **Your tools** — Plans, To-Do Board, Storyboards, Mockups, Brand Tester,
+  Software — with a light that follows the pointer.
+- **Pipeline** — your plans by status as one bar and per stage (Briefing →
+  Concept → Design → Production → Review → Delivered); a stage opens the plan
+  list filtered to it.
+- **Recent plans**, newest first, with status, timeframe progress and to-dos
+  done, and the **latest mockups** as pictures.
+
+Sections rise in one after the other; with *reduce motion* on in the system
+nothing moves.
 
 ### To-Do board
 A general **Kanban planner**. Lists (columns) hold **cards**; add lists and
 cards, rename them inline, give cards **coloured tags**, tint a whole card in
 one of the same colours, and **drag cards** (via the grip handle) within a list
-or across lists to track progress. Each card's **⋯ menu** does the same without
+or across lists to track progress. Each card's **⋯ menu** (it opens above everything, never cut off by the card) does the same without
 dragging — **Move to “…”** any list, move up / down, mark urgent, colour, add a
 tag, delete — which is how cards move on touch screens. On desktop the board
 uses the **full width**, so extra lists run past the usual content margins; on
@@ -290,7 +304,8 @@ jump between them. Everything auto-saves to one global board.
 
 A card can **belong to a plan** (⋯ → **Link to plan…**): it shows the plan's
 name (a click opens the plan), the filter at the top shows **one plan's cards**
-(new cards then belong to it), and the plan lists its cards under **To-dos on
+(new cards then belong to it; it's always there — every plan can be picked, the
+ones with cards first, × shows all cards again), and the plan lists its cards under **To-dos on
 the board** — add one there (it lands in the first list), move it to another
 list, flag it urgent or unlink it; those changes touch only that card. Urgent
 cards on the Dashboard name their plan.
@@ -324,9 +339,9 @@ one stage at a time (archived plans only show under **Archived**). Each
   - a **status** — Briefing, Concept, Design, Production, Review, Delivered or
     Archived (or none) — picked from the pill under the plan's name, next to
     its **client**,
-  - a **Notion-style banner** — pick a **preset gradient** or upload a **custom
-    image** — plus a **profile image** that can be an **emoji** (quick-pick grid
-    or type/paste your own) or an **uploaded image**; both banner and profile
+  - a **Notion-style banner** — pick a **preset gradient**, upload a **custom
+    image** or take one **from the app** — plus a **profile image** that can be an **emoji** (quick-pick grid
+    or type/paste your own), an **uploaded image** or one from the app; both banner and profile
     also show on the plan's card in the grid,
   - a **timeframe** (start / end date) with **checkable milestones** — each has a
     title, an optional date and a checkbox that strikes it through when done.
@@ -370,8 +385,9 @@ one stage at a time (archived plans only show under **Archived**). Each
       by side (they play in sync), and on a new version check what was **still
       open in the one before**: mark each point *fixed* or carry it over.
     - **Moodboard** — a **collapsible** board of images. Add images by button, by
-      **dropping** files onto the board, or by **pasting** (⌘V) into the last-used
-      board.
+      **dropping** files onto the board, by **pasting** (⌘V) into the last-used
+      board, or **From the app** — any picture already in the app (library,
+      other plans, Motion frames, Inbox …), as many as you like.
     - **Text** — a free-text notes area, auto-saved.
     - **To-dos** — a checklist you add items to and tick off, auto-saved.
     - **Files** — a list of uploaded files. **Add file** opens a small dialog
@@ -416,7 +432,8 @@ last (or its phase's, when that has blocks).
 - **Overview** — the plan at a glance: per phase a card for every block with
   content (its summary — “4/10 answered”, “6 images”, “2/8 done”, “v3 · 2 open
   comments”, “0/4 delivered” … — with a glimpse: thumbnails, swatches, the
-  first answers, open to-dos, a progress bar) and the blocks that are still
+  first answers, open to-dos, a progress bar; a links card lists each link
+  once, by its label) and the blocks that are still
   empty as chips. A card or chip opens the block in its tab. The plan's to-dos
   on the board are here too.
 - **Empty blocks are one line** (“Styleframes — empty · drop or add images”)
@@ -464,6 +481,9 @@ an emoji, and it opens a page with four tabs, each searchable:
   **one-click copy**.
 - **Tutorials** — link useful **YouTube** videos / articles (title, URL,
   channel, tags).
+
+Banner, profile picture and the preview images of plugins and expression
+groups can be uploaded or taken **from the app** (any picture already in it).
 
 Everything auto-saves. Deleting a software moves it (and its files) to **Trash**.
 Note: license keys and account details are stored **in plain text** in
@@ -607,7 +627,10 @@ model…*, *3D · Business card / Poster / Box / Mug* or *2D · ‹type›*.
 - **Screen**: **upload** a picture or a video, or take one **from the app** —
   your plans' **profile pictures and banners**, a plan's moodboards, files,
   storyboard frames and review renders, your Motion references (the video,
-  its saved frames and moments), library images or the Inbox. **Fill screen**
+  its saved frames, moments and cover), the whole library by type (branding,
+  logos with their dark / light versions, business cards front and back,
+  image gallery, font screenshots, colour examples, logo no-go), software
+  pictures or the Inbox. **Fill screen**
   crops to fit, **Show whole** keeps it all.
   For a video, **Starts at** picks the part that plays (also by dragging its
   clip in the timeline) and **Sound on** plays its sound — in the preview and
@@ -705,6 +728,9 @@ looks printed.
   one or take it **from the app** (a plan's profile picture fits a profile
   picture slot); **Position & size…** places it in its frame over a grid, as
   for the 3D screens.
+  A **video** in a slot can be **paused**, and plays **with sound** (and its
+  own volume) when you switch it on; it stops as soon as you leave the
+  editor or remove it.
 - **Zoom** into the preview: − / + / 100 % at the bottom right, ⌘ / Ctrl +
   scroll or pinch; zoomed in, drag (or scroll) to move around. Texts, numbers and switches are
   in **Content**; switching the type keeps what you typed.
