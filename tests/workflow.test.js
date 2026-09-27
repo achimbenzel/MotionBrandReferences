@@ -87,7 +87,7 @@ test('built-in templates are listed and a launch-video plan starts filled in', a
   const again = await newPlan({ template: 'launch' });
   const allIds = [...plan.blocks, ...again.blocks].map((b) => b.id);
   assert.equal(new Set(allIds).size, allIds.length);
-  assert.equal(again.name, 'Untitled plan');
+  assert.equal(again.name, 'Untitled project');
 });
 
 test('an unknown template is refused; a plan without one starts empty with no status', async () => {

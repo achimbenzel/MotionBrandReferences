@@ -8,6 +8,7 @@
  *       shapes are converted on the fly on every read.
  *   2 — all records stored in the current shape; `schemaVersion` recorded.
  */
+import { createHash } from 'node:crypto';
 import { nanoid } from 'nanoid';
 import { DEFAULT_STORAGE_LIMIT, TYPES } from './config.js';
 
@@ -19,7 +20,7 @@ export const TAG_KEYS = new Set(['red', 'orange', 'yellow', 'green', 'blue', 'pu
 export const CURRENCIES = new Set(['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD']);
 
 export const emptyDB = () => ({
-  schemaVersion: SCHEMA_VERSION, projects: [], galleries: [], plans: [], planTemplates: [], software: [], trash: [], inbox: [], mockups: [], mockupModels: [], mockupHdris: [], timeEntries: [],
+  schemaVersion: SCHEMA_VERSION, projects: [], galleries: [], plans: [], planTemplates: [], software: [], trash: [], inbox: [], mockups: [], mockupModels: [], mockupHdris: [], timeEntries: [], clients: [],
   settings: { storageLimitBytes: DEFAULT_STORAGE_LIMIT },
 });
 
@@ -232,7 +233,21 @@ export function normalizePlan(plan) {
   if (!PLAN_STATUSES.includes(plan.status)) plan.status = '';
   if (typeof plan.client !== 'string') plan.client = '';
   if (!Array.isArray(plan.archivedAs)) plan.archivedAs = []; // library projects made from this plan
+  plan.budget = normalizeBudget(plan.budget); // hours for the project or per month (null = none)
+  plan.rate = normalizeRate(plan.rate);       // hourly rate (null = none)
   return plan;
+}
+
+/** A project's hour budget: { hours, per: 'project' | 'month' } — or null. */
+export function normalizeBudget(b) {
+  const h = Number(b?.hours);
+  if (!b || !Number.isFinite(h) || h <= 0) return null;
+  return { hours: Math.round(Math.min(h, 100000) * 100) / 100, per: b.per === 'month' ? 'month' : 'project' };
+}
+/** An hourly rate (in the currency of the settings) — or null. */
+export function normalizeRate(v) {
+  const n = Number(v);
+  return v == null || v === '' || !Number.isFinite(n) || n <= 0 ? null : Math.round(Math.min(n, 1e6) * 100) / 100;
 }
 
 // ---------------------------------------------------------------------------
@@ -628,7 +643,10 @@ export function normalizeDB(db) {
   if (!Array.isArray(db.mockupHdris)) db.mockupHdris = [];
   if (!Array.isArray(db.timeEntries)) db.timeEntries = [];           // the time tracker's entries
   db.timeTracker = normalizeTimeTracker(db.timeTracker);              // …and what's running now
+  if (!Array.isArray(db.clients)) db.clients = [];                    // who projects are for
+  db.clients = db.clients.filter((c) => c && typeof c === 'object').map(normalizeClient);
   for (const plan of db.plans) normalizePlan(plan);
+  linkClients(db);
   for (const s of db.software) normalizeSoftware(s);
   for (const p of db.projects) {
     if (p?.type === 'motion' && Array.isArray(p.segments) && p.segments.some((x) => x && !('kind' in x))) {
@@ -640,6 +658,7 @@ export function normalizeDB(db) {
   if (!('dashboardBanner' in db.settings)) db.settings.dashboardBanner = null;
   if (!('dashboardBannerGradient' in db.settings)) db.settings.dashboardBannerGradient = null;
   if (typeof db.settings.dashboardNote !== 'string') db.settings.dashboardNote = ''; // the dashboard's quick note
+  if (!CURRENCIES.has(db.settings.currency)) db.settings.currency = 'EUR';             // hourly rates, invoices
   db.settings.dashboardFocus = normalizeDashboardFocus(db.settings.dashboardFocus);
   db.settings.dashboardLayout = normalizeDashboardLayout(db.settings.dashboardLayout);
   return db;
@@ -764,6 +783,7 @@ export function normalizeTimeEntry(e) {
     start: isTimeOfDay(e?.start) ? e.start : '09:00',
     end: isTimeOfDay(e?.end) ? e.end : (isTimeOfDay(e?.start) ? e.start : '09:00'),
     planId: typeof e?.planId === 'string' && ID.test(e.planId) ? e.planId : null,
+    clientId: typeof e?.clientId === 'string' && ID.test(e.clientId) ? e.clientId : null, // time for a client, not for one of its projects
     project: str(e?.project, 160),    // a project / client without a plan (or as it was called)
     activity: str(e?.activity, 60),
     details: str(e?.details, 2000),
@@ -776,10 +796,83 @@ export function normalizeTimeTracker(t) {
   const running = r && Number.isFinite(r.startedAt) && r.startedAt > 0 ? {
     startedAt: Math.round(r.startedAt),
     planId: typeof r.planId === 'string' && ID.test(r.planId) ? r.planId : null,
+    clientId: typeof r.clientId === 'string' && ID.test(r.clientId) ? r.clientId : null,
     project: str(r.project, 160), activity: str(r.activity, 60), details: str(r.details, 2000),
   } : null;
   const seen = new Set();
   const activities = (Array.isArray(t?.activities) ? t.activities : DEFAULT_ACTIVITIES)
     .map((a) => str(a, 60).trim()).filter((a) => a && !seen.has(a.toLowerCase()) && seen.add(a.toLowerCase())).slice(0, 40);
   return { running, activities };
+}
+
+// ---------------------------------------------------------------------------
+// Clients — who a project is for: their people (with birthdays), billing
+// details, notes and invoices. A project points at one (plan.clientId); its
+// `client` name is kept in step for everything that shows it.
+// ---------------------------------------------------------------------------
+/** The id a client gets when it's made from an older project's client name (same name → same client). */
+export const clientIdFor = (name) => `cl${createHash('sha1').update(String(name).trim().toLowerCase()).digest('hex').slice(0, 10)}`;
+export const INVOICE_STATUSES = ['open', 'paid'];
+const clientFile = (v) => (typeof v === 'string' && v && !v.includes('..') && !v.startsWith('/') ? str(v, 300) : null);
+
+export function normalizeContact(c) {
+  return {
+    id: typeof c?.id === 'string' && ID.test(c.id) ? c.id : nanoid(8),
+    name: str(c?.name, 120), role: str(c?.role, 120),
+    email: str(c?.email, 200).trim(), phone: str(c?.phone, 60).trim(),
+    birthday: isDay(c?.birthday) ? c.birthday : '', // shows in the dashboard's calendar
+  };
+}
+export function normalizeInvoice(i) {
+  const amount = Number(i?.amount);
+  return {
+    id: typeof i?.id === 'string' && ID.test(i.id) ? i.id : nanoid(8),
+    file: clientFile(i?.file),               // invoices/… in the client's folder (a PDF)
+    name: str(i?.name, 200),                  // the file's original name
+    number: str(i?.number, 60), date: isDay(i?.date) ? i.date : '',
+    amount: i?.amount === '' || i?.amount == null || !Number.isFinite(amount) || amount < 0 ? null : Math.round(Math.min(amount, 1e9) * 100) / 100,
+    status: INVOICE_STATUSES.includes(i?.status) ? i.status : 'open',
+    planId: typeof i?.planId === 'string' && ID.test(i.planId) ? i.planId : null,
+    note: str(i?.note, 500),
+    addedAt: num(i?.addedAt, 0, 1e14, 0) || Date.now(),
+  };
+}
+export function normalizeClient(c) {
+  const name = str(c?.name, 200).trim() || 'Client';
+  return {
+    id: typeof c?.id === 'string' && ID.test(c.id) ? c.id : clientIdFor(name),
+    name,
+    color: TAG_KEYS.has(c?.color) ? c.color : 'blue',
+    logo: clientFile(c?.logo),
+    website: str(c?.website, 300).trim(), email: str(c?.email, 200).trim(), phone: str(c?.phone, 60).trim(),
+    address: str(c?.address, 1000), billingAddress: str(c?.billingAddress, 1000),
+    vatId: str(c?.vatId, 60).trim(), customerNumber: str(c?.customerNumber, 60).trim(),
+    notes: str(c?.notes, 20000),
+    contacts: (Array.isArray(c?.contacts) ? c.contacts : []).slice(0, 50).map(normalizeContact),
+    invoices: (Array.isArray(c?.invoices) ? c.invoices : []).slice(0, 2000).map(normalizeInvoice),
+    createdAt: num(c?.createdAt, 0, 1e14, 0),
+    updatedAt: num(c?.updatedAt, 0, 1e14, 0),
+  };
+}
+
+// Projects written before clients existed only have a client name: it becomes
+// a client (the same name → the same one, found again on every read until it's
+// saved). A project whose client is gone has none.
+function linkClients(db) {
+  const byId = new Map(db.clients.map((c) => [c.id, c]));
+  const byName = new Map(db.clients.map((c) => [c.name.toLowerCase(), c]));
+  for (const plan of db.plans) {
+    if (!('clientId' in plan)) {
+      const name = str(plan.client, 200).trim();
+      let c = name ? byName.get(name.toLowerCase()) : null;
+      if (name && !c) {
+        c = normalizeClient({ id: clientIdFor(name), name, createdAt: plan.createdAt || 0 });
+        db.clients.push(c); byId.set(c.id, c); byName.set(name.toLowerCase(), c);
+      }
+      plan.clientId = c ? c.id : null;
+    }
+    const c = typeof plan.clientId === 'string' ? byId.get(plan.clientId) : null;
+    plan.clientId = c ? c.id : null;
+    plan.client = c ? c.name : '';
+  }
 }

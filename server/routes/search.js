@@ -58,8 +58,18 @@ router.get('/api/search', async (req, res) => {
       .filter(Boolean).join(' ').toLowerCase();
     const score = scoreMatch(terms, pl.name || '', hay);
     if (score > 0) results.push({
-      kind: 'plan', id: pl.id, title: pl.name || 'Untitled plan', subtitle: pl.client ? `Plan · ${pl.client}` : 'Plan',
+      kind: 'plan', id: pl.id, title: pl.name || 'Untitled project', subtitle: pl.client ? `Project · ${pl.client}` : 'Project',
       thumb: pl.avatar ? `/data/plan/${pl.id}/${pl.avatar}` : null, score,
+    });
+  }
+  for (const c of db.clients || []) {
+    const hay = [c.name, c.customerNumber, c.vatId, c.email, c.website, c.notes,
+      ...(c.contacts || []).flatMap((x) => [x.name, x.role, x.email, x.phone]),
+      ...(c.invoices || []).flatMap((i) => [i.number, i.name])].filter(Boolean).join(' ').toLowerCase();
+    const score = scoreMatch(terms, c.name || '', hay);
+    if (score > 0) results.push({
+      kind: 'client', id: c.id, title: c.name, subtitle: c.customerNumber ? `Client · ${c.customerNumber}` : 'Client',
+      thumb: c.logo ? `/data/client/${c.id}/${c.logo}` : null, score,
     });
   }
   for (const g of db.galleries) {

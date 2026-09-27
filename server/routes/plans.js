@@ -10,7 +10,9 @@ import { upload } from '../upload.js';
 import {
   BLOCK_TYPES, BLOCK_TITLES, BLOCK_TABS, BLOCK_WIDTHS, PLAN_STATUSES, STORYBOARD_ASPECTS, normalizeField, normalizeShot, normalizeAudio,
   normalizeLine, normalizeTarget, normalizePace, normalizeVersion, normalizeDeliverable, normTags, str, normalizeBeat, normalizeCutdowns,
+  normalizeBudget, normalizeRate,
 } from '../schema.js';
+import { resolveClient } from './clients.js';
 import { STORYBOARD_TEMPLATES, storyboardTemplate, templateInfo } from '../storyboards.js';
 import { BUILTIN_TEMPLATES, builtinTemplate, planFromTemplate, templateFromPlan, templateSummary } from '../templates.js';
 import { createRouter } from '../http.js';
@@ -23,7 +25,7 @@ const planDir = (planId) => path.join(DATA_DIR, 'plan', planId);
 const blockDir = (planId, blockId) => path.join(planDir(planId), 'blocks', blockId);
 const findBlock = (plan, blockId) => (plan && Array.isArray(plan.blocks)) ? plan.blocks.find((b) => b.id === blockId) : null;
 
-const PLAN_EDITABLE = ['name', 'start', 'end', 'milestones', 'bannerGradient', 'avatarEmoji', 'status', 'client'];
+const PLAN_EDITABLE = ['name', 'start', 'end', 'milestones', 'bannerGradient', 'avatarEmoji', 'status', 'client', 'clientId', 'budget', 'rate'];
 
 // Fields a briefing block starts with when added by hand.
 const DEFAULT_BRIEFING = ['Product / company', 'Target audience', 'Key message', 'Call to action',
@@ -48,10 +50,14 @@ router.post('/api/plans', async (req, res) => {
   const plan = await mutateDB((db) => {
     const t = templateId ? (builtinTemplate(templateId) || db.planTemplates.find((x) => x.id === templateId)) : null;
     if (templateId && !t) return null;
+    const clientId = resolveClient(db, { clientId: req.body.clientId, client: req.body.client }) || null; // an id, or a name (new → a new client)
     const p = {
       id: nanoid(10),
-      name: str(req.body.name || 'Untitled plan', 200).trim() || 'Untitled plan',
-      client: str(req.body.client, 200).trim(),
+      name: str(req.body.name || 'Untitled project', 200).trim() || 'Untitled project',
+      clientId,
+      client: db.clients.find((c) => c.id === clientId)?.name || '',
+      budget: normalizeBudget(req.body.budget),
+      rate: normalizeRate(req.body.rate),
       status: '',
       start: '',
       end: '',
@@ -121,7 +127,15 @@ router.patch('/api/plans/:id', async (req, res) => {
       const v = req.body[k];
       if (k === 'milestones') { if (Array.isArray(v)) plan.milestones = v; }
       else if (k === 'status') { if (v === '' || v == null || PLAN_STATUSES.includes(v)) plan.status = v || ''; }
-      else if (k === 'client') plan.client = str(v, 200);
+      else if (k === 'client' || k === 'clientId') {
+        if (k === 'client' && 'clientId' in req.body) continue; // the id wins
+        const id = resolveClient(db, k === 'clientId' ? { clientId: v } : { client: v });
+        if (id === undefined) continue; // unknown client id: unchanged
+        plan.clientId = id;
+        plan.client = db.clients.find((c) => c.id === id)?.name || '';
+      }
+      else if (k === 'budget') plan.budget = normalizeBudget(v);
+      else if (k === 'rate') plan.rate = normalizeRate(v);
       else plan[k] = v;
     }
     return plan;

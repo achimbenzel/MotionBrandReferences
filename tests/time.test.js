@@ -81,18 +81,39 @@ test('export: an .xlsx with the log (filters, frozen header, drop-downs, duratio
     assert.match(book, /<sheet name="Zeiterfassung" sheetId="1" r:id="rId1"\/>/);
     assert.match(book, /<sheet name="Listen" sheetId="3" state="hidden"/);
     const log = await read('xl/worksheets/sheet1.xml');
-    for (const h of ['Datum', 'Startzeit', 'Endzeit', 'Dauer (h)', 'Projekt/Kunde', 'Tätigkeit', 'Details &amp; Ergebnisse']) assert.ok(log.includes(`<t xml:space="preserve">${h}</t>`), h);
+    for (const h of ['Datum', 'Startzeit', 'Endzeit', 'Dauer (h)', 'Kunde', 'Projekt', 'Tätigkeit', 'Details &amp; Ergebnisse']) assert.ok(log.includes(`<t xml:space="preserve">${h}</t>`), h);
+    assert.ok(!log.includes('>Betrag<')); // no project has a rate yet
     assert.match(log, /<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"\/>/);
-    assert.match(log, /<autoFilter ref="A1:G4"\/>/); // header + 3 August entries
+    assert.match(log, /<autoFilter ref="A1:H4"\/>/); // header + 3 August entries
     assert.match(log, /<f>ROUND\(MOD\(C2-B2,1\)\*24,2\)<\/f><v>1.75<\/v>/); // 21:30–23:15
     assert.match(log, /<f>ROUND\(MOD\(C3-B3,1\)\*24,2\)<\/f><v>2<\/v>/); // 22:00–00:00 over midnight
     assert.match(log, /<f>SUBTOTAL\(109,D2:D4\)<\/f><v>4.5<\/v>/);
-    assert.match(log, /<dataValidation type="list"[^>]*sqref="E2:E503"><formula1>Listen!\$A\$1:\$A\$\d+<\/formula1>/);
+    assert.match(log, /<dataValidation type="list"[^>]*sqref="F2:F503"><formula1>Listen!\$B\$1:\$B\$\d+<\/formula1>/);
+    assert.match(log, /<dataValidation type="list"[^>]*sqref="G2:G503"><formula1>Listen!\$C\$1:\$C\$\d+<\/formula1>/);
     assert.match(log, /<c r="A2" s="2"><v>46240<\/v><\/c>/); // 2026-08-06 as an Excel date
     const summary = await read('xl/worksheets/sheet2.xml');
-    assert.match(summary, /Nach Projekt\/Kunde/);
-    assert.match(summary, /SUMIF\('Zeiterfassung'!\$E\$2:\$E\$4,A\d+,'Zeiterfassung'!\$D\$2:\$D\$4\)/);
+    assert.match(summary, /Nach Kunde/);
+    assert.match(summary, /Nach Projekt/);
+    assert.match(summary, /SUMIFS\('Zeiterfassung'!\$D\$2:\$D\$4,'Zeiterfassung'!\$F\$2:\$F\$4,&quot;Current plan&quot;\)/);
   } finally { await fh.close(); }
+
+  // A project with an hourly rate: Rate + Amount columns and their total.
+  await srv.api('/api/plans/plan3', { method: 'PATCH', json: { rate: 80 } });
+  const res2 = await fetch(`${srv.base}/api/time/export.xlsx?from=2026-08-01&to=2026-08-31&lang=de`);
+  const buf2 = Buffer.from(await res2.arrayBuffer());
+  const file2 = path.join(srv.dataDir, 'test-export2.xlsx');
+  await fsp.writeFile(file2, buf2);
+  const fh2 = await fsp.open(file2, 'r');
+  try {
+    const entries = await readCentralDirectory(fh2, buf2.length);
+    const log = (await readEntryBuffer(fh2, entries.find((e) => e.name === 'xl/worksheets/sheet1.xml'))).toString('utf8');
+    assert.ok(log.includes('<t xml:space="preserve">Betrag</t>'));
+    assert.match(log, /<autoFilter ref="A1:J4"\/>/);
+    assert.match(log, /<f>IF\(I2=&quot;&quot;,&quot;&quot;,ROUND\(D2\*I2,2\)\)<\/f><v>140<\/v>/); // 1.75 h × 80
+    assert.match(log, /<f>SUBTOTAL\(109,J2:J4\)<\/f><v>140<\/v>/);
+    const styles = (await readEntryBuffer(fh2, entries.find((e) => e.name === 'xl/styles.xml'))).toString('utf8');
+    assert.ok(styles.includes('formatCode="#,##0.00 &quot;€&quot;"'));
+  } finally { await fh2.close(); }
   // English, classic look, one plan only.
   const en = await fetch(`${srv.base}/api/time/export.xlsx?lang=en&style=classic&plan=plan2`);
   assert.match(en.headers.get('content-disposition'), /time-log\.xlsx/);

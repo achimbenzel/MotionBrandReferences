@@ -8,6 +8,7 @@ import { createRouter } from '../http.js';
 import { softDir } from './software.js';
 import { inboxDir } from './inbox.js';
 import { mockupDir, modelDir, hdriDir } from './mockups.js';
+import { clientDir } from './clients.js';
 
 const router = createRouter();
 export default router;
@@ -40,17 +41,20 @@ const trashThumb = (t) => {
           : t.kind === 'block' ? ((t.data.block?.images || [])[0]?.file || (t.data.block?.files || []).find((f) => f.example)?.example || null)
             : t.kind === 'orphans' ? firstImage(t.data.rels)
               : t.kind === 'inbox' ? firstImage([t.data.file])
-                : t.kind === 'mockup' ? t.data.thumb : null;
+                : t.kind === 'mockup' ? t.data.thumb
+                  : t.kind === 'client' ? t.data.logo : null;
   return rel ? `/data/trash/${t.trashId}/${rel}` : null;
 };
 
 function describe(t) {
   switch (t.kind) {
-    case 'plan': return { title: t.data.name || 'Untitled plan', subtitle: 'Plan' };
+    case 'plan': return { title: t.data.name || 'Untitled project', subtitle: 'Project' };
+    case 'client': return { title: t.data.name || 'Client', subtitle: 'Client' };
+    case 'invoice': return { title: t.data.invoice?.number ? `Invoice ${t.data.invoice.number}` : (t.data.invoice?.name || 'Invoice'), subtitle: `Invoice · ${t.data.clientName || 'Client'}` };
     case 'gallery': return { title: t.data.name || 'Gallery', subtitle: `Gallery · ${TYPE_LABEL[t.data.type] || t.data.type}` };
     case 'software': return { title: t.data.name || 'Software', subtitle: 'Software' };
     case 'file': return { title: t.data.item?.title || t.data.item?.name || 'File', subtitle: 'File' };
-    case 'block': return { title: t.data.block?.title || BLOCK_TITLES[t.data.block?.type] || 'Block', subtitle: `Block · ${t.data.planName || 'Plan'}` };
+    case 'block': return { title: t.data.block?.title || BLOCK_TITLES[t.data.block?.type] || 'Block', subtitle: `Block · ${t.data.planName || 'Project'}` };
     case 'mockup': return { title: t.data.name || 'Mockup', subtitle: 'Mockup' };
     case 'mockupModel': return { title: t.data.name || '3D model', subtitle: '3D model (mockups)' };
     case 'mockupHdri': return { title: t.data.name || 'HDRI', subtitle: 'HDRI (mockup light)' };
@@ -123,13 +127,31 @@ router.post('/api/trash/:trashId/restore', async (req, res) => {
       if (!Array.isArray(db.timeEntries)) db.timeEntries = [];
       const { label: _label, ...e } = data;
       if (!db.timeEntries.some((x) => x.id === e.id)) db.timeEntries.push(e);
+    } else if (entry.kind === 'client') {
+      if (!Array.isArray(db.clients)) db.clients = [];
+      if (db.clients.some((c) => c.name.trim().toLowerCase() === data.name.trim().toLowerCase() && c.id !== data.id)) { gone = 'name'; return null; }
+      if (!db.clients.some((c) => c.id === data.id)) db.clients.push(data);
+      // Its projects and time again — those that haven't been given to someone else meanwhile.
+      for (const p of db.plans) if ((entry.planIds || []).includes(p.id) && !p.clientId) { p.clientId = data.id; p.client = data.name; }
+      for (const e of db.timeEntries || []) {
+        if (!(entry.entryIds || []).includes(e.id) || e.clientId || e.planId) continue;
+        e.clientId = data.id;
+        if (e.project === data.name) e.project = '';
+      }
+      move = { from, to: clientDir(data.id) };
+    } else if (entry.kind === 'invoice') {
+      const c = (db.clients || []).find((x) => x.id === data.clientId);
+      if (!c) { gone = true; return null; }
+      if (!c.invoices.some((i) => i.id === data.invoice.id)) c.invoices.unshift(data.invoice);
+      rels = { base: clientDir(c.id), list: data.rels };
     } else if (entry.kind === 'orphans') {
       rels = { base: DATA_DIR, list: data.rels };
     }
     db.trash.splice(idx, 1);
     return entry;
   });
-  if (gone) return res.status(409).json({ error: 'target_gone', message: 'The plan or block this item belonged to no longer exists.' });
+  if (gone === 'name') return res.status(409).json({ error: 'name_taken', message: 'You have another client with that name now — rename it first.' });
+  if (gone) return res.status(409).json({ error: 'target_gone', message: 'The project, block or client this item belonged to no longer exists.' });
   if (!restored) return res.status(404).json({ error: 'not_found' });
   if (move) await restoreFromTrash(move.from, move.to);
   if (rels) {

@@ -21,6 +21,7 @@ import maintenance from './routes/maintenance.js';
 import inbox from './routes/inbox.js';
 import mockups from './routes/mockups.js';
 import time from './routes/time.js';
+import clients from './routes/clients.js';
 
 export function createApp() {
   const app = express();
@@ -35,7 +36,7 @@ export function createApp() {
   // the video player needs for seeking. Only library folders are exposed.
   app.use('/data', dataGuard, express.static(DATA_DIR, { setHeaders: dataHeaders }));
 
-  for (const r of [projects, plans, software, board, trash, search, settings, library, maintenance, inbox, mockups, time]) app.use(r);
+  for (const r of [projects, plans, software, board, trash, search, settings, library, maintenance, inbox, mockups, time, clients]) app.use(r);
   app.use('/api', (_req, res) => res.status(404).json({ error: 'not_found' }));
 
   // In production (npm start) serve the built frontend from the same origin.

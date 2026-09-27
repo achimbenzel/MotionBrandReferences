@@ -100,7 +100,7 @@ export function countActivity(req, res, next) {
   const full = `${req.baseUrl}${req.path}`;
   if (req.method !== 'GET' && req.method !== 'HEAD' && !/\/thumb$/.test(full) && !/^\/api\/activity(\/|$)/.test(full)) {
     // Deleting something isn't somewhere to continue.
-    const subject = req.method === 'DELETE' && /^\/api\/(plans|mockups|projects|software)\/[\w-]+$/.test(full) ? null : subjectOf(full);
+    const subject = req.method === 'DELETE' && /^\/api\/(plans|mockups|projects|software|clients)\/[\w-]+$/.test(full) ? null : subjectOf(full);
     res.on('finish', () => { if (res.statusCode < 400) noteActivity(subject).catch(() => {}); });
   }
   next();
