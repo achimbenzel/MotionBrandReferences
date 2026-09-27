@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Settings, Keyboard, SlidersHorizontal, RotateCcw, Database, Sparkles, Download, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { rememberCurrency } from '../lib/clients.js';
 import { useToast } from '../components/Toast.jsx';
 import { useConfirm } from '../components/ConfirmDialog.jsx';
 
@@ -36,9 +37,9 @@ const GROUPS = [
     ],
   },
   {
-    title: 'Project detail',
+    title: 'Reference detail',
     rows: [
-      { keys: ['←', '→'], sep: ' ', desc: 'Previous / next project in the same section' },
+      { keys: ['←', '→'], sep: ' ', desc: 'Previous / next reference in the same section' },
     ],
   },
   {
@@ -54,6 +55,14 @@ export default function SettingsPage() {
   const [vol, setVol] = useState(() => {
     try { const v = parseFloat(localStorage.getItem('videoVolume')); return Number.isFinite(v) ? v : null; } catch { return null; }
   });
+
+  // The currency hourly rates and invoice amounts are in (stored with the library).
+  const [currency, setCurrency] = useState(null);
+  useEffect(() => { api.getSettings().then((s) => setCurrency(s.currency || 'EUR')).catch(() => setCurrency('EUR')); }, []);
+  const pickCurrency = async (c) => {
+    setCurrency(c);
+    try { await api.updateSettings({ currency: c }); rememberCurrency(c); toast(`Amounts in ${c}`); } catch (e) { toast(`Could not save: ${e.message}`, 'error'); }
+  };
 
   const resetVolume = () => {
     try { localStorage.removeItem('videoVolume'); localStorage.removeItem('videoMuted'); } catch { /* ignore */ }
@@ -109,6 +118,15 @@ export default function SettingsPage() {
               <div className="pref-title">Remembered UI state</div>
               <div className="pref-sub">The collapsed sidebar and video volume are stored in <b>this browser only</b> (localStorage) — nothing leaves your device.</div>
             </div>
+          </div>
+          <div className="pref-row">
+            <div>
+              <div className="pref-title">Currency</div>
+              <div className="pref-sub">For hourly rates, amounts in the Time Tracker's Excel export and invoice sums.</div>
+            </div>
+            <select className="input pref-select" value={currency || 'EUR'} disabled={!currency} onChange={(e) => pickCurrency(e.target.value)} aria-label="Currency">
+              {['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD'].map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
           </div>
           <div className="pref-row">
             <div>

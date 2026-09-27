@@ -31,7 +31,7 @@ export default function ContinueWork({ reloadKey }) {
     <section className="dash-cont">
       <div className="dash-card-kicker"><History size={14} /> Continue where you left off</div>
       {items === null ? <div className="dash-cont-grid">{[0, 1, 2, 3].map((i) => <div key={i} className="dash-cont-tile dash-act-skeleton" />)}</div>
-        : !items.length ? <p className="dash-cont-empty">What you work on shows up here — a plan, a storyboard, a mockup.</p> : (
+        : !items.length ? <p className="dash-cont-empty">What you work on shows up here — a project, a storyboard, a mockup.</p> : (
           <div className="dash-cont-grid">
             {items.slice(0, 4).map((it) => {
               const Icon = ICON[it.kind] || History;

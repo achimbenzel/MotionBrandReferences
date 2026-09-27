@@ -27,7 +27,7 @@ export default function EditDetailsModal({ project, onClose, onSaved, focusField
       if (isFont) patch.url = url.trim();
       const updated = await api.update(project.id, patch);
       onSaved(updated);
-      toast('Project updated');
+      toast('Saved');
     } catch (e) {
       toast(`Update failed: ${e.message}`, 'error');
       setSaving(false);
@@ -38,7 +38,7 @@ export default function EditDetailsModal({ project, onClose, onSaved, focusField
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget && !saving) onClose(); }}>
       <div className="modal" role="dialog" aria-modal="true" style={{ maxWidth: 480 }}>
         <div className="modal-head">
-          <h2>Edit project</h2>
+          <h2>Edit reference</h2>
           <button className="icon-btn" onClick={onClose} disabled={saving}><X size={18} /></button>
         </div>
         <div className="modal-body">

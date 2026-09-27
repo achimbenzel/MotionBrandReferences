@@ -73,7 +73,7 @@ export default function FramePicker({ plan, single = false, onPick, onClose }) {
         </div>
         <div className="modal-body">
           <div className="segmented fp-tabs" role="tablist">
-            <button type="button" className={tab === 'plan' ? 'on' : ''} onClick={() => setTab('plan')} role="tab" aria-selected={tab === 'plan'}><Images size={14} /> This plan</button>
+            <button type="button" className={tab === 'plan' ? 'on' : ''} onClick={() => setTab('plan')} role="tab" aria-selected={tab === 'plan'}><Images size={14} /> This project</button>
             <button type="button" className={tab === 'motion' ? 'on' : ''} onClick={() => setTab('motion')} role="tab" aria-selected={tab === 'motion'}><Film size={14} /> Motion references</button>
           </div>
           {tab === 'plan' && (groups.length ? groups.map((g) => (
@@ -81,7 +81,7 @@ export default function FramePicker({ plan, single = false, onPick, onClose }) {
               <div className="fp-group-head">{g.title} <span className="count">{g.items.length}</span></div>
               <div className="fp-grid">{g.items.map(thumb)}</div>
             </div>
-          )) : <div className="empty-hint">No images in this plan’s moodboards or files yet.</div>)}
+          )) : <div className="empty-hint">No images in this project’s moodboards or files yet.</div>)}
           {tab === 'motion' && (
             <>
               <label className="pp-search">

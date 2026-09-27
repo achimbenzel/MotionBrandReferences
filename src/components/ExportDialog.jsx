@@ -224,7 +224,7 @@ export default function ExportDialog({ title = 'Export', targets, initial, store
           {busy && isVideo
             ? <button className="btn" onClick={() => abort.current?.abort()}>Cancel</button>
             : <button className="btn btn-ghost" onClick={onClose} disabled={busy}>Close</button>}
-          {onSaveToPlan && !isVideo && <button className="btn" onClick={toPlan} disabled={busy}><FolderInput size={14} /> Save to plan…</button>}
+          {onSaveToPlan && !isVideo && <button className="btn" onClick={toPlan} disabled={busy}><FolderInput size={14} /> Save to project…</button>}
           <button className="btn btn-primary" onClick={download} disabled={busy || !format}>
             <Download size={14} /> {busy ? (isVideo ? 'Rendering…' : 'Exporting…') : 'Download'}
           </button>

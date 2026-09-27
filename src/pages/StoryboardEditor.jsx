@@ -401,7 +401,7 @@ export default function StoryboardEditor() {
               ...ASPECTS.map((a) => ({ label: `Copy as ${a} version`, icon: <CopyIcon size={15} />, onClick: () => duplicate(a) })),
               { separator: true },
               { label: 'Draw a new shot…', icon: <PenLine size={15} />, onClick: () => setDrawing({ shotId: null, over: false }) },
-              { label: 'Open the plan', icon: <PencilRuler size={15} />, onClick: back },
+              { label: 'Open the project', icon: <PencilRuler size={15} />, onClick: back },
               { label: 'Delete storyboard', icon: <Trash2 size={15} />, danger: true, onClick: removeStoryboard },
             ]} />
         </div>
@@ -532,7 +532,7 @@ export default function StoryboardEditor() {
         <div className="empty sbe-empty">
           <Clapperboard size={30} />
           <h3>No shots yet</h3>
-          <p>Upload frames (one shot each), take them from the plan’s moodboards or your Motion references, paste an image, or start with empty shots.</p>
+          <p>Upload frames (one shot each), take them from the project’s moodboards or your Motion references, paste an image, or start with empty shots.</p>
         </div>
       )}
 

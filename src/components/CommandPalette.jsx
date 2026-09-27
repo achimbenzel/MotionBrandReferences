@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, CornerDownLeft, FileText, Film, Square, CreditCard, Palette, Images, Type,
-  PencilRuler, FolderOpen, Trash2, LayoutGrid, FlaskConical, Ban, Settings, Inbox, Clapperboard, MonitorSmartphone,
+  PencilRuler, FolderOpen, Trash2, LayoutGrid, FlaskConical, Ban, Settings, Inbox, Clapperboard, MonitorSmartphone, Building2, Clock,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { TABS } from '../lib/types.js';
@@ -14,10 +14,12 @@ const TYPE_ICON = {
 
 const NAV = [
   ...TABS.map((t) => ({ kind: 'nav', title: t.label, subtitle: 'Section', to: `/${t.key}`, icon: TYPE_ICON[t.key] || LayoutGrid })),
-  { kind: 'nav', title: 'Plans', subtitle: 'Work mode', to: '/plan', icon: PencilRuler },
+  { kind: 'nav', title: 'Clients', subtitle: 'Work mode · who you work for', to: '/clients', icon: Building2 },
+  { kind: 'nav', title: 'Projects', subtitle: 'Work mode', to: '/plan', icon: PencilRuler },
+  { kind: 'nav', title: 'Time Tracker', subtitle: 'Work mode · hours & Excel export', to: '/time', icon: Clock },
   { kind: 'nav', title: 'Brand Tester', subtitle: 'Work mode · logo tests', to: '/logo-tester', icon: FlaskConical },
   { kind: 'nav', title: 'Storyboards', subtitle: 'Work mode · all storyboards', to: '/storyboards', icon: Clapperboard },
-  { kind: 'nav', title: 'New storyboard', subtitle: 'For a plan, from a template', to: '/storyboards?new', icon: Clapperboard },
+  { kind: 'nav', title: 'New storyboard', subtitle: 'For a project, from a template', to: '/storyboards?new', icon: Clapperboard },
   { kind: 'nav', title: 'Mockups', subtitle: 'Work mode · 3D device mockups', to: '/mockups', icon: MonitorSmartphone },
   { kind: 'nav', title: 'Inbox', subtitle: 'Shared from your phone', to: '/inbox', icon: Inbox },
   { kind: 'nav', title: 'Trash', subtitle: 'Deleted items', to: '/trash', icon: Trash2 },
@@ -57,6 +59,7 @@ export default function CommandPalette({ onClose }) {
     if (item.kind === 'nav') navigate(item.to);
     else if (item.kind === 'project') navigate(`/project/${item.id}`);
     else if (item.kind === 'plan') navigate(`/plan/${item.id}`);
+    else if (item.kind === 'client') navigate(`/clients/${item.id}`);
     else if (item.kind === 'gallery') navigate(`/gallery/${item.id}`);
     onClose();
   };
@@ -74,7 +77,7 @@ export default function CommandPalette({ onClose }) {
         <div className="cmd-input">
           <Search size={18} />
           <input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKey}
-            placeholder="Search projects, plans, galleries — or jump to a section…" />
+            placeholder="Search references, projects, clients, galleries — or jump to a section…" />
           <span className="cmd-esc">Esc</span>
         </div>
         <div className="cmd-list">
@@ -102,6 +105,7 @@ export default function CommandPalette({ onClose }) {
 function Ico({ item }) {
   if (item.kind === 'nav') { const I = item.icon; return <I size={17} />; }
   if (item.kind === 'plan') return <PencilRuler size={17} />;
+  if (item.kind === 'client') return <Building2 size={17} />;
   if (item.kind === 'gallery') return <FolderOpen size={17} />;
   const I = TYPE_ICON[item.type] || FileText;
   return <I size={17} />;

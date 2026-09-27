@@ -61,7 +61,7 @@ export default function BrandingDetail({ project, setProject }) {
           </figure>
         )
       ) : (
-        <div className="panel center-msg">No files in this project.</div>
+        <div className="panel center-msg">No files in this reference.</div>
       )}
 
       {imageAssets.length > 1 && (

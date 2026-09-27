@@ -58,11 +58,11 @@ export default function SaveToPlanModal({ title, boardName, boardMatch, hint, su
         </div>
         <div className="modal-body">
           {plans === null ? <div className="spinner" /> : !plans.length ? (
-            <div className="hint">No plans yet — create one under Plans first.</div>
+            <div className="hint">No projects yet — create one under Projects first.</div>
           ) : (
             <>
               <div className="field">
-                <label>Plan</label>
+                <label>Project</label>
                 <select className="input" value={planId} onChange={(e) => setPlanId(e.target.value)}>
                   {plans.map((p) => <option key={p.id} value={p.id}>{p.avatarEmoji ? `${p.avatarEmoji} ` : ''}{p.name}{p.status === 'archived' ? ' (archived)' : ''}</option>)}
                 </select>

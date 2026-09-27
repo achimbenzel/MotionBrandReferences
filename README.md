@@ -3,9 +3,9 @@
 A personal, **local-only** design reference library with eight sections —
 **Branding**, **Motion Design**, **Logos**, **Business Cards**, **Colors**,
 **Image Gallery**, **Fonts** and **Logo No Go** — plus a **Work** area (a
-Dashboard, Plans, Software, a To-Do board and the Brand Tester). Cards with thumbnails and text below, styled after
+Dashboard, Projects, Software, a To-Do board and the Brand Tester). Cards with thumbnails and text below, styled after
 [achimbenzel.com/de/work](https://achimbenzel.com/de/work). Each section can be
-viewed as **All** (all projects) or **Galleries** (named collections you create,
+viewed as **All** (all references) or **Galleries** (named collections you create,
 e.g. "Green Tech Companies"). A storage meter in the header sums the `data/`
 folder against an editable limit (default 80 GB).
 
@@ -130,10 +130,11 @@ data/
 ├── imagegallery/<id>/image.<ext>   # one image per item
 ├── font/<id>/shot.<ext>            # optional screenshot of a free-font site
 ├── logonogo/<id>/image.<ext>       # a logo/symbol to avoid resembling
-├── plan/<id>/                      # Plan-mode plans
+├── plan/<id>/                      # projects (Work mode; stored as "plans")
     ├── banner.<ext>, avatar.<ext>  # Notion-style banner + profile image
     └── blocks/<blockId>/*          # one folder per content block
                                     # (moodboard images, files + example images)
+├── client/<id>/                    # a client's logo + invoices/*.pdf
 ├── software/<id>/*                 # plugin installers + your own script files
 ├── mockup/<id>/                    # a mockup's screen pictures / videos, 2D pictures + thumb.webp
 ├── mockup-model/<id>/model.<ext>   # an imported 3D model (.glb / .gltf / .usdz)
@@ -178,7 +179,7 @@ never touched. To back up or move your library, just copy the `data/` folder.
 ### Data format & migration
 
 `db.json` carries a `schemaVersion`. Libraries created with older versions of
-the app (no version = v1) contain records in older shapes — e.g. plans from
+the app (no version = v1) contain records in older shapes — e.g. projects from
 before content blocks, logos with light/dark variants or plain hex colour lists,
 Software entries with separate scripts. The app reads all of these as-is, so
 nothing changes after an update.
@@ -189,7 +190,7 @@ nothing changes after an update.
 and every file reference is kept. To undo, stop the app and copy that backup
 over `data/db.json`.
 
-Newer additions — plan status and client, the briefing block, plan templates
+Newer additions — project status and client, the briefing block, project templates
 and video section types — need no migration: records without them read as
 “no status”, “no client”, “no type”, and older section labels keep their text.
 
@@ -223,17 +224,17 @@ and full **ZIP64** is supported, so archives and individual files larger than
 ### Search everything (⌘K / Ctrl-K)
 
 Press **⌘K** (macOS) / **Ctrl-K**, or the header search button, to open a
-command palette that searches **across every section at once** — project
+command palette that searches **across every section at once** — reference
 titles, categories, tags and notes, colours (by hex), font sites, a video's
-sections (type and note), and plan names, clients, milestones, to-dos and
+sections (type and note), and project names, clients, milestones, to-dos and
 briefing answers. It also lets you **jump to any section** (or
-Plans, Brand Tester, Trash) by name. Arrow keys to move, Enter to open, Esc to
+Projects, Brand Tester, Trash) by name. Arrow keys to move, Enter to open, Esc to
 close.
 
 ### Trash (recoverable deletes)
 
-Deleting a **project, plan, gallery, software, plan block** — or a **file from
-a plan's Files block** — moves it to **Trash** instead of removing it
+Deleting a **reference, project, gallery, software, project block** — or a **file from
+a project's Files block** — moves it to **Trash** instead of removing it
 immediately, and a toast offers a one-click **Undo**. Open Trash from the storage **⋯** menu (or
 the palette) to **restore** items — files, example images and gallery
 membership come back intact — or delete them permanently. Trash auto-empties
@@ -245,10 +246,11 @@ excluded from exports.)
 A **Settings** page (in the sidebar footer above Trash, the storage **⋯** menu,
 or the palette) has a **Library** section — data-format migration, unused-file
 cleanup and backups (see above) — and lists every **keyboard shortcut** — ⌘K search, the fullscreen
-viewer's scroll-zoom / drag / arrows, Motion's `,` `.` frame stepping, project
+viewer's scroll-zoom / drag / arrows, Motion's `,` `.` frame stepping, reference
 `←`/`→` navigation — plus per-browser **preferences**. The **video player
 volume** (and mute) is remembered across reloads in this browser, and can be
-reset from here.
+reset from here. The **currency** (EUR, USD, GBP, CHF, JPY, CAD, AUD) is
+what hourly rates, amounts in the Excel export and invoice sums are shown in.
 
 ---
 
@@ -257,10 +259,17 @@ reset from here.
 A toggle switches between two modes:
 
 - **Work** — the **default** mode (left in the toggle), your working area. It
-  opens on a **Dashboard** and holds **Plans**, **Software**, the **To-Do
-  board**, the **Brand Tester**, **Storyboards** and **Mockups** (see below).
+  opens on a **Dashboard** and holds **Clients**, **Projects**, **Software**,
+  the **To-Do board**, the **Brand Tester**, **Storyboards**, **Mockups** and
+  the **Time Tracker** (see below).
 - **Reference** — the library (Branding, Motion Design, Logos, Business Cards,
   Colors, Image Gallery, Fonts, Logo No Go).
+
+**Naming:** in the app, *references* are the items of your library and
+*projects* are your own work. Under the hood the names are older: references
+are stored as `projects` in `db.json` (and open at `/project/…`), projects as
+`plans` (at `/plan/…`) — so nothing had to be migrated when projects got
+their name.
 
 The app starts in Work, and switching from Reference back to Work always returns
 to the Dashboard.
@@ -268,18 +277,18 @@ to the Dashboard.
 ### Dashboard
 The Work landing page, a Notion-style overview that moves a little:
 - **Hero** over your banner — a greeting for the time of day, the date and a
-  one-line summary, quick actions (**New plan**, **To-dos**, **Search ⌘K**)
-  and four glass tiles that count up: **open plans**, **dates in the next 7
-  days**, **open to-dos** (plan to-dos + board cards, with a ring for how many
+  one-line summary, quick actions (**New project**, **To-dos**, **Search ⌘K**)
+  and four glass tiles that count up: **open projects**, **dates in the next 7
+  days**, **open to-dos** (project to-dos + board cards, with a ring for how many
   are done; cards in a list called *Done* count as done) and **urgent**. A
   gradient banner drifts slowly, a picture banner zooms in very slowly. The
   banner is a preset gradient, an upload or a picture **from the app**.
 Below it come **widgets you arrange yourself** — **Customize** (right above
 them) lets you drag each one by its handle, make it half or full width, hide
 it and show it again; your layout is saved. The widgets:
-- **Today’s focus** — pin up to five to-dos (board cards or a plan's to-dos)
+- **Today’s focus** — pin up to five to-dos (board cards or a project's to-dos)
   or write a new one (it becomes a card on the board) and tick them off right
-  there: a card moves to your *Done* list, a plan to-do gets its tick. A ring
+  there: a card moves to your *Done* list, a project to-do gets its tick. A ring
   shows how far you are; ticked ones stay struck through until the next day.
 - **Focus timer** — 25, 50 or 90 minutes of focus, then a short break (a long
   one after four sessions). It's one timer for the whole app: it keeps
@@ -290,23 +299,24 @@ it and show it again; your layout is saved. The widgets:
   takes minutes (`45`, `1:30`, `1h 30`) and adds a chip (up to four, × to
   remove, remembered per browser); or click the big time and type how long
   this round should be.
-- **Continue where you left off** — the last plans, storyboards, mockups and
-  references you changed, with a picture; a plan opens at the block you
+- **Continue where you left off** — the last projects, storyboards, mockups and
+  references you changed, with a picture; a project opens at the block you
   edited.
 - **Next up** — a big countdown to the next milestone or deadline (from every
-  plan that isn't delivered or archived), with its plan and how far the plan's
+  project that isn't delivered or archived), with its project and how far the project's
   timeframe has run; the following dates below. Next to it **Two weeks**: this
-  week and the next as a calendar, a dot per milestone (◆ for a deadline); a
-  day opens its plan.
-- **Urgent** to-dos from the board and every plan.
-- **Your tools** — Plans, To-Do Board, Storyboards, Mockups, Brand Tester,
-  Software — with a light that follows the pointer.
-- **Pipeline** — your plans by status as one bar and per stage (Briefing →
-  Concept → Design → Production → Review → Delivered); a stage opens the plan
+  week and the next as a calendar, a dot per milestone (◆ for a deadline) and
+  a pink one for a **birthday** of one of your clients' contacts (hover for
+  who and how old they turn); a day opens its project (or the client).
+- **Urgent** to-dos from the board and every project.
+- **Your tools** — Clients, Projects, To-Do Board, Storyboards, Mockups,
+  Brand Tester, Software, Time Tracker — with a light that follows the pointer.
+- **Pipeline** — your projects by status as one bar and per stage (Briefing →
+  Concept → Design → Production → Review → Delivered); a stage opens the project
   list filtered to it.
 - **Your rhythm** — a GitHub-style map of the last 26 weeks (15 on a phone):
   a square per day, dark → bright with how much you did — every save, and the
-  references, plans, mockups and Inbox shares you added. Hover a day for its
+  references, projects, mockups and Inbox shares you added. Hover a day for its
   numbers (and focus minutes); beside it your current **streak**, **this
   week** and your **busiest weekday**. Saves are counted per day in `data/activity.json` (a
   small file of its own; the library database isn't touched), so the map
@@ -335,18 +345,66 @@ uses the **full width**, so extra lists run past the usual content margins; on
 a phone every list is a full-width, swipeable page with **list tabs** above to
 jump between them. Everything auto-saves to one global board.
 
-A card can **belong to a plan** (⋯ → **Link to plan…**): it shows the plan's
-name (a click opens the plan), the filter at the top shows **one plan's cards**
-(new cards then belong to it; it's always there — every plan can be picked, the
-ones with cards first, × shows all cards again), and the plan lists its cards under **To-dos on
+A card can **belong to a project** (⋯ → **Link to project…**): it shows the project's
+name (a click opens the project), the filter at the top shows **one project's cards**
+(new cards then belong to it; it's always there — every project can be picked, the
+ones with cards first, × shows all cards again), and the project lists its cards under **To-dos on
 the board** — add one there (it lands in the first list), move it to another
 list, flag it urgent or unlink it; those changes touch only that card. Urgent
-cards on the Dashboard name their plan.
+cards on the Dashboard name their project.
 
-### Plans
-Plan new projects. The **+** opens **New plan**: give it a name and (optionally)
-a client, and choose what to start from —
-- **Empty plan** — a blank page,
+### Clients
+**Clients** (sidebar, above Projects) are who you work for — a client comes
+back, you start a new project for them, and everything stays together.
+
+- **The list** — each client with its logo (or initials on its colour), how
+  many projects (and how many are open), this month's and all hours, open
+  invoices and a birthday coming up.
+- **A client's page**:
+  - **Header** — the name (edit in place), logo and colour (click the
+    logo), customer number, website, email and phone at a glance;
+    **New project** (with the client already set), **Track time** (on the
+    client itself, no project needed), and ⋯ **All time entries**,
+    **Export hours (.xlsx)** (just this client) and **Delete**.
+  - **Numbers** — hours in all and this month, open / all projects,
+    deliverables delivered, tracked hours × rate, invoices open / paid.
+  - **Projects** — every project of the client: status, dates, deliverables
+    (“3/5 delivered”), hourly rate, and its hours — against its **budget**
+    (“12.0 / 20 h”, amber from 80 %, red over it) or with the amount
+    (hours × rate).
+  - **Deliverables** — every deliverable of every project, by project,
+    **Open / Delivered / All**; a click opens it in its project.
+  - **Time** — hours per project (and without one) and the latest entries.
+  - **Invoices** — drop or upload invoice **PDFs** (or a scan); give each a
+    number, date, amount and project, tick **Paid**; the sums of open and
+    paid invoices show on top. Deleting one goes to the Trash (Undo).
+  - **Coming up** — milestones and deadlines of the open projects and your
+    contacts' birthdays in the next weeks.
+  - **Contacts** — the people you talk to: name, role, email, phone and
+    **birthday** (it shows in the dashboard's calendar, with how old they turn).
+  - **Details & billing** — customer number, VAT ID, email for invoices,
+    phone, website, address and a billing address.
+  - **Notes** — how they like to work, payment terms…
+  Everything saves as you type.
+- Deleting a client puts it (and its invoices) in the **Trash**; its projects
+  stay, without a client, and its time keeps the client's name. Restoring it
+  links everything again.
+
+Clients are stored in `data/db.json` (`clients`), their logos and invoice PDFs
+under `data/client/<id>/`. Libraries from before clients existed turn each
+project's client name into a client on their own (the same name — in any
+case — is one client), so nothing has to be typed again.
+
+### Projects
+Your projects (formerly *Plans*) — for a client or just for you. The
+**Projects** page shows them **by client** (each client's projects together,
+“Without a client” last, a **New project** tile in each group with that client
+set) or **All** in one grid; the status chips filter both. Cards show the
+hours tracked (against the budget, with a thin bar, when there is one).
+
+The **+** opens **New project**: give it a name, pick its **client** — one of
+yours, **New client…** (type the name) or none — and choose what to start from —
+- **Empty project** — a blank page,
 - **Launch video** — briefing (product, audience, key message, CTA, target
   length, formats, tone, music & VO, must-haves, budget), a script (lines
   pre-labelled Hook → Logo outro), moodboard, references, styleframes,
@@ -356,35 +414,41 @@ a client, and choose what to start from —
 - **Branding** — briefing, research (references, competitors), moodboard, logo
   concepts, colour palette, typography, a checklist, a deliverables table and a
   brand-guidelines PDF block,
-- **your own templates** — any plan can be saved with **Edit → Save as
+- **your own templates** — any project can be saved with **Edit → Save as
   template…**. A template keeps the blocks, text, to-dos (unticked), tables,
   script lines, storyboard shots (their text and timing) and briefing
   questions, and leaves out images, frames, tracks, files, dates and briefing
   answers.
   Saving under the name of an existing template updates it; delete one with
-  its **×** in the New plan dialog. The dialog remembers the last choice.
+  its **×** in the New project dialog. The dialog remembers the last choice.
 
-Plans are listed in a grid like galleries, with **status chips** above to show
-one stage at a time (archived plans only show under **Archived**). Each
-**plan** has:
-  - **To-dos on the board** — the To-Do board's cards linked to this plan (see
+Projects are listed in a grid like galleries, with **status chips** above to show
+one stage at a time (archived projects only show under **Archived**). Each
+**project** has:
+  - **To-dos on the board** — the To-Do board's cards linked to this project (see
     To-Do board),
   - a **status** — Briefing, Concept, Design, Production, Review, Delivered or
-    Archived (or none) — picked from the pill under the plan's name, next to
-    its **client**,
+    Archived (or none) — picked from the pill under the project's name, next
+    to its **client**: a chip with the client's logo; a click finds another
+    client, creates one (“Create …”), opens the client's page or removes it,
   - a **Notion-style banner** — pick a **preset gradient**, upload a **custom
     image** or take one **from the app** — plus a **profile image** that can be an **emoji** (quick-pick grid
     or type/paste your own), an **uploaded image** or one from the app; both banner and profile
-    also show on the plan's card in the grid,
+    also show on the project's card in the grid,
   - a **timeframe** (start / end date) with **checkable milestones** — each has a
     title, an optional date and a checkbox that strikes it through when done.
     In the header it's **one line** — “23 Sep – 16 Oct · 1/3 milestones ·
     next: Styleframes in 3 days” (with a red calendar when one is overdue);
     a click opens the dates and milestones to edit. Next to it a small
-    **clock chip** shows the hours tracked on the plan (a click opens the
-    Time Tracker filtered to it) and ▶ / ■ starts or stops tracking time on
-    this plan (see [Time Tracker](#time-tracker)),
-  - a stack of **content blocks** below the timeframe. A **new plan is empty**;
+    **clock chip** shows the hours tracked on the project (a click opens the
+    Time Tracker filtered to it), ▶ / ■ starts or stops tracking time on
+    it (see [Time Tracker](#time-tracker)), and its gauge sets an optional
+    **budget** — hours **for the project** or **per month** — and an optional
+    **hourly rate**. With a budget the chip reads “12.0 / 20 h” (amber from
+    80 %, red over it, with a thin bar); with a rate it adds the amount
+    (“12.5 h · €1,062.50”); the rate also fills the Excel export's Amount
+    column. The currency is set in Settings (EUR by default),
+  - a stack of **content blocks** below the timeframe. A **new project is empty**;
     add blocks with **+ Add block** at the bottom, **drag them into place** by
     the handle left of each block (on a phone: the small pill on its top edge;
     a line shows where it lands; with the handle focused, ↑ / ↓ move it too) or
@@ -399,11 +463,11 @@ one stage at a time (archived plans only show under **Archived**). Each
       when it starts and roughly how long its voice-over takes at the chosen
       **pace** (English 2.5, German 2.2, slow or fast words per second), and the
       total runs against a **target length** — the block's own, or the target
-      length in the plan's briefing. Text in [brackets] or (parentheses) is a
+      length in the project's briefing. Text in [brackets] or (parentheses) is a
       direction and isn't counted; `[pause 1s]` adds a pause. **Copy** puts the
       script on the clipboard; the block's ⋯ **Storyboard from script** turns
       every line into a shot, timed by its voice-over.
-    - **Storyboard** — in the plan a **preview**: the frames in order (with
+    - **Storyboard** — in the project a **preview**: the frames in order (with
       their section colour), format, length against the target, how many
       shots are approved, and **Animatic**. **Open storyboard** (or a click on
       a frame) opens the **storyboard editor** — see *Storyboards* below.
@@ -426,7 +490,7 @@ one stage at a time (archived plans only show under **Archived**). Each
     - **Moodboard** — a **collapsible** board of images. Add images by button, by
       **dropping** files onto the board, by **pasting** (⌘V) into the last-used
       board, or **From the app** — any picture already in the app (library,
-      other plans, Motion frames, Inbox …), as many as you like.
+      other projects, Motion frames, Inbox …), as many as you like.
     - **Text** — a free-text notes area, auto-saved.
     - **To-dos** — a checklist you add items to and tick off, auto-saved.
     - **Files** — a list of uploaded files. **Add file** opens a small dialog
@@ -437,52 +501,52 @@ one stage at a time (archived plans only show under **Archived**). Each
     - **Links** — a list of **bookmarks** (label + URL), each opening in a new
       tab; handy for inspiration, references or client sites.
     - **References** — attach existing items from your **Reference library**
-      (projects and galleries) via a search picker; they’re shown as the **same
+      (references and galleries) via a search picker; they’re shown as the **same
       cards as in the library** (three across) and **jump to that item**, so a
-      plan can point back at the work it draws on. The other way round works
-      too: every project and gallery page has **Edit → Add to plan…**, which
-      puts it into the chosen plan's References (a References block is added
-      if the plan has none; nothing is added twice).
+      project can point back at the work it draws on. The other way round works
+      too: every reference and gallery page has **Edit → Add to project…**, which
+      puts it into the chosen project's References (a References block is added
+      if the project has none; nothing is added twice).
     - **Palette** — a set of colour **swatches** (hex + optional name); add them
       by hand or **extract a palette from an uploaded image**, and copy any hex
       with one click.
     - **Heading** and **Divider** — lightweight structural blocks (an inline
       heading with an optional subtitle, and a horizontal rule) for organising
-      longer plans.
+      longer projects.
     - **Table** — a small editable grid: rename columns, add/remove columns and
       rows, and any column whose values are all numeric gets an automatic
       **sum row** (handy for budget lines).
 
-  Following the general rule below, a plan's title and each block's name are only
+  Following the general rule below, a project's title and each block's name are only
   editable via a **⋯** menu — there is no bare Delete button.
 
-**Tabs.** A plan's blocks are grouped by phase in tabs under its header —
+**Tabs.** A project's blocks are grouped by phase in tabs under its header —
 **Briefing**, **Concept**, **Production**, **Delivery** — each in its own
 colour, with the number of blocks it holds; a dot marks the tab of the phase
-the plan's status says it's in. The Launch video template, for example, puts
+the project's status says it's in. The Launch video template, for example, puts
 the briefing in Briefing; moodboard, references, styleframes, palette and
 links in Concept; script, storyboard and the checklist in Production; review,
 deliverables and files in Delivery. Blocks made before tabs existed are placed
 by their type (a heading goes with the block below it); **Move to …** in a
 block's ⋯ menu puts it in another tab, **Move up / down** works within the tab,
-and **Add block to …** adds to the open tab. A plan opens on the tab you used
+and **Add block to …** adds to the open tab. A project opens on the tab you used
 last (or its phase's, when that has blocks).
 
-- **Overview** — the plan at a glance: per phase a card for every block with
+- **Overview** — the project at a glance: per phase a card for every block with
   content (its summary — “4/10 answered”, “6 images”, “2/8 done”, “v3 · 2 open
   comments”, “0/4 delivered” … — with a glimpse: thumbnails, swatches, the
   first answers, open to-dos, a progress bar; a links card lists each link
   once, by its label) and the blocks that are still
-  empty as chips. A card or chip opens the block in its tab. The plan's to-dos
+  empty as chips. A card or chip opens the block in its tab. The project's to-dos
   on the board are here too.
 - **Empty blocks are one line** (“Styleframes — empty · drop or add images”)
   until you open them, so a fresh template stays short.
 - **Every block folds** (⌃ next to its ⋯, or ⋯ → Fold) to one line with its
   summary and a glimpse of the content; **Fold all / Unfold all** does the
-  whole tab. Folding is saved with the plan.
+  whole tab. Folding is saved with the project.
 - **Small blocks side by side**: palette, links and files stand two in a row
   on a wide screen; ⋯ → **Half width** / **Full width** changes it for any
-  block (saved with the plan).
+  block (saved with the project).
 - **Contents**: on a wide screen every block is listed at the right edge by
   tab — icon, name and where it stands (“empty”, “3/10 answered”, “2/8 done”
   …), the one in view highlighted; a click shows the block, switching tab and
@@ -492,17 +556,17 @@ last (or its phase's, when that has blocks).
 **Archive as reference.** When a job is done, **Edit → Archive as reference…**
 turns it into references in your library, next to the work of others:
 - the **final video** — a Review version (the last approved one is picked) or a
-  video in a Files block — becomes a **Motion Design** project with a cover
+  video in a Files block — becomes a **Motion Design** reference with a cover
   frame, its format and length,
 - the **images and PDFs** you tick — moodboards (boards named styleframes,
   logo, final, design, concept … are ticked from the start), PDF and Files
-  blocks; tap a picture to leave it out — become one **Branding** project,
-- the **palette** becomes a **Colors** project (with RGB, CMYK and Pantone).
+  blocks; tap a picture to leave it out — become one **Branding** reference,
+- the **palette** becomes a **Colors** reference (with RGB, CMYK and Pantone).
 
 Title, year and tags (the client and “Own work” to start with) are set in the
-dialog, and the plan can be set to **Archived** in the same step. The files are
-**copied** — the plan keeps everything. The plan then shows **In your library**
-chips linking to the new projects, and each project says **From plan “…”**.
+dialog, and the project can be set to **Archived** in the same step. The files are
+**copied** — the project keeps everything. The project then shows **In your library**
+chips linking to the new references, and each reference says **From project “…”**.
 
 ### Software
 A **topic per app** (After Effects, Premiere, Blender…). Add a software, give it
@@ -548,25 +612,25 @@ colour variants come along. Then:
   picture** (circle) or an **app icon** (squircle / rounded) — at preset or
   your own sizes, with space around it, on a transparent, white, black, stage
   or brand-colour background, as **PNG, JPG or WebP**. From there **Save to
-  plan…** puts the file into a plan; the **Save to plan…** button saves the
-  sheet (PNG) into a plan's moodboard (an existing one, or a new “Brand tests”
+  project…** puts the file into a project; the **Save to project…** button saves the
+  sheet (PNG) into a project's moodboard (an existing one, or a new “Brand tests”
   board). Nothing else is stored; the settings are remembered for the session
   (and the export choices on this device).
 
 ### Storyboards
 **Storyboards** (sidebar, under the Brand Tester) lists the storyboards of all
-your plans — frames, format, length, section colours and plan — searchable.
-**New storyboard** asks for the plan (or makes a new plan, with client, in the
+your projects — frames, format, length, section colours and project — searchable.
+**New storyboard** asks for the project (or makes a new project, with client, in the
 same step), a starting point and the format:
 - **Empty**,
 - **Launch video · 30 s** — Hook → Problem → Product reveal → Features →
   Proof → Call to action → Logo outro, 11 shots with suggested timings,
 - **Social cut · 15 s · 9:16** and **Logo sting · 5 s**.
 
-A storyboard is stored in its plan (as its storyboard block), so the plan and
+A storyboard is stored in its project (as its storyboard block), so the project and
 the Storyboards page always show the same thing.
 
-**The editor** (a page of its own; ← goes back to the plan):
+**The editor** (a page of its own; ← goes back to the project):
 - **Name, format** (16:9, 9:16, 1:1, 4:5), **target length** (or the
   briefing's), a **music / voice-over track**, a **progress bar** by status and
   a strip of all shots with the **sections** underneath — click a shot to jump
@@ -613,7 +677,7 @@ the Storyboards page always show the same thing.
   you click is edited below). The view is remembered.
 - **Frames**: **Upload frames** (one shot each), **drop** images anywhere
   (on a shot: replaces its frame), **paste** an image, or **From library**:
-  the plan's moodboard / files images or the **frames and moments saved on
+  the project's moodboard / files images or the **frames and moments saved on
   your Motion references** (searchable; the shot's note then says where it
   came from). Pictures are copied into the storyboard.
 - **Animatic** — as before, now also showing the on-screen text as a super,
@@ -627,7 +691,7 @@ the Storyboards page always show the same thing.
 - **PDF** — A4 landscape for the client: **large** (three shots a page, frame
   left, text right) or **compact** (six a page; upright formats 4 / 6), with
   the fields you tick (voice-over, on-screen text, camera, sound, notes,
-  status), plan, client, date and page numbers. It goes through the browser's
+  status), project, client, date and page numbers. It goes through the browser's
   print dialog — choose **Save as PDF**.
 - ⋯ **Copy as 9:16 / 1:1 / 4:5 / 16:9 version** — a copy (frames, variants,
   voice-overs, track, beat and cutdowns included) to rework for another
@@ -664,7 +728,7 @@ model…*, *3D · Business card / Poster / Box / Mug* or *2D · ‹type›*.
   **Arrange** them: side by side, the big one behind with the others in
   front, or a cascade.
 - **Screen**: **upload** a picture or a video, or take one **from the app** —
-  your plans' **profile pictures and banners**, a plan's moodboards, files,
+  your projects' **profile pictures and banners**, a project's moodboards, files,
   storyboard frames and review renders, your Motion references (the video,
   its saved frames, moments and cover), the whole library by type (branding,
   logos with their dark / light versions, business cards front and back,
@@ -714,9 +778,9 @@ model…*, *3D · Business card / Poster / Box / Mug* or *2D · ‹type›*.
   of the timeline: 720p–4K, 24 / 30 / 60 fps, **MP4** (H.264 + AAC) or
   **WebM** (VP9 + Opus), rendered frame by frame so it's smooth on any
   computer, with the screen videos' sound where it is on (MP4 where the
-  browser can encode it — Chrome, Edge, Safari). **Save to plan** puts the
-  file into a “Mockups” moodboard of any plan (or a new one); the quick
-  **Save to plan** button saves a 4K PNG.
+  browser can encode it — Chrome, Edge, Safari). **Save to project** puts the
+  file into a “Mockups” moodboard of any project (or a new one); the quick
+  **Save to project** button saves a 4K PNG.
 - **The built-in devices are gone** (iPhone, iPad, MacBook … drawn by the app)
   in favour of your own models. Scenes made with them still open — each old
   device as a plain screen of its size with your picture on it — so you can
@@ -764,7 +828,7 @@ looks printed.
   These are look-alikes drawn by this app for presentations; nothing is
   posted anywhere.
 - **Click a picture** in the preview (or in the **Pictures** list) to upload
-  one or take it **from the app** (a plan's profile picture fits a profile
+  one or take it **from the app** (a project's profile picture fits a profile
   picture slot); **Position & size…** places it in its frame over a grid, as
   for the 3D screens.
   A **video** in a slot can be **paused**, and plays **with sound** (and its
@@ -777,16 +841,18 @@ looks printed.
   1:1, 9:16, 3:2; background none / colour / gradient (brand colours at
   hand); **Space**, **Size** and a **soft shadow**.
 - **Export…** as PNG / JPG / WebP at 1×–4× (Fit) or 1080–4K, transparent,
-  white, black, any colour or as set — or **Save to plan**.
+  white, black, any colour or as set — or **Save to project**.
 
 Everything **saves as you go**; the list shows a small picture of each mockup.
 ⋯ **Duplicate** / **Delete** (→ Trash, with Undo).
 
 ### Time Tracker
-**Time Tracker** (sidebar, under Mockups) logs your working hours per project.
+**Time Tracker** (sidebar, under Mockups) logs your working hours per project
+and client.
 
-- **Live tracking** — pick a **plan** (shown as “Client · Plan”) or type any
-  other project / client, an **activity** (Design, Animation, Storyboard,
+- **Live tracking** — pick a **project** (grouped by client), a **client
+  without a project** (“Acme — no project”, e.g. a meeting) or type any
+  other name, an **activity** (Design, Animation, Storyboard,
   After Effects, Website, Meeting, Research, Admin — add your own with **+**)
   and what you're doing, then **Start**. While it runs a pill with the time
   shows in the sidebar (the top bar on a phone) on every page; project,
@@ -795,24 +861,28 @@ Everything **saves as you go**; the list shows a small picture of each mockup.
   anything under a minute isn't saved. The running tracker lives on the
   server, so it keeps going when you close the tab or switch devices.
   Times are your browser's local time; a session over midnight is fine.
-- **From the plan** — the clock chip in a plan's header starts / stops the
-  tracker for that plan and shows its hours.
+- **From the project or client** — the clock chip in a project's header starts
+  / stops the tracker for that project and shows its hours (or its budget);
+  **Track time** on a client's page tracks time for the client itself.
 - **Entries** — grouped by day with a daily total. **+ Add entry** for time
   you didn't track live; every entry can be edited in place (date, from, to
   with the duration shown as you go, project, activity, details), **Again
-  today** copies it to today to adjust, **Open the plan** jumps to its plan,
-  and **Delete** goes to the Trash (Undo).
+  today** copies it to today to adjust, **Open the project** / **Open the
+  client** jump there, and **Delete** goes to the Trash (Undo).
 - **Overview** — today, this week, this month and the filtered total; filter
   by **period** (this / last week, this / last month, all, or your own dates),
-  **plan** and **activity**, with bars per project and a split by activity.
+  **client**, **project** and **activity**, with bars per project and a split
+  by activity.
 - **Export to Excel** — a real `.xlsx` like a classic time sheet:
-  Date, Start, End, Duration (h), Project / Client, Activity, Details &
-  results. The header is **frozen** and has **filter buttons**; project and
-  activity cells have **drop-downs** (from a hidden list sheet) so new rows
-  can be typed in Excel; durations are **formulas** (overnight works) and
-  the total at the bottom follows the filter (`SUBTOTAL`). A second
-  **Summary** sheet sums the hours per project, per activity and per month
-  (formulas, so edits in the log update it). Headings in **German** or
+  Date, Start, End, Duration (h), **Client**, **Project**, Activity, Details &
+  results — plus **Rate** and **Amount** (hours × rate, as a formula) when a
+  project has an hourly rate. The header is **frozen** and has **filter
+  buttons**; client, project and activity cells have **drop-downs** (from a
+  hidden list sheet) so new rows can be typed in Excel; durations are
+  **formulas** (overnight works) and the totals at the bottom follow the
+  filter (`SUBTOTAL`). A second **Summary** sheet sums hours (and amounts)
+  per client, per project, per activity and per month (`SUMIFS` formulas, so
+  edits in the log update it). Headings in **German** or
   **English**; the look **like the app** (dark header, teal line) or
   **classic blue**. The export takes the current filters, and your choices
   are remembered. Opens in Excel, Numbers, LibreOffice and Google Sheets.
@@ -828,12 +898,12 @@ menu button). There you sort each item:
 - **into the library** — an image becomes a new **Branding**, **Image
   gallery**, **Logo**, **Logo No Go**, **Colors** (from the image) or **Font**
   entry, a video or a **YouTube / Vimeo link** a **Motion** reference, a PDF a
-  **Branding** project. The usual add dialog opens with everything filled in;
-  select several pictures to make **one** Branding project (or gallery images)
+  **Branding** reference. The usual add dialog opens with everything filled in;
+  select several pictures to make **one** Branding reference (or gallery images)
   of them,
-- **into a plan** — images go to its first moodboard, PDFs to a PDF (or Files)
+- **into a project** — images go to its first moodboard, PDFs to a PDF (or Files)
   block, other files to a Files block, links to a Links block and notes to a
-  Text block (each made when the plan has none),
+  Text block (each made when the project has none),
 - or delete it (→ Trash, with Undo).
 
 Once sorted, an item leaves the Inbox. You can also add to it right there:
@@ -872,7 +942,7 @@ Upload **PDFs** (brand guidelines, presentations) and/or **images**. PDFs open
 in a page-by-page viewer with fixed side arrows (arrow keys work too; wrapping
 past the last page returns to the first) and open **fullscreen**. Images display at their true aspect ratio and open in a
 fullscreen lightbox with arrow navigation. You can pick **any PDF page as the
-cover** thumbnail. Tag each project by **color scheme** and **type** (tech,
+cover** thumbnail. Tag each reference by **color scheme** and **type** (tech,
 restaurant, …) and filter the grid by those tags.
 
 ### Motion Design
@@ -893,7 +963,7 @@ full width), sortable by date or length and filterable by tag, with a table of
 **averages per section type** — in how many videos, average length, where it
 starts, share of the video. A section opens its video right there.
 
-On a project you get:
+On a reference you get:
 - a **player** (its **volume / mute is remembered** across reloads) with notes
   (auto-saved) and **tags** (used for filtering),
 - an automatic **length tag** — `≤ 30s`, `30–60s`, `60–90s`, `> 90s` — and a
@@ -903,7 +973,7 @@ On a project you get:
   this are measured once in the background when you open Motion Design,
 - the **audio waveform** under the section bar (see the cuts land on the beat;
   click or drag to scrub). It's read once in the browser and stored with the
-  project; for files over 150 MB it's read when you ask for it. Videos without
+  reference; for files over 150 MB it's read when you ask for it. Videos without
   a readable audio track simply show none,
 - **player tools** — speed **¼×, ½×, 1×, 2×** (`<` / `>`), **Loop** (`L`) the
   section under the playhead (or the whole video; each section also has its
@@ -916,7 +986,7 @@ On a project you get:
   the library, filterable by technique (“all speed ramps”); a card opens the
   video right at that moment,
 - a **“Add current frame”** button: pause anywhere and save that frame; frames
-  are stored as **WebP** in the project folder. While paused, step **frame by
+  are stored as **WebP** in the reference folder. While paused, step **frame by
   frame** with **`,`** (back) and **`.`** (forward), YouTube-style,
 - a **big frame preview** with prev/next arrows (fixed position; wrapping past
   the last frame returns to the first), click-to-**fullscreen** with arrow
@@ -992,9 +1062,9 @@ notes field for its history / what to steer clear of.
 ### Galleries (All / Galleries)
 Every section has an **All / Galleries** toggle. Under **Galleries** you create
 named collections (e.g. "Green Tech Companies"), open one, and add or remove
-projects of that section via a picker. A project can be in several galleries;
-deleting a project removes it from its galleries automatically. Galleries are
-just references — deleting a gallery never deletes the projects.
+references of that section via a picker. A reference can be in several galleries;
+deleting a reference removes it from its galleries automatically. Galleries are
+just references — deleting a gallery never deletes the references.
 
 ### Storage meter
 The storage meter (sidebar footer on desktop, header on mobile) shows how much
@@ -1011,8 +1081,8 @@ everything: the **logo** and a collapse button at the top, search (⌘K) below
 it, the Work / Reference toggle, the section list (with icons, current one
 highlighted), an **Add** button, and a footer with **Settings**, **Trash** and
 the storage meter. In **Work** mode the section list is **Dashboard**,
-**Plans**, **Software**, **To-Dos**, **Brand Tester**, **Storyboards**,
-**Mockups** and **Time Tracker**; a running focus timer or time tracker shows
+**Clients**, **Projects**, **Software**, **To-Dos**, **Brand Tester**,
+**Storyboards**, **Mockups** and **Time Tracker**; a running focus timer or time tracker shows
 as a small pill under the search.
 The collapse button folds the sidebar into a slim **rail of icons** (names show
 as tooltips; Work and Reference stand one above the other) for a wider canvas;
@@ -1025,7 +1095,7 @@ hides while you scroll down and returns when you scroll up.
 
 On **touch screens**:
 - menus (⋯, Edit, Export…) open as **bottom sheets** with big rows, and
-  dialogs (Add project, Edit details…) slide up from the bottom with **Save**
+  dialogs (Add reference, Edit details…) slide up from the bottom with **Save**
   always in reach;
 - every control that appears on mouse-hover on desktop (block menus, Add block,
   banner / avatar change, image ⋯ menus, delete buttons) is always visible;
@@ -1035,7 +1105,7 @@ On **touch screens**:
 On desktop, block menus and “Add block” stay faintly visible instead of
 appearing only on hover, and **Tab** shows a clear focus ring for keyboard use.
 
-A project's detail page has **Previous / Next** buttons at the foot (and the
+A reference's detail page has **Previous / Next** buttons at the foot (and the
 **← / →** arrow keys) to step through the other projects in the same section
 without going back to the grid; stepping past the last one wraps to the first.
 
@@ -1097,14 +1167,14 @@ lookup off with `LINK_LOOKUP=off`).
   ├── config.js       # paths, ports, env vars
   ├── db.js           # atomic writes, self-healing reads, snapshots, write queue
   ├── schema.js       # record shapes, read-time normalizing, the v1→v2 migration
-  ├── templates.js    # built-in plan templates, save-as-template
+  ├── templates.js    # built-in project templates, save-as-template
   ├── files.js        # fs helpers (path containment, moves, trash, storage size)
   ├── http.js         # async-safe routers, JSON errors, host/CSRF/data guards
   ├── upload.js       # multer (per-request tmp folder, always cleaned up)
   ├── unused.js       # unused-file scan
   ├── zip.js          # dependency-free ZIP64 export/import
   ├── xlsx.js         # dependency-free .xlsx writer (time sheet export)
-  └── routes/         # projects, plans, software, board, mockups, time, trash, search, settings, library, maintenance
+  └── routes/         # projects (references), projects (projects), clients, software, board, mockups, time, trash, search, settings, library, maintenance
   ```
 - **Tests:** `npm test` starts the real server against throwaway data folders —
   including a library with every data shape older versions wrote — and checks

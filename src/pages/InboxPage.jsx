@@ -168,7 +168,7 @@ export default function InboxPage() {
     setBusy(false);
     setSelected(new Set());
     changed();
-    if (plan) toast(`Added ${ok} item${ok === 1 ? '' : 's'} to “${plan.name}”`, 'ok', { label: 'Open plan', onClick: () => navigate(`/plan/${plan.id}`) });
+    if (plan) toast(`Added ${ok} item${ok === 1 ? '' : 's'} to “${plan.name}”`, 'ok', { label: 'Open project', onClick: () => navigate(`/plan/${plan.id}`) });
   };
 
   const remove = async (list) => {
@@ -204,7 +204,7 @@ export default function InboxPage() {
       <div className="page-head-row">
         <div className="page-head">
           <h1>Inbox {items?.length > 0 && <span className="count">{items.length}</span>}</h1>
-          <p>What you share from your phone lands here. Turn it into a reference, or put it into a plan.</p>
+          <p>What you share from your phone lands here. Turn it into a reference, or put it into a project.</p>
         </div>
       </div>
 
@@ -221,7 +221,7 @@ export default function InboxPage() {
           <span><b>{sel.length}</b> selected</span>
           {canBranding && <button className="btn btn-sm" onClick={() => toLibrary('branding', sel)} disabled={busy}><FileText size={14} /> New Branding</button>}
           {canGallery && <button className="btn btn-sm" onClick={() => toLibrary('imagegallery', sel)} disabled={busy}><Images size={14} /> To Image gallery</button>}
-          <button className="btn btn-sm" onClick={() => askPlan(sel)} disabled={busy}><PencilRuler size={14} /> Add to plan</button>
+          <button className="btn btn-sm" onClick={() => askPlan(sel)} disabled={busy}><PencilRuler size={14} /> Add to project</button>
           <button className="btn btn-sm btn-ghost" onClick={() => remove(sel)} disabled={busy}><Trash2 size={14} /> Delete</button>
           <button className="icon-btn" onClick={() => setSelected(new Set())} title="Clear selection" aria-label="Clear selection"><X size={15} /></button>
         </div>
@@ -242,7 +242,7 @@ export default function InboxPage() {
       {upload && (
         <UploadModal prefill={upload.prefill} initialType={upload.prefill.type} onClose={() => setUpload(null)} onCreated={onCreated} />
       )}
-      {planFor && <PlanPicker plans={plans} title={planFor.length > 1 ? `Add ${planFor.length} items to plan` : 'Add to plan'} onPick={toPlan} onClose={() => setPlanFor(null)} />}
+      {planFor && <PlanPicker plans={plans} title={planFor.length > 1 ? `Add ${planFor.length} items to project` : 'Add to project'} onPick={toPlan} onClose={() => setPlanFor(null)} />}
     </div>
   );
 }
@@ -268,7 +268,7 @@ function InboxCard({ item, selected, busy, onToggle, onNew, onPlan, onCopy, onRe
 
   const menu = [
     ...types.map((t) => ({ label: `New ${NEW_META[t].label}`, icon: (() => { const I = NEW_META[t].icon; return <I size={15} />; })(), onClick: () => onNew(t) })),
-    { label: 'Add to plan…', icon: <PencilRuler size={15} />, onClick: onPlan },
+    { label: 'Add to project…', icon: <PencilRuler size={15} />, onClick: onPlan },
     { separator: true },
     ...(item.url ? [{ label: 'Open link', icon: <ExternalLink size={15} />, onClick: () => window.open(normalizeUrl(item.url), '_blank', 'noopener') }] : []),
     ...(url ? [{ label: 'Open file', icon: <ExternalLink size={15} />, onClick: () => window.open(url, '_blank', 'noopener') }] : []),
@@ -294,8 +294,8 @@ function InboxCard({ item, selected, busy, onToggle, onNew, onPlan, onCopy, onRe
       <div className="ib-actions">
         {main
           ? <button className="btn btn-sm" onClick={() => onNew(main)} disabled={busy}><MainIcon size={14} /> {NEW_META[main].label.replace(/ \(.*\)$/, '')}</button>
-          : <button className="btn btn-sm" onClick={onPlan} disabled={busy}><PencilRuler size={14} /> Add to plan</button>}
-        {main && <button className="icon-btn" onClick={onPlan} title="Add to plan…" aria-label="Add to plan" disabled={busy}><PencilRuler size={15} /></button>}
+          : <button className="btn btn-sm" onClick={onPlan} disabled={busy}><PencilRuler size={14} /> Add to project</button>}
+        {main && <button className="icon-btn" onClick={onPlan} title="Add to project…" aria-label="Add to project" disabled={busy}><PencilRuler size={15} /></button>}
         <Menu align="right" title="Sort into…" trigger={<button className="icon-btn" aria-label="More"><MoreHorizontal size={16} /></button>} items={menu} />
       </div>
     </div>

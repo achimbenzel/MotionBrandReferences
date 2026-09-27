@@ -8,7 +8,7 @@ import { isTouch } from '../../lib/useMedia.js';
 const IMAGE = /\.(png|jpe?g|gif|webp|avif|svg)$/i;
 const VIDEO = /\.(mp4|m4v|mov|webm|ogv)$/i;
 const TABS = [
-  { key: 'plans', label: 'Plans', icon: PencilRuler },
+  { key: 'plans', label: 'Projects', icon: PencilRuler },
   { key: 'motion', label: 'Motion', icon: Film },
   { key: 'library', label: 'Library', icon: Library },
   { key: 'inbox', label: 'Inbox', icon: InboxIcon },
@@ -137,17 +137,17 @@ export default function MediaPicker({ onPick, onClose, title = 'Put on the scree
             </label>
           )}
 
-          {tab === 'plans' && (!plans ? <div className="spinner" /> : !plans.length ? <div className="empty-hint">No plans yet.</div> : (
+          {tab === 'plans' && (!plans ? <div className="spinner" /> : !plans.length ? <div className="empty-hint">No projects yet.</div> : (
             <>
               {avatars.length > 0 && (
                 <div className="fp-group">
-                  <div className="fp-group-head">Profile pictures of your plans <span className="count">{avatars.length}</span></div>
+                  <div className="fp-group-head">Profile pictures of your projects <span className="count">{avatars.length}</span></div>
                   <div className="mp-grid mp-avatars">
                     {avatars.map((p) => <Tile key={p.id} src={planFileUrl(p, p.avatar)} label={p.name} onClick={() => pick({ kind: 'plan', planId: p.id, itemId: '@avatar' })} />)}
                   </div>
                 </div>
               )}
-              <select className="input mp-plan" value={planId} onChange={(e) => setPlanId(e.target.value)} aria-label="Plan">
+              <select className="input mp-plan" value={planId} onChange={(e) => setPlanId(e.target.value)} aria-label="Project">
                 {plans.map((p) => <option key={p.id} value={p.id}>{p.avatarEmoji ? `${p.avatarEmoji} ` : ''}{p.name}</option>)}
               </select>
               {planOwn.length > 0 && (
@@ -158,7 +158,7 @@ export default function MediaPicker({ onPick, onClose, title = 'Put on the scree
                   </div>
                 </div>
               )}
-              {!planGroups.length && !planOwn.length && <div className="empty-hint">No pictures or videos in this plan yet.</div>}
+              {!planGroups.length && !planOwn.length && <div className="empty-hint">No pictures or videos in this project yet.</div>}
               {planGroups.map((g) => (
                 <div className="fp-group" key={g.id}>
                   <div className="fp-group-head">{g.title} <span className="count">{g.items.length}</span></div>

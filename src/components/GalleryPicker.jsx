@@ -31,12 +31,12 @@ export default function GalleryPicker({ projects, selectedIds, onSave, onClose }
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
       <div className="modal" role="dialog" aria-modal="true" style={{ maxWidth: 720 }}>
         <div className="modal-head">
-          <h2>Add projects</h2>
+          <h2>Add references</h2>
           <button className="icon-btn" onClick={onClose} disabled={busy}><X size={18} /></button>
         </div>
         <div className="modal-body">
           {projects.length === 0 ? (
-            <div className="center-msg">No projects of this type yet.</div>
+            <div className="center-msg">No references of this type yet.</div>
           ) : (
             <div className="picker-grid">
               {projects.map((p) => {

@@ -39,7 +39,7 @@ export default function FocusToday({ board, setBoard, plans, setPlans, settings,
     const block = plan?.blocks?.find((b) => b.id === it.blockId);
     const todo = block?.items?.find((x) => x.id === it.itemId);
     if (!todo) return null;
-    return { it, title: todo.text || 'To-do', done: !!todo.done, where: plan.name || 'Plan', href: `/plan/${plan.id}?block=${block.id}`, board: false };
+    return { it, title: todo.text || 'To-do', done: !!todo.done, where: plan.name || 'Project', href: `/plan/${plan.id}?block=${block.id}`, board: false };
   };
   const rows = items.map(resolve);
   const ready = !!board && !!plans;
@@ -94,7 +94,7 @@ export default function FocusToday({ board, setBoard, plans, setPlans, settings,
         if (b.type !== 'todos') continue;
         for (const t of b.items || []) {
           const it = { kind: 'todo', planId: p.id, blockId: b.id, itemId: t.id };
-          if (!t.done && String(t.text || '').trim() && !pinned.has(keyOf(it))) list.push({ it, title: t.text, where: p.name || 'Plan', board: false, urgent: !!t.urgent });
+          if (!t.done && String(t.text || '').trim() && !pinned.has(keyOf(it))) list.push({ it, title: t.text, where: p.name || 'Project', board: false, urgent: !!t.urgent });
         }
       }
     }
@@ -138,7 +138,7 @@ export default function FocusToday({ board, setBoard, plans, setPlans, settings,
       <div className="dash-today-body">
         <span className="dash-today-ring" style={{ '--p': p }} aria-hidden="true">{all ? <Check size={18} /> : <b>{shown.length - doneN}</b>}</span>
         <div className="dash-today-list">
-          {!shown.length && <p className="dash-today-empty">What matters today? Pin up to five to-dos from the board or your plans — or write a new one.</p>}
+          {!shown.length && <p className="dash-today-empty">What matters today? Pin up to five to-dos from the board or your projects — or write a new one.</p>}
           {shown.map((r) => (
             <div key={keyOf(r.it)} className={`dash-today-row ${r.done ? 'done' : ''}`}>
               <button type="button" className="dash-today-check" onClick={() => toggle(r)} aria-pressed={r.done} aria-label={r.done ? `Mark “${r.title}” as open` : `Tick “${r.title}”`}>

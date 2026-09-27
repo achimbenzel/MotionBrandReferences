@@ -110,8 +110,8 @@ export default function TodoBoard() {
   }), true);
   const setCardPlan = (colId, cardId, planId) => { commit(mapCard(colId, cardId, (k) => ({ ...k, planId: planId || null })), true); setLinkFor(null); };
   const cardMenu = (col, card, idx) => [
-    { label: planById[card.planId] ? 'Change plan…' : 'Link to plan…', icon: <Link2 size={15} />, onClick: () => setLinkFor({ colId: col.id, cardId: card.id, planId: card.planId || null }) },
-    ...(card.planId ? [{ label: 'Unlink from plan', icon: <Unlink size={15} />, onClick: () => setCardPlan(col.id, card.id, null) }] : []),
+    { label: planById[card.planId] ? 'Change project…' : 'Link to project…', icon: <Link2 size={15} />, onClick: () => setLinkFor({ colId: col.id, cardId: card.id, planId: card.planId || null }) },
+    ...(card.planId ? [{ label: 'Unlink from project', icon: <Unlink size={15} />, onClick: () => setCardPlan(col.id, card.id, null) }] : []),
     { label: card.urgent ? 'Unmark urgent' : 'Mark urgent', icon: <AlertTriangle size={15} />, onClick: () => toggleUrgent(col.id, card.id) },
     { label: 'Colour…', icon: <Palette size={15} />, onClick: () => setColorEditFor(card.id) },
     { label: 'Add tag', icon: <TagIcon size={15} />, onClick: () => setTagEditFor(card.id) },
@@ -176,7 +176,7 @@ export default function TodoBoard() {
       <div className="page-head-row">
         <div className="page-head">
           <h1>To-Dos</h1>
-          <p>A general planner — add cards and move them across your lists. Link a card to a plan to see it there too.</p>
+          <p>A general planner — add cards and move them across your lists. Link a card to a project to see it there too.</p>
         </div>
         {(plans.length > 0 || planFilter) && (
           // Always there (also after switching to "All cards"): every plan can be picked —
@@ -186,16 +186,16 @@ export default function TodoBoard() {
             <select className="input" value={planFilter} onChange={(e) => setPlanFilter(e.target.value)} aria-label="Show cards of">
               <option value="">All cards</option>
               {linkedPlans.length > 0 && (
-                <optgroup label="Plans with cards">
+                <optgroup label="Projects with cards">
                   {linkedPlans.map((p) => <option key={p.id} value={p.id}>{p.avatarEmoji ? `${p.avatarEmoji} ` : ''}{p.name}</option>)}
                 </optgroup>
               )}
               {otherPlans.length > 0 && (
-                <optgroup label="Other plans">
+                <optgroup label="Other projects">
                   {otherPlans.map((p) => <option key={p.id} value={p.id}>{p.avatarEmoji ? `${p.avatarEmoji} ` : ''}{p.name}</option>)}
                 </optgroup>
               )}
-              <option value="none">Not linked to a plan</option>
+              <option value="none">Not linked to a project</option>
             </select>
             {planFilter && <button type="button" className="icon-btn kb-filter-x" onClick={() => setPlanFilter('')} aria-label="Show all cards"><X size={14} /></button>}
           </label>
@@ -279,7 +279,7 @@ export default function TodoBoard() {
                     onChange={(e) => { e.target.style.height = 'auto'; e.target.style.height = `${e.target.scrollHeight}px`; editCard(col.id, card.id, { title: e.target.value }); }}
                   />
                   {plan && (
-                    <button className="kb-plan" onClick={() => navigate(`/plan/${plan.id}`)} title={`Open the plan “${plan.name}”`}>
+                    <button className="kb-plan" onClick={() => navigate(`/plan/${plan.id}`)} title={`Open the project “${plan.name}”`}>
                       {plan.avatarEmoji ? <span>{plan.avatarEmoji}</span> : <PencilRuler size={12} />}{plan.name}
                     </button>
                   )}
@@ -313,7 +313,7 @@ export default function TodoBoard() {
 
       {total === 0 && <div className="hint" style={{ marginTop: 16 }}>Add a card to a list, then drag it (or use its ⋯ menu) to move it across lists.</div>}
       {linkFor && (
-        <PlanPicker plans={plans} current={linkFor.planId} title="Link to plan" allowNone
+        <PlanPicker plans={plans} current={linkFor.planId} title="Link to project" allowNone
           onPick={(pid) => setCardPlan(linkFor.colId, linkFor.cardId, pid)} onClose={() => setLinkFor(null)} />
       )}
       {dialog}

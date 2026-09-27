@@ -26,9 +26,9 @@ export function useAddToPlan() {
     try {
       const { plan, added } = await api.addPlanRef(planId, t.kind, t.id);
       toast(added ? `Added to “${plan.name}” → References` : `Already in “${plan.name}”`, 'ok',
-        { label: 'Open plan', onClick: () => navigate(`/plan/${plan.id}`) });
+        { label: 'Open project', onClick: () => navigate(`/plan/${plan.id}`) });
     } catch (e) { toast(`Could not add: ${e.message}`, 'error'); }
   };
-  const picker = target ? <PlanPicker plans={plans} title="Add to plan" onPick={pick} onClose={() => setTarget(null)} /> : null;
+  const picker = target ? <PlanPicker plans={plans} title="Add to project" onPick={pick} onClose={() => setTarget(null)} /> : null;
   return [picker, open];
 }

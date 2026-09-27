@@ -34,7 +34,7 @@ export default function StoryboardsPage() {
       <div className="page-head-row">
         <div className="page-head">
           <h1>Storyboards</h1>
-          <p>The storyboards of all your plans — frames, timing, camera and voice-over, with an animatic and a PDF for the client.</p>
+          <p>The storyboards of all your projects — frames, timing, camera and voice-over, with an animatic and a PDF for the client.</p>
         </div>
         <button className="btn btn-primary" onClick={() => setCreating(true)} disabled={!plans}><Plus size={16} /> New storyboard</button>
       </div>
@@ -45,7 +45,7 @@ export default function StoryboardsPage() {
       {plans && allStoryboards(plans).length > 3 && (
         <label className="pp-search sbs-search">
           <Search size={15} />
-          <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search storyboards, plans, clients…" />
+          <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search storyboards, projects, clients…" />
         </label>
       )}
 
@@ -53,7 +53,7 @@ export default function StoryboardsPage() {
         <div className="empty">
           <Clapperboard size={30} />
           <h3>No storyboards yet</h3>
-          <p>Start one for a plan — empty, or from the launch video, social cut or logo sting template.</p>
+          <p>Start one for a project — empty, or from the launch video, social cut or logo sting template.</p>
           <button className="btn btn-primary" onClick={() => setCreating(true)}><Plus size={16} /> New storyboard</button>
         </div>
       )}

@@ -231,7 +231,7 @@ router.post('/api/plans/:id/archive', async (req, res) => {
   const base = {
     year: str(req.body.year || String(new Date().getFullYear()), 10),
     tags: normTags(req.body.tags),
-    notes: `From the plan “${plan.name}”${plan.client ? ` for ${plan.client}` : ''}.`,
+    notes: `From the project “${plan.name}”${plan.client ? ` for ${plan.client}` : ''}.`,
     fromPlan: plan.id,
     createdAt: Date.now(),
   };
@@ -242,7 +242,7 @@ router.post('/api/plans/:id/archive', async (req, res) => {
     const m = req.body.motion;
     if (m) {
       const src = fileOf(m.blockId, m.itemId);
-      if (!src || !VIDEO_EXT.test(src.rel)) return res.status(400).json({ error: 'file_missing', message: 'That video is no longer in the plan.' });
+      if (!src || !VIDEO_EXT.test(src.rel)) return res.status(400).json({ error: 'file_missing', message: 'That video is no longer in the project.' });
       const id = nanoid(10);
       const ext = extOf(src.rel) || '.mp4';
       await fsp.copyFile(path.join(pdir, src.rel), path.join(await newDir('motion', id), `video${ext}`));

@@ -633,7 +633,7 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
         <button className="detail-back" style={{ margin: 0 }} onClick={async () => { await Promise.all([saver.flush(), flushThumb()]); navigate('/mockups'); }}><ArrowLeft size={16} /> Mockups</button>
         <input className="mke-name" value={m.name} onChange={(e) => patch({ name: e.target.value })} aria-label="Mockup name" placeholder="Untitled mockup" />
         <div className="mke-actions">
-          <button className="btn btn-sm" onClick={() => setQuickPlan(true)}><FolderInput size={14} /> <span className="mke-long">Save to plan</span><span className="mke-short">Plan</span></button>
+          <button className="btn btn-sm" onClick={() => setQuickPlan(true)}><FolderInput size={14} /> <span className="mke-long">Save to project</span><span className="mke-short">Project</span></button>
           <button className="btn btn-sm btn-primary" onClick={() => openExport('image')}><Download size={14} /> Export</button>
           <Menu align="right" title="Mockup" trigger={<button className="btn btn-sm" aria-label="Mockup options"><MoreHorizontal size={15} /></button>}
             items={[
@@ -940,11 +940,11 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
           onClose={() => setExporting(null)} />
       )}
       {(planFile || quickPlan) && (
-        <SaveToPlanModal title="Save mockup to plan" boardName="Mockups" boardMatch={MOCKUP_BOARD} submitLabel="Save mockup"
-          hint={planFile ? `Saved as ${planFile.name}.` : 'Saved as a 4K PNG — for another size or format use Export → Save to plan.'}
+        <SaveToPlanModal title="Save mockup to project" boardName="Mockups" boardMatch={MOCKUP_BOARD} submitLabel="Save mockup"
+          hint={planFile ? `Saved as ${planFile.name}.` : 'Saved as a 4K PNG — for another size or format use Export → Save to project.'}
           makeFile={async () => planFile || quickPng()}
           onClose={() => { setPlanFile(null); setQuickPlan(false); }}
-          onSaved={(plan) => { setPlanFile(null); setQuickPlan(false); toast(`Mockup saved to “${plan.name}”`, 'ok', { label: 'Open plan', onClick: () => navigate(`/plan/${plan.id}`) }); }} />
+          onSaved={(plan) => { setPlanFile(null); setQuickPlan(false); toast(`Mockup saved to “${plan.name}”`, 'ok', { label: 'Open project', onClick: () => navigate(`/plan/${plan.id}`) }); }} />
       )}
     </div>
   );

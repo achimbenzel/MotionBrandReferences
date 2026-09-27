@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
-  Clock, Play, Square, X, Plus, FileSpreadsheet, Pencil, Copy, Trash2, MoreHorizontal, Check, CalendarDays, Timer, Briefcase, Tag, Download,
+  Clock, Play, Square, X, Plus, FileSpreadsheet, Pencil, Copy, Trash2, MoreHorizontal, Check, CalendarDays, Timer, Briefcase, Tag, Download, Building2,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
 import { useTimeTracker, tracker, fmtElapsed, dayKey, hhmm } from '../lib/timeTracker.js';
+import { whoOf, entryLabel } from '../lib/clients.js';
 
 const OTHER = '__other__';
 const minutesOf = (e) => { const t = (x) => { const [h, m] = x.split(':').map(Number); return h * 60 + m; }; return (t(e.end) - t(e.start) + 1440) % 1440; };
@@ -14,7 +15,6 @@ const fmtH = (min) => `${(min / 60).toFixed(2)} h`;
 const fmtHM = (min) => `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}`;
 const dateOf = (iso) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d); };
 const fmtDay = (iso) => dateOf(iso).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: dateOf(iso).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
-const planLabel = (p) => (p ? (p.client ? `${p.client} · ${p.name}` : p.name) : '');
 
 // The periods to look at.
 function periodRange(key, custom) {
@@ -32,25 +32,44 @@ function periodRange(key, custom) {
 }
 const PERIODS = [['week', 'This week'], ['lastweek', 'Last week'], ['month', 'This month'], ['lastmonth', 'Last month'], ['all', 'All'], ['custom', 'Custom']];
 
-/** Pick a plan, or name another project / client. */
-function ProjectPick({ plans, planId, project, onChange, compact = false }) {
-  const [free, setFree] = useState(!planId && !!project); // typing another project / client
-  const open = plans.filter((p) => p.status !== 'archived');
+/**
+ * Who the time is for: a project (grouped by client), a client without a
+ * project, or any other name typed in.
+ */
+function ProjectPick({ plans, clients, planId, clientId, project, onChange }) {
+  const [free, setFree] = useState(!planId && !clientId && !!project); // typing another name
+  const open = plans.filter((p) => p.status !== 'archived' || p.id === planId);
+  const groups = clients.map((c) => ({ c, list: open.filter((p) => p.clientId === c.id) }));
+  const loose = open.filter((p) => !p.clientId);
+  const value = free ? OTHER : planId ? `p:${planId}` : clientId ? `c:${clientId}` : '';
+  const pick = (v) => {
+    if (v === OTHER) { setFree(true); onChange({ planId: null, clientId: null, project: project || '' }); return; }
+    setFree(false);
+    if (v.startsWith('p:')) onChange({ planId: v.slice(2), clientId: null, project: '' });
+    else if (v.startsWith('c:')) onChange({ planId: null, clientId: v.slice(2), project: '' });
+    else onChange({ planId: null, clientId: null, project: '' });
+  };
+  const opt = (p) => <option key={p.id} value={`p:${p.id}`}>{p.avatarEmoji ? `${p.avatarEmoji} ` : ''}{p.name}</option>;
   return (
-    <span className={`tt-project ${compact ? 'compact' : ''} ${free ? 'free' : ''}`}>
-      <select className="input" value={free ? OTHER : planId || ''} aria-label="Plan / project"
-        onChange={(e) => { if (e.target.value === OTHER) { setFree(true); onChange({ planId: null, project: project || '' }); } else { setFree(false); onChange({ planId: e.target.value || null, project: '' }); } }}>
+    <span className={`tt-project ${free ? 'free' : ''}`}>
+      <select className="input" value={value} aria-label="Client / project" onChange={(e) => pick(e.target.value)}>
         <option value="">No project</option>
-        {open.map((p) => <option key={p.id} value={p.id}>{p.avatarEmoji ? `${p.avatarEmoji} ` : ''}{planLabel(p)}</option>)}
-        <option value={OTHER}>Other project / client…</option>
+        {groups.map(({ c, list }) => (
+          <optgroup key={c.id} label={c.name}>
+            <option value={`c:${c.id}`}>{c.name} — no project</option>
+            {list.map(opt)}
+          </optgroup>
+        ))}
+        {loose.length > 0 && <optgroup label="Without a client">{loose.map(opt)}</optgroup>}
+        <option value={OTHER}>Something else (type a name)…</option>
       </select>
-      {free && <input className="input" value={project || ''} placeholder="Project / client" onChange={(e) => onChange({ planId: null, project: e.target.value })} aria-label="Project / client" />}
+      {free && <input className="input" value={project || ''} placeholder="Project / client" onChange={(e) => onChange({ planId: null, clientId: null, project: e.target.value })} aria-label="Project / client" />}
     </span>
   );
 }
 
 /** An entry being written or changed. */
-function EntryEditor({ initial, plans, activities, onSave, onCancel }) {
+function EntryEditor({ initial, plans, clients, activities, onSave, onCancel }) {
   const [e, setE] = useState(initial);
   const set = (p) => setE((x) => ({ ...x, ...p }));
   const min = e.start && e.end ? minutesOf(e) : 0;
@@ -65,7 +84,7 @@ function EntryEditor({ initial, plans, activities, onSave, onCancel }) {
         <span className="tt-f tt-dur"><span>Duration</span><b>{fmtHM(min)}</b></span>
       </div>
       <div className="tt-editor-row">
-        <label className="tt-f grow"><span>Plan / project</span><ProjectPick plans={plans} planId={e.planId} project={e.project} onChange={set} /></label>
+        <label className="tt-f grow"><span>Client / project</span><ProjectPick plans={plans} clients={clients} planId={e.planId} clientId={e.clientId} project={e.project} onChange={set} /></label>
         <label className="tt-f"><span>Activity</span>
           <input className="input" list="tt-activities" value={e.activity} placeholder="Design, Website…" onChange={(ev) => set({ activity: ev.target.value })} />
         </label>
@@ -91,7 +110,7 @@ function ExportDialog({ query, count, onClose }) {
       <div className="modal tt-export" role="dialog" aria-modal="true" aria-label="Export as Excel">
         <div className="modal-head"><h2><FileSpreadsheet size={17} /> Export as Excel</h2><button className="icon-btn" onClick={onClose} aria-label="Close"><X size={18} /></button></div>
         <div className="modal-body">
-          <p className="tt-export-what">{count} entr{count === 1 ? 'y' : 'ies'} — the period, plan and activity you're looking at.</p>
+          <p className="tt-export-what">{count} entr{count === 1 ? 'y' : 'ies'} — the period, client, project and activity you're looking at.</p>
           <div className="tt-export-opt"><span>Headers</span>
             <div className="segmented segmented-sm">{[['de', 'Deutsch'], ['en', 'English']].map(([k, l]) => <button key={k} type="button" className={lang === k ? 'on' : ''} onClick={() => setLang(k)}>{l}</button>)}</div>
           </div>
@@ -99,12 +118,13 @@ function ExportDialog({ query, count, onClose }) {
             <div className="segmented segmented-sm">{[['app', 'Like the app'], ['classic', 'Classic blue']].map(([k, l]) => <button key={k} type="button" className={style === k ? 'on' : ''} onClick={() => setStyle(k)}>{l}</button>)}</div>
           </div>
           <div className={`tt-export-preview ${style}`} aria-hidden="true">
-            {(lang === 'de' ? ['Datum', 'Startzeit', 'Endzeit', 'Dauer (h)', 'Projekt/Kunde', 'Tätigkeit'] : ['Date', 'Start', 'End', 'Duration (h)', 'Project / client', 'Activity']).map((h) => <span key={h}>{h}</span>)}
+            {(lang === 'de' ? ['Datum', 'Startzeit', 'Endzeit', 'Dauer (h)', 'Kunde', 'Projekt', 'Tätigkeit'] : ['Date', 'Start', 'End', 'Duration (h)', 'Client', 'Project', 'Activity']).map((h) => <span key={h}>{h}</span>)}
           </div>
           <ul className="tt-export-list">
-            <li>Filter buttons and a frozen header row, drop-downs for project and activity</li>
+            <li>Filter buttons and a frozen header row, drop-downs for client, project and activity</li>
             <li>Durations as formulas (past midnight too), a total of the visible rows</li>
-            <li>A summary sheet: hours by project, activity and month</li>
+            <li>Rate and amount when a project has an hourly rate</li>
+            <li>A summary sheet: hours by client, project, activity and month</li>
           </ul>
         </div>
         <div className="modal-foot">
@@ -117,9 +137,9 @@ function ExportDialog({ query, count, onClose }) {
 }
 
 /**
- * Time Tracker: track working time per plan — live (start / stop, it keeps
- * running across pages and devices) or after the fact — look at a period,
- * a plan or an activity, and export it as an Excel sheet.
+ * Time Tracker: track working time per project or client — live (start /
+ * stop, it keeps running across pages and devices) or after the fact — look
+ * at a period, a client, a project or an activity, and export it as an Excel sheet.
  */
 export default function TimeTracker() {
   const toast = useToast();
@@ -128,33 +148,39 @@ export default function TimeTracker() {
   const t = useTimeTracker();
   const [entries, setEntries] = useState(null);
   const [plans, setPlans] = useState([]);
+  const [clients, setClients] = useState([]);
   const [period, setPeriod] = useState(() => { try { return localStorage.getItem('ttPeriod') || 'week'; } catch { return 'week'; } });
   const [custom, setCustom] = useState({ from: '', to: '' });
   const [planF, setPlanF] = useState(params.get('plan') || '');
+  const [clientF, setClientF] = useState(params.get('client') || '');
   const [actF, setActF] = useState('');
   const [editing, setEditing] = useState(null); // entry id | 'new'
-  const [draft, setDraft] = useState({ planId: params.get('plan') || null, project: '', activity: '', details: '' });
+  const [draft, setDraft] = useState({ planId: params.get('plan') || null, clientId: null, project: '', activity: '', details: '' });
   const [exporting, setExporting] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     api.getTime().then((d) => { setEntries(d.entries); tracker.apply(d); }).catch((e) => { setEntries([]); toast(e.message, 'error'); });
     api.listPlans().then(setPlans).catch(() => {});
+    api.listClients().then(setClients).catch(() => {});
   }, [toast]);
-  useEffect(() => { if (params.get('plan')) setParams({}, { replace: true }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (params.get('plan') || params.get('client')) setParams({}, { replace: true }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { try { localStorage.setItem('ttPeriod', period); } catch { /* ignore */ } }, [period]);
   // While it runs, the tracker's own fields are the draft.
   useEffect(() => {
-    if (t.running) setDraft({ planId: t.running.planId, project: t.running.project, activity: t.running.activity, details: t.running.details });
+    if (t.running) setDraft({ planId: t.running.planId, clientId: t.running.clientId || null, project: t.running.project, activity: t.running.activity, details: t.running.details });
   }, [t.running?.startedAt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const planById = useMemo(() => Object.fromEntries(plans.map((p) => [p.id, p])), [plans]);
-  const labelOf = (e) => planLabel(planById[e.planId]) || e.project || 'No project';
+  const clientById = useMemo(() => Object.fromEntries(clients.map((c) => [c.id, c])), [clients]);
+  const labelOf = (e) => entryLabel(e, planById, clientById) || 'No project';
   const [from, to] = periodRange(period, custom);
   const shown = useMemo(() => (entries || [])
     .filter((e) => (!from || e.date >= from) && (!to || e.date <= to))
+    .filter((e) => !clientF || (clientF === 'none' ? !whoOf(e, planById, clientById).client : whoOf(e, planById, clientById).client?.id === clientF))
     .filter((e) => !planF || (planF === 'none' ? !e.planId : e.planId === planF))
-    .filter((e) => !actF || e.activity === actF), [entries, from, to, planF, actF]);
+    .filter((e) => !actF || e.activity === actF), [entries, from, to, clientF, planF, actF, planById, clientById]);
+  const filterPlans = plans.filter((p) => !clientF || (clientF === 'none' ? !p.clientId : p.clientId === clientF));
   const total = shown.reduce((m, e) => m + minutesOf(e), 0);
   const days = useMemo(() => {
     const m = new Map();
@@ -207,7 +233,7 @@ export default function TimeTracker() {
   // ---- entries
   const saveEntry = async (e) => {
     try {
-      const body = { date: e.date, start: e.start, end: e.end, planId: e.planId || null, project: e.project || '', activity: e.activity || '', details: e.details || '' };
+      const body = { date: e.date, start: e.start, end: e.end, planId: e.planId || null, clientId: e.planId ? null : e.clientId || null, project: e.project || '', activity: e.activity || '', details: e.details || '' };
       if (e.id) { const x = await api.updateTimeEntry(e.id, body); setEntries((l) => l.map((y) => (y.id === x.id ? x : y))); } else { const x = await api.addTimeEntry(body); setEntries((l) => [x, ...l]); }
       setEditing(null);
     } catch (err) { toast(`Could not save: ${err.message}`, 'error'); }
@@ -225,7 +251,8 @@ export default function TimeTracker() {
   const newEntry = () => {
     const last = (entries || []).filter((x) => x.date === today).sort((a, b) => b.end.localeCompare(a.end))[0];
     const now = hhmm();
-    return { date: today, start: last ? last.end : hhmm(Date.now() - 3600000), end: now, planId: planF && planF !== 'none' ? planF : null, project: '', activity: actF || '', details: '' };
+    const planId = planF && planF !== 'none' ? planF : null;
+    return { date: today, start: last ? last.end : hhmm(Date.now() - 3600000), end: now, planId, clientId: !planId && clientF && clientF !== 'none' ? clientF : null, project: '', activity: actF || '', details: '' };
   };
 
   return (
@@ -233,7 +260,7 @@ export default function TimeTracker() {
       <div className="page-head-row">
         <div className="page-head">
           <h1>Time Tracker</h1>
-          <p>Your working time per plan — tracked live or entered after the fact — and as an Excel sheet for invoices or reports.</p>
+          <p>Your working time per project and client — tracked live or entered after the fact — and as an Excel sheet for invoices or reports.</p>
         </div>
         <button type="button" className="btn" onClick={() => setExporting(true)} disabled={!shown.length}><FileSpreadsheet size={16} /> Export .xlsx</button>
       </div>
@@ -249,7 +276,7 @@ export default function TimeTracker() {
             ) : <span className="tt-since">Ready when you are</span>}
           </div>
           <div className="tt-live-fields">
-            <ProjectPick plans={plans} planId={draft.planId} project={draft.project} onChange={changeLive} />
+            <ProjectPick plans={plans} clients={clients} planId={draft.planId} clientId={draft.clientId} project={draft.project} onChange={changeLive} />
             <input className="input tt-live-details" value={draft.details} placeholder="What are you working on?" onChange={(e) => changeLive({ details: e.target.value })} aria-label="Details" />
           </div>
           <div className="tt-live-actions">
@@ -273,7 +300,7 @@ export default function TimeTracker() {
         <div className="tt-stat"><span className="tt-stat-ico"><Timer size={16} /></span><b>{fmtHM(sumRange(today, today) + liveMin)}</b><span>today</span></div>
         <div className="tt-stat"><span className="tt-stat-ico"><CalendarDays size={16} /></span><b>{fmtHM(sumRange(wFrom, wTo) + liveMin)}</b><span>this week</span></div>
         <div className="tt-stat"><span className="tt-stat-ico"><CalendarDays size={16} /></span><b>{fmtHM(sumRange(mFrom, mTo) + liveMin)}</b><span>this month</span></div>
-        <div className="tt-stat accent"><span className="tt-stat-ico"><Clock size={16} /></span><b>{fmtH(total)}</b><span>{PERIODS.find((p) => p[0] === period)?.[1].toLowerCase()}{planF || actF ? ' · filtered' : ''}</span></div>
+        <div className="tt-stat accent"><span className="tt-stat-ico"><Clock size={16} /></span><b>{fmtH(total)}</b><span>{PERIODS.find((p) => p[0] === period)?.[1].toLowerCase()}{clientF || planF || actF ? ' · filtered' : ''}</span></div>
       </div>
 
       {/* Filters */}
@@ -285,10 +312,15 @@ export default function TimeTracker() {
             <input type="date" className="input" value={custom.to} onChange={(e) => setCustom((c) => ({ ...c, to: e.target.value }))} aria-label="To" />
           </span>
         )}
-        <select className="input tt-filter" value={planF} onChange={(e) => setPlanF(e.target.value)} aria-label="Plan">
-          <option value="">All plans</option>
-          {plans.map((p) => <option key={p.id} value={p.id}>{planLabel(p)}</option>)}
-          <option value="none">Without a plan</option>
+        <select className="input tt-filter" value={clientF} onChange={(e) => { setClientF(e.target.value); setPlanF(''); }} aria-label="Client">
+          <option value="">All clients</option>
+          {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          <option value="none">Without a client</option>
+        </select>
+        <select className="input tt-filter" value={planF} onChange={(e) => setPlanF(e.target.value)} aria-label="Project">
+          <option value="">All projects</option>
+          {filterPlans.map((p) => <option key={p.id} value={p.id}>{clientF ? p.name : entryLabel({ planId: p.id }, planById, clientById)}</option>)}
+          <option value="none">Without a project</option>
         </select>
         <select className="input tt-filter" value={actF} onChange={(e) => setActF(e.target.value)} aria-label="Activity">
           <option value="">All activities</option>
@@ -327,7 +359,7 @@ export default function TimeTracker() {
         <h2>Entries <span className="count">{shown.length}</span></h2>
         <button type="button" className="btn btn-sm" onClick={() => setEditing('new')}><Plus size={15} /> Add entry</button>
       </div>
-      {editing === 'new' && <EntryEditor initial={newEntry()} plans={plans} activities={usedActs} onSave={saveEntry} onCancel={() => setEditing(null)} />}
+      {editing === 'new' && <EntryEditor initial={newEntry()} plans={plans} clients={clients} activities={usedActs} onSave={saveEntry} onCancel={() => setEditing(null)} />}
       {entries === null ? <div className="spinner" /> : !days.length ? (
         <div className="empty tt-empty">
           <Clock size={28} />
@@ -338,7 +370,7 @@ export default function TimeTracker() {
         <section key={d.date} className="tt-day">
           <div className="tt-day-head"><span>{d.date === today ? 'Today' : fmtDay(d.date)}</span><b>{fmtH(d.min)}</b></div>
           {d.list.map((e) => (editing === e.id ? (
-            <EntryEditor key={e.id} initial={e} plans={plans} activities={usedActs} onSave={saveEntry} onCancel={() => setEditing(null)} />
+            <EntryEditor key={e.id} initial={e} plans={plans} clients={clients} activities={usedActs} onSave={saveEntry} onCancel={() => setEditing(null)} />
           ) : (
             <div key={e.id} className="tt-row">
               <button type="button" className="tt-row-main" onClick={() => setEditing(e.id)} title="Edit">
@@ -353,7 +385,8 @@ export default function TimeTracker() {
               <Menu align="right" trigger={<button className="icon-btn tt-row-menu" aria-label="Entry options"><MoreHorizontal size={16} /></button>} items={[
                 { label: 'Edit', icon: <Pencil size={15} />, onClick: () => setEditing(e.id) },
                 { label: 'Again today', icon: <Copy size={15} />, onClick: () => duplicate(e) },
-                ...(e.planId && planById[e.planId] ? [{ label: 'Open the plan', icon: <Briefcase size={15} />, onClick: () => navigate(`/plan/${e.planId}`) }] : []),
+                ...(e.planId && planById[e.planId] ? [{ label: 'Open the project', icon: <Briefcase size={15} />, onClick: () => navigate(`/plan/${e.planId}`) }] : []),
+                ...(whoOf(e, planById, clientById).client ? [{ label: 'Open the client', icon: <Building2 size={15} />, onClick: () => navigate(`/clients/${whoOf(e, planById, clientById).client.id}`) }] : []),
                 { separator: true },
                 { label: 'Delete', icon: <Trash2 size={15} />, danger: true, onClick: () => remove(e) },
               ]} />
@@ -362,7 +395,7 @@ export default function TimeTracker() {
         </section>
       ))}
 
-      {exporting && <ExportDialog query={{ from, to, plan: planF, activity: actF }} count={shown.length} onClose={() => setExporting(false)} />}
+      {exporting && <ExportDialog query={{ from, to, client: clientF, plan: planF, activity: actF }} count={shown.length} onClose={() => setExporting(false)} />}
     </div>
   );
 }

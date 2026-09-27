@@ -23,7 +23,7 @@ export default function PlanOverview({ plan, tabs, onOpen, onTab }) {
   }).filter((g) => g.filled.length || g.empty.length);
 
   if (!groups.length) {
-    return <div className="empty-hint pov-none">No blocks yet — pick a tab and add a block, or start the next plan from a template.</div>;
+    return <div className="empty-hint pov-none">No blocks yet — pick a tab and add a block, or start the next project from a template.</div>;
   }
   return (
     <div className="pov">

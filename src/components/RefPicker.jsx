@@ -51,7 +51,7 @@ export default function RefPicker({ addedIds, onPick, onClose }) {
         </div>
         <div className="cmd-list">
           {results.length === 0 ? (
-            <div className="cmd-empty">{q.trim() ? 'No matches in your library' : 'Type to search projects & galleries'}</div>
+            <div className="cmd-empty">{q.trim() ? 'No matches in your library' : 'Type to search references & galleries'}</div>
           ) : results.map((item) => {
             const added = addedIds.has(item.id);
             const I = item.kind === 'gallery' ? FolderOpen : (TYPE_ICON[item.type] || FileText);

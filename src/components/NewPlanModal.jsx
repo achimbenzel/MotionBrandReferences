@@ -6,24 +6,29 @@ import { useConfirm } from './ConfirmDialog.jsx';
 import { useToast } from './Toast.jsx';
 
 const BLANK = '';
+const NEW_CLIENT = '__new__';
 const LAST_KEY = 'newPlanTemplate';
 
 /**
- * "New plan": a name, an optional client and what to start from — an empty
- * page, a built-in template (launch video, branding) or one saved from a plan.
+ * "New project": a name, its client (one of yours, a new one, or none) and
+ * what to start from — an empty page, a built-in template (launch video,
+ * branding) or one saved from a project.
  */
-export default function NewPlanModal({ onClose, onCreated }) {
+export default function NewPlanModal({ clientId: initialClient = '', onClose, onCreated }) {
   const toast = useToast();
   const [dialog, ask] = useConfirm();
   const [templates, setTemplates] = useState(null);
   const [choice, setChoice] = useState(() => { try { return localStorage.getItem(LAST_KEY) || BLANK; } catch { return BLANK; } });
   const [name, setName] = useState('');
-  const [client, setClient] = useState('');
+  const [clients, setClients] = useState([]);
+  const [clientId, setClientId] = useState(initialClient || '');
+  const [newClient, setNewClient] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let alive = true;
     api.listPlanTemplates().then((t) => { if (alive) setTemplates(t); }).catch(() => { if (alive) setTemplates([]); });
+    api.listClients().then((c) => { if (alive) setClients(c); }).catch(() => {});
     return () => { alive = false; };
   }, []);
   // A remembered template that no longer exists falls back to an empty plan.
@@ -41,18 +46,21 @@ export default function NewPlanModal({ onClose, onCreated }) {
     if (busy) return;
     setBusy(true);
     try {
-      const plan = await api.createPlan({ name: name.trim() || undefined, client: client.trim(), template: choice || undefined });
+      const plan = await api.createPlan({
+        name: name.trim() || undefined, template: choice || undefined,
+        ...(clientId === NEW_CLIENT ? { client: newClient.trim() } : { clientId: clientId || null }),
+      });
       try { localStorage.setItem(LAST_KEY, choice); } catch { /* ignore */ }
       onCreated(plan);
     } catch (e) {
-      toast(`Could not create plan: ${e.message}`, 'error');
+      toast(`Could not create the project: ${e.message}`, 'error');
       setBusy(false);
     }
   };
 
   const removeTemplate = (t) => ask({
     title: 'Delete template?',
-    message: `“${t.name}” will be removed. Plans made from it stay as they are.`,
+    message: `“${t.name}” will be removed. Projects made from it stay as they are.`,
     confirmLabel: 'Delete', danger: true,
     onConfirm: async () => {
       try {
@@ -86,29 +94,36 @@ export default function NewPlanModal({ onClose, onCreated }) {
 
   return (
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
-      <div className="modal new-plan-modal" role="dialog" aria-modal="true" aria-label="New plan">
+      <div className="modal new-plan-modal" role="dialog" aria-modal="true" aria-label="New project">
         <div className="modal-head">
-          <h2>New plan</h2>
+          <h2>New project</h2>
           <button className="icon-btn" onClick={onClose} disabled={busy} aria-label="Close"><X size={18} /></button>
         </div>
         <div className="modal-body">
           <div className="row-2">
             <div className="field">
               <label>Name</label>
-              <input className="input" value={name} autoFocus={!isTouch()} placeholder="Untitled plan"
+              <input className="input" value={name} autoFocus={!isTouch()} placeholder="Untitled project"
                 onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') create(); }} />
             </div>
             <div className="field">
               <label>Client <span className="label-opt">optional</span></label>
-              <input className="input" value={client} placeholder="e.g. Acme"
-                onChange={(e) => setClient(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') create(); }} />
+              <select className="input" value={clientId} onChange={(e) => setClientId(e.target.value)} aria-label="Client">
+                <option value="">No client</option>
+                {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                <option value={NEW_CLIENT}>New client…</option>
+              </select>
+              {clientId === NEW_CLIENT && (
+                <input className="input new-plan-client" value={newClient} autoFocus placeholder="Client name, e.g. Acme" aria-label="New client's name"
+                  onChange={(e) => setNewClient(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') create(); }} />
+              )}
             </div>
           </div>
 
           <div className="field" style={{ marginBottom: 0 }}>
             <label>Start from</label>
             <div className="tpl-list" role="radiogroup" aria-label="Start from">
-              {option({ id: BLANK, icon: FilePlus2, title: 'Empty plan', text: 'A blank page — add blocks as you go.' })}
+              {option({ id: BLANK, icon: FilePlus2, title: 'Empty project', text: 'A blank page — add blocks as you go.' })}
               {templates === null && <div className="spinner" style={{ margin: '12px auto' }} />}
               {builtin.map((t) => option({ id: t.id, emoji: t.emoji, icon: LayoutTemplate, title: t.name, text: t.description, outline: t.outline }))}
               {own.length > 0 && <div className="tpl-group">Your templates</div>}
@@ -117,12 +132,12 @@ export default function NewPlanModal({ onClose, onCreated }) {
                 text: `${t.outline.length} block${t.outline.length === 1 ? '' : 's'}`, outline: t.outline, onRemove: () => removeTemplate(t),
               }))}
             </div>
-            <div className="hint" style={{ marginTop: 8 }}>Tip: save any plan as your own template from its <b>Edit</b> menu.</div>
+            <div className="hint" style={{ marginTop: 8 }}>Tip: save any project as your own template from its <b>Edit</b> menu.</div>
           </div>
         </div>
         <div className="modal-foot">
           <button className="btn btn-ghost" onClick={onClose} disabled={busy}>Cancel</button>
-          <button className="btn btn-primary" onClick={create} disabled={busy}>{busy ? 'Creating…' : 'Create plan'}</button>
+          <button className="btn btn-primary" onClick={create} disabled={busy || (clientId === NEW_CLIENT && !newClient.trim())}>{busy ? 'Creating…' : 'Create project'}</button>
         </div>
       </div>
       {dialog}

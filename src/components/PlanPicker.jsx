@@ -7,7 +7,7 @@ import StatusBadge from './StatusBadge.jsx';
  * Pick a plan from a searchable list (archived plans last). `current` is
  * highlighted; `allowNone` adds "No plan". onPick(planId | null).
  */
-export default function PlanPicker({ plans, current = null, title = 'Choose a plan', allowNone = false, onPick, onClose }) {
+export default function PlanPicker({ plans, current = null, title = 'Choose a project', allowNone = false, onPick, onClose }) {
   const [q, setQ] = useState('');
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
@@ -31,13 +31,13 @@ export default function PlanPicker({ plans, current = null, title = 'Choose a pl
         <div className="modal-body">
           <label className="pp-search">
             <Search size={15} />
-            <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search plans…" autoFocus={!isTouch()} />
+            <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search projects…" autoFocus={!isTouch()} />
           </label>
           <div className="pp-list">
             {allowNone && (
               <button className={`pp-item ${!current ? 'on' : ''}`} onClick={() => onPick(null)}>
                 <span className="pp-avatar"><X size={15} /></span>
-                <span className="pp-name">No plan</span>
+                <span className="pp-name">No project</span>
                 {!current && <Check size={15} className="pp-check" />}
               </button>
             )}
@@ -49,7 +49,7 @@ export default function PlanPicker({ plans, current = null, title = 'Choose a pl
                 {current === p.id && <Check size={15} className="pp-check" />}
               </button>
             ))}
-            {!list.length && <div className="hint" style={{ padding: 10 }}>{plans?.length ? 'No plan matches.' : 'No plans yet — create one under Plans.'}</div>}
+            {!list.length && <div className="hint" style={{ padding: 10 }}>{plans?.length ? 'No project matches.' : 'No projects yet — create one under Projects.'}</div>}
           </div>
         </div>
       </div>

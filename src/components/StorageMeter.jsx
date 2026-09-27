@@ -59,7 +59,7 @@ export default function StorageMeter({ menuUp = false }) {
     if (!file) return;
     ask({
       title: 'Import library?', danger: true, confirmLabel: 'Replace library',
-      message: `This REPLACES your current library — all projects, galleries, plans and software — with “${file.name}”. `
+      message: `This REPLACES your current library — all references, galleries, projects, clients and software — with “${file.name}”. `
         + 'A safety backup of your current library is saved to data/backups/ first.',
       onConfirm: () => { runImport(file); }, // close the dialog; the import shows its own overlay
     });

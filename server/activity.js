@@ -145,10 +145,10 @@ export async function recentItems(db, limit = 8) {
       const b = r.kind === 'block' ? (p.blocks || []).find((x) => x.id === r.blockId) : null;
       if (b?.type === 'storyboard') {
         const shot = (b.shots || []).find((s) => s.image);
-        item = { key: `storyboard:${p.id}:${b.id}`, kind: 'storyboard', title: b.title || 'Storyboard', sub: `Storyboard · ${p.name || 'Plan'}`,
+        item = { key: `storyboard:${p.id}:${b.id}`, kind: 'storyboard', title: b.title || 'Storyboard', sub: `Storyboard · ${p.name || 'Project'}`,
           href: `/storyboards/${p.id}/${b.id}`, thumb: shot ? planPic(p, shot.image) : null };
       } else {
-        item = { key: `plan:${p.id}`, kind: 'plan', title: p.name || 'Plan', sub: b ? `Plan · ${b.title || 'block'}` : 'Plan',
+        item = { key: `plan:${p.id}`, kind: 'plan', title: p.name || 'Project', sub: b ? `Project · ${b.title || 'block'}` : 'Project',
           href: b ? `/plan/${p.id}?block=${b.id}` : `/plan/${p.id}`, thumb: planPic(p, p.banner), gradient: p.banner ? null : p.bannerGradient || null,
           emoji: p.avatar ? null : p.avatarEmoji || null, avatar: planPic(p, p.avatar) };
       }

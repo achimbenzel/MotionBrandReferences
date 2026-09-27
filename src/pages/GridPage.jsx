@@ -252,7 +252,7 @@ export default function GridPage({ type, reloadKey, onAdd }) {
             <div className="empty">
               <Filter size={30} />
               <h3>Nothing matches</h3>
-              <p>No projects have all of the selected tags.</p>
+              <p>No references have all of the selected tags.</p>
               <button className="btn" onClick={() => setSelected([])}>Clear filters</button>
             </div>
           )}

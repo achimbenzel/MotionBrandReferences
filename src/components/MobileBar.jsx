@@ -64,7 +64,7 @@ export default function MobileBar({ onMenu, onSearch, onAdd }) {
       <button className="icon-btn mbar-btn" onClick={onSearch} aria-label="Search"><Search size={19} /></button>
       {showAdd && (
         <button className="icon-btn mbar-btn mbar-add" onClick={() => onAdd(tab)}
-          aria-label={workMode ? 'New plan' : 'Add project'}><Plus size={20} /></button>
+          aria-label={workMode ? 'New project' : 'Add reference'}><Plus size={20} /></button>
       )}
     </header>
   );

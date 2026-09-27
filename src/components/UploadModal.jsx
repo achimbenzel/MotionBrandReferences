@@ -311,7 +311,7 @@ export default function UploadModal({ initialType, prefill = null, onClose, onCr
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget && !saving) onClose(); }}>
       <div className="modal" role="dialog" aria-modal="true">
         <div className="modal-head">
-          <h2>Add project</h2>
+          <h2>Add reference</h2>
           <button className="icon-btn" onClick={onClose} disabled={saving} aria-label="Close"><X size={18} /></button>
         </div>
 
@@ -335,7 +335,7 @@ export default function UploadModal({ initialType, prefill = null, onClose, onCr
               <div className="field">
                 <label>Title</label>
                 <input className="input" value={title} onChange={(e) => setTitle(e.target.value)}
-                  placeholder={type === 'motion' && motionSource === 'link' ? 'Leave empty to use the video’s title' : 'Project name'} autoFocus={!isTouch()} />
+                  placeholder={type === 'motion' && motionSource === 'link' ? 'Leave empty to use the video’s title' : 'Name'} autoFocus={!isTouch()} />
               </div>
               <div className="row-2">
                 <div className="field">

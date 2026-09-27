@@ -185,7 +185,7 @@ export default function LogoTester() {
     <div>
       <div className="page-head">
         <h1><FlaskConical size={22} style={{ verticalAlign: '-3px', marginRight: 8 }} />Brand Tester</h1>
-        <p>Put a logo through its paces — backgrounds and brand colours, as profile picture and app icon, clear space and minimum size — and keep the test sheet in a plan.</p>
+        <p>Put a logo through its paces — backgrounds and brand colours, as profile picture and app icon, clear space and minimum size — and keep the test sheet in a project.</p>
       </div>
 
       {!logo ? (
@@ -204,7 +204,7 @@ export default function LogoTester() {
             <button className="btn btn-sm btn-ghost" onClick={clear}><X size={15} /> Clear</button>
             <div className="lt-spacer" />
             <button className="btn btn-sm" onClick={() => setExporting(true)} disabled={!art}><Download size={14} /> Export…</button>
-            <button className="btn btn-sm btn-primary" onClick={() => setSaving(true)} disabled={!art}><FolderInput size={14} /> Save to plan…</button>
+            <button className="btn btn-sm btn-primary" onClick={() => setSaving(true)} disabled={!art}><FolderInput size={14} /> Save to project…</button>
             <input ref={fileRef} type="file" accept="image/*,.svg" className="visually-hidden-input"
               onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) pick(f); }} />
           </div>
@@ -370,10 +370,10 @@ export default function LogoTester() {
           onClose={() => setExporting(false)} />
       )}
       {saving && art && (
-        <SaveToPlanModal title={saving instanceof File ? 'Save to plan' : 'Save test sheet to plan'} boardName="Brand tests" boardMatch={BRAND_BOARD} submitLabel={saving instanceof File ? 'Save' : 'Save sheet'}
+        <SaveToPlanModal title={saving instanceof File ? 'Save to project' : 'Save test sheet to project'} boardName="Brand tests" boardMatch={BRAND_BOARD} submitLabel={saving instanceof File ? 'Save' : 'Save sheet'}
           hint={saving instanceof File ? `Saved as ${saving.name}.` : 'The sheet (PNG) shows every test on one page — backgrounds, profile picture, app icon, minimum size, clear space and your colours.'}
           onClose={() => setSaving(false)} makeFile={saving instanceof File ? async () => saving : sheetFile}
-          onSaved={(plan) => { setSaving(false); toast(`Test sheet saved to “${plan.name}”`, 'ok', { label: 'Open plan', onClick: () => navigate(`/plan/${plan.id}`) }); }} />
+          onSaved={(plan) => { setSaving(false); toast(`Test sheet saved to “${plan.name}”`, 'ok', { label: 'Open project', onClick: () => navigate(`/plan/${plan.id}`) }); }} />
       )}
     </div>
   );

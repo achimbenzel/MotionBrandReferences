@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Search, Plus, PanelLeftClose, PanelLeftOpen, Trash2, Settings, X,
   FileText, Film, Square, CreditCard, Palette, Images, Type, PencilRuler, FlaskConical,
-  LayoutDashboard, ListTodo, Ban, AppWindow, Inbox, Clapperboard, MonitorSmartphone, Clock,
+  LayoutDashboard, ListTodo, Ban, AppWindow, Inbox, Clapperboard, MonitorSmartphone, Clock, Building2,
 } from 'lucide-react';
 import { TABS, WORK_TABS, isWorkPath, setLastTab } from '../lib/types.js';
 import { useActiveTab } from '../lib/useActiveTab.js';
@@ -19,7 +19,7 @@ const ICON = {
   branding: FileText, motion: Film, logo: Square, businesscard: CreditCard,
   color: Palette, imagegallery: Images, font: Type, logonogo: Ban,
 };
-const WORK_ICON = { dashboard: LayoutDashboard, plan: PencilRuler, software: AppWindow, board: ListTodo, logotester: FlaskConical, storyboards: Clapperboard, mockups: MonitorSmartphone, time: Clock };
+const WORK_ICON = { dashboard: LayoutDashboard, clients: Building2, plan: PencilRuler, software: AppWindow, board: ListTodo, logotester: FlaskConical, storyboards: Clapperboard, mockups: MonitorSmartphone, time: Clock };
 
 /**
  * Notion-style sidebar holding all navigation. Docked on desktop, where it
@@ -100,8 +100,8 @@ export default function Sidebar({ onAdd, onSearch, onToggle, drawer = false, ope
         </nav>
 
         {showAdd && (
-          <button className="sb-add" onClick={() => onAdd(active)} data-tip={workMode ? 'New plan' : 'Add project'}>
-            <Plus size={16} /> <span>{workMode ? 'New plan' : 'Add project'}</span>
+          <button className="sb-add" onClick={() => onAdd(active)} data-tip={workMode ? 'New project' : 'Add reference'}>
+            <Plus size={16} /> <span>{workMode ? 'New project' : 'Add reference'}</span>
           </button>
         )}
 

@@ -79,11 +79,11 @@ export default function GalleryDetail() {
           <div className="sub">{typeLabel} · {members.length} {members.length === 1 ? 'project' : 'projects'}</div>
         </div>
         <div className="detail-actions">
-          <button className="btn btn-sm btn-primary" onClick={() => setPicking(true)}><Plus size={15} /> Projects</button>
+          <button className="btn btn-sm btn-primary" onClick={() => setPicking(true)}><Plus size={15} /> References</button>
           <Menu
             trigger={<button className="btn btn-sm" aria-label="Gallery options" title="Gallery options"><Pencil size={15} /> <MoreHorizontal size={15} /></button>}
             items={[
-              { label: 'Add to plan…', icon: <FolderInput size={15} />, onClick: () => addToPlan('gallery', gallery.id) },
+              { label: 'Add to project…', icon: <FolderInput size={15} />, onClick: () => addToPlan('gallery', gallery.id) },
               { label: 'Rename', icon: <Pencil size={15} />, onClick: () => setRenaming(true) },
               { separator: true },
               { label: 'Delete gallery', icon: <Trash2 size={15} />, danger: true, onClick: remove },
@@ -102,8 +102,8 @@ export default function GalleryDetail() {
         <div className="empty">
           <FolderOpen size={30} />
           <h3>Gallery is empty</h3>
-          <p>Add projects, e.g. brandings of green tech companies.</p>
-          <button className="btn btn-primary" onClick={() => setPicking(true)}><Plus size={16} /> Add projects</button>
+          <p>Add references, e.g. brandings of green tech companies.</p>
+          <button className="btn btn-primary" onClick={() => setPicking(true)}><Plus size={16} /> Add references</button>
         </div>
       )}
 

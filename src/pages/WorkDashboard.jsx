@@ -4,11 +4,12 @@ import {
   PencilRuler, ListTodo, FlaskConical, Clapperboard, Plus, ArrowRight, CalendarRange, AppWindow,
   AlertTriangle, Image as ImageIcon, UploadCloud, Database, Flag, CalendarClock, MonitorSmartphone,
   Library, Search, Sparkles, Target, CheckCircle2, Layers, Settings2, GripVertical, EyeOff, Eye, Columns2, RectangleHorizontal, Check,
-  MoreHorizontal,
+  MoreHorizontal, Building2, Timer,
 } from 'lucide-react';
 import { api, planFileUrl, dashboardFileUrl } from '../lib/api.js';
 import { gradientCss, PLAN_GRADIENTS, PLAN_STATUSES, TABS, tagColor } from '../lib/types.js';
 import Menu from '../components/Menu.jsx';
+import { upcomingBirthdays } from '../lib/clients.js';
 import { useToast } from '../components/Toast.jsx';
 import MediaPicker from '../components/mockups/MediaPicker.jsx';
 import ActivityMap from '../components/dashboard/ActivityMap.jsx';
@@ -142,6 +143,7 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
   const [settings, setSettings] = useState(null);
   const [mockups, setMockups] = useState([]);
   const [refs, setRefs] = useState(null); // your references, for Inspiration
+  const [clients, setClients] = useState([]); // for birthdays in the calendar
   const [needsMigration, setNeedsMigration] = useState(false);
   const [bannerPicker, setBannerPicker] = useState(false);
   const [appPick, setAppPick] = useState(false);
@@ -158,6 +160,7 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
     api.getSettings().then((s) => { if (alive) setSettings(s); }).catch(() => { if (alive) setSettings({}); });
     api.listMockups().then((m) => { if (alive) setMockups(m.mockups || []); }).catch(() => {});
     api.list().then((ps) => { if (alive) setRefs(ps); }).catch(() => { if (alive) setRefs([]); });
+    api.listClients().then((c) => { if (alive) setClients(c); }).catch(() => {});
     api.maintenanceStatus().then((m) => { if (alive) setNeedsMigration(!!m.needsMigration); }).catch(() => {});
     return () => { alive = false; };
   }, [reloadKey]);
@@ -185,7 +188,7 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
     })));
   const urgentPlans = (plans || []).flatMap((p) =>
     (p.blocks || []).filter((b) => b.type === 'todos').flatMap((b) =>
-      (b.items || []).filter((it) => it.urgent && !it.done).map((it) => ({ id: it.id, kind: 'plan', label: it.text || 'Untitled to-do', context: p.name || 'Plan', to: `/plan/${p.id}` }))));
+      (b.items || []).filter((it) => it.urgent && !it.done).map((it) => ({ id: it.id, kind: 'plan', label: it.text || 'Untitled to-do', context: p.name || 'Project', to: `/plan/${p.id}` }))));
   const urgent = [...urgentBoard, ...urgentPlans];
 
   // Open plans by status, and their upcoming milestones / deadlines.
@@ -213,26 +216,29 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
 
   // The next two weeks from this Monday: what's due each day.
   const monday = (() => { const t = today0(); t.setDate(t.getDate() - ((t.getDay() + 6) % 7)); return t; })();
+  const bdays = upcomingBirthdays(clients, 13, monday); // your clients' people's birthdays
   const days = Array.from({ length: 14 }, (_, i) => {
     const dt = new Date(monday); dt.setDate(monday.getDate() + i);
     const iso = isoOf(dt);
-    return { iso, dt, items: allDue.filter((x) => x.date === iso), past: dt < today0(), today: iso === isoOf(today0()) };
+    return { iso, dt, items: allDue.filter((x) => x.date === iso), bdays: bdays.filter((b) => b.date === iso), past: dt < today0(), today: iso === isoOf(today0()) };
   });
 
   const hour = now.getHours();
   const summary = [
-    openPlans.length ? plural(openPlans.length, 'open plan') : 'No open plans',
+    openPlans.length ? plural(openPlans.length, 'open project') : 'No open projects',
     thisWeek ? `${plural(thisWeek, 'date')} in the next 7 days` : 'nothing due in the next 7 days',
     urgent.length ? `${urgent.length} urgent` : null,
   ].filter(Boolean).join(' · ');
 
   const tools = [
-    { key: 'plan', icon: PencilRuler, title: 'Plans', sub: planCount ? plural(planCount, 'plan') : 'Plan a new project', to: '/plan', accent: 'linear-gradient(120deg,#6a11cb,#2575fc)', glow: '#5b5bff' },
-    { key: 'board', icon: ListTodo, title: 'To-Do Board', sub: boardCards ? `${plural(boardCards, 'card')} · ${boardLists} lists` : 'Plan your to-dos', to: '/board', accent: 'linear-gradient(120deg,#00c6a7,#1e4fd6)', glow: '#00c6a7' },
+    { key: 'clients', icon: Building2, title: 'Clients', sub: clients.length ? plural(clients.length, 'client') : 'Who you work for', to: '/clients', accent: 'linear-gradient(120deg,#f7971e,#ffd200)', glow: '#f7b21e' },
+    { key: 'plan', icon: PencilRuler, title: 'Projects', sub: planCount ? plural(planCount, 'project') : 'Start a new project', to: '/plan', accent: 'linear-gradient(120deg,#6a11cb,#2575fc)', glow: '#5b5bff' },
+    { key: 'board', icon: ListTodo, title: 'To-Do Board', sub: boardCards ? `${plural(boardCards, 'card')} · ${boardLists} lists` : 'Organise your to-dos', to: '/board', accent: 'linear-gradient(120deg,#00c6a7,#1e4fd6)', glow: '#00c6a7' },
     { key: 'storyboards', icon: Clapperboard, title: 'Storyboards', sub: sbCount ? plural(sbCount, 'storyboard') : 'Frames, timing & animatic', to: '/storyboards', accent: 'linear-gradient(120deg,#ff6a88,#6a11cb)', glow: '#ff6a88' },
     { key: 'mockups', icon: MonitorSmartphone, title: 'Mockups', sub: mockups.length ? plural(mockups.length, 'mockup') : 'Your work on devices & print', to: '/mockups', accent: 'linear-gradient(120deg,#434343,#8e9eab)', glow: '#9fb0c0' },
     { key: 'logotester', icon: FlaskConical, title: 'Brand Tester', sub: 'Test a logo, keep the sheet', to: '/logo-tester', accent: 'linear-gradient(120deg,#f83600,#f9d423)', glow: '#ff8a1f' },
     { key: 'software', icon: AppWindow, title: 'Software', sub: softCount ? plural(softCount, 'app') : 'Plugins, scripts & more', to: '/software', accent: 'linear-gradient(120deg,#7b4397,#dc2430)', glow: '#dc2430' },
+    { key: 'time', icon: Timer, title: 'Time Tracker', sub: 'Hours per project & client', to: '/time', accent: 'linear-gradient(120deg,#11998e,#38ef7d)', glow: '#2fd08a' },
   ];
   const openSearch = () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, metaKey: true, bubbles: true }));
   // ---- The widgets: your layout, arranging, and what each one shows ----
@@ -273,7 +279,7 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
   });
   const EMPTY_HINT = {
     urgent: 'Shows up when a to-do is flagged urgent.',
-    pipeline: 'Shows up once your plans have a status.',
+    pipeline: 'Shows up once your projects have a status.',
     next: 'Loading your dates…',
   };
   const renderWidget = (w) => {
@@ -324,7 +330,7 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
                 <div className="dash-free">
                   <span className="dash-free-ico"><CalendarRange size={22} /></span>
                   <b>Nothing due in the next two weeks</b>
-                  <span>Add milestones or a timeframe to a plan and they count down here.</span>
+                  <span>Add milestones or a timeframe to a project and they count down here.</span>
                 </div>
               )}
             </div>
@@ -333,20 +339,25 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
               <div className="dash-cal-grid">
                 {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((w, i) => <span key={`w${i}`} className="dash-cal-wd">{w}</span>)}
                 {days.map((d) => {
-                  const tip = d.items.map((x) => `${x.label} — ${x.plan.name}`).join('\n');
+                  const tip = [
+                    ...d.items.map((x) => `${x.label} — ${x.plan.name}`),
+                    ...d.bdays.map((b) => `🎂 ${b.contact.name || 'Birthday'}${b.age ? ` turns ${b.age}` : ''} (${b.client.name})`),
+                  ].join('\n');
+                  const open = () => { if (d.items[0]) navigate(`/plan/${d.items[0].plan.id}`); else if (d.bdays[0]) navigate(`/clients/${d.bdays[0].client.id}`); };
                   return (
-                    <button key={d.iso} type="button" disabled={!d.items.length}
-                      className={`dash-cal-day ${d.today ? 'today' : ''} ${d.past ? 'past' : ''} ${d.items.length ? 'has' : ''} ${d.dt.getDay() % 6 === 0 ? 'weekend' : ''}`}
-                      title={tip || undefined} onClick={() => d.items[0] && navigate(`/plan/${d.items[0].plan.id}`)}>
+                    <button key={d.iso} type="button" disabled={!d.items.length && !d.bdays.length}
+                      className={`dash-cal-day ${d.today ? 'today' : ''} ${d.past ? 'past' : ''} ${d.items.length || d.bdays.length ? 'has' : ''} ${d.bdays.length ? 'bday' : ''} ${d.dt.getDay() % 6 === 0 ? 'weekend' : ''}`}
+                      title={tip || undefined} onClick={open}>
                       <span className="dash-cal-num">{d.dt.getDate()}</span>
                       <span className="dash-cal-dots">
                         {d.items.slice(0, 3).map((x) => <i key={x.id} className={x.end ? 'end' : ''} style={{ background: tagColor(PLAN_STATUSES.find((s) => s.key === x.plan.status)?.color || 'blue').fg }} />)}
+                        {d.bdays.slice(0, 2).map((b) => <i key={`b${b.contact.id}`} className="bday" />)}
                       </span>
                     </button>
                   );
                 })}
               </div>
-              <div className="dash-cal-legend"><span><i /> Milestone</span><span><i className="end" /> Deadline</span><span><i className="today" /> Today</span></div>
+              <div className="dash-cal-legend"><span><i /> Milestone</span><span><i className="end" /> Deadline</span>{bdays.length > 0 && <span><i className="bday" /> Birthday</span>}<span><i className="today" /> Today</span></div>
             </div>
           </div>
       );
@@ -364,7 +375,7 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
                     {u.kind === 'plan' ? <PencilRuler size={12} /> : <ListTodo size={12} />} {u.context}
                   </span>
                   <button className="btn btn-sm dash-urgent-go" onClick={() => navigate(u.to)}>
-                    {u.kind === 'plan' ? 'Open plan' : 'Open to-dos'} <ArrowRight size={14} />
+                    {u.kind === 'plan' ? 'Open project' : 'Open to-dos'} <ArrowRight size={14} />
                   </button>
                 </div>
               ))}
@@ -392,7 +403,7 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
           <section>
             <div className="dash-section-head">
               <h2>Pipeline</h2>
-              <button className="btn btn-sm btn-ghost" onClick={() => navigate('/plan')}>All plans <ArrowRight size={14} /></button>
+              <button className="btn btn-sm btn-ghost" onClick={() => navigate('/plan')}>All projects <ArrowRight size={14} /></button>
             </div>
             <div className="dash-flow" role="img" aria-label={pipeline.filter((st) => st.plans.length).map((st) => `${st.label}: ${st.plans.length}`).join(', ')}>
               {pipeline.filter((st) => st.plans.length).map((st) => (
@@ -441,13 +452,13 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
           <h1>{greeting(hour)}</h1>
           <p>{plans === null ? 'Getting your day ready…' : summary}</p>
           <div className="dash-hero-actions">
-            <button type="button" className="btn btn-sm dash-glass-btn" onClick={onNewPlan}><Plus size={15} /> New plan</button>
+            <button type="button" className="btn btn-sm dash-glass-btn" onClick={onNewPlan}><Plus size={15} /> New project</button>
             <button type="button" className="btn btn-sm dash-glass-btn" onClick={() => navigate('/board')}><ListTodo size={15} /> To-dos</button>
             <button type="button" className="btn btn-sm dash-glass-btn dash-search" onClick={openSearch}><Search size={15} /> Search <kbd>⌘K</kbd></button>
           </div>
         </div>
         <div className="dash-stats">
-          <Stat icon={PencilRuler} value={openPlans.length} label="open plans" onClick={() => navigate('/plan')} />
+          <Stat icon={PencilRuler} value={openPlans.length} label="open projects" onClick={() => navigate('/plan')} />
           <Stat icon={CalendarClock} value={thisWeek} label="due in 7 days" tone={thisWeek ? 'accent' : ''} onClick={() => document.getElementById('dash-next')?.scrollIntoView({ behavior: 'smooth', block: 'center' })} />
           <Stat icon={CheckCircle2} value={todosOpen} label={<>open to-dos{todosAll > 0 && <span className="dash-stat-extra"> · {Math.round((todosDone / todosAll) * 100)}% done</span>}</>}
             ring={todosAll ? todosDone / todosAll : 0} onClick={() => navigate('/board')} />

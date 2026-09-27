@@ -107,7 +107,7 @@ export default function MockupsPage() {
       <div className="page-head-row">
         <div className="page-head">
           <h1>Mockups</h1>
-          <p>Your designs and videos on your own 3D models, on business cards, posters, boxes and mugs — or in a browser window, an app icon, social posts and profiles. Export an image or a video, or save it into a plan.</p>
+          <p>Your designs and videos on your own 3D models, on business cards, posters, boxes and mugs — or in a browser window, an app icon, social posts and profiles. Export an image or a video, or save it into a project.</p>
         </div>
         {data && (
           <Menu align="left" title="New mockup" trigger={<button className="btn btn-primary" disabled={busy}><Plus size={16} /> New mockup</button>} items={newItems} />

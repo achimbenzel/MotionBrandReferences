@@ -84,7 +84,7 @@ export default function ArchiveModal({ plan, client, flush, onDone, onClose }) {
 
   const submit = async () => {
     if (!count || busy) return;
-    setBusy('Saving the plan…');
+    setBusy('Saving the project…');
     try {
       await flush?.();
       const name = title.trim() || plan.name;
@@ -133,9 +133,9 @@ export default function ArchiveModal({ plan, client, flush, onDone, onClose }) {
         </div>
         <div className="modal-body">
           <p className="hint" style={{ marginTop: 0 }}>
-            The finished work goes into your library as references, next to the work of others. The files are copied — this plan stays as it is.
+            The finished work goes into your library as references, next to the work of others. The files are copied — this project stays as it is.
           </p>
-          {nothing && <div className="empty-hint">This plan has no videos, images, PDFs or colours yet.</div>}
+          {nothing && <div className="empty-hint">This project has no videos, images, PDFs or colours yet.</div>}
 
           {videos.length > 0 && (
             <div className="ar-part">
@@ -211,7 +211,7 @@ export default function ArchiveModal({ plan, client, flush, onDone, onClose }) {
               </div>
               <label className="ar-check ar-status">
                 <input type="checkbox" checked={setArchived} onChange={(e) => setSetArchived(e.target.checked)} />
-                Set this plan to <b>Archived</b>
+                Set this project to <b>Archived</b>
               </label>
             </>
           )}

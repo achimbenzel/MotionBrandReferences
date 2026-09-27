@@ -113,7 +113,7 @@ export default function ProjectDetail() {
     || project.type === 'color'
     || (project.type === 'font' && !!project.shot);
 
-  const toPlan = { label: 'Add to plan…', icon: <FolderInput size={15} />, onClick: () => addToPlan('project', project.id) };
+  const toPlan = { label: 'Add to project…', icon: <FolderInput size={15} />, onClick: () => addToPlan('project', project.id) };
   const menuItems = isImage
     ? [toPlan, { separator: true }, { label: 'Delete', icon: <Trash2 size={15} />, danger: true, onClick: remove }]
     : [
@@ -122,7 +122,7 @@ export default function ProjectDetail() {
         ...(project.type === 'logo' ? [{ label: 'Logo options', icon: <ImageIcon size={15} />, onClick: () => setLogoOptions(true) }] : []),
         ...(canSetThumb ? [{ label: 'Change cover', icon: <ImageIcon size={15} />, onClick: () => setThumbing(true) }] : []),
         { separator: true },
-        { label: 'Delete project', icon: <Trash2 size={15} />, danger: true, onClick: remove },
+        { label: 'Delete reference', icon: <Trash2 size={15} />, danger: true, onClick: remove },
       ];
 
   return (
@@ -217,7 +217,7 @@ function FromPlan({ planId }) {
   }, [planId]);
   if (!plan) return null;
   return (
-    <button className="from-plan" onClick={() => navigate(`/plan/${plan.id}`)} title="Open the plan this came from">
+    <button className="from-plan" onClick={() => navigate(`/plan/${plan.id}`)} title="Open the project this came from">
       <PencilRuler size={13} /> From plan “{plan.name}”
     </button>
   );

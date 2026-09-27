@@ -60,7 +60,7 @@ export default function TrashPage() {
       <div className="page-head-row">
         <div className="page-head">
           <h1>Trash</h1>
-          <p>Deleted projects, plans, blocks, galleries and files. Items are removed permanently after {ttl} days.</p>
+          <p>Deleted references, projects, clients, blocks, galleries and files. Items are removed permanently after {ttl} days.</p>
         </div>
         {items?.length > 0 && (
           <button className="btn btn-ghost" onClick={empty} disabled={busy}><Trash2 size={15} /> Empty trash</button>
@@ -72,7 +72,7 @@ export default function TrashPage() {
         <div className="empty">
           <Trash2 size={30} />
           <h3>Trash is empty</h3>
-          <p>Deleted projects, plans, blocks and files land here and can be restored.</p>
+          <p>Deleted references, projects, clients, blocks and files land here and can be restored.</p>
         </div>
       )}
       {items && items.length > 0 && (

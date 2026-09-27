@@ -80,7 +80,7 @@ export default function PlanTodos({ planId, toast }) {
                   onChange={(e) => editTitle(k.id, e.target.value)} />
                 <button className={`icon-btn pt-urgent ${k.urgent ? 'on' : ''}`} title={k.urgent ? 'Unmark urgent' : 'Mark urgent'}
                   onClick={() => run(() => api.updateBoardCard(k.id, { urgent: !k.urgent }))}><AlertTriangle size={14} /></button>
-                <button className="icon-btn pt-unlink" title="Unlink from this plan (stays on the board)"
+                <button className="icon-btn pt-unlink" title="Unlink from this project (stays on the board)"
                   onClick={() => run(() => api.updateBoardCard(k.id, { planId: null }), 'Unlinked — the card stays on the board')}><Unlink size={14} /></button>
               </div>
             );
@@ -90,7 +90,7 @@ export default function PlanTodos({ planId, toast }) {
       <form className="pt-add" onSubmit={(e) => { e.preventDefault(); add(); }}>
         <Plus size={15} />
         <input className="input" value={draft} onChange={(e) => setDraft(e.target.value)}
-          placeholder={`Add a to-do — it goes to “${columns[0]?.name || 'the board'}”, linked to this plan`} aria-label="New to-do" />
+          placeholder={`Add a to-do — it goes to “${columns[0]?.name || 'the board'}”, linked to this project`} aria-label="New to-do" />
         {draft.trim() && <button className="btn btn-sm btn-primary">Add</button>}
       </form>
     </div>

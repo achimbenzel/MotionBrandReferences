@@ -187,8 +187,9 @@ export const api = {
     const { plan } = await request(`/api/plans/${id}`);
     return plan;
   },
-  async createPlan({ name, client, template } = {}) {
-    const { plan } = await request('/api/plans', { method: 'POST', json: { name, client, template } });
+  // client: a client's id (clientId) or a name (an existing client, or a new one).
+  async createPlan({ name, clientId, client, template } = {}) {
+    const { plan } = await request('/api/plans', { method: 'POST', json: { name, clientId, client, template } });
     return plan;
   },
   // Put a library item into a plan's References → { plan, blockId, added }.
@@ -482,8 +483,34 @@ export const api = {
     const { days: list } = await request(`/api/activity?days=${days}`);
     return list;
   },
+  // --- Clients ---
+  async listClients() { const { clients } = await request('/api/clients'); return clients; },
+  async getClient(id) { const { client } = await request(`/api/clients/${id}`); return client; },
+  async createClient(body) { return request('/api/clients', { method: 'POST', json: body }); }, // → { client, existed }
+  async updateClient(id, patch) { const { client } = await request(`/api/clients/${id}`, { method: 'PATCH', json: patch }); return client; },
+  async removeClient(id) { return request(`/api/clients/${id}`, { method: 'DELETE' }); }, // → { trashId }
+  async setClientLogo(id, file) {
+    const { client } = await request(`/api/clients/${id}/logo`, { method: 'POST', ...picBody('logo', file, imageName('logo', file)) });
+    return client;
+  },
+  async removeClientLogo(id) { const { client } = await request(`/api/clients/${id}/logo`, { method: 'DELETE' }); return client; },
+  // Invoice PDFs; `fields` (number, date, amount, status, planId, note) go with a single file. → { client, invoices }
+  async addInvoices(id, files, fields = {}) {
+    const fd = new FormData();
+    for (const f of files) fd.append('files', f);
+    for (const [k, v] of Object.entries(fields)) if (v != null && v !== '') fd.append(k, v);
+    return request(`/api/clients/${id}/invoices`, { method: 'POST', body: fd });
+  },
+  async updateInvoice(id, invoiceId, patch) { return request(`/api/clients/${id}/invoices/${invoiceId}`, { method: 'PATCH', json: patch }); }, // → { client, invoice }
+  async removeInvoice(id, invoiceId) { return request(`/api/clients/${id}/invoices/${invoiceId}`, { method: 'DELETE' }); }, // → { client, trashId }
+
   // --- Time tracker ---
-  async getTime(planId) { return request(`/api/time${planId ? `?plan=${encodeURIComponent(planId)}` : ''}`); }, // → { entries, running, activities }
+  // → { entries, running, activities } — all, or one project's / client's ({ plan } / { client }).
+  async getTime(q) {
+    const query = typeof q === 'string' ? { plan: q } : q || {};
+    const qs = new URLSearchParams(Object.entries(query).filter(([, v]) => v)).toString();
+    return request(`/api/time${qs ? `?${qs}` : ''}`);
+  },
   async addTimeEntry(entry) { const { entry: e } = await request('/api/time/entries', { method: 'POST', json: entry }); return e; },
   async updateTimeEntry(id, patch) { const { entry } = await request(`/api/time/entries/${id}`, { method: 'PATCH', json: patch }); return entry; },
   async removeTimeEntry(id) { return request(`/api/time/entries/${id}`, { method: 'DELETE' }); }, // → { trashId }
@@ -548,6 +575,8 @@ export function fileUrl(project, relPath) {
 export const mockupFileUrl = (m, rel) => (rel ? `/data/mockup/${m.id}/${rel}` : null);
 export const mockupModelUrl = (model) => (model?.file ? `/data/mockup-model/${model.id}/${model.file}` : null);
 export const mockupHdriUrl = (h, file = h?.file) => (file ? `/data/mockup-hdri/${h.id}/${file}` : null);
+
+export const clientFileUrl = (c, rel) => (c && rel ? `/data/client/${c.id}/${rel}` : null);
 
 export function planFileUrl(plan, relPath) {
   if (!relPath) return null;

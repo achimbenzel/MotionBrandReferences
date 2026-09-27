@@ -57,16 +57,16 @@ export default function NewStoryboardModal({ plans, planId: initialPlan = '', on
         </div>
         <div className="modal-body">
           <div className="field">
-            <label htmlFor="nsb-plan">For the plan</label>
+            <label htmlFor="nsb-plan">For the project</label>
             <select id="nsb-plan" className="input" value={planId} onChange={(e) => setPlanId(e.target.value)}>
               {open.map((p) => <option key={p.id} value={p.id}>{p.name}{p.client ? ` — ${p.client}` : ''}{p.status === 'archived' ? ' (archived)' : ''}</option>)}
-              <option value={NEW_PLAN}>＋ New plan…</option>
+              <option value={NEW_PLAN}>＋ New project…</option>
             </select>
           </div>
           {isNew && (
             <div className="row-2">
               <div className="field">
-                <label htmlFor="nsb-pname">Plan name</label>
+                <label htmlFor="nsb-pname">Project name</label>
                 <input id="nsb-pname" className="input" value={planName} onChange={(e) => setPlanName(e.target.value)} placeholder="e.g. Nova launch" autoFocus={!isTouch()} />
               </div>
               <div className="field">

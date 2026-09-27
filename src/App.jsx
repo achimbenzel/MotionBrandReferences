@@ -29,6 +29,8 @@ const StoryboardEditor = lazy(() => import('./pages/StoryboardEditor.jsx'));
 const MockupsPage = lazy(() => import('./pages/MockupsPage.jsx'));
 const MockupOpen = lazy(() => import('./pages/MockupOpen.jsx'));
 const TimeTracker = lazy(() => import('./pages/TimeTracker.jsx'));
+const ClientsPage = lazy(() => import('./pages/ClientsPage.jsx'));
+const ClientDetail = lazy(() => import('./pages/ClientDetail.jsx'));
 import { TABS, isWorkPath, WORK_HOME } from './lib/types.js';
 import { useMediaQuery, DESKTOP } from './lib/useMedia.js';
 
@@ -78,12 +80,13 @@ function Shell() {
   const handleCreated = useCallback((project) => {
     setModalType(null);
     setReloadKey((k) => k + 1);
-    if (project?.id) { toast('Project added'); navigate(`/project/${project.id}`); }
+    if (project?.id) { toast('Reference added'); navigate(`/project/${project.id}`); }
     else if (project?.type) { toast('Images added'); navigate(`/${project.type}`); }
   }, [navigate, toast]);
 
-  // "New plan" opens a dialog to name it and pick a template.
-  const createPlan = useCallback(() => setNewPlan(true), []);
+  // "New project" opens a dialog to name it, pick its client and a template
+  // (from a client's page with that client set: { clientId }).
+  const createPlan = useCallback((opts) => setNewPlan({ clientId: typeof opts?.clientId === 'string' ? opts.clientId : '' }), []);
   const planCreated = useCallback((plan) => {
     setNewPlan(false);
     setReloadKey((k) => k + 1);
@@ -130,6 +133,8 @@ function Shell() {
                 <Route path="/mockups" element={<MockupsPage />} />
                 <Route path="/mockups/:id" element={<MockupOpen />} />
                 <Route path="/time" element={<TimeTracker />} />
+                <Route path="/clients" element={<ClientsPage reloadKey={reloadKey} />} />
+                <Route path="/clients/:id" element={<ClientDetail onNewPlan={createPlan} />} />
                 <Route path="/inbox" element={<InboxPage />} />
                 <Route path="/trash" element={<TrashPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
@@ -143,7 +148,7 @@ function Shell() {
       {modalType && (
         <UploadModal initialType={modalType} onClose={closeModal} onCreated={handleCreated} />
       )}
-      {newPlan && <NewPlanModal onClose={() => setNewPlan(false)} onCreated={planCreated} />}
+      {newPlan && <NewPlanModal clientId={newPlan.clientId} onClose={() => setNewPlan(false)} onCreated={planCreated} />}
       {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
     </div>
     </StorageProvider>

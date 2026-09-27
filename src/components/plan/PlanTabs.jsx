@@ -17,14 +17,14 @@ export default function PlanTabs({ active, counts, current, onPick, tools }) {
   }, [active]);
   return (
     <div className="plan-tabs-wrap">
-      <div className="plan-tabs" role="tablist" aria-label="Plan sections" ref={bar}>
+      <div className="plan-tabs" role="tablist" aria-label="Project sections" ref={bar}>
         {PLAN_TABS.map((t) => {
           const c = tabColor(t.key);
           const on = active === t.key;
           return (
             <button key={t.key} type="button" role="tab" aria-selected={on} className={`plan-tab ${on ? 'on' : ''}`}
               style={{ '--tab-fg': c.fg, '--tab-bg': c.bg }} onClick={() => onPick(t.key)}
-              title={current === t.key ? `${t.label} — where the plan stands` : t.label}>
+              title={current === t.key ? `${t.label} — where the project stands` : t.label}>
               <t.icon size={15} />
               <span>{t.label}</span>
               {t.key !== 'overview' && counts?.[t.key] ? <span className="plan-tab-count">{counts[t.key]}</span> : null}

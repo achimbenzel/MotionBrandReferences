@@ -6,7 +6,7 @@ import {
   Image as ImageIcon, Camera, ArrowUp, ArrowDown, File as FileIcon, ExternalLink,
   Link2, Library, FolderOpen, Palette as PaletteIcon,
   Wand2, Copy, FileText, AlertTriangle,
-  LayoutTemplate, Building2, Clapperboard, PackageCheck,
+  LayoutTemplate, Clapperboard, PackageCheck,
   Archive, Film, ChevronUp, ChevronsDownUp, ChevronsUpDown, Columns2, RectangleHorizontal, GripVertical, GripHorizontal,
 } from 'lucide-react';
 import { api, planFileUrl, fileUrl } from '../lib/api.js';
@@ -37,6 +37,7 @@ import BlockRow from '../components/plan/BlockRow.jsx';
 import PlanWhen from '../components/plan/PlanWhen.jsx';
 import { PlanToc, PlanJump } from '../components/plan/PlanToc.jsx';
 import PlanTime from '../components/plan/PlanTime.jsx';
+import ClientPicker from '../components/ClientPicker.jsx';
 import { PLAN_TABS, BLOCK_TABS, STRUCTURAL, blockTabs, statusTab, isEmptyBlock, tabColor, planTab } from '../lib/planTabs.js';
 import { voEstimate } from '../lib/timing.js';
 import { useSortable, moveItem } from '../lib/useSortable.js';
@@ -92,6 +93,7 @@ export default function PlanDetail() {
   const [opened, setOpened] = useState(() => new Set()); // empty blocks opened on this visit
   const [whenOpen, setWhenOpen] = useState(false);        // the timeframe / milestones panel under the header
   const [client, setClient] = useState('');
+  const [clients, setClients] = useState([]);
   const saver = useSaver();
   const planRef = useRef(null);
   const bannerRef = useRef(null);
@@ -125,6 +127,7 @@ export default function PlanDetail() {
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- firstTab reads ?tab= once per plan
   }, [id, saver]);
+  useEffect(() => { api.listClients().then(setClients).catch(() => {}); }, []);
 
   // The tab to open: ?tab= (a link), the one used last on this plan, else the
   // one for the plan's phase, else the overview.
@@ -236,10 +239,26 @@ export default function PlanDetail() {
     setPlan((p) => ({ ...p, status }));
     api.updatePlan(id, { status }).catch((e) => toast(`Could not save: ${e.message}`, 'error'));
   };
-  const editClient = (value) => {
-    setClient(value);
+  // The client: one of yours, a new one, or none.
+  const pickClient = async (clientId) => {
+    const c = clients.find((x) => x.id === clientId);
+    setPlan((p) => ({ ...p, clientId, client: c?.name || '' })); setClient(c?.name || '');
+    try { await api.updatePlan(id, { clientId }); } catch (e) { toast(`Could not save: ${e.message}`, 'error'); }
+  };
+  const newClient = async (name) => {
+    try {
+      const { client: c } = await api.createClient({ name });
+      setClients((l) => (l.some((x) => x.id === c.id) ? l : [...l, c].sort((a, b) => a.name.localeCompare(b.name))));
+      setPlan((p) => ({ ...p, clientId: c.id, client: c.name })); setClient(c.name);
+      await api.updatePlan(id, { clientId: c.id });
+      toast(`Client “${c.name}” added`, 'ok', { label: 'Open', onClick: () => navigate(`/clients/${c.id}`) });
+    } catch (e) { toast(`Could not add the client: ${e.message}`, 'error'); }
+  };
+  // Budget / hourly rate (from the time chip) — saved shortly after typing.
+  const editMoney = (patch) => {
+    setPlan((p) => ({ ...p, ...patch }));
     const planId = id;
-    saver.schedule('client', () => api.updatePlan(planId, { client: value }).catch((e) => toast(`Could not save: ${e.message}`, 'error')));
+    saver.schedule('money', () => api.updatePlan(planId, patch).catch((e) => toast(`Could not save: ${e.message}`, 'error')));
   };
 
   // Save this plan's structure as a template for new plans.
@@ -737,7 +756,7 @@ export default function PlanDetail() {
             </div>
           ) : (
             <div className="dropzone" onClick={() => setRefPickerBlock(b.id)}>
-              <Library size={20} /><div>Attach projects or galleries from your library</div>
+              <Library size={20} /><div>Attach references or galleries from your library</div>
             </div>
           )}
         </div>
@@ -993,7 +1012,7 @@ export default function PlanDetail() {
     <div className="detail has-toc">
       <PlanToc plan={plan} tabs={tabs} tab={tab} onOpen={openBlock} onTab={setTab} />
       <div className="plan-topbar">
-        <BackBtn to="/plan" label="Back to Plans" />
+        <BackBtn to="/plan" label="Back to Projects" />
         <Menu
           trigger={<button className="btn btn-sm"><Pencil size={15} /> Edit <MoreHorizontal size={15} /></button>}
           items={[
@@ -1001,7 +1020,7 @@ export default function PlanDetail() {
             { label: 'Save as template…', icon: <LayoutTemplate size={15} />, onClick: () => setSavingTemplate(true) },
             { label: 'Archive as reference…', icon: <Archive size={15} />, onClick: () => setArchiving(true) },
             { separator: true },
-            { label: 'Delete plan', icon: <Trash2 size={15} />, danger: true, onClick: remove },
+            { label: 'Delete project', icon: <Trash2 size={15} />, danger: true, onClick: remove },
           ]}
         />
       </div>
@@ -1073,12 +1092,9 @@ export default function PlanDetail() {
             { label: 'No status', icon: <span className="status-dot" style={{ background: 'var(--text-faint)' }} />, onClick: () => setStatus('') },
           ]}
         />
-        <label className="plan-client" title="Client">
-          <Building2 size={15} />
-          <input value={client} placeholder="Add client" onChange={(e) => editClient(e.target.value)} aria-label="Client" />
-        </label>
+        <ClientPicker clients={clients} value={plan.clientId} onPick={pickClient} onCreate={newClient} onOpen={(cid) => navigate(`/clients/${cid}`)} />
         <PlanWhen plan={plan} milestones={milestones} open={whenOpen} onToggle={() => setWhenOpen((v) => !v)} />
-        <PlanTime plan={plan} toast={toast} />
+        <PlanTime plan={plan} toast={toast} onChange={editMoney} />
       </div>
       {/* Timeframe + milestones: one line in the header, the details on click */}
       {whenOpen && (
@@ -1165,7 +1181,7 @@ export default function PlanDetail() {
         <Lightbox items={lightbox.items} index={lightbox.index} onIndex={(n) => setLightbox((l) => ({ ...l, index: n }))} onClose={() => setLightbox(null)} />
       )}
       {renaming && (
-        <GalleryNameModal title="Rename plan" initialName={plan.name} submitLabel="Save" placeholder="Plan name"
+        <GalleryNameModal title="Rename project" initialName={plan.name} submitLabel="Save" placeholder="Project name"
           onSubmit={async (name) => { await patch({ name }); setRenaming(false); }} onClose={() => setRenaming(false)} />
       )}
       {savingTemplate && (

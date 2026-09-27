@@ -35,7 +35,7 @@ export function findSource(db, s) {
     // The plan's own profile picture / banner (no block).
     if (plan && (s.itemId === '@avatar' || s.itemId === '@banner')) {
       const rel = s.itemId === '@avatar' ? plan.avatar : plan.banner;
-      return rel ? { abs: path.join(DATA_DIR, 'plan', plan.id, rel), name: `${plan.name || 'Plan'} · ${s.itemId === '@avatar' ? 'profile picture' : 'banner'}` } : null;
+      return rel ? { abs: path.join(DATA_DIR, 'plan', plan.id, rel), name: `${plan.name || 'Project'} · ${s.itemId === '@avatar' ? 'profile picture' : 'banner'}` } : null;
     }
     const b = plan?.blocks?.find((x) => x.id === s.blockId);
     if (!b) return null;
@@ -43,7 +43,7 @@ export function findSource(db, s) {
       || (b.versions || []).find((x) => x.id === s.itemId);
     const shot = (b.shots || []).find((x) => x.id === s.itemId);
     const rel = hit?.file || shot?.image;
-    const label = hit?.title || hit?.name || hit?.label || (shot ? `${b.title || 'Storyboard'} · shot ${b.shots.indexOf(shot) + 1}` : `${plan.name || 'Plan'} · ${b.title || 'Moodboard'}`);
+    const label = hit?.title || hit?.name || hit?.label || (shot ? `${b.title || 'Storyboard'} · shot ${b.shots.indexOf(shot) + 1}` : `${plan.name || 'Project'} · ${b.title || 'Moodboard'}`);
     return rel ? { abs: path.join(DATA_DIR, 'plan', plan.id, rel), name: label } : null;
   }
   if (s?.kind === 'project') {
