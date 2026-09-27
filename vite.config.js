@@ -5,6 +5,11 @@ import react from '@vitejs/plugin-react';
 // The backend API + uploaded files live on 4300 and are proxied through here
 // so the app is reachable from a single origin during development.
 const API_PORT = process.env.API_PORT || 4300;
+// Where the dev server listens: loopback only (like the API) — unless DEV_HOST
+// says otherwise, e.g. your PC's Tailscale IP to open it from your phone
+// (PowerShell: $env:DEV_HOST="100.x.y.z"; npm run dev). The API stays on
+// 127.0.0.1 either way; everything goes through this server.
+const DEV_HOST = process.env.DEV_HOST || '127.0.0.1';
 
 // When the API can't be reached for a moment (it restarts after an update, or
 // is still starting) Vite would answer with an empty "500 Internal Server
@@ -25,9 +30,7 @@ export default defineConfig({
   server: {
     port: 4200,
     strictPort: true,
-    // Loopback only (like the API) — reach it from your phone with `tailscale serve`
-    // (see README → "Test it on your phone"), which also brings HTTPS.
-    host: '127.0.0.1',
+    host: DEV_HOST,
     // Vite refuses unknown host names; your Tailscale address (…ts.net) is fine.
     allowedHosts: ['.ts.net'],
     proxy: {
@@ -37,7 +40,7 @@ export default defineConfig({
       '/data': { target: `http://127.0.0.1:${API_PORT}`, changeOrigin: true, configure: explainProxyErrors },
     },
   },
-  preview: { host: '127.0.0.1', allowedHosts: ['.ts.net'] },
+  preview: { host: DEV_HOST, allowedHosts: ['.ts.net'] },
   build: {
     outDir: 'dist',
   },

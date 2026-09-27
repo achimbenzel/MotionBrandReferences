@@ -117,13 +117,28 @@ address in **Safari** → **Share** → **Add to Home Screen**: the app starts
 full-screen with its own icon. iOS keeps the icon it got when you added it —
 after an icon change, remove the app from the home screen and add it again.
 
-Without `serve` (plain `http://`, no clipboard features): listen on the
-Tailscale IP and allow the port for Tailscale addresses only, e.g. on Windows
-(PowerShell as administrator)
-`New-NetFirewallRule -DisplayName "Confinium (Tailscale)" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 4300 -RemoteAddress 100.64.0.0/10`,
-then `$env:HOST="100.x.y.z"; npm run serve` and open `http://100.x.y.z:4300`
-(Linux: `sudo ufw allow in on tailscale0 to any port 4300 proto tcp`; macOS:
-allow *node* when it asks).
+Without `serve` (plain `http://` straight to your computer's Tailscale IP —
+`tailscale ip -4` shows it; no clipboard features): the app has to listen on
+that IP, and the firewall has to let Tailscale addresses in on that port. On
+Windows (PowerShell as administrator, once per port):
+
+```powershell
+New-NetFirewallRule -DisplayName "Confinium (Tailscale)" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 4200 -RemoteAddress 100.64.0.0/10
+```
+
+- **`npm run dev`** (port 4200): `$env:DEV_HOST="100.x.y.z"; npm run dev`,
+  then open `http://100.x.y.z:4200` — on the phone and on the computer (the
+  dev server now listens on that address instead of localhost). The API stays
+  on 127.0.0.1; everything goes through the dev server.
+- **`npm run serve`** (port 4300, use `-LocalPort 4300` in the rule):
+  `$env:HOST="100.x.y.z"; npm run serve`, then open `http://100.x.y.z:4300`.
+
+If it still doesn't open: once you clicked *Cancel* on Windows' "allow Node.js"
+prompt, Windows keeps a **block** rule for Node.js, and blocks win over allow
+rules — `Get-NetFirewallRule -DisplayName "*Node*" | Where-Object Action -eq Block`
+shows it, `… | Disable-NetFirewallRule` turns it off. (Linux:
+`sudo ufw allow in on tailscale0 to any port 4200 proto tcp`; macOS: allow
+*node* when it asks.) In the shell, `$env:…` only lasts for that window.
 
 | Environment variable | Default | What it does |
 | --- | --- | --- |
