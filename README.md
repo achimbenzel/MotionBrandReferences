@@ -90,6 +90,41 @@ Caddy in between (`encode zstd gzip` + `reverse_proxy 127.0.0.1:4300`) and point
 clipboard features. Never use `HOST=0.0.0.0` on a VPS with a public IP unless a
 firewall blocks port 4300.
 
+#### Test it on your phone (Tailscale)
+With your computer and your phone in the same tailnet, **`tailscale serve`**
+is the easy way: Tailscale takes the connection itself and hands it to the app
+on `127.0.0.1`, so **no firewall rule is needed**, nothing is exposed to your
+LAN, and you get HTTPS (in the Tailscale admin console, *DNS* → enable
+**MagicDNS** and **HTTPS Certificates**; the first `serve` shows a link if
+it isn't on yet).
+
+```bash
+# like the real thing (one server, the built app):
+npm run serve                     # build + start on 127.0.0.1:4300
+tailscale serve --bg 4300         # → https://<computer>.<tailnet>.ts.net
+
+# or while developing (changes show up live):
+npm run dev                       # Vite on 127.0.0.1:4200 (+ the API)
+tailscale serve --bg 4200
+
+tailscale serve status            # what's being served
+tailscale serve reset             # stop it
+```
+
+(On Windows run `tailscale` in a normal terminal; on Linux use `sudo` or once
+`sudo tailscale set --operator=$USER`.) On the iPhone open the `https://…ts.net`
+address in **Safari** → **Share** → **Add to Home Screen**: the app starts
+full-screen with its own icon. iOS keeps the icon it got when you added it —
+after an icon change, remove the app from the home screen and add it again.
+
+Without `serve` (plain `http://`, no clipboard features): listen on the
+Tailscale IP and allow the port for Tailscale addresses only, e.g. on Windows
+(PowerShell as administrator)
+`New-NetFirewallRule -DisplayName "Confinium (Tailscale)" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 4300 -RemoteAddress 100.64.0.0/10`,
+then `$env:HOST="100.x.y.z"; npm run serve` and open `http://100.x.y.z:4300`
+(Linux: `sudo ufw allow in on tailscale0 to any port 4300 proto tcp`; macOS:
+allow *node* when it asks).
+
 | Environment variable | Default | What it does |
 | --- | --- | --- |
 | `HOST` | `127.0.0.1` | Interface to listen on |

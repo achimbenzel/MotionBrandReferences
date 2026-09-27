@@ -25,6 +25,11 @@ export default defineConfig({
   server: {
     port: 4200,
     strictPort: true,
+    // Loopback only (like the API) — reach it from your phone with `tailscale serve`
+    // (see README → "Test it on your phone"), which also brings HTTPS.
+    host: '127.0.0.1',
+    // Vite refuses unknown host names; your Tailscale address (…ts.net) is fine.
+    allowedHosts: ['.ts.net'],
     proxy: {
       // 127.0.0.1, not "localhost": the API listens on IPv4 loopback only, and
       // "localhost" may resolve to ::1 first.
@@ -32,6 +37,7 @@ export default defineConfig({
       '/data': { target: `http://127.0.0.1:${API_PORT}`, changeOrigin: true, configure: explainProxyErrors },
     },
   },
+  preview: { host: '127.0.0.1', allowedHosts: ['.ts.net'] },
   build: {
     outDir: 'dist',
   },
