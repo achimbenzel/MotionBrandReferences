@@ -258,11 +258,13 @@ export function timeWorkbook(db, q = {}) {
     { v: '', s: 6 }, { v: '', s: 6 }, { v: '', s: 6 }, { v: '', s: 6 },
     ...(money ? [{ v: '', s: 6 }, { f: `SUBTOTAL(109,J2:J${n + 1})`, v: amountOf(rows), s: 12 }] : [])]);
 
-  // Drop-down lists (like the example): clients, projects, activities — the ones you have and the ones used.
+  // Drop-down lists (like the example): only the clients, projects and activities in this export —
+  // one project's sheet offers that project, its client and the activities done on it.
   const sortText = (list) => [...new Set(list.filter(Boolean))].sort((a, b) => a.localeCompare(b));
-  const clientList = sortText([...(db.clients || []).map((c) => c.name), ...rows.map((e) => e.client)]);
-  const projectList = sortText([...db.plans.filter((p) => p.status !== 'archived').map((p) => p.name), ...rows.map((e) => e.projectName)]);
-  const acts = [...new Set([...normalizeTimeTracker(db.timeTracker).activities, ...rows.map((e) => e.activity)].filter(Boolean))];
+  const clientList = sortText(rows.map((e) => e.client));
+  const projectList = sortText(rows.map((e) => e.projectName));
+  const used = new Set(rows.map((e) => e.activity).filter(Boolean));
+  const acts = [...new Set([...normalizeTimeTracker(db.timeTracker).activities.filter((a) => used.has(a)), ...used])]; // in your order
   const listRows = Array.from({ length: Math.max(clientList.length, projectList.length, acts.length) }, (_, i) => [clientList[i] ?? '', projectList[i] ?? '', acts[i] ?? '']);
   const upto = n + 500; // new rows typed into the sheet get the lists too
   const lists = [
@@ -275,7 +277,14 @@ export function timeWorkbook(db, q = {}) {
   const L = quoteSheet(w.log);
   const col = (c) => `${L}!$${c}$2:$${c}$${n + 1}`;
   const period = from || to ? `${from || '…'} – ${to || '…'}` : w.all;
-  const summary = [[{ v: w.log, s: 8 }], [{ v: `${w.period}: ${period} · ${n} ${w.entries}`, s: 9 }], []];
+  // What the export is narrowed to (client, project, activity) — in the summary and the file name.
+  const plan = q.plan && q.plan !== 'none' ? db.plans.find((p) => p.id === q.plan) : null;
+  const client = q.client && q.client !== 'none' ? (db.clients || []).find((c) => c.id === q.client)
+    : plan?.clientId ? (db.clients || []).find((c) => c.id === plan.clientId) : null;
+  const scope = [
+    client && `${w.head[4]}: ${client.name}`, plan && `${w.head[5]}: ${plan.name}`, q.activity && `${w.head[6]}: ${q.activity}`,
+  ].filter(Boolean);
+  const summary = [[{ v: w.log, s: 8 }], [{ v: [`${w.period}: ${period}`, ...scope, `${n} ${w.entries}`].join(' · '), s: 9 }], []];
   const heads = [w.hours, w.entries, ...(money ? [w.amount] : [])];
   // groups: [{ label, list, crit }] — crit: [[column, value], …] for SUMIFS / COUNTIFS (null = values only)
   const block = (title, groups) => {
@@ -322,7 +331,10 @@ export function timeWorkbook(db, q = {}) {
     ],
   });
   const span = from || to ? `_${from || 'start'}_${to || 'today'}` : '';
-  return { buffer, filename: `${w.file}${span}.xlsx` };
+  // ASCII only (it goes into a header): "Zeiterfassung_Acme_Launch-film_2026-09-01_2026-09-30.xlsx"
+  const slug = (t) => String(t).normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/ß/g, 'ss').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+  const who = [client?.name, plan?.name, q.activity].filter(Boolean).map(slug).filter(Boolean).map((x) => `_${x}`).join('');
+  return { buffer, filename: `${w.file}${who}${span}.xlsx` };
 }
 
 router.get('/api/time/export.xlsx', async (req, res) => {

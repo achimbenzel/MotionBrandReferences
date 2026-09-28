@@ -114,7 +114,26 @@ test('export: an .xlsx with the log (filters, frozen header, drop-downs, duratio
     const styles = (await readEntryBuffer(fh2, entries.find((e) => e.name === 'xl/styles.xml'))).toString('utf8');
     assert.ok(styles.includes('formatCode="#,##0.00 &quot;€&quot;"'));
   } finally { await fh2.close(); }
-  // English, classic look, one plan only.
+  // English, classic look, one project only.
   const en = await fetch(`${srv.base}/api/time/export.xlsx?lang=en&style=classic&plan=plan2`);
-  assert.match(en.headers.get('content-disposition'), /time-log\.xlsx/);
+  assert.match(en.headers.get('content-disposition'), /time-log_Mid-plan\.xlsx/);
+
+  // One project's export: its drop-downs offer only that project and the activities done on it.
+  const one = await fetch(`${srv.base}/api/time/export.xlsx?plan=plan3&lang=de`);
+  assert.match(one.headers.get('content-disposition'), /Zeiterfassung_Current-plan\.xlsx/);
+  const buf3 = Buffer.from(await one.arrayBuffer());
+  const file3 = path.join(srv.dataDir, 'test-export3.xlsx');
+  await fsp.writeFile(file3, buf3);
+  const fh3 = await fsp.open(file3, 'r');
+  try {
+    const entries = await readCentralDirectory(fh3, buf3.length);
+    const read = async (n) => (await readEntryBuffer(fh3, entries.find((e) => e.name === n))).toString('utf8');
+    const lists = await read('xl/worksheets/sheet3.xml');
+    for (const v of ['Current plan', 'Design']) assert.ok(lists.includes(`>${v}<`), v);
+    for (const v of ['Mid plan', 'LumaKeys', 'Storyboard', 'After Effects', 'Animation', 'Website']) assert.ok(!lists.includes(`>${v}<`), v);
+    const log = await read('xl/worksheets/sheet1.xml');
+    assert.match(log, /sqref="F2:F\d+"><formula1>Listen!\$B\$1:\$B\$1<\/formula1>/); // one project
+    assert.match(log, /sqref="G2:G\d+"><formula1>Listen!\$C\$1:\$C\$1<\/formula1>/); // one activity
+    assert.match(await read('xl/worksheets/sheet2.xml'), /Projekt: Current plan/);
+  } finally { await fh3.close(); }
 });

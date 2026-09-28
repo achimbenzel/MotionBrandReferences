@@ -928,14 +928,18 @@ and client.
   results — plus **Rate** and **Amount** (hours × rate, as a formula) when a
   project has an hourly rate. The header is **frozen** and has **filter
   buttons**; client, project and activity cells have **drop-downs** (from a
-  hidden list sheet) so new rows can be typed in Excel; durations are
+  hidden list sheet) so new rows can be typed in Excel — they offer only the
+  clients, projects and activities **in this export** (one project's sheet:
+  that project, its client and the activities done on it); durations are
   **formulas** (overnight works) and the totals at the bottom follow the
   filter (`SUBTOTAL`). A second **Summary** sheet sums hours (and amounts)
   per client, per project, per activity and per month (`SUMIFS` formulas, so
   edits in the log update it). Headings in **German** or
   **English**; the look **like the app** (dark header, teal line) or
-  **classic blue**. The export takes the current filters, and your choices
-  are remembered. Opens in Excel, Numbers, LibreOffice and Google Sheets.
+  **classic blue**. The export takes the current filters (the dialog says
+  which, the summary sheet too, and the file is named after them, e.g.
+  `Zeiterfassung_Acme_Launch-film_2026-09-01_2026-09-30.xlsx`), and your
+  choices are remembered. Opens in Excel, Numbers, LibreOffice and Google Sheets.
 
 Entries are stored in `data/db.json` (`timeEntries`), so they're part of the
 library export / import.

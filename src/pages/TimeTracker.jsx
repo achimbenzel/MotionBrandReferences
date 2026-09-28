@@ -100,7 +100,7 @@ function EntryEditor({ initial, plans, clients, activities, onSave, onCancel }) 
 }
 
 /** The export: which period (from the filters), language, look. */
-function ExportDialog({ query, count, onClose }) {
+function ExportDialog({ query, count, scope, onClose }) {
   const [lang, setLang] = useState(() => { try { return localStorage.getItem('ttExportLang') || 'de'; } catch { return 'de'; } });
   const [style, setStyle] = useState(() => { try { return localStorage.getItem('ttExportStyle') || 'app'; } catch { return 'app'; } });
   const url = api.timeExportUrl({ ...query, lang, style });
@@ -110,7 +110,7 @@ function ExportDialog({ query, count, onClose }) {
       <div className="modal tt-export" role="dialog" aria-modal="true" aria-label="Export as Excel">
         <div className="modal-head"><h2><FileSpreadsheet size={17} /> Export as Excel</h2><button className="icon-btn" onClick={onClose} aria-label="Close"><X size={18} /></button></div>
         <div className="modal-body">
-          <p className="tt-export-what">{count} entr{count === 1 ? 'y' : 'ies'} — the period, client, project and activity you're looking at.</p>
+          <p className="tt-export-what"><b>{count} entr{count === 1 ? 'y' : 'ies'}</b> — {scope}</p>
           <div className="tt-export-opt"><span>Headers</span>
             <div className="segmented segmented-sm">{[['de', 'Deutsch'], ['en', 'English']].map(([k, l]) => <button key={k} type="button" className={lang === k ? 'on' : ''} onClick={() => setLang(k)}>{l}</button>)}</div>
           </div>
@@ -121,7 +121,7 @@ function ExportDialog({ query, count, onClose }) {
             {(lang === 'de' ? ['Datum', 'Startzeit', 'Endzeit', 'Dauer (h)', 'Kunde', 'Projekt', 'Tätigkeit'] : ['Date', 'Start', 'End', 'Duration (h)', 'Client', 'Project', 'Activity']).map((h) => <span key={h}>{h}</span>)}
           </div>
           <ul className="tt-export-list">
-            <li>Filter buttons and a frozen header row, drop-downs for client, project and activity</li>
+            <li>Filter buttons and a frozen header row; the drop-downs offer only the clients, projects and activities in this export</li>
             <li>Durations as formulas (past midnight too), a total of the visible rows</li>
             <li>Rate and amount when a project has an hourly rate</li>
             <li>A summary sheet: hours by client, project, activity and month</li>
@@ -395,7 +395,14 @@ export default function TimeTracker() {
         </section>
       ))}
 
-      {exporting && <ExportDialog query={{ from, to, client: clientF, plan: planF, activity: actF }} count={shown.length} onClose={() => setExporting(false)} />}
+      {exporting && (
+        <ExportDialog query={{ from, to, client: clientF, plan: planF, activity: actF }} count={shown.length} onClose={() => setExporting(false)}
+          scope={[
+            clientF === 'none' ? 'without a client' : clientById[clientF]?.name,
+            planF === 'none' ? 'without a project' : planById[planF]?.name,
+            actF, period === 'all' ? 'all time' : period === 'custom' ? `${from || '…'} – ${to || '…'}` : PERIODS.find((x) => x[0] === period)?.[1].toLowerCase(),
+          ].filter(Boolean).join(' · ')} />
+      )}
     </div>
   );
 }
