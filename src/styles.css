@@ -3603,7 +3603,10 @@ img { max-width: 100%; display: block; }
 .pt-title:hover { border-color: var(--border); }
 .pt-title:focus { border-color: var(--accent); background: var(--bg); }
 .pt-row.done .pt-title { color: var(--text-faint); text-decoration: line-through; }
-.pt-urgent, .pt-unlink { width: 30px; height: 30px; color: var(--text-faint); flex: none; }
+.pt-urgent, .pt-unlink, .pt-color { width: 30px; height: 30px; color: var(--text-faint); flex: none; }
+.pt-color:hover { color: var(--text); }
+.pt-row.tinted .pt-title:hover { border-color: rgba(255, 255, 255, .12); }
+.pt-row.tinted .pt-col:not(.done) { background: rgba(0, 0, 0, .22); }
 .pt-urgent.on { color: var(--danger); }
 .pt-urgent:hover { color: var(--danger); }
 .pt-unlink:hover { color: var(--text); }

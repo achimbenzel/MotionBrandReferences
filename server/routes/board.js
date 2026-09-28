@@ -1,7 +1,7 @@
 // To-Do board (a single global Kanban planner: columns → cards → tags).
 import { nanoid } from 'nanoid';
 import { readDB, mutateDB } from '../db.js';
-import { normalizeBoard, DEFAULT_BOARD, str } from '../schema.js';
+import { normalizeBoard, DEFAULT_BOARD, str, TAG_KEYS } from '../schema.js';
 import { createRouter } from '../http.js';
 
 const router = createRouter();
@@ -43,7 +43,7 @@ router.post('/api/board/cards', async (req, res) => {
   res.status(201).json({ board });
 });
 
-// Retitle, flag, link / unlink, or move a card to another list (at its end).
+// Retitle, flag, colour, link / unlink, or move a card to another list (at its end).
 router.patch('/api/board/cards/:id', async (req, res) => {
   const board = await mutateDB((d) => {
     const b = currentBoard(d);
@@ -53,6 +53,7 @@ router.patch('/api/board/cards/:id', async (req, res) => {
     const card = from.cards[i];
     if ('title' in req.body) card.title = str(req.body.title, 4000);
     if ('urgent' in req.body) card.urgent = !!req.body.urgent;
+    if ('color' in req.body) card.color = TAG_KEYS.has(req.body.color) ? req.body.color : null; // null = no colour
     if ('planId' in req.body) card.planId = req.body.planId ? str(req.body.planId, 40) : null;
     const to = req.body.columnId && req.body.columnId !== from.id ? b.columns.find((c) => c.id === req.body.columnId) : null;
     if (to) { from.cards.splice(i, 1); to.cards.push(card); }

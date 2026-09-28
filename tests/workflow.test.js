@@ -392,6 +392,11 @@ test('board cards can belong to a plan; single-card add / move / unlink leave th
   assert.ok(moved && moved.urgent && moved.title === 'Storyboard review ✓' && moved.planId === plan.id);
   assert.ok(!r.data.board.columns[0].cards.some((k) => k.id === card.id));
 
+  // A colour (one of the tag colours), and back to none.
+  r = await srv.api(`/api/board/cards/${card.id}`, { method: 'PATCH', json: { color: 'purple' } });
+  assert.equal(r.data.board.columns.flatMap((c) => c.cards).find((k) => k.id === card.id).color, 'purple');
+  r = await srv.api(`/api/board/cards/${card.id}`, { method: 'PATCH', json: { color: 'neon' } });
+  assert.equal(r.data.board.columns.flatMap((c) => c.cards).find((k) => k.id === card.id).color, null);
   r = await srv.api(`/api/board/cards/${card.id}`, { method: 'PATCH', json: { planId: null } });
   assert.equal(r.data.board.columns.find((c) => c.id === target.id).cards.find((k) => k.id === card.id).planId, null);
   assert.equal((await srv.api('/api/board/cards/nope', { method: 'PATCH', json: { title: 'x' } })).status, 404);

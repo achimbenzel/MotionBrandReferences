@@ -400,7 +400,8 @@ name (a click opens the project), the filter at the top shows **one project's ca
 (new cards then belong to it; it's always there — every project can be picked, the
 ones with cards first, × shows all cards again), and the project lists its cards under **To-dos on
 the board** — add one there (it lands in the first list), move it to another
-list, flag it urgent or unlink it; those changes touch only that card. Urgent
+list, give it a **colour** (the same as on the board), flag it urgent or
+unlink it; those changes touch only that card. Urgent
 cards on the Dashboard name their project.
 
 ### Clients

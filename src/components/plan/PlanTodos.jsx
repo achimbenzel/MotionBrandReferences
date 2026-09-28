@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ListTodo, ArrowRight, ChevronDown, AlertTriangle, Unlink, Plus } from 'lucide-react';
+import { ListTodo, ArrowRight, ChevronDown, AlertTriangle, Unlink, Plus, Palette, X } from 'lucide-react';
 import { api } from '../../lib/api.js';
+import { TAG_COLORS, tagColor } from '../../lib/types.js';
 import Menu from '../Menu.jsx';
 
 const DONE = /\b(done|erledigt|fertig|complete[d]?|finished|delivered|geliefert)\b/i;
 
 /**
- * The To-Do board's cards that belong to this plan, each with the list it
- * sits in (tap the list to move the card). Cards added here
- * land on the board too, linked to the plan. Every change is one card at a
- * time, so nothing else on the board is touched.
+ * The To-Do board's cards that belong to this project, each with the list it
+ * sits in (tap the list to move the card), its colour, urgent flag and
+ * unlink — like on the board. Cards added here land on the board too, linked
+ * to the project. Every change is one card at a time, so nothing else on the
+ * board is touched.
  */
 export default function PlanTodos({ planId, toast }) {
   const navigate = useNavigate();
@@ -71,13 +73,30 @@ export default function PlanTodos({ planId, toast }) {
         <div className="pt-list">
           {cards.map((k) => {
             const done = isDone(k.col);
+            const cc = k.color ? tagColor(k.color) : null;
             return (
-              <div key={k.id} className={`pt-row ${done ? 'done' : ''} ${k.urgent ? 'urgent' : ''}`}>
+              <div key={k.id} className={`pt-row ${done ? 'done' : ''} ${k.urgent ? 'urgent' : ''} ${cc ? 'tinted' : ''}`}
+                style={cc ? { background: cc.bg, borderColor: 'transparent', ...(k.urgent ? {} : { boxShadow: `inset 3px 0 0 ${cc.fg}` }) } : undefined}>
                 <Menu align="left" title="Move to list"
                   trigger={<button className={`pt-col ${done ? 'done' : ''}`} title="Move to another list">{k.col.name || 'Untitled'} <ChevronDown size={12} /></button>}
                   items={columns.map((c) => ({ label: c.name || 'Untitled', icon: c.id === k.col.id ? <span className="status-dot" style={{ background: 'var(--accent)' }} /> : <span className="status-dot" style={{ background: 'var(--text-faint)' }} />, onClick: () => { if (c.id !== k.col.id) run(() => api.updateBoardCard(k.id, { columnId: c.id }), `Moved to “${c.name || 'Untitled'}”`); } }))} />
                 <input className="pt-title" value={titles[k.id] ?? k.title} placeholder="Untitled to-do" aria-label="To-do"
                   onChange={(e) => editTitle(k.id, e.target.value)} />
+                <Menu align="right" title="Colour"
+                  trigger={(
+                    <button className={`icon-btn pt-color ${cc ? 'on' : ''}`} title="Colour" aria-label="Colour" style={cc ? { color: cc.fg } : undefined}>
+                      <Palette size={14} />
+                    </button>
+                  )}
+                  items={[
+                    ...TAG_COLORS.map((c) => ({
+                      label: c.key[0].toUpperCase() + c.key.slice(1), checked: k.color === c.key,
+                      icon: <span className="status-dot" style={{ background: c.fg }} />,
+                      onClick: () => run(() => api.updateBoardCard(k.id, { color: c.key })),
+                    })),
+                    { separator: true },
+                    { label: 'No colour', icon: <X size={14} />, onClick: () => run(() => api.updateBoardCard(k.id, { color: null })) },
+                  ]} />
                 <button className={`icon-btn pt-urgent ${k.urgent ? 'on' : ''}`} title={k.urgent ? 'Unmark urgent' : 'Mark urgent'}
                   onClick={() => run(() => api.updateBoardCard(k.id, { urgent: !k.urgent }))}><AlertTriangle size={14} /></button>
                 <button className="icon-btn pt-unlink" title="Unlink from this project (stays on the board)"
