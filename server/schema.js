@@ -233,6 +233,7 @@ export function normalizePlan(plan) {
   if (!PLAN_STATUSES.includes(plan.status)) plan.status = '';
   if (typeof plan.client !== 'string') plan.client = '';
   if (!Array.isArray(plan.archivedAs)) plan.archivedAs = []; // library projects made from this plan
+  plan.pinned = !!plan.pinned;                // on top of the project list
   plan.budget = normalizeBudget(plan.budget); // hours for the project or per month (null = none)
   plan.rate = normalizeRate(plan.rate);       // hourly rate (null = none)
   return plan;

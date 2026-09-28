@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { X, ChevronLeft, ChevronRight, Image as ImageIcon, FileText, Film, Upload, Check, Loader2 } from 'lucide-react';
 import { loadImage, renderPdfPage } from '../lib/imaging.js';
 import ThumbCropper from './ThumbCropper.jsx';
+import FromAppButton from './FromApp.jsx';
 
 /**
  * Choose a cover source (video frame, PDF page, or image) and crop/zoom it.
@@ -134,10 +135,11 @@ export default function ThumbnailStudio({ type, video, assets = [], image, initi
                 </div>
               )}
 
-              <div style={{ marginTop: 16, textAlign: 'center' }}>
+              <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
                 <button className="btn btn-ghost btn-sm" onClick={() => uploadRef.current?.click()}>
                   <Upload size={15} /> Upload a different image
                 </button>
+                <FromAppButton className="btn btn-ghost btn-sm" label="A picture from the app…" title="Cover from the app" onFile={fromImage} />
                 <input ref={uploadRef} type="file" accept="image/*" className="visually-hidden-input"
                   onChange={(e) => { if (e.target.files?.[0]) fromImage(e.target.files[0]); e.target.value = ''; }} />
               </div>

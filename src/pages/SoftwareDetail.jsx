@@ -530,12 +530,14 @@ function PluginEditor({ soft, plugin: p, onEdit, onSetImage, onPickImage, onRemo
               </div>
             </div>
           ) : (
-            <>
-              <button className="pe-img-add" onClick={() => imgRef.current?.click()}>
-                <ImageIcon size={22} /><span>Add preview image</span><small>Shown on the plugin card</small>
-              </button>
-              <button className="btn btn-sm btn-ghost pe-img-fromapp" onClick={onPickImage}><Library size={13} /> Or pick one from the app…</button>
-            </>
+            <div className="pe-img-add pe-img-empty" onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => { e.preventDefault(); const f = [...e.dataTransfer.files].find((x) => x.type.startsWith('image/')); if (f) onSetImage(f); }}>
+              <ImageIcon size={22} /><span>Preview image</span><small>Shown on the plugin card — or drop one here</small>
+              <div className="pe-img-choices">
+                <button type="button" className="btn btn-sm" onClick={() => imgRef.current?.click()}><UploadCloud size={13} /> Upload…</button>
+                <button type="button" className="btn btn-sm" onClick={onPickImage}><Library size={13} /> From the app…</button>
+              </div>
+            </div>
           )}
           <input ref={imgRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { onSetImage(e.target.files?.[0]); e.target.value = ''; }} />
         </div>

@@ -10,6 +10,7 @@ import LogoImage from '../components/LogoImage.jsx';
 import SaveToPlanModal from '../components/SaveToPlanModal.jsx';
 import ExportDialog from '../components/ExportDialog.jsx';
 import Range from '../components/Range.jsx';
+import FromAppButton from '../components/FromApp.jsx';
 
 const BRAND_BOARD = /brand|logo|test/i;
 
@@ -201,6 +202,7 @@ export default function LogoTester() {
             <span className="bt-name" title={logo.name}>{logo.name}</span>
             <button className="btn btn-sm" onClick={() => setPicking(true)}><Library size={14} /> Library</button>
             <button className="btn btn-sm" onClick={() => fileRef.current?.click()}><RefreshCw size={14} /> Upload</button>
+            <FromAppButton title="A logo from the app" onFile={pick} />
             <button className="btn btn-sm btn-ghost" onClick={clear}><X size={15} /> Clear</button>
             <div className="lt-spacer" />
             <button className="btn btn-sm" onClick={() => setExporting(true)} disabled={!art}><Download size={14} /> Export…</button>
@@ -427,6 +429,7 @@ function Dropzone({ onPick, inputRef }) {
       <UploadCloud size={26} />
       <div>Upload a logo — PNG or SVG</div>
       <div className="hint">Drop it here or click to choose · nothing is saved unless you save a test sheet</div>
+      <div className="dropzone-or"><span>or</span><FromAppButton label="Any picture from the app…" title="A logo from the app" onFile={onPick} /></div>
       <input ref={inputRef} type="file" accept="image/*,.svg" className="visually-hidden-input"
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onPick(f); }} />
     </div>

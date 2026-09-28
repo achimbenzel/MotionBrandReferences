@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { X, Search, Film, Library, Inbox as InboxIcon, PencilRuler, Play } from 'lucide-react';
-import { api, fileUrl, planFileUrl, softwareFileUrl } from '../../lib/api.js';
+import { X, Search, Film, Library, Inbox as InboxIcon, PencilRuler, Play, Briefcase } from 'lucide-react';
+import { api, fileUrl, planFileUrl, softwareFileUrl, dashboardFileUrl, clientFileUrl, noteFileUrl, mockupFileUrl } from '../../lib/api.js';
 import { inboxFileUrl, inboxKind } from '../../lib/inbox.js';
 import { fmtClock } from '../../lib/timing.js';
 import { isTouch } from '../../lib/useMedia.js';
@@ -10,7 +10,8 @@ const VIDEO = /\.(mp4|m4v|mov|webm|ogv)$/i;
 const TABS = [
   { key: 'plans', label: 'Projects', icon: PencilRuler },
   { key: 'motion', label: 'Motion', icon: Film },
-  { key: 'library', label: 'Library', icon: Library },
+  { key: 'library', label: 'Library', icon: Library, images: true },
+  { key: 'work', label: 'Work', icon: Briefcase },
   { key: 'inbox', label: 'Inbox', icon: InboxIcon },
 ];
 
@@ -58,29 +59,46 @@ function Tile({ src, video, label, onClick }) {
   );
 }
 
+function Group({ title, tiles, className = '', onPick }) {
+  if (!tiles.length) return null;
+  return (
+    <div className="fp-group">
+      <div className="fp-group-head">{title} <span className="count">{tiles.length}</span></div>
+      <div className={`mp-grid ${className}`}>{tiles.map((x) => <Tile key={x.key} src={x.src} video={x.video} label={x.label} onClick={() => onPick(x)} />)}</div>
+    </div>
+  );
+}
+
 /**
- * Pick a picture or video from what's already in the app: a plan's
- * moodboards, files, storyboard frames and review renders; Motion references
- * (the video, saved frames, moments); every library reference (branding,
- * logos, business cards, …) and software pictures; the Inbox.
- * onPick(source) with a source the server understands (server/sources.js).
- * `accept="image"`: pictures only (banners, profile pictures, moodboards).
+ * Pick a picture or video from what's already in the app: a project's
+ * moodboards, files, storyboard frames, review renders, profile picture and
+ * banner; Motion references (the video, saved frames, moments); every
+ * library reference (branding, logos, business cards, …) and software
+ * pictures; the dashboard banner, clients' logos, notes' pictures and
+ * mockups (their previews and what's on their screens); the Inbox.
+ * onPick(source, { url, name, kind }) — a source the server understands
+ * (server/sources.js), and where the file is (for places that take a file).
+ * `accept`: 'any', 'image' (banners, profile pictures, moodboards) or 'video'.
  */
 export default function MediaPicker({ onPick, onClose, title = 'Put on the screen', accept = 'any' }) {
-  const imagesOnly = accept === 'image';
+  const wantImage = accept !== 'video';
+  const wantVideo = accept !== 'image';
+  const tabs = TABS.filter((x) => wantImage || !x.images);
   const [tab, setTab] = useState('plans');
   const [plans, setPlans] = useState(null);
   const [planId, setPlanId] = useState('');
   const [motion, setMotion] = useState(null);
   const [library, setLibrary] = useState(null);
   const [software, setSoftware] = useState(null);
+  const [work, setWork] = useState(null); // { settings, clients, notes, mockups }
   const [inbox, setInbox] = useState(null);
   const [q, setQ] = useState('');
 
+  // Escape closes the picker only — not a dialog it was opened from.
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, [onClose]);
   useEffect(() => {
     if (tab === 'plans' && !plans) api.listPlans().then((ps) => { setPlans(ps); setPlanId(ps.find((p) => p.status !== 'archived')?.id || ps[0]?.id || ''); }).catch(() => setPlans([]));
@@ -89,8 +107,14 @@ export default function MediaPicker({ onPick, onClose, title = 'Put on the scree
       Promise.all(LIB_TYPES.map((x) => api.list(x.type).catch(() => []))).then((lists) => setLibrary(lists.flat())).catch(() => setLibrary([]));
       api.listSoftware().then(setSoftware).catch(() => setSoftware([]));
     }
+    if (tab === 'work' && !work) {
+      Promise.all([
+        api.getSettings().catch(() => ({})), api.listClients().catch(() => []), api.listNotes().catch(() => []),
+        api.listMockups().then((r) => r.mockups || []).catch(() => []),
+      ]).then(([settings, clients, notes, mockups]) => setWork({ settings, clients, notes, mockups }));
+    }
     if (tab === 'inbox' && !inbox) api.listInbox().then(setInbox).catch(() => setInbox([]));
-  }, [tab, plans, motion, library, inbox]);
+  }, [tab, plans, motion, library, work, inbox]);
 
   const t = q.trim().toLowerCase();
   const plan = (plans || []).find((p) => p.id === planId);
@@ -100,20 +124,46 @@ export default function MediaPicker({ onPick, onClose, title = 'Put on the scree
       ...(b.files || []).map((x) => ({ id: x.id, file: x.file, name: x.title || x.name })),
       ...(b.versions || []).map((x, i) => ({ id: x.id, file: x.file, name: x.label || `v${i + 1}` })),
       ...(b.shots || []).filter((x) => x.image).map((x, i) => ({ id: x.id, file: x.image, name: `Shot ${i + 1}` })),
-    ].filter((x) => IMAGE.test(x.file || '') || (!imagesOnly && VIDEO.test(x.file || '')));
+    ].filter((x) => (wantImage && IMAGE.test(x.file || '')) || (wantVideo && VIDEO.test(x.file || '')));
     return { id: b.id, title: b.title || 'Block', items };
-  }).filter((g) => g.items.length), [plan, imagesOnly]);
+  }).filter((g) => g.items.length), [plan, wantImage, wantVideo]);
 
   // Every plan's profile picture, and the chosen plan's own banner + profile picture.
   // (always pictures — older ones were saved as `.img`, so no extension check here)
-  const avatars = (plans || []).filter((p) => p.avatar);
-  const planOwn = plan ? [
+  const avatars = wantImage ? (plans || []).filter((p) => p.avatar) : [];
+  const planOwn = plan && wantImage ? [
     ...(plan.avatar ? [{ id: '@avatar', file: plan.avatar, name: 'Profile picture' }] : []),
     ...(plan.banner ? [{ id: '@banner', file: plan.banner, name: 'Banner' }] : []),
   ] : [];
 
-  const pick = (source) => onPick(source);
+  const pick = (x) => onPick(x.source, { url: x.src, name: x.name || x.label || 'Picture', kind: x.video ? 'video' : 'image' });
   const match = (s) => !t || String(s || '').toLowerCase().includes(t);
+
+  // The Work tab: dashboard banner, clients' logos, notes' pictures, mockups.
+  const workGroups = useMemo(() => {
+    if (!work) return [];
+    const banner = work.settings?.dashboardBanner;
+    const mockTiles = (m, withThumb) => {
+      const seen = new Set();
+      const files = [];
+      if (withThumb && pic(m.thumb)) files.push({ file: m.thumb, label: m.name || 'Mockup' });
+      for (const it of m.items || []) {
+        if (it.content?.file) files.push({ file: it.content.file, label: it.content.name || m.name });
+        for (const f of Object.values(it.faces || {})) if (f?.file) files.push({ file: f.file, label: f.name || m.name });
+      }
+      for (const s of Object.values(m.d2?.slots || {})) if (s?.file) files.push({ file: s.file, label: s.name || m.name });
+      return files.filter((f) => !seen.has(f.file) && seen.add(f.file)).map((f) => ({
+        key: `${m.id}:${f.file}`, src: mockupFileUrl(m, f.file), video: VIDEO.test(f.file), label: f.label, source: { kind: 'mockup', mockupId: m.id, file: f.file },
+      }));
+    };
+    return [
+      { title: 'Dashboard', tiles: wantImage && pic(banner) && match('dashboard banner') ? [{ key: 'banner', src: dashboardFileUrl(banner), label: 'Dashboard banner', source: { kind: 'dashboard' } }] : [] },
+      { title: 'Clients', className: 'mp-logos', tiles: wantImage ? work.clients.filter((c) => pic(c.logo) && match(c.name)).map((c) => ({ key: c.id, src: clientFileUrl(c, c.logo), label: c.name, source: { kind: 'client', clientId: c.id } })) : [] },
+      { title: 'Notes', tiles: wantImage ? work.notes.filter((n) => match(`${n.title} ${n.body}`)).flatMap((n) => n.images.map((img) => ({ key: img.id, src: noteFileUrl(n, img.file), label: n.title || img.name, name: img.name || n.title, source: { kind: 'note', noteId: n.id, itemId: img.id } }))) : [] },
+      { title: 'Mockup previews', tiles: wantImage ? work.mockups.filter((m) => pic(m.thumb) && match(m.name)).map((m) => ({ key: m.id, src: mockupFileUrl(m, m.thumb), label: m.name || 'Mockup', source: { kind: 'mockup', mockupId: m.id, file: m.thumb } })) : [] },
+      { title: 'On mockups', tiles: work.mockups.filter((m) => match(m.name)).flatMap((m) => mockTiles(m, false)).filter((x) => (x.video ? wantVideo : wantImage)) },
+    ];
+  }, [work, t, wantImage, wantVideo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -124,7 +174,7 @@ export default function MediaPicker({ onPick, onClose, title = 'Put on the scree
         </div>
         <div className="modal-body">
           <div className="segmented mp-tabs" role="tablist">
-            {TABS.map((x) => (
+            {tabs.map((x) => (
               <button key={x.key} type="button" role="tab" aria-selected={tab === x.key} className={tab === x.key ? 'on' : ''} onClick={() => setTab(x.key)}>
                 <x.icon size={14} /> {x.label}
               </button>
@@ -139,33 +189,17 @@ export default function MediaPicker({ onPick, onClose, title = 'Put on the scree
 
           {tab === 'plans' && (!plans ? <div className="spinner" /> : !plans.length ? <div className="empty-hint">No projects yet.</div> : (
             <>
-              {avatars.length > 0 && (
-                <div className="fp-group">
-                  <div className="fp-group-head">Profile pictures of your projects <span className="count">{avatars.length}</span></div>
-                  <div className="mp-grid mp-avatars">
-                    {avatars.map((p) => <Tile key={p.id} src={planFileUrl(p, p.avatar)} label={p.name} onClick={() => pick({ kind: 'plan', planId: p.id, itemId: '@avatar' })} />)}
-                  </div>
-                </div>
-              )}
+              <Group title="Profile pictures of your projects" className="mp-avatars" onPick={pick}
+                tiles={avatars.map((p) => ({ key: p.id, src: planFileUrl(p, p.avatar), label: p.name, source: { kind: 'plan', planId: p.id, itemId: '@avatar' } }))} />
               <select className="input mp-plan" value={planId} onChange={(e) => setPlanId(e.target.value)} aria-label="Project">
                 {plans.map((p) => <option key={p.id} value={p.id}>{p.avatarEmoji ? `${p.avatarEmoji} ` : ''}{p.name}</option>)}
               </select>
-              {planOwn.length > 0 && (
-                <div className="fp-group">
-                  <div className="fp-group-head">Profile picture &amp; banner</div>
-                  <div className="mp-grid">
-                    {planOwn.map((x) => <Tile key={x.id} src={planFileUrl(plan, x.file)} label={x.name} onClick={() => pick({ kind: 'plan', planId: plan.id, itemId: x.id })} />)}
-                  </div>
-                </div>
-              )}
-              {!planGroups.length && !planOwn.length && <div className="empty-hint">No pictures or videos in this project yet.</div>}
+              <Group title="Profile picture & banner" onPick={pick}
+                tiles={planOwn.map((x) => ({ key: x.id, src: planFileUrl(plan, x.file), label: x.name, name: `${plan.name} · ${x.name}`, source: { kind: 'plan', planId: plan.id, itemId: x.id } }))} />
+              {!planGroups.length && !planOwn.length && <div className="empty-hint">No {wantImage ? (wantVideo ? 'pictures or videos' : 'pictures') : 'videos'} in this project yet.</div>}
               {planGroups.map((g) => (
-                <div className="fp-group" key={g.id}>
-                  <div className="fp-group-head">{g.title} <span className="count">{g.items.length}</span></div>
-                  <div className="mp-grid">
-                    {g.items.map((x) => <Tile key={x.id} src={planFileUrl(plan, x.file)} video={VIDEO.test(x.file)} label={x.name} onClick={() => pick({ kind: 'plan', planId: plan.id, blockId: g.id, itemId: x.id })} />)}
-                  </div>
-                </div>
+                <Group key={g.id} title={g.title} onPick={pick}
+                  tiles={g.items.map((x) => ({ key: x.id, src: planFileUrl(plan, x.file), video: VIDEO.test(x.file), label: x.name, name: x.name || `${plan.name} · ${g.title}`, source: { kind: 'plan', planId: plan.id, blockId: g.id, itemId: x.id } }))} />
               ))}
             </>
           ))}
@@ -174,62 +208,54 @@ export default function MediaPicker({ onPick, onClose, title = 'Put on the scree
             <>
               {motion.filter((p) => match(`${p.title} ${(p.tags || []).join(' ')}`)).map((p) => {
                 const tiles = [
-                  ...(p.video && !imagesOnly ? [{ key: 'video', src: fileUrl(p, p.video), video: true, label: 'Whole video', source: { kind: 'project', projectId: p.id } }] : []),
-                  ...(pic(p.thumb) && (imagesOnly || !p.video) ? [{ key: 'thumb', src: fileUrl(p, p.thumb), label: 'Cover', source: { kind: 'project', projectId: p.id, field: 'thumb' } }] : []),
-                  ...(p.markers || []).filter((m) => m.thumb).map((m) => ({ key: m.id, src: fileUrl(p, m.thumb), label: `${fmtClock(m.t)} · ${m.label || 'Moment'}`, source: { kind: 'project', projectId: p.id, itemId: m.id } })),
-                  ...(p.frames || []).map((f) => ({ key: f.id, src: fileUrl(p, f.file), label: fmtClock(f.t), source: { kind: 'project', projectId: p.id, itemId: f.id } })),
+                  ...(p.video && wantVideo ? [{ key: 'video', src: fileUrl(p, p.video), video: true, label: 'Whole video', name: p.title, source: { kind: 'project', projectId: p.id } }] : []),
+                  ...(wantImage && pic(p.thumb) && (!wantVideo || !p.video) ? [{ key: 'thumb', src: fileUrl(p, p.thumb), label: 'Cover', name: p.title, source: { kind: 'project', projectId: p.id, field: 'thumb' } }] : []),
+                  ...(wantImage ? (p.markers || []).filter((m) => m.thumb).map((m) => ({ key: m.id, src: fileUrl(p, m.thumb), label: `${fmtClock(m.t)} · ${m.label || 'Moment'}`, source: { kind: 'project', projectId: p.id, itemId: m.id } })) : []),
+                  ...(wantImage ? (p.frames || []).map((f) => ({ key: f.id, src: fileUrl(p, f.file), label: fmtClock(f.t), name: `${p.title} ${fmtClock(f.t)}`, source: { kind: 'project', projectId: p.id, itemId: f.id } })) : []),
                 ];
-                if (!tiles.length) return null;
-                return (
-                  <div className="fp-group" key={p.id}>
-                    <div className="fp-group-head">{p.title || 'Untitled'} <span className="count">{tiles.length}</span></div>
-                    <div className="mp-grid">{tiles.map((x) => <Tile key={x.key} src={x.src} video={x.video} label={x.label} onClick={() => pick(x.source)} />)}</div>
-                  </div>
-                );
+                return <Group key={p.id} title={p.title || 'Untitled'} tiles={tiles} onPick={pick} />;
               })}
-              {!motion.some((p) => p.video || p.thumb || (p.frames || []).length) && <div className="empty-hint">No Motion references with pictures yet.</div>}
+              {!motion.some((p) => (wantVideo && p.video) || (wantImage && (p.thumb || (p.frames || []).length))) && <div className="empty-hint">No Motion references with {wantImage ? 'pictures' : 'videos'} yet.</div>}
             </>
           ))}
 
           {tab === 'library' && (!library ? <div className="spinner" /> : (
             <>
-              {LIB_TYPES.map((lt) => {
-                const tiles = library.filter((p) => p.type === lt.type && match(`${p.title} ${p.category || ''} ${(p.tags || []).join(' ')}`))
-                  .flatMap((p) => libraryTiles(p).map((x) => ({ ...x, key: `${p.id}:${x.key}`, src: fileUrl(p, x.file) })));
-                if (!tiles.length) return null;
-                return (
-                  <div className="fp-group" key={lt.type}>
-                    <div className="fp-group-head">{lt.label} <span className="count">{tiles.length}</span></div>
-                    <div className={`mp-grid ${lt.type === 'logo' ? 'mp-logos' : ''}`}>{tiles.map((x) => <Tile key={x.key} src={x.src} label={x.label} onClick={() => pick(x.source)} />)}</div>
-                  </div>
-                );
-              })}
-              {(() => {
-                const tiles = (software || []).filter((sw) => match(sw.name)).flatMap((sw) => [
-                  ...(pic(sw.avatar) ? [{ key: `${sw.id}:avatar`, src: softwareFileUrl(sw.id, sw.avatar), label: `${sw.name} · profile picture`, source: { kind: 'software', softwareId: sw.id, field: 'avatar' } }] : []),
-                  ...(pic(sw.banner) ? [{ key: `${sw.id}:banner`, src: softwareFileUrl(sw.id, sw.banner), label: `${sw.name} · banner`, source: { kind: 'software', softwareId: sw.id, field: 'banner' } }] : []),
-                  ...(sw.plugins || []).filter((x) => pic(x.image)).map((x) => ({ key: `${sw.id}:${x.id}`, src: softwareFileUrl(sw.id, x.image), label: x.name, source: { kind: 'software', softwareId: sw.id, itemId: x.id } })),
-                  ...(sw.expressionGroups || []).filter((x) => pic(x.image)).map((x) => ({ key: `${sw.id}:${x.id}`, src: softwareFileUrl(sw.id, x.image), label: x.name || sw.name, source: { kind: 'software', softwareId: sw.id, itemId: x.id } })),
-                ]);
-                return tiles.length ? (
-                  <div className="fp-group">
-                    <div className="fp-group-head">Software <span className="count">{tiles.length}</span></div>
-                    <div className="mp-grid">{tiles.map((x) => <Tile key={x.key} src={x.src} label={x.label} onClick={() => pick(x.source)} />)}</div>
-                  </div>
-                ) : null;
-              })()}
+              {LIB_TYPES.map((lt) => (
+                <Group key={lt.type} title={lt.label} className={lt.type === 'logo' ? 'mp-logos' : ''} onPick={pick}
+                  tiles={library.filter((p) => p.type === lt.type && match(`${p.title} ${p.category || ''} ${(p.tags || []).join(' ')}`))
+                    .flatMap((p) => libraryTiles(p).map((x) => ({ ...x, key: `${p.id}:${x.key}`, src: fileUrl(p, x.file) })))} />
+              ))}
+              <Group title="Software" onPick={pick} tiles={(software || []).filter((sw) => match(sw.name)).flatMap((sw) => [
+                ...(pic(sw.avatar) ? [{ key: `${sw.id}:avatar`, src: softwareFileUrl(sw.id, sw.avatar), label: `${sw.name} · profile picture`, source: { kind: 'software', softwareId: sw.id, field: 'avatar' } }] : []),
+                ...(pic(sw.banner) ? [{ key: `${sw.id}:banner`, src: softwareFileUrl(sw.id, sw.banner), label: `${sw.name} · banner`, source: { kind: 'software', softwareId: sw.id, field: 'banner' } }] : []),
+                ...(sw.plugins || []).filter((x) => pic(x.image)).map((x) => ({ key: `${sw.id}:${x.id}`, src: softwareFileUrl(sw.id, x.image), label: x.name, source: { kind: 'software', softwareId: sw.id, itemId: x.id } })),
+                ...(sw.expressionGroups || []).filter((x) => pic(x.image)).map((x) => ({ key: `${sw.id}:${x.id}`, src: softwareFileUrl(sw.id, x.image), label: x.name || sw.name, source: { kind: 'software', softwareId: sw.id, itemId: x.id } })),
+              ])} />
               {!library.some((p) => libraryTiles(p).length) && !(software || []).some((sw) => sw.avatar || sw.banner) && <div className="empty-hint">No pictures in the library yet.</div>}
             </>
           ))}
 
-          {tab === 'inbox' && (!inbox ? <div className="spinner" /> : (
-            <div className="mp-grid">
-              {inbox.filter((it) => (imagesOnly ? ['image', 'svg'] : ['image', 'video', 'svg']).includes(inboxKind(it)) && match(`${it.title} ${it.name}`)).map((it) => (
-                <Tile key={it.id} src={inboxFileUrl(it)} video={inboxKind(it) === 'video'} label={it.title || it.name} onClick={() => pick({ kind: 'inbox', itemId: it.id })} />
-              ))}
-              {!inbox.some((it) => ['image', 'video', 'svg'].includes(inboxKind(it))) && <div className="empty-hint">No pictures or videos in the Inbox.</div>}
-            </div>
+          {tab === 'work' && (!work ? <div className="spinner" /> : (
+            <>
+              {workGroups.map((g) => <Group key={g.title} title={g.title} tiles={g.tiles} className={g.className} onPick={pick} />)}
+              {!workGroups.some((g) => g.tiles.length) && <div className="empty-hint">{t ? 'Nothing matches.' : 'No dashboard banner, client logos, note pictures or mockups yet.'}</div>}
+            </>
           ))}
+
+          {tab === 'inbox' && (!inbox ? <div className="spinner" /> : (() => {
+            const kinds = [...(wantImage ? ['image', 'svg'] : []), ...(wantVideo ? ['video'] : [])];
+            const items = inbox.filter((it) => kinds.includes(inboxKind(it)));
+            return (
+              <div className="mp-grid">
+                {items.filter((it) => match(`${it.title} ${it.name}`)).map((it) => (
+                  <Tile key={it.id} src={inboxFileUrl(it)} video={inboxKind(it) === 'video'} label={it.title || it.name}
+                    onClick={() => pick({ src: inboxFileUrl(it), video: inboxKind(it) === 'video', name: it.name || it.title, source: { kind: 'inbox', itemId: it.id } })} />
+                ))}
+                {!items.length && <div className="empty-hint">No {wantImage ? (wantVideo ? 'pictures or videos' : 'pictures') : 'videos'} in the Inbox.</div>}
+              </div>
+            );
+          })())}
         </div>
       </div>
     </div>

@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import Menu from '../Menu.jsx';
 import AutoTextarea from '../AutoTextarea.jsx';
+import FromAppButton from '../FromApp.jsx';
 import { fmtClock } from '../../lib/timing.js';
 import { resolveDuration } from '../../lib/media.js';
 
@@ -150,6 +151,7 @@ export default function ReviewBlock({ plan, block: b, menu, icon: Icon, editBloc
           <button className="btn btn-sm" onClick={() => fileRef.current?.click()} disabled={busy}>
             <UploadCloud size={14} /> {busy ? 'Uploading…' : versions.length ? 'New version' : 'Upload version'}
           </button>
+          <FromAppButton accept="video" title="A render from the app" disabled={busy} onFile={addVersion} />
           {menu}
         </div>
       </div>
@@ -160,6 +162,7 @@ export default function ReviewBlock({ plan, block: b, menu, icon: Icon, editBloc
         <div className="dropzone" onClick={() => fileRef.current?.click()}>
           <UploadCloud size={20} />
           <div>Upload a render (v1) — then pause anywhere and write feedback pinned to that moment.</div>
+          <div className="dropzone-or"><span>or</span><FromAppButton accept="video" label="A video from the app…" title="A render from the app" onFile={addVersion} /></div>
         </div>
       ) : (
         <>

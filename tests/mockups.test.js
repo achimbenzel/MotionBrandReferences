@@ -381,3 +381,53 @@ test('pictures already in the app: banners, profile pictures and moodboards take
   r = await srv.api('/api/plans/plan3');
   assert.match(r.data.plan.banner, /^banner-.+\.webp$/);
 });
+
+test('from the app, too: the dashboard banner, a client logo, a note picture and a mockup picture', async () => {
+  // The dashboard banner (set above) as a client's logo, that logo as a project's profile picture.
+  const client = (await srv.api('/api/clients', { method: 'POST', json: { name: 'Sources Co' } })).data.client;
+  let r = await srv.api(`/api/clients/${client.id}/logo`, { method: 'POST', json: { source: { kind: 'dashboard' } } });
+  assert.equal(r.status, 200);
+  assert.match(r.data.client.logo, /^logo-.+\.png$/);
+  r = await srv.api('/api/plans/plan3/avatar', { method: 'POST', json: { source: { kind: 'client', clientId: client.id } } });
+  assert.equal(r.status, 200);
+  assert.match(r.data.plan.avatar, /^avatar-.+\.png$/);
+  // A note's picture into a moodboard and onto a mockup screen…
+  const note = (await srv.api('/api/notes', { method: 'POST', json: { title: 'Refs' } })).data.note;
+  const fd = new FormData();
+  fd.append('images', new Blob([png(8, 8, [200, 10, 10])], { type: 'image/png' }), 'red.png');
+  const img = (await srv.api(`/api/notes/${note.id}/images`, { method: 'POST', body: fd })).data.images[0];
+  r = await srv.api('/api/plans/plan3/blocks/b3/files', { method: 'POST', json: { source: { kind: 'note', noteId: note.id, itemId: img.id } } });
+  assert.equal(r.status, 201);
+  const a = (await srv.api('/api/mockups', { method: 'POST', json: { device: 'iphone' } })).data.mockup;
+  r = await srv.api(`/api/mockups/${a.id}/content/import`, { method: 'POST', json: { source: { kind: 'note', noteId: note.id, itemId: img.id } } });
+  const file = r.data.mockup.content.file;
+  // …and from that mockup (a file it names) onto another one.
+  const b = (await srv.api('/api/mockups', { method: 'POST', json: { device: 'iphone' } })).data.mockup;
+  r = await srv.api(`/api/mockups/${b.id}/content/import`, { method: 'POST', json: { source: { kind: 'mockup', mockupId: a.id, file } } });
+  assert.equal(r.data.mockup.content.kind, 'image');
+  assert.equal((await served(b, r.data.mockup.content.file)), 200);
+
+  // A file the mockup doesn't name, a path, a picture or client that isn't there: refused.
+  for (const source of [
+    { kind: 'mockup', mockupId: a.id, file: '../../db.json' },
+    { kind: 'mockup', mockupId: a.id, file: 'content-nope.png' },
+    { kind: 'note', noteId: note.id, itemId: 'nope' },
+    { kind: 'client', clientId: 'nope' },
+  ]) {
+    r = await srv.api('/api/plans/plan3/banner', { method: 'POST', json: { source } });
+    assert.equal(r.status, 400, JSON.stringify(source));
+  }
+});
+
+test('projects: pinned ones come first, pinning is kept', async () => {
+  const one = (await srv.api('/api/plans', { method: 'POST', json: { name: 'Older' } })).data.plan;
+  const two = (await srv.api('/api/plans', { method: 'POST', json: { name: 'Newer' } })).data.plan;
+  assert.equal((await srv.api(`/api/plans/${one.id}`)).data.plan.pinned, false);
+  let r = await srv.api(`/api/plans/${one.id}`, { method: 'PATCH', json: { pinned: 'yes' } });
+  assert.equal(r.data.plan.pinned, true);
+  const ids = (await srv.api('/api/plans')).data.plans.map((p) => p.id);
+  assert.equal(ids[0], one.id);
+  assert.ok(ids.indexOf(two.id) > 0);
+  r = await srv.api(`/api/plans/${one.id}`, { method: 'PATCH', json: { pinned: false } });
+  assert.equal(r.data.plan.pinned, false);
+});

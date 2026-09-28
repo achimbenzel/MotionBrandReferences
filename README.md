@@ -291,6 +291,25 @@ membership come back intact — or delete them permanently. Trash auto-empties
 items older than **30 days**. (Trashed items live under `data/trash/` and are
 excluded from exports.)
 
+### Pictures from the app (everywhere)
+Wherever a picture goes in — a banner or profile picture, a moodboard, a
+note, a client's logo, a plugin's or expression group's preview, a mockup
+screen or print, a storyboard frame, a new reference (logo, business card,
+gallery, font screenshot, colour example, branding picture), a cover, the
+example of a file, a logo in the Brand Tester, colours to extract from —
+**From the app** sits next to **Upload** (and dropping a file). A render for a
+review version (or a Motion reference's video) works the same way, videos only.
+The picker shows, by tab:
+- **Projects** — every project's profile picture, and the chosen project's
+  banner, moodboards, files, storyboard frames and review renders;
+- **Motion** — the videos, their covers, saved frames and moments;
+- **Library** — every reference type's pictures, plus software pictures;
+- **Work** — the **dashboard banner**, **clients' logos**, **notes' pictures**,
+  **mockup previews** and what's **on mockup screens**;
+- **Inbox** — shared pictures (and videos).
+
+The picture is copied to its new place, so the original stays where it was.
+
 ### Settings
 
 A **Settings** page (in the sidebar footer above Trash, the storage **⋯** menu,
@@ -452,6 +471,17 @@ Your projects (formerly *Plans*) — for a client or just for you. The
 “Without a client” last, a **New project** tile in each group with that client
 set) or **All** in one grid; the status chips filter both. Cards show the
 hours tracked (against the budget, with a thin bar, when there is one).
+
+- **Pin** the projects you're on right now — the pin on a card (on hover, or
+  always on a phone), or the pin next to **Edit** on the project's page. Pinned
+  projects stand in their own **Pinned** group at the top (in both views) and
+  come first in every project list and picker (time tracker, pickers …).
+- **Find** a project by name, client or status, filter by **client** (or
+  “Without a client”) and by **status** (the chips count what's left after
+  the other filters), and **sort** by **Recently added**, **Deadline**
+  (soonest first, none last), **Start date**, **Name**, **Status** (pipeline
+  order) or **Hours tracked**. The view and the sort are remembered; client and
+  status sit in the address, so a filtered list can be bookmarked.
 
 The **+** opens **New project**: give it a name, pick its **client** — one of
 yours, **New client…** (type the name) or none — and choose what to start from —

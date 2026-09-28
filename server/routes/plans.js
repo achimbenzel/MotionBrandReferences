@@ -25,7 +25,7 @@ const planDir = (planId) => path.join(DATA_DIR, 'plan', planId);
 const blockDir = (planId, blockId) => path.join(planDir(planId), 'blocks', blockId);
 const findBlock = (plan, blockId) => (plan && Array.isArray(plan.blocks)) ? plan.blocks.find((b) => b.id === blockId) : null;
 
-const PLAN_EDITABLE = ['name', 'start', 'end', 'milestones', 'bannerGradient', 'avatarEmoji', 'status', 'client', 'clientId', 'budget', 'rate'];
+const PLAN_EDITABLE = ['name', 'start', 'end', 'milestones', 'bannerGradient', 'avatarEmoji', 'status', 'client', 'clientId', 'budget', 'rate', 'pinned'];
 
 // Fields a briefing block starts with when added by hand.
 const DEFAULT_BRIEFING = ['Product / company', 'Target audience', 'Key message', 'Call to action',
@@ -33,7 +33,8 @@ const DEFAULT_BRIEFING = ['Product / company', 'Target audience', 'Key message',
 
 router.get('/api/plans', async (_req, res) => {
   const db = await readDB();
-  const plans = [...db.plans].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  // Pinned ones first (on top in every list and picker), then the newest.
+  const plans = [...db.plans].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || (b.createdAt || 0) - (a.createdAt || 0));
   res.json({ plans });
 });
 
@@ -136,6 +137,7 @@ router.patch('/api/plans/:id', async (req, res) => {
       }
       else if (k === 'budget') plan.budget = normalizeBudget(v);
       else if (k === 'rate') plan.rate = normalizeRate(v);
+      else if (k === 'pinned') plan.pinned = !!v;
       else plan[k] = v;
     }
     return plan;

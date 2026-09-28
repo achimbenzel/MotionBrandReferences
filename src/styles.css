@@ -377,7 +377,9 @@ img { max-width: 100%; display: block; }
   transition: border-color .15s, background .15s;
 }
 .dropzone:hover { border-color: var(--accent); background: var(--surface-2); }
-.dropzone svg { margin-bottom: 8px; }
+.dropzone > svg { margin-bottom: 8px; }
+.dropzone-or { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 12px; font-size: 12.5px; color: var(--text-faint); }
+.dropzone-or .btn { cursor: pointer; }
 
 .modal-foot {
   display: flex;
@@ -701,7 +703,9 @@ img { max-width: 100%; display: block; }
 .pe-img-add { width: 100%; aspect-ratio: 16 / 10; border: 1px dashed var(--border-strong); border-radius: 12px; background: transparent; color: var(--text-muted); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 13px; font-weight: 600; }
 .pe-img-add small { font-weight: 400; color: var(--text-faint); }
 .pe-img-add:hover { border-color: var(--accent); color: var(--accent); }
-.pe-img-fromapp { width: 100%; justify-content: center; margin-top: 6px; }
+.pe-img-empty { cursor: default; padding: 12px; text-align: center; }
+.pe-img-empty:hover { border-color: var(--border-strong); color: var(--text-muted); }
+.pe-img-choices { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; justify-content: center; }
 .plugin-editor-fields { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .plugin-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 @media (max-width: 480px) { .plugin-row2 { grid-template-columns: 1fr; } }
@@ -1572,6 +1576,8 @@ img { max-width: 100%; display: block; }
 
 /* ------------------------------------------------------------- Plan detail */
 .plan-topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.plan-topbar-r { display: flex; align-items: center; gap: 6px; }
+.plan-pin.on { color: var(--accent); }
 .plan-banner {
   position: relative;
   height: 210px;
@@ -1722,6 +1728,9 @@ img { max-width: 100%; display: block; }
 .fileadd-file:hover { border-color: var(--border-strong); }
 .fileadd-file.has-file { color: var(--text); border-color: var(--accent); }
 .fileadd-file span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fileadd-example-col { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.fileadd-example-col .btn { justify-content: center; padding-inline: 6px; font-size: 12px; }
+.fileadd-fromapp { align-self: flex-start; margin-top: 6px; }
 
 /* Add-block button pinned below the last block. */
 .add-block { margin-top: 26px; padding-bottom: 8px; }
@@ -3943,6 +3952,8 @@ img { max-width: 100%; display: block; }
 /* Frame picker */
 .frame-picker { max-width: 760px; }
 .fp-tabs { margin-bottom: 14px; }
+.fp-tabs-row { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.fp-tabs-row > .btn { margin-top: 2px; }
 .fp-tabs button { display: inline-flex; align-items: center; gap: 6px; }
 .fp-group + .fp-group { margin-top: 14px; }
 .fp-group-head { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
@@ -5295,6 +5306,26 @@ span.sbe-cut > button:first-child { display: inline-flex; align-items: center; g
 
 /* Projects page: by client */
 .projects-view { align-self: center; }
+.projects-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.projects-tools .projects-search { margin: 0; flex: 1 1 220px; max-width: 340px; }
+.projects-search .icon-btn { width: 24px; height: 24px; }
+select.projects-client { width: auto; max-width: 240px; height: 38px; padding: 0 28px 0 12px; font-size: 13.5px; }
+.projects-sort { height: 38px; }
+.projects-none { display: flex; align-items: center; gap: 10px; }
+.plan-card-pin {
+  position: absolute; top: 10px; left: 10px; width: 30px; height: 30px; border-radius: 9px; border: 0; padding: 0;
+  display: grid; place-items: center; cursor: pointer; color: #fff; background: rgba(0, 0, 0, .45);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); opacity: 0; transition: opacity .15s, background .15s;
+}
+.plan-card:hover .plan-card-pin, .plan-card-pin:focus-visible, .plan-card-pin.on { opacity: 1; }
+.plan-card-pin.on { background: var(--accent); color: #062a2e; }
+.plan-card-pin:hover { background: rgba(0, 0, 0, .7); }
+.plan-card-pin.on:hover { background: var(--accent); filter: brightness(1.1); }
+@media (hover: none) { .plan-card-pin { opacity: .9; } }
+@media (max-width: 620px) {
+  .projects-tools .projects-search { flex-basis: 100%; max-width: none; }
+  select.projects-client { flex: 1; max-width: none; }
+}
 .project-groups { display: flex; flex-direction: column; gap: 34px; }
 .project-group-head { display: flex; align-items: center; margin-bottom: 14px; }
 .project-group-client {

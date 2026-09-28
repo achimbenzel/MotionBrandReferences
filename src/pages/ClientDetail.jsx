@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Plus, Play, Square, MoreHorizontal, Trash2, FileSpreadsheet, Clock, Briefcase, PackageCheck, CalendarClock,
   Flag, Cake, Users, Mail, Phone, Globe, Pencil, Check, FileText, UploadCloud, ExternalLink, Receipt, StickyNote,
-  ImageOff, Timer, Wallet, ArrowRight,
+  ImageOff, Timer, Wallet, ArrowRight, Library,
 } from 'lucide-react';
 import { api, clientFileUrl } from '../lib/api.js';
 import { useSaver } from '../lib/autosave.js';
@@ -14,6 +14,7 @@ import Menu from '../components/Menu.jsx';
 import ClientAvatar from '../components/ClientAvatar.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import { useFromApp } from '../components/FromApp.jsx';
 import { DELIVERABLE_STATUS } from '../components/plan/DeliverablesBlock.jsx';
 import { useTimeTracker, tracker, dayKey } from '../lib/timeTracker.js';
 import {
@@ -51,6 +52,7 @@ export default function ClientDetail({ onNewPlan }) {
   const [error, setError] = useState(null);
   const pending = useRef({});
   const logoRef = useRef(null);
+  const [appPicker, pickFromApp] = useFromApp();
 
   useEffect(() => {
     let alive = true;
@@ -153,12 +155,14 @@ export default function ClientDetail({ onNewPlan }) {
           <button type="button" className="client-logo-btn" aria-label="Logo and colour" title="Logo and colour"><ClientAvatar client={client} size="xl" /></button>
         )} items={[
           { label: client.logo ? 'Replace logo…' : 'Upload logo…', icon: <UploadCloud size={15} />, onClick: () => logoRef.current?.click() },
+          { label: 'Logo from the app…', icon: <Library size={15} />, onClick: async () => { const got = await pickFromApp({ title: 'Logo from the app' }); if (got) setLogo({ source: got.source }); } },
           ...(client.logo ? [{ label: 'Remove logo', icon: <ImageOff size={15} />, onClick: removeLogo }] : []),
           { separator: true },
           { heading: 'Colour' },
           ...TAG_COLORS.map((c) => ({ label: c.key[0].toUpperCase() + c.key.slice(1), icon: <span className="status-dot" style={{ background: c.fg }} />, checked: client.color === c.key, keepOpen: true, onClick: () => patch({ color: c.key }) })),
         ]} />
         <input ref={logoRef} type="file" accept="image/*" hidden onChange={(e) => { setLogo(e.target.files?.[0]); e.target.value = ''; }} />
+        {appPicker}
         <div className="client-head-main">
           <input className="client-name" value={client.name} onChange={(e) => patch({ name: e.target.value })} onBlur={() => { if (!client.name.trim()) patch({ name: 'Client' }); }} aria-label="Client name" />
           <div className="client-head-meta">

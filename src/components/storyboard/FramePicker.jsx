@@ -3,6 +3,7 @@ import { X, Search, Check, Images, Film } from 'lucide-react';
 import { api, fileUrl, planFileUrl } from '../../lib/api.js';
 import { fmtClock } from '../../lib/timing.js';
 import { isTouch } from '../../lib/useMedia.js';
+import FromAppButton from '../FromApp.jsx';
 
 const IMAGE = /\.(png|jpe?g|gif|webp|avif|svg)$/i;
 
@@ -10,8 +11,10 @@ const IMAGE = /\.(png|jpe?g|gif|webp|avif|svg)$/i;
  * Pick pictures for storyboard shots from what you already have: the plan's
  * moodboards and files, or frames and moments saved on Motion references.
  * `single` picks one (to replace a frame). onPick([{ kind, …ids, label }]).
+ * `onFile(file)`: one picture from anywhere else in the app (library,
+ * clients, notes, mockups, the Inbox …), handed over as a file.
  */
-export default function FramePicker({ plan, single = false, onPick, onClose }) {
+export default function FramePicker({ plan, single = false, onPick, onFile, onClose }) {
   const groups = useMemo(() => (plan.blocks || [])
     .filter((b) => b.type === 'moodboard' || b.type === 'files')
     .map((b) => ({
@@ -72,9 +75,12 @@ export default function FramePicker({ plan, single = false, onPick, onClose }) {
           <button className="icon-btn" onClick={onClose} aria-label="Close"><X size={18} /></button>
         </div>
         <div className="modal-body">
-          <div className="segmented fp-tabs" role="tablist">
-            <button type="button" className={tab === 'plan' ? 'on' : ''} onClick={() => setTab('plan')} role="tab" aria-selected={tab === 'plan'}><Images size={14} /> This project</button>
-            <button type="button" className={tab === 'motion' ? 'on' : ''} onClick={() => setTab('motion')} role="tab" aria-selected={tab === 'motion'}><Film size={14} /> Motion references</button>
+          <div className="fp-tabs-row">
+            <div className="segmented fp-tabs" role="tablist">
+              <button type="button" className={tab === 'plan' ? 'on' : ''} onClick={() => setTab('plan')} role="tab" aria-selected={tab === 'plan'}><Images size={14} /> This project</button>
+              <button type="button" className={tab === 'motion' ? 'on' : ''} onClick={() => setTab('motion')} role="tab" aria-selected={tab === 'motion'}><Film size={14} /> Motion references</button>
+            </div>
+            {onFile && <FromAppButton className="btn btn-sm btn-ghost" label="Anywhere in the app…" title="A picture from anywhere in the app" onFile={onFile} />}
           </div>
           {tab === 'plan' && (groups.length ? groups.map((g) => (
             <div className="fp-group" key={g.id}>

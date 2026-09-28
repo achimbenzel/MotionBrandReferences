@@ -9,6 +9,11 @@
  * { kind: 'project', projectId, field }          one picture of a reference (a card's back, a logo's dark version …)
  * { kind: 'software', softwareId, field | itemId }  a software's banner / profile picture, a plugin's or group's picture
  * { kind: 'inbox', itemId }                      a shared file
+ * { kind: 'dashboard' }                          the dashboard's banner
+ * { kind: 'client', clientId }                   a client's logo
+ * { kind: 'note', noteId, itemId }               a picture of a note
+ * { kind: 'mockup', mockupId, file }             a mockup's rendered preview or one of its screen / print pictures
+ *                                                (`file` only as the mockup itself names it)
  */
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
@@ -73,7 +78,36 @@ export function findSource(db, s) {
     const it = db.inbox.find((x) => x.id === s.itemId);
     return it?.file ? { abs: path.join(DATA_DIR, 'inbox', it.id, it.file), name: it.name || it.file } : null;
   }
+  if (s?.kind === 'dashboard') {
+    const rel = db.settings?.dashboardBanner;
+    return typeof rel === 'string' && rel ? { abs: path.join(DATA_DIR, 'dashboard', path.basename(rel)), name: 'Dashboard banner' } : null;
+  }
+  if (s?.kind === 'client') {
+    const c = (db.clients || []).find((x) => x.id === s.clientId);
+    return c?.logo ? { abs: path.join(DATA_DIR, 'client', c.id, c.logo), name: `${c.name || 'Client'} · logo` } : null;
+  }
+  if (s?.kind === 'note') {
+    const n = (db.notes || []).find((x) => x.id === s.noteId);
+    const img = n?.images.find((x) => x.id === s.itemId);
+    return img ? { abs: path.join(DATA_DIR, 'note', n.id, img.file), name: img.name || n.title || 'Note' } : null;
+  }
+  if (s?.kind === 'mockup') {
+    const m = (db.mockups || []).find((x) => x.id === s.mockupId);
+    const rel = m && typeof s.file === 'string' && mockupFiles(m).includes(s.file) ? s.file : null;
+    return rel ? { abs: path.join(DATA_DIR, 'mockup', m.id, rel), name: m.name || 'Mockup' } : null;
+  }
   return null;
+}
+
+/** Every picture / video file a mockup names: its preview, what's on its screens, printed faces and 2D slots. */
+export function mockupFiles(m) {
+  const out = [m.thumb];
+  for (const it of m.items || []) {
+    out.push(it.content?.file);
+    for (const f of Object.values(it.faces || {})) out.push(f?.file);
+  }
+  for (const s of Object.values(m.d2?.slots || {})) out.push(s?.file);
+  return out.filter((f) => typeof f === 'string' && f);
 }
 
 /**

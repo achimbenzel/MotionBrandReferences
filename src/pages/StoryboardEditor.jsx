@@ -568,7 +568,8 @@ export default function StoryboardEditor() {
       <input ref={audioRef} type="file" accept="audio/*" className="visually-hidden-input"
         onChange={(e) => { setTrack(e.target.files?.[0]); e.target.value = ''; }} />
 
-      {picker && <FramePicker plan={plan} single={!!picker.replace} onPick={fromLibrary} onClose={() => setPicker(null)} />}
+      {picker && <FramePicker plan={plan} single={!!picker.replace} onPick={fromLibrary} onClose={() => setPicker(null)}
+        onFile={(f) => { const replace = picker.replace || null; setPicker(null); addFiles([f], replace); }} />}
       {printing && <PrintSheet plan={plan} block={block} fileUrl={fileUrl} onClose={() => setPrinting(false)} />}
       {drawing && (() => {
         const ds = shots.find((x) => x.id === drawing.shotId);

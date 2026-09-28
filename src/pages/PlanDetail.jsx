@@ -8,6 +8,7 @@ import {
   Wand2, Copy, FileText, AlertTriangle,
   LayoutTemplate, Clapperboard, PackageCheck,
   Archive, Film, ChevronUp, ChevronsDownUp, ChevronsUpDown, Columns2, RectangleHorizontal, GripVertical, GripHorizontal,
+  Pin, PinOff,
 } from 'lucide-react';
 import { api, planFileUrl, fileUrl } from '../lib/api.js';
 import { useSaver, useRefreshOnReturn, whenSaved } from '../lib/autosave.js';
@@ -180,11 +181,14 @@ export default function PlanDetail() {
   // Header images (banner / avatar)
   const setImage = async (kind, file) => { if (!file) return; try { setPlan(await api.setPlanImage(id, kind, file)); } catch (e) { toast(`Upload failed: ${e.message}`, 'error'); } };
   // A picture that's already in the app, as banner / profile picture or into a moodboard.
-  const pickFromApp = async (source) => {
+  const pickFromApp = async (source, meta) => {
     const target = appPick;
     if (!target) return;
     try {
-      if (target.kind === 'moodboard') {
+      if (target.kind === 'palette') { // colours from a picture that's in the app
+        setAppPick(null);
+        await onExtract(meta?.url, target.blockId);
+      } else if (target.kind === 'moodboard') {
         const next = await api.addBlockFiles(id, target.blockId, { source });
         setPlan((prev) => ({ ...prev, blocks: next.blocks.map((x) => (x.id === target.blockId ? x : prev.blocks.find((y) => y.id === x.id) || x)) }));
         toast('Added to the moodboard', 'ok');
@@ -501,9 +505,8 @@ export default function PlanDetail() {
 
   // Palette block — swatches (hex + optional name), or extract from an image.
   const extractInto = (bid) => { pending.current = bid; paletteRef.current?.click(); };
-  const onExtract = async (file) => {
-    if (!file || !pending.current) return;
-    const bid = pending.current;
+  const onExtract = async (file, bid = pending.current) => {
+    if (!file || !bid) return;
     try {
       const rgbs = await extractPalette(file, 6);
       const b = (planRef.current?.blocks || []).find((x) => x.id === bid); if (!b) return;
@@ -772,7 +775,10 @@ export default function PlanDetail() {
           <div className="section-head">
             <h2><Meta.icon size={16} /> {b.title} {items.length > 0 && <span className="count">{items.length}</span>}</h2>
             <div className="moodboard-actions">
-              <button className="btn btn-sm" onClick={() => extractInto(b.id)}><Wand2 size={14} /> Extract from image</button>
+              <Menu align="right" title="Extract colours" trigger={<button className="btn btn-sm"><Wand2 size={14} /> Extract from image</button>} items={[
+                { label: 'Upload a picture…', icon: <UploadCloud size={15} />, onClick: () => extractInto(b.id) },
+                { label: 'A picture from the app…', icon: <Library size={15} />, onClick: () => setAppPick({ kind: 'palette', blockId: b.id }) },
+              ]} />
               <button className="btn btn-sm" onClick={() => setItems([...items, { id: rid(), hex: '#5B8CFF', name: '' }])}><Plus size={14} /> Add color</button>
               {menu}
             </div>
@@ -802,6 +808,9 @@ export default function PlanDetail() {
           ) : (
             <div className="dropzone" onClick={() => extractInto(b.id)}>
               <PaletteIcon size={20} /><div>Extract colours from an image · or add them by hand</div>
+              <div className="dropzone-or"><span>or</span>
+                <button type="button" className="btn btn-sm" onClick={(e) => { e.stopPropagation(); setAppPick({ kind: 'palette', blockId: b.id }); }}><Library size={14} /> From the app…</button>
+              </div>
             </div>
           )}
         </div>
@@ -1013,9 +1022,15 @@ export default function PlanDetail() {
       <PlanToc plan={plan} tabs={tabs} tab={tab} onOpen={openBlock} onTab={setTab} />
       <div className="plan-topbar">
         <BackBtn to="/plan" label="Back to Projects" />
+        <div className="plan-topbar-r">
+        <button type="button" className={`icon-btn plan-pin ${plan.pinned ? 'on' : ''}`} onClick={() => patch({ pinned: !plan.pinned })}
+          title={plan.pinned ? 'Unpin — no longer on top of the project list' : 'Pin — keep it on top of the project list'} aria-label={plan.pinned ? 'Unpin project' : 'Pin project'} aria-pressed={!!plan.pinned}>
+          {plan.pinned ? <PinOff size={16} /> : <Pin size={16} />}
+        </button>
         <Menu
           trigger={<button className="btn btn-sm"><Pencil size={15} /> Edit <MoreHorizontal size={15} /></button>}
           items={[
+            { label: plan.pinned ? 'Unpin from the top' : 'Pin to the top', icon: plan.pinned ? <PinOff size={15} /> : <Pin size={15} />, onClick: () => patch({ pinned: !plan.pinned }) },
             { label: 'Rename', icon: <Pencil size={15} />, onClick: () => setRenaming(true) },
             { label: 'Save as template…', icon: <LayoutTemplate size={15} />, onClick: () => setSavingTemplate(true) },
             { label: 'Archive as reference…', icon: <Archive size={15} />, onClick: () => setArchiving(true) },
@@ -1023,6 +1038,7 @@ export default function PlanDetail() {
             { label: 'Delete project', icon: <Trash2 size={15} />, danger: true, onClick: remove },
           ]}
         />
+        </div>
       </div>
 
       {/* Banner + avatar */}
@@ -1127,7 +1143,7 @@ export default function PlanDetail() {
 
       {appPick && (
         <MediaPicker accept="image" onPick={pickFromApp} onClose={() => setAppPick(null)}
-          title={appPick.kind === 'banner' ? 'Banner from the app' : appPick.kind === 'avatar' ? 'Profile picture from the app' : 'Add to the moodboard'} />
+          title={appPick.kind === 'banner' ? 'Banner from the app' : appPick.kind === 'avatar' ? 'Profile picture from the app' : appPick.kind === 'palette' ? 'Extract colours from…' : 'Add to the moodboard'} />
       )}
 
       <input ref={bannerRef} type="file" accept="image/*" className="visually-hidden-input" onChange={(e) => { setImage('banner', e.target.files[0]); e.target.value = ''; }} />

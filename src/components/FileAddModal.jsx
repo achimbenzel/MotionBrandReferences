@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { X, UploadCloud, ImagePlus, FileUp } from 'lucide-react';
+import FromAppButton from './FromApp.jsx';
 
 /**
  * Modal to add one file to a Files block: pick an optional example image
@@ -45,9 +46,12 @@ export default function FileAddModal({ onSubmit, onClose }) {
         </div>
         <div className="modal-body">
           <div className="fileadd-row">
-            <button type="button" className="fileadd-example" onClick={() => exRef.current?.click()} title="Choose an example image">
-              {exampleUrl ? <img src={exampleUrl} alt="" /> : <span className="fileadd-example-empty"><ImagePlus size={22} /><span>Example image</span></span>}
-            </button>
+            <div className="fileadd-example-col">
+              <button type="button" className="fileadd-example" onClick={() => exRef.current?.click()} title="Choose an example image">
+                {exampleUrl ? <img src={exampleUrl} alt="" /> : <span className="fileadd-example-empty"><ImagePlus size={22} /><span>Example image</span></span>}
+              </button>
+              <FromAppButton className="btn btn-sm btn-ghost" label="From the app" iconSize={13} title="Example image from the app" onFile={pickExample} />
+            </div>
             <div className="fileadd-fields">
               <div className="field" style={{ marginBottom: 10 }}>
                 <label>Title</label>
@@ -59,6 +63,8 @@ export default function FileAddModal({ onSubmit, onClose }) {
                 <FileUp size={16} />
                 <span>{file ? file.name : 'Choose file…'}</span>
               </button>
+              <FromAppButton className="btn btn-sm btn-ghost fileadd-fromapp" accept="any" label="or a picture / video from the app" iconSize={13} title="A file from the app"
+                onFile={(f) => { setFile(f); if (!title) setTitle(f.name.replace(/\.[^.]+$/, '')); }} />
             </div>
           </div>
           <div className="hint" style={{ marginTop: 12 }}>The example image is shown as a square preview before the file.</div>

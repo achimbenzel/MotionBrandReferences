@@ -13,6 +13,7 @@ import ColorCard from './ColorCard.jsx';
 import ThumbnailStudio from './ThumbnailStudio.jsx';
 import CropModal from './CropModal.jsx';
 import LogoRenditionsEditor from './LogoRenditionsEditor.jsx';
+import FromAppButton from './FromApp.jsx';
 import { parseVideoLink, PROVIDER_LABEL } from '../lib/videoLinks.js';
 
 const ASPECT = 16 / 10;
@@ -621,11 +622,17 @@ function BcSide({ label, data, ratio, onPick, onClear }) {
   );
 }
 
+// A click opens the file dialog, a drop takes the files — and "From the app"
+// takes a picture (or, for a video field, a video) that's already in the app.
 function FilePick({ accept, multiple, onPick, children }) {
   const ref = useRef(null);
+  const fromApp = /video/.test(accept) && !/image/.test(accept) ? 'video' : 'image';
   return (
     <div className="dropzone" onClick={() => ref.current?.click()} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); onPick(e.dataTransfer.files); }}>
       {children}
+      <div className="dropzone-or"><span>or</span>
+        <FromAppButton accept={fromApp} label="From the app…" title={fromApp === 'video' ? 'Video from the app' : 'Picture from the app'} onFile={(f) => onPick([f])} />
+      </div>
       <input ref={ref} type="file" accept={accept} multiple={multiple} className="visually-hidden-input"
         onChange={(e) => { if (e.target.files?.length) onPick(e.target.files); e.target.value = ''; }} />
     </div>

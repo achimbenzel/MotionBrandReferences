@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Palette, Plus, Tag, Maximize2, Wand2, Download, Contrast } from 'lucide-react';
+import { Palette, Plus, Tag, Maximize2, Wand2, Download, Contrast, UploadCloud, Library } from 'lucide-react';
 import { api, fileUrl } from '../lib/api.js';
 import { useToast } from '../components/Toast.jsx';
 import ColorCard from '../components/ColorCard.jsx';
@@ -10,6 +10,7 @@ import Lightbox from '../components/Lightbox.jsx';
 import NotesField from '../components/NotesField.jsx';
 import DetailLayout from '../components/DetailLayout.jsx';
 import Menu from '../components/Menu.jsx';
+import { useFromApp } from '../components/FromApp.jsx';
 import { extractPalette } from '../lib/imaging.js';
 import { expandColor, paletteToCss, paletteToJson, paletteToTailwind } from '../lib/color.js';
 
@@ -57,10 +58,13 @@ export default function ColorDetail({ project, setProject }) {
       setExtracting(false);
     }
   };
-  const onExtractClick = () => {
-    if (project.example) extractFrom(fileUrl(project, project.example));
-    else fileRef.current?.click();
-  };
+  // …from the example picture, one you upload, or any picture that's already in the app.
+  const [appPicker, pickFromApp] = useFromApp();
+  const extractItems = [
+    ...(project.example ? [{ label: 'From the example picture', icon: <Palette size={15} />, onClick: () => extractFrom(fileUrl(project, project.example)) }] : []),
+    { label: 'Upload a picture…', icon: <UploadCloud size={15} />, onClick: () => fileRef.current?.click() },
+    { label: 'A picture from the app…', icon: <Library size={15} />, onClick: async () => { const got = await pickFromApp({ title: 'Extract colours from…' }); if (got) extractFrom(got.url); } },
+  ];
 
   const copy = async (text, label) => {
     try { await navigator.clipboard.writeText(text); toast(`${label} copied`); }
@@ -100,9 +104,9 @@ export default function ColorDetail({ project, setProject }) {
         <div className="section-head">
           <h2><Palette size={16} /> Palette <span className="count">{colors.length}</span></h2>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="btn btn-sm" onClick={onExtractClick} disabled={extracting}>
-              <Wand2 size={15} /> {extracting ? 'Extracting…' : 'Extract from image'}
-            </button>
+            <Menu align="right" title="Extract colours" trigger={(
+              <button className="btn btn-sm" disabled={extracting}><Wand2 size={15} /> {extracting ? 'Extracting…' : 'Extract from image'}</button>
+            )} items={extractItems} />
             {colors.length > 0 && (
               <Menu align="right"
                 trigger={<button className="btn btn-sm"><Download size={15} /> Export</button>}
@@ -119,6 +123,7 @@ export default function ColorDetail({ project, setProject }) {
         </div>
         <input ref={fileRef} type="file" accept="image/*" className="visually-hidden-input"
           onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) extractFrom(f); }} />
+        {appPicker}
 
         {adding && (
           <div style={{ marginBottom: 18 }}>
