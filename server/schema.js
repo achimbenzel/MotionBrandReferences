@@ -21,6 +21,7 @@ export const CURRENCIES = new Set(['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'CAD', 'AU
 
 export const emptyDB = () => ({
   schemaVersion: SCHEMA_VERSION, projects: [], galleries: [], plans: [], planTemplates: [], software: [], trash: [], inbox: [], mockups: [], mockupModels: [], mockupHdris: [], timeEntries: [], clients: [], notes: [],
+  content: [], achievements: [],
   settings: { storageLimitBytes: DEFAULT_STORAGE_LIMIT },
 });
 
@@ -659,6 +660,11 @@ export function normalizeDB(db) {
   db.clients = db.clients.filter((c) => c && typeof c === 'object').map(normalizeClient);
   if (!Array.isArray(db.notes)) db.notes = [];                        // general notes (with pictures)
   db.notes = db.notes.filter((n) => n && typeof n === 'object').map(normalizeNote);
+  if (!Array.isArray(db.content)) db.content = [];                    // social media posts being planned
+  db.content = db.content.filter((c) => c && typeof c === 'object').map(normalizeContent);
+  if (!Array.isArray(db.achievements)) db.achievements = [];          // milestones (gamified)
+  db.achievements = db.achievements.filter((a) => a && typeof a === 'object').map(normalizeAchievement);
+  db.achievementStats = normalizeAchievementStats(db.achievementStats);
   for (const plan of db.plans) normalizePlan(plan);
   linkClients(db);
   for (const s of db.software) normalizeSoftware(s);
@@ -912,5 +918,84 @@ export function normalizeNote(n) {
     images: (Array.isArray(n?.images) ? n.images : []).slice(0, 500).map(normalizeNoteImage).filter((i) => i.file),
     createdAt: num(n?.createdAt, 0, 1e14, 0),
     updatedAt: num(n?.updatedAt, 0, 1e14, 0),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Content — posts planned for social media (pictures / videos in data/content/<id>/)
+// ---------------------------------------------------------------------------
+export const CONTENT_PLATFORMS = ['instagram', 'tiktok', 'x', 'youtube', 'linkedin'];
+export const CONTENT_FORMATS = ['reel', 'post', 'carousel', 'story', 'text', 'thread', 'video'];
+export const CONTENT_STATUSES = ['idea', 'script', 'production', 'scheduled', 'posted'];
+export const CONTENT_METRICS = ['views', 'likes', 'comments', 'shares', 'saves', 'follows'];
+const contentFile = (v) => (typeof v === 'string' && v.startsWith('media/') && !v.includes('..') ? str(v, 300) : null);
+export function normalizeContentMedia(m) {
+  return {
+    id: typeof m?.id === 'string' && ID.test(m.id) ? m.id : nanoid(8),
+    file: contentFile(m?.file), name: str(m?.name, 200), kind: m?.kind === 'video' ? 'video' : 'image',
+  };
+}
+export function normalizeContent(c) {
+  const metrics = c?.metrics && typeof c.metrics === 'object' ? c.metrics : {};
+  return {
+    id: typeof c?.id === 'string' && ID.test(c.id) ? c.id : nanoid(10),
+    title: str(c?.title, 300),
+    platforms: [...new Set(Array.isArray(c?.platforms) ? c.platforms : [])].filter((p) => CONTENT_PLATFORMS.includes(p)),
+    format: CONTENT_FORMATS.includes(c?.format) ? c.format : 'reel',
+    status: CONTENT_STATUSES.includes(c?.status) ? c.status : 'idea',
+    date: isDay(c?.date) ? c.date : '',            // when it goes out
+    time: isTimeOfDay(c?.time) ? c.time : '',
+    hook: str(c?.hook, 1000),                       // the first second / first line
+    caption: str(c?.caption, 20000),
+    hashtags: str(c?.hashtags, 4000),
+    script: str(c?.script, 100000),                 // shots, voice-over, notes
+    link: str(c?.link, 2000),                       // where it's live
+    planId: typeof c?.planId === 'string' && ID.test(c.planId) ? c.planId : null, // the project it shows
+    color: TAG_KEYS.has(c?.color) ? c.color : null,
+    media: (Array.isArray(c?.media) ? c.media : []).slice(0, 200).map(normalizeContentMedia).filter((m) => m.file),
+    metrics: Object.fromEntries(CONTENT_METRICS.map((k) => [k, metrics[k] === '' || metrics[k] == null ? null : num(metrics[k], 0, 1e12, null)])),
+    postedAt: num(c?.postedAt, 0, 1e14, 0),
+    createdAt: num(c?.createdAt, 0, 1e14, 0),
+    updatedAt: num(c?.updatedAt, 0, 1e14, 0),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Achievements — milestones you reach, with a rarity (→ XP). Some unlock by
+// themselves from a number the app knows (biggest deal, clients, delivered
+// projects, posts) or one you keep up to date (followers).
+// ---------------------------------------------------------------------------
+export const RARITIES = ['stone', 'bronze', 'silver', 'gold', 'emerald', 'diamond', 'mythic', 'quest', 'dream'];
+export const ACHIEVEMENT_METRICS = ['deal', 'revenue', 'clients', 'projects', 'posts', 'followers:instagram', 'followers:tiktok', 'followers:x', 'followers:youtube'];
+const achFile = (v) => (typeof v === 'string' && /^[\w.-]{1,120}$/.test(v) && !v.startsWith('.') ? v : null);
+export function normalizeAchievement(a) {
+  const icon = a?.icon && typeof a.icon === 'object' ? a.icon : {};
+  const metric = ACHIEVEMENT_METRICS.includes(a?.metric) ? a.metric : null;
+  return {
+    id: typeof a?.id === 'string' && ID.test(a.id) ? a.id : nanoid(10),
+    group: str(a?.group, 60).trim() || 'Achievements',
+    title: str(a?.title, 120),
+    description: str(a?.description, 600),
+    rarity: RARITIES.includes(a?.rarity) ? a.rarity : 'stone',
+    icon: { type: ['text', 'symbol', 'image'].includes(icon.type) ? icon.type : 'text', text: str(icon.text, 8), symbol: str(icon.symbol, 40) },
+    iconImage: achFile(a?.iconImage),   // icon.type 'image'
+    sticker: achFile(a?.sticker),       // a small picture on the card (an event's logo …)
+    metric,
+    target: metric ? num(a?.target, 0, 1e12, null) : null,
+    achievedAt: isDay(a?.achievedAt) ? a.achievedAt : '',
+    order: num(a?.order, -1e9, 1e9, 0),
+    createdAt: num(a?.createdAt, 0, 1e14, 0),
+    updatedAt: num(a?.updatedAt, 0, 1e14, 0),
+  };
+}
+/** The numbers you keep yourself: followers per platform, and what you did before using the app. */
+export function normalizeAchievementStats(s) {
+  const o = s && typeof s === 'object' ? s : {};
+  const n = (v) => Math.round(num(v, 0, 1e12, 0));
+  const f = o.followers && typeof o.followers === 'object' ? o.followers : {};
+  const e = o.earlier && typeof o.earlier === 'object' ? o.earlier : {};
+  return {
+    followers: { instagram: n(f.instagram), tiktok: n(f.tiktok), x: n(f.x), youtube: n(f.youtube) },
+    earlier: { deal: n(e.deal), revenue: n(e.revenue), clients: n(e.clients), projects: n(e.projects), posts: n(e.posts) },
   };
 }

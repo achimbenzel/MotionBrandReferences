@@ -80,6 +80,19 @@ router.get('/api/search', async (req, res) => {
       thumb: n.images?.[0]?.file ? `/data/note/${n.id}/${n.images[0].file}` : null, score,
     });
   }
+  for (const c of db.content || []) {
+    const hay = [c.title, c.hook, c.caption, c.hashtags, c.script, ...c.platforms, c.format].filter(Boolean).join(' ').toLowerCase();
+    const score = scoreMatch(terms, c.title || '', hay);
+    const pic = c.media.find((m) => m.kind === 'image');
+    if (score > 0) results.push({
+      kind: 'content', id: c.id, title: c.title || 'Untitled post', subtitle: `Content · ${c.status}${c.date ? ` · ${c.date}` : ''}`,
+      thumb: pic ? `/data/content/${c.id}/${pic.file}` : null, score,
+    });
+  }
+  for (const a of db.achievements || []) {
+    const score = scoreMatch(terms, a.title || '', [a.title, a.description, a.group].filter(Boolean).join(' ').toLowerCase());
+    if (score > 0) results.push({ kind: 'achievement', id: a.id, title: a.title || 'Achievement', subtitle: `Achievement · ${a.group}${a.achievedAt ? ' · unlocked' : ''}`, score });
+  }
   for (const g of db.galleries) {
     const hay = [g.name, TYPE_LABEL[g.type], g.type].filter(Boolean).join(' ').toLowerCase();
     const score = scoreMatch(terms, g.name || '', hay);

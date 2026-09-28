@@ -330,7 +330,7 @@ A toggle switches between two modes:
 - **Work** — the **default** mode (left in the toggle), your working area. It
   opens on a **Dashboard** and holds **Clients**, **Projects**, **Software**,
   the **To-Do board**, the **Brand Tester**, **Storyboards**, **Mockups**,
-  the **Time Tracker** and **Notes** (see below).
+  the **Time Tracker**, **Notes**, **Content** and **Achievements** (see below).
 - **Reference** — the library (Branding, Motion Design, Logos, Business Cards,
   Colors, Image Gallery, Fonts, Logo No Go).
 
@@ -348,8 +348,9 @@ The Work landing page, a Notion-style overview that moves a little:
 - **Hero** over your banner — a greeting for the time of day, the date and a
   one-line summary, quick actions (**New project**, **To-dos**, **Search ⌘K**)
   and four glass tiles that count up: **open projects**, **dates in the next 7
-  days**, **open to-dos** (project to-dos + board cards, with a ring for how many
-  are done; cards in a list called *Done* count as done) and **urgent**. A
+  days**, **open to-dos** (the cards on the **To-Do board** only — a project's
+  own checklists, like a template's to-do block, don't count; a ring shows how
+  many are done, cards in a list called *Done* count as done) and **urgent**. A
   gradient banner drifts slowly, a picture banner zooms in very slowly. The
   banner is a preset gradient, an upload or a picture **from the app**.
 Below it come **widgets you arrange yourself** — **Customize** (right above
@@ -379,7 +380,7 @@ it and show it again; your layout is saved. The widgets:
   who and how old they turn); a day opens its project (or the client).
 - **Urgent** to-dos from the board and every project.
 - **Your tools** — Clients, Projects, To-Do Board, Storyboards, Mockups,
-  Brand Tester, Software, Time Tracker, Notes — with a light that follows the pointer.
+  Brand Tester, Software, Time Tracker, Notes, Content, Achievements — with a light that follows the pointer.
 - **Pipeline** — your projects by status as one bar and per stage (Briefing →
   Concept → Design → Production → Review → Delivered); a stage opens the project
   list filtered to it.
@@ -1008,6 +1009,83 @@ fonts to try.
 Notes are stored in `data/db.json` (`notes`), their pictures in
 `data/note/<id>/images/`, so both are part of the library export / import.
 
+### Content
+**Content** (sidebar, under Notes) is where you plan posts for **Instagram**,
+**TikTok / Reels** and **X** (YouTube and LinkedIn too) — from the idea to the
+numbers.
+
+- **Board** — a column per stage: **Ideas → Script → In production →
+  Scheduled → Posted**. Drag a post to the next stage; type a **quick idea**
+  into the Ideas column (Enter) to catch it without leaving the page; **+** in a
+  column starts a post in that stage. A card shows the cover, the hook, the
+  platforms, the format and the day (orange once the day has passed and it
+  isn't out yet; views and likes once it's posted).
+- **Calendar** — the month from Monday: drag a post to another day, **+** on a
+  day plans one for it, a click on a day lists its posts underneath. **Not
+  scheduled** on the side holds the ones without a day — drag them onto the
+  calendar, or back to unschedule. On a phone the days show dots and the list
+  of the day you tap.
+- **List** — every post in plan order (next ones first, posted ones last) with
+  its stage to change right there.
+- On top: ideas, posts in the works, the next 7 days, posted this month and
+  the **next post** to go out; filter by **platform** and search the text.
+- **A post** — the stage, a title, the **platforms** and the **format** (Reel /
+  Short, Post, Carousel, Story, Text, Thread, Video — with a hint for its
+  size), the day and time it goes out, the **hook** (the first second / line),
+  the **caption** and **hashtags** — counted against each platform's limit
+  (Instagram 2,200, X 280, …; a hint past 5 hashtags on Instagram) with a
+  **Copy** button for caption + hashtags — a **script** (shots, voice-over,
+  on-screen text, sound) and the **project** it shows. Once it's **posted**:
+  the link and its numbers (views, likes, comments, shares, saves, new
+  followers).
+- **Pictures and videos** — upload, paste, drop or take them **from the app**;
+  drag to reorder (the first is the cover, shown in a preview in the post's
+  format). **Duplicate** plans the same idea again (without its numbers);
+  **delete** goes to the Trash (with Undo). A “New post” you leave empty simply
+  goes away. ⌘K finds posts.
+
+Posts are stored in `data/db.json` (`content`), their pictures and videos in
+`data/content/<id>/media/`.
+
+### Achievements
+**Achievements** (sidebar, under Content) turns your milestones into
+collectible cards — a paper card in a frame of its **rarity**, a round
+**badge** (a short text like “10K”, a symbol or your own picture), the name,
+what it takes and the day you reached it. Locked ones stay faded and show how
+far you are.
+
+- **Rarity = XP**: Stone 10 · Bronze 25 · Silver 50 · Gold 100 · Emerald 200 ·
+  Diamond 400 · Mythic 800 · Quest 150 · Dream quest 300. Reached ones add up
+  to your **level** (level 2 at 100 XP, 3 at 300, 4 at 600 … — Rookie,
+  Apprentice, Designer, Pro, Expert, Master, Legend), shown on top with the
+  XP bar and how many of each rarity you have.
+- **They unlock by themselves** when an achievement has a number: the
+  **biggest single deal** (your invoices), **revenue paid**, **clients**,
+  **delivered client projects**, **posts** marked posted in Content, and your
+  **followers** on Instagram, TikTok, X and YouTube. Under **Your numbers**
+  you keep the followers up to date and add what came **before the app** (so
+  a count doesn't start at zero). Reached ones never lock again. **Next up**
+  shows the three you're closest to.
+- **Quests** you tick off yourself (set the day, or **Today**). Unlocking one —
+  by a number or by hand — gets its moment: the card flips in with its XP (and
+  your new level, if there is one).
+- **Start with the starter set** (also in **⋯**, adding only the missing
+  ones): revenue deals from 500 € to 100K, Instagram followers from 100 to
+  500K, client projects from the first one to 500, posts from the first to
+  500 — each tier a rarer frame — and **Special Quests** as quest / dream-quest
+  pairs (album cover, visualizer, a known person, a known brand, a business
+  trip, game assets), with the days you already reached them.
+- **Your own**: **New achievement** (or **Add to …** in a group) opens the
+  editor with the card as it will look — name, what it takes, **group**,
+  **rarity**, the badge, an optional **sticker** (an event's or a client's
+  logo on the corner; upload or from the app), the number it unlocks at and
+  the day it was reached. It suggests quests that fit the work (showreel,
+  returning client, referral, retainer, a higher rate, a viral post, featured,
+  a talk, your own product, an award). Delete goes to the Trash (with Undo).
+
+Achievements are stored in `data/db.json` (`achievements`, your numbers in
+`achievementStats`), their pictures in `data/achievement/<id>/`.
+
 ### Inbox (share from your phone)
 Everything you come across on the go — a screenshot, a screen recording, an
 Instagram / Behance / YouTube link, a quick idea — goes into the **Inbox**
@@ -1208,7 +1286,7 @@ it, the Work / Reference toggle, the section list (with icons, current one
 highlighted), an **Add** button, and a footer with **Settings**, **Trash** and
 the storage meter. In **Work** mode the section list is **Dashboard**,
 **Clients**, **Projects**, **Software**, **To-Dos**, **Brand Tester**,
-**Storyboards**, **Mockups**, **Time Tracker** and **Notes**; a running focus timer or time tracker shows
+**Storyboards**, **Mockups**, **Time Tracker**, **Notes**, **Content** and **Achievements**; a running focus timer or time tracker shows
 as a small pill under the search.
 The collapse button folds the sidebar into a slim **rail of icons** (names show
 as tooltips; Work and Reference stand one above the other) for a wider canvas;
@@ -1300,7 +1378,8 @@ lookup off with `LINK_LOOKUP=off`).
   ├── unused.js       # unused-file scan
   ├── zip.js          # dependency-free ZIP64 export/import
   ├── xlsx.js         # dependency-free .xlsx writer (time sheet export)
-  └── routes/         # projects (references), projects (projects), clients, software, board, mockups, time, notes, trash, search, settings, library, maintenance
+  ├── achievements.js # what achievements unlock from, the starter set
+  └── routes/         # projects (references), projects (projects), clients, software, board, mockups, time, notes, content, achievements, trash, search, settings, library, maintenance
   ```
 - **Tests:** `npm test` starts the real server against throwaway data folders —
   including a library with every data shape older versions wrote — and checks

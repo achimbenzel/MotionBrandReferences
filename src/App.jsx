@@ -33,6 +33,9 @@ const ClientsPage = lazy(() => import('./pages/ClientsPage.jsx'));
 const ClientDetail = lazy(() => import('./pages/ClientDetail.jsx'));
 const NotesPage = lazy(() => import('./pages/NotesPage.jsx'));
 const NoteDetail = lazy(() => import('./pages/NoteDetail.jsx'));
+const ContentPage = lazy(() => import('./pages/ContentPage.jsx'));
+const ContentDetail = lazy(() => import('./pages/ContentDetail.jsx'));
+const AchievementsPage = lazy(() => import('./pages/AchievementsPage.jsx'));
 import { TABS, isWorkPath, WORK_HOME } from './lib/types.js';
 import { useMediaQuery, DESKTOP } from './lib/useMedia.js';
 
@@ -139,6 +142,9 @@ function Shell() {
                 <Route path="/clients/:id" element={<ClientDetail onNewPlan={createPlan} />} />
                 <Route path="/notes" element={<NotesPage reloadKey={reloadKey} />} />
                 <Route path="/notes/:id" element={<NoteDetail />} />
+                <Route path="/content" element={<ContentPage reloadKey={reloadKey} />} />
+                <Route path="/content/:id" element={<ContentDetail />} />
+                <Route path="/achievements" element={<AchievementsPage reloadKey={reloadKey} />} />
                 <Route path="/inbox" element={<InboxPage />} />
                 <Route path="/trash" element={<TrashPage />} />
                 <Route path="/settings" element={<SettingsPage />} />

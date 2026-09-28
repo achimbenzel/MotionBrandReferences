@@ -12,6 +12,7 @@
  * { kind: 'dashboard' }                          the dashboard's banner
  * { kind: 'client', clientId }                   a client's logo
  * { kind: 'note', noteId, itemId }               a picture of a note
+ * { kind: 'content', contentId, itemId }        a picture / video of a planned post
  * { kind: 'mockup', mockupId, file }             a mockup's rendered preview or one of its screen / print pictures
  *                                                (`file` only as the mockup itself names it)
  */
@@ -90,6 +91,11 @@ export function findSource(db, s) {
     const n = (db.notes || []).find((x) => x.id === s.noteId);
     const img = n?.images.find((x) => x.id === s.itemId);
     return img ? { abs: path.join(DATA_DIR, 'note', n.id, img.file), name: img.name || n.title || 'Note' } : null;
+  }
+  if (s?.kind === 'content') {
+    const c = (db.content || []).find((x) => x.id === s.contentId);
+    const m = c?.media.find((x) => x.id === s.itemId);
+    return m ? { abs: path.join(DATA_DIR, 'content', c.id, m.file), name: m.name || c.title || 'Content' } : null;
   }
   if (s?.kind === 'mockup') {
     const m = (db.mockups || []).find((x) => x.id === s.mockupId);

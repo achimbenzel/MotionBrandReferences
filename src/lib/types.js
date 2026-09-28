@@ -52,6 +52,8 @@ export const WORK_TABS = [
   { key: 'mockups', label: 'Mockups', path: '/mockups' },
   { key: 'time', label: 'Time Tracker', path: '/time' },
   { key: 'notes', label: 'Notes', path: '/notes' },
+  { key: 'content', label: 'Content', path: '/content' },
+  { key: 'achievements', label: 'Achievements', path: '/achievements' },
 ];
 export const WORK_HOME = '/work';
 

@@ -10,6 +10,8 @@ import { inboxDir } from './inbox.js';
 import { mockupDir, modelDir, hdriDir } from './mockups.js';
 import { clientDir } from './clients.js';
 import { noteDir } from './notes.js';
+import { contentDir } from './content.js';
+import { achievementDir } from './achievements.js';
 
 const router = createRouter();
 export default router;
@@ -45,7 +47,10 @@ const trashThumb = (t) => {
                 : t.kind === 'mockup' ? t.data.thumb
                   : t.kind === 'client' ? t.data.logo
                     : t.kind === 'note' ? t.data.images?.[0]?.file
-                      : t.kind === 'noteImage' ? t.data.image?.file : null;
+                      : t.kind === 'noteImage' ? t.data.image?.file
+                        : t.kind === 'content' ? t.data.media?.find((m) => m.kind === 'image')?.file
+                          : t.kind === 'contentMedia' ? (t.data.media?.kind === 'image' ? t.data.media.file : null)
+                            : t.kind === 'achievement' ? (t.data.iconImage || t.data.sticker) : null;
   return rel ? `/data/trash/${t.trashId}/${rel}` : null;
 };
 
@@ -55,6 +60,9 @@ function describe(t) {
     case 'client': return { title: t.data.name || 'Client', subtitle: 'Client' };
     case 'note': return { title: t.data.title || 'Untitled note', subtitle: 'Note' };
     case 'noteImage': return { title: t.data.image?.name || 'Picture', subtitle: `Picture · ${t.data.noteTitle || 'Note'}` };
+    case 'content': return { title: t.data.title || 'Untitled post', subtitle: 'Content' };
+    case 'contentMedia': return { title: t.data.media?.name || 'Media', subtitle: `${t.data.media?.kind === 'video' ? 'Video' : 'Picture'} · ${t.data.contentTitle || 'Content'}` };
+    case 'achievement': return { title: t.data.title || 'Achievement', subtitle: `Achievement · ${t.data.group || ''}` };
     case 'invoice': return { title: t.data.invoice?.number ? `Invoice ${t.data.invoice.number}` : (t.data.invoice?.name || 'Invoice'), subtitle: `Invoice · ${t.data.clientName || 'Client'}` };
     case 'gallery': return { title: t.data.name || 'Gallery', subtitle: `Gallery · ${TYPE_LABEL[t.data.type] || t.data.type}` };
     case 'software': return { title: t.data.name || 'Software', subtitle: 'Software' };
@@ -153,6 +161,19 @@ router.post('/api/trash/:trashId/restore', async (req, res) => {
       if (!n) { gone = true; return null; }
       if (!n.images.some((i) => i.id === data.image.id)) n.images.splice(Math.min(data.index ?? n.images.length, n.images.length), 0, data.image);
       rels = { base: noteDir(n.id), list: data.rels };
+    } else if (entry.kind === 'content') {
+      if (!Array.isArray(db.content)) db.content = [];
+      if (!db.content.some((c) => c.id === data.id)) db.content.push(data);
+      move = { from, to: contentDir(data.id) };
+    } else if (entry.kind === 'contentMedia') {
+      const c = (db.content || []).find((x) => x.id === data.contentId);
+      if (!c) { gone = true; return null; }
+      if (!c.media.some((m) => m.id === data.media.id)) c.media.splice(Math.min(data.index ?? c.media.length, c.media.length), 0, data.media);
+      rels = { base: contentDir(c.id), list: data.rels };
+    } else if (entry.kind === 'achievement') {
+      if (!Array.isArray(db.achievements)) db.achievements = [];
+      if (!db.achievements.some((a) => a.id === data.id)) db.achievements.push(data);
+      move = { from, to: achievementDir(data.id) };
     } else if (entry.kind === 'invoice') {
       const c = (db.clients || []).find((x) => x.id === data.clientId);
       if (!c) { gone = true; return null; }

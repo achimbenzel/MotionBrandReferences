@@ -520,6 +520,36 @@ export const api = {
   },
   async removeNoteImage(id, imageId) { return request(`/api/notes/${id}/images/${imageId}`, { method: 'DELETE' }); }, // → { note, trashId }
 
+  // --- Content (posts planned for social media) ---
+  async listContent() { const { items } = await request('/api/content'); return items; },
+  async getContent(id) { const { item } = await request(`/api/content/${id}`); return item; },
+  async createContent(body = {}) { const { item } = await request('/api/content', { method: 'POST', json: body }); return item; },
+  async updateContent(id, patch) { const { item } = await request(`/api/content/${id}`, { method: 'PATCH', json: patch }); return item; },
+  async duplicateContent(id) { const { item } = await request(`/api/content/${id}/duplicate`, { method: 'POST' }); return item; },
+  async removeContent(id) { return request(`/api/content/${id}`, { method: 'DELETE' }); }, // → { trashId }
+  async removeContentIfEmpty(id) { return request(`/api/content/${id}?ifEmpty=1`, { method: 'DELETE' }); }, // no Trash; a post with anything in it stays
+  // Pictures / videos: Files, or { source } for one that's already in the app. → { item, media }
+  async addContentMedia(id, files) {
+    if (files && !Array.isArray(files) && files.source) return request(`/api/content/${id}/media`, { method: 'POST', json: { source: files.source } });
+    const fd = new FormData();
+    for (const f of files) fd.append('media', f, f.name || 'pasted.png');
+    return request(`/api/content/${id}/media`, { method: 'POST', body: fd });
+  },
+  async removeContentMedia(id, mediaId) { return request(`/api/content/${id}/media/${mediaId}`, { method: 'DELETE' }); }, // → { item, trashId }
+
+  // --- Achievements ---
+  async getAchievements() { return request('/api/achievements'); }, // → { achievements, stats, metrics, unlocked, ideas }
+  async createAchievement(body) { return request('/api/achievements', { method: 'POST', json: body }); }, // → { achievement, unlocked }
+  async updateAchievement(id, patch) { return request(`/api/achievements/${id}`, { method: 'PATCH', json: patch }); }, // → { achievement, unlocked }
+  async removeAchievement(id) { return request(`/api/achievements/${id}`, { method: 'DELETE' }); }, // → { trashId }
+  // The icon picture or the sticker ('icon' | 'sticker'): a File or { source }. → { achievement }
+  async setAchievementImage(id, slot, pic) {
+    return request(`/api/achievements/${id}/image?slot=${slot}`, { method: 'POST', ...picBody('image', pic, imageName(slot, pic)) });
+  },
+  async removeAchievementImage(id, slot) { return request(`/api/achievements/${id}/image?slot=${slot}`, { method: 'DELETE' }); },
+  async updateAchievementStats(patch) { return request('/api/achievement-stats', { method: 'PATCH', json: patch }); }, // → like getAchievements
+  async addStarterAchievements() { return request('/api/achievements/starter', { method: 'POST' }); }, // → like getAchievements + { added }
+
   // --- Time tracker ---
   // → { entries, running, activities } — all, or one project's / client's ({ plan } / { client }).
   async getTime(q) {
@@ -594,6 +624,8 @@ export const mockupHdriUrl = (h, file = h?.file) => (file ? `/data/mockup-hdri/$
 
 export const clientFileUrl = (c, rel) => (c && rel ? `/data/client/${c.id}/${rel}` : null);
 export const noteFileUrl = (n, rel) => (n && rel ? `/data/note/${n.id}/${rel}` : null);
+export const contentFileUrl = (c, rel) => (c && rel ? `/data/content/${c.id}/${rel}` : null);
+export const achievementFileUrl = (a, rel) => (a && rel ? `/data/achievement/${a.id}/${rel}` : null);
 
 export function planFileUrl(plan, relPath) {
   if (!relPath) return null;

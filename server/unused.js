@@ -66,6 +66,8 @@ export async function scanUnused() {
   for (const h of db.mockupHdris || []) if (h?.id) owners.set(`mockup-hdri/${h.id}`, refSet(h));
   for (const c of db.clients || []) if (c?.id) owners.set(`client/${c.id}`, refSet(c)); // logo, invoice PDFs
   for (const n of db.notes || []) if (n?.id) owners.set(`note/${n.id}`, refSet(n));       // a note's pictures
+  for (const c of db.content || []) if (c?.id) owners.set(`content/${c.id}`, refSet(c));   // a post's pictures / videos
+  for (const a of db.achievements || []) if (a?.id) owners.set(`achievement/${a.id}`, refSet(a)); // icon, sticker
   owners.set('dashboard', refSet(db.settings));
 
   const found = [];
@@ -77,7 +79,7 @@ export async function scanUnused() {
     found.push({ rel: `${key}/${rel}`, size: st.size });
   });
 
-  for (const root of [...TYPES, 'plan', 'software', 'inbox', 'mockup', 'mockup-model', 'mockup-hdri', 'client', 'note']) {
+  for (const root of [...TYPES, 'plan', 'software', 'inbox', 'mockup', 'mockup-model', 'mockup-hdri', 'client', 'note', 'content', 'achievement']) {
     const rootDir = path.join(DATA_DIR, root);
     const entries = await fsp.readdir(rootDir, { withFileTypes: true }).catch(() => []);
     for (const e of entries) {

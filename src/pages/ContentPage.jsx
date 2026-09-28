@@ -1,0 +1,379 @@
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Plus, Megaphone, Search, X, ChevronLeft, ChevronRight, CalendarDays, Columns3, List, Clock, Eye, Heart, Film, Images,
+} from 'lucide-react';
+import { api, contentFileUrl } from '../lib/api.js';
+import { tagColor } from '../lib/types.js';
+import { isTouch } from '../lib/useMedia.js';
+import { PLATFORMS, FORMATS, STATUSES, statusOf, dayKey, fmtDay, fmtNum } from '../lib/content.js';
+import { useToast } from '../components/Toast.jsx';
+import PlatformIcon from '../components/content/PlatformIcon.jsx';
+
+const VIEWS = [
+  { key: 'board', label: 'Board', icon: Columns3 },
+  { key: 'calendar', label: 'Calendar', icon: CalendarDays },
+  { key: 'list', label: 'List', icon: List },
+];
+const load = (k, fallback) => { try { return localStorage.getItem(k) || fallback; } catch { return fallback; } };
+const save = (k, v) => { try { localStorage.setItem(k, v); } catch { /* private window */ } };
+const WEEKDAYS = Array.from({ length: 7 }, (_, i) => new Date(2024, 0, 1 + i).toLocaleDateString(undefined, { weekday: 'short' })); // 1 Jan 2024 was a Monday
+const POSTED_SHOWN = 12;
+
+const matches = (c, needle) => !needle || `${c.title}\n${c.hook}\n${c.caption}\n${c.hashtags}\n${c.script}`.toLowerCase().includes(needle);
+// Planned ones by the day they go out (undated ones after), posted ones newest first.
+const planOrder = (a, b) => {
+  const pa = a.status === 'posted'; const pb = b.status === 'posted';
+  if (pa !== pb) return pa ? 1 : -1;
+  if (pa) return `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`) || b.postedAt - a.postedAt;
+  if (!!a.date !== !!b.date) return a.date ? -1 : 1;
+  return `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`) || b.updatedAt - a.updatedAt;
+};
+
+/**
+ * Content: posts for Instagram, TikTok / Reels and X (YouTube, LinkedIn too),
+ * from the idea to the numbers. A board by stage (drag a post along), a month
+ * calendar (drag it to another day) and a list.
+ */
+export default function ContentPage({ reloadKey }) {
+  const navigate = useNavigate();
+  const toast = useToast();
+  const [items, setItems] = useState(null);
+  const [error, setError] = useState(null);
+  const [view, setViewState] = useState(() => (VIEWS.some((v) => v.key === load('contentView', '')) ? load('contentView', '') : 'board'));
+  const [platform, setPlatformState] = useState(() => (PLATFORMS[load('contentPlatform', '')] ? load('contentPlatform', '') : ''));
+  const [q, setQ] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [changed, setChanged] = useState(0);
+  const setView = (v) => { setViewState(v); save('contentView', v); };
+  const setPlatform = (p) => { setPlatformState(p); save('contentPlatform', p); };
+
+  useEffect(() => {
+    const on = () => setChanged((n) => n + 1);
+    window.addEventListener('content:changed', on);
+    return () => window.removeEventListener('content:changed', on);
+  }, []);
+  useEffect(() => {
+    let alive = true;
+    api.listContent().then((l) => { if (alive) setItems(l); }).catch((e) => { if (alive) setError(e.message); });
+    return () => { alive = false; };
+  }, [reloadKey, changed]);
+
+  const create = async (fields = {}, open = true) => {
+    if (busy) return null;
+    setBusy(true);
+    try {
+      const c = await api.createContent({ platforms: platform ? [platform] : [], ...fields });
+      if (open) navigate(`/content/${c.id}`, { state: { fresh: true } });
+      else { setItems((l) => [c, ...(l || [])]); setBusy(false); }
+      return c;
+    } catch (e) { toast(`Could not add a post: ${e.message}`, 'error'); setBusy(false); return null; }
+  };
+  // Optimistic: the card moves right away, the server answers with the whole post (posted → its date).
+  const update = async (id, fields) => {
+    const before = items;
+    setItems((l) => l.map((c) => (c.id === id ? { ...c, ...fields } : c)));
+    try { const saved = await api.updateContent(id, fields); setItems((l) => l.map((c) => (c.id === id ? saved : c))); }
+    catch (e) { setItems(before); toast(`Could not move it: ${e.message}`, 'error'); }
+  };
+
+  const needle = q.trim().toLowerCase();
+  const shown = useMemo(() => (items || []).filter((c) => (!platform || c.platforms.includes(platform)) && matches(c, needle)), [items, platform, needle]);
+  const today = dayKey();
+  const stats = useMemo(() => {
+    const all = items || [];
+    const month = today.slice(0, 7);
+    const week = dayKey(new Date(Date.now() + 7 * 864e5));
+    return {
+      ideas: all.filter((c) => c.status === 'idea').length,
+      working: all.filter((c) => c.status === 'script' || c.status === 'production').length,
+      week: all.filter((c) => c.status !== 'posted' && c.date && c.date >= today && c.date <= week).length,
+      posted: all.filter((c) => c.status === 'posted' && c.date.startsWith(month)).length,
+      next: all.filter((c) => c.status !== 'posted' && c.date >= today).sort(planOrder)[0] || null,
+    };
+  }, [items, today]);
+
+  return (
+    <div className="ctp-page">
+      <div className="page-head-row">
+        <div className="page-head">
+          <h1>Content</h1>
+          <p>Plan posts for Instagram, TikTok / Reels and X — from the idea to the numbers.</p>
+        </div>
+        <button type="button" className="btn btn-primary" onClick={() => create()} disabled={busy}><Plus size={16} /> New post</button>
+      </div>
+      {error && <div className="center-msg">Couldn’t load: {error}</div>}
+      {!items && !error && <div className="spinner" />}
+      {items && (items.length ? (
+        <>
+          <div className="ctp-stats">
+            <div><b>{stats.ideas}</b><span>Ideas</span></div>
+            <div><b>{stats.working}</b><span>In the works</span></div>
+            <div><b>{stats.week}</b><span>Next 7 days</span></div>
+            <div><b>{stats.posted}</b><span>Posted this month</span></div>
+            {stats.next && (
+              <button type="button" className="ctp-next" onClick={() => navigate(`/content/${stats.next.id}`)}>
+                <span>Next up · {stats.next.date === today ? 'today' : fmtDay(stats.next.date)}{stats.next.time ? ` ${stats.next.time}` : ''}</span>
+                <b>{stats.next.title || 'Untitled post'}</b>
+              </button>
+            )}
+          </div>
+
+          <div className="ctp-tools">
+            <div className="segmented" role="group" aria-label="View">
+              {VIEWS.map((v) => <button key={v.key} type="button" className={view === v.key ? 'on' : ''} onClick={() => setView(v.key)}><v.icon size={14} /> {v.label}</button>)}
+            </div>
+            <div className="ctp-plats" role="group" aria-label="Platform">
+              <button type="button" className={`chip ${!platform ? 'on' : ''}`} onClick={() => setPlatform('')}>All</button>
+              {Object.entries(PLATFORMS).map(([k, p]) => (
+                <button key={k} type="button" className={`chip ${platform === k ? 'on' : ''}`} onClick={() => setPlatform(platform === k ? '' : k)} title={p.label}>
+                  <PlatformIcon platform={k} size={13} /> <span className="ctp-plat-label">{p.label}</span>
+                </button>
+              ))}
+            </div>
+            <label className="clients-search ctp-search"><Search size={15} />
+              <input value={q} placeholder="Find a post…" onChange={(e) => setQ(e.target.value)} aria-label="Find a post" />
+              {q && <button type="button" className="icon-btn" onClick={() => setQ('')} aria-label="Clear"><X size={14} /></button>}
+            </label>
+          </div>
+
+          {view === 'board' && <Board items={shown} today={today} onOpen={(c) => navigate(`/content/${c.id}`)} onMove={update} onCreate={create} busy={busy} />}
+          {view === 'calendar' && <Calendar items={shown} today={today} onOpen={(c) => navigate(`/content/${c.id}`)} onMove={update} onCreate={create} busy={busy} />}
+          {view === 'list' && <ListView items={shown} today={today} onOpen={(c) => navigate(`/content/${c.id}`)} onMove={update} />}
+          {(needle || platform) && !shown.length && <div className="hint">No post {needle ? `contains “${q.trim()}”` : ''}{needle && platform ? ' on ' : platform ? 'for ' : ''}{platform ? PLATFORMS[platform].label : ''}.</div>}
+        </>
+      ) : (
+        <div className="empty">
+          <Megaphone size={30} />
+          <h3>No posts planned yet</h3>
+          <p>Collect ideas, write hooks and captions, schedule them — and note how they did once they’re out.</p>
+          <button className="btn btn-primary" onClick={() => create()} disabled={busy}><Plus size={16} /> New post</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** A small cover: the first picture, or a frame of the first video. */
+function Cover({ c }) {
+  const m = c.media[0];
+  if (!m) return null;
+  const url = contentFileUrl(c, m.file);
+  return (
+    <span className="ctp-cover">
+      {m.kind === 'video' ? <video src={`${url}#t=0.1`} muted preload="metadata" /> : <img src={url} alt="" loading="lazy" draggable={false} />}
+      {c.media.length > 1 && <i>{c.format === 'carousel' ? <Images size={11} /> : null}{c.media.length}</i>}
+      {m.kind === 'video' && c.media.length === 1 && <i><Film size={11} /></i>}
+    </span>
+  );
+}
+
+const Plats = ({ c }) => (c.platforms.length ? (
+  <span className="ctp-card-plats">{c.platforms.map((p) => <PlatformIcon key={p} platform={p} size={12} title={PLATFORMS[p]?.label} />)}</span>
+) : null);
+
+const When = ({ c, today }) => {
+  if (!c.date) return null;
+  const late = c.status !== 'posted' && c.date < today;
+  return (
+    <span className={`ctp-when ${late ? 'late' : c.date === today ? 'today' : ''}`} title={late ? 'The day has passed' : undefined}>
+      <CalendarDays size={11} /> {c.date === today ? 'Today' : fmtDay(c.date)}{c.time ? ` · ${c.time}` : ''}
+    </span>
+  );
+};
+
+function Card({ c, today, onOpen, dragging, setDragging }) {
+  const col = c.color ? tagColor(c.color) : null;
+  return (
+    <button type="button" className={`ctp-card ${dragging === c.id ? 'moving' : ''}`} draggable={!isTouch()}
+      onDragStart={(e) => { setDragging(c.id); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', c.id); }}
+      onDragEnd={() => setDragging(null)}
+      onClick={() => onOpen(c)} style={col ? { '--line': col.fg } : undefined}>
+      <Cover c={c} />
+      <span className="ctp-card-body">
+        <b className={c.title ? '' : 'untitled'}>{c.title || 'Untitled post'}</b>
+        {c.hook && <span className="ctp-card-hook">{c.hook}</span>}
+        <span className="ctp-card-meta">
+          <Plats c={c} />
+          <span className="ctp-fmt">{FORMATS[c.format]?.label}</span>
+          <When c={c} today={today} />
+          {c.status === 'posted' && c.metrics.views != null && <span className="ctp-num"><Eye size={11} /> {fmtNum(c.metrics.views)}</span>}
+          {c.status === 'posted' && c.metrics.likes != null && <span className="ctp-num"><Heart size={11} /> {fmtNum(c.metrics.likes)}</span>}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function Board({ items, today, onOpen, onMove, onCreate, busy }) {
+  const [dragging, setDragging] = useState(null);
+  const [over, setOver] = useState(null);
+  const [idea, setIdea] = useState('');
+  const [allPosted, setAllPosted] = useState(false);
+  const addIdea = async (e) => {
+    e.preventDefault();
+    const title = idea.trim();
+    if (!title) return;
+    if (await onCreate({ title, status: 'idea' }, false)) setIdea('');
+  };
+  return (
+    <div className="ctp-board">
+      {STATUSES.map((s) => {
+        const list = items.filter((c) => c.status === s.key).sort(planOrder);
+        const cut = s.key === 'posted' && !allPosted && list.length > POSTED_SHOWN;
+        return (
+          <section key={s.key} className={`ctp-col ${over === s.key ? 'over' : ''}`}
+            onDragOver={(e) => { if (dragging) { e.preventDefault(); setOver(s.key); } }}
+            onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setOver(null); }}
+            onDrop={(e) => {
+              e.preventDefault(); setOver(null);
+              const c = items.find((x) => x.id === dragging);
+              setDragging(null);
+              if (c && c.status !== s.key) onMove(c.id, { status: s.key });
+            }}>
+            <header className="ctp-col-head">
+              <span className="status-dot" style={{ background: s.color }} /> <b>{s.label}</b> <span className="count">{list.length}</span>
+              {s.key !== 'idea' && (
+                <button type="button" className="icon-btn" onClick={() => onCreate({ status: s.key })} disabled={busy} aria-label={`New post in ${s.label}`} title={`New post in “${s.label}”`}><Plus size={15} /></button>
+              )}
+            </header>
+            {s.key === 'idea' && (
+              <form className="ctp-quick" onSubmit={addIdea}>
+                <Plus size={14} />
+                <input value={idea} onChange={(e) => setIdea(e.target.value)} placeholder="Quick idea… (Enter)" aria-label="Quick idea" disabled={busy} />
+              </form>
+            )}
+            <div className="ctp-col-cards">
+              {(cut ? list.slice(0, POSTED_SHOWN) : list).map((c) => <Card key={c.id} c={c} today={today} onOpen={onOpen} dragging={dragging} setDragging={setDragging} />)}
+              {cut && <button type="button" className="btn btn-sm btn-ghost" onClick={() => setAllPosted(true)}>Show all {list.length}</button>}
+              {!list.length && <div className="ctp-col-empty">{dragging ? 'Drop here' : s.key === 'posted' ? 'Posted ones land here' : '—'}</div>}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+function Calendar({ items, today, onOpen, onMove, onCreate, busy }) {
+  const [month, setMonth] = useState(() => today.slice(0, 7)); // 'YYYY-MM'
+  const [picked, setPicked] = useState(today);
+  const [dragging, setDragging] = useState(null);
+  const [over, setOver] = useState(null);
+  const [y, m] = month.split('-').map(Number);
+  const first = new Date(y, m - 1, 1);
+  const lead = (first.getDay() + 6) % 7; // Monday first
+  const days = new Date(y, m, 0).getDate();
+  const cells = Array.from({ length: Math.ceil((lead + days) / 7) * 7 }, (_, i) => dayKey(new Date(y, m - 1, i - lead + 1)));
+  const byDay = useMemo(() => {
+    const map = {};
+    for (const c of items) if (c.date) (map[c.date] ||= []).push(c);
+    for (const k of Object.keys(map)) map[k].sort((a, b) => (a.time || '99').localeCompare(b.time || '99'));
+    return map;
+  }, [items]);
+  const unscheduled = items.filter((c) => !c.date && c.status !== 'posted').sort(planOrder);
+  const shift = (n) => { const d = new Date(y, m - 1 + n, 1); setMonth(dayKey(d).slice(0, 7)); };
+  const drop = (day) => {
+    const c = items.find((x) => x.id === dragging);
+    setDragging(null); setOver(null);
+    if (c && c.date !== day) onMove(c.id, { date: day });
+  };
+  const chip = (c) => {
+    const s = statusOf(c.status);
+    const col = c.color ? tagColor(c.color) : null;
+    return (
+      <button key={c.id} type="button" className={`ctp-chip ${c.status === 'posted' ? 'done' : ''} ${dragging === c.id ? 'moving' : ''}`} draggable={!isTouch()}
+        onDragStart={(e) => { e.stopPropagation(); setDragging(c.id); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', c.id); }}
+        onDragEnd={() => setDragging(null)}
+        onClick={(e) => { e.stopPropagation(); onOpen(c); }} title={`${c.title || 'Untitled post'} · ${s.one}`}
+        style={{ '--st': col ? col.fg : s.color }}>
+        {c.time && <span className="ctp-chip-time">{c.time}</span>}
+        <span className="ctp-chip-title">{c.title || 'Untitled'}</span>
+        <Plats c={c} />
+      </button>
+    );
+  };
+  const pickedList = byDay[picked] || [];
+  return (
+    <div className="ctp-cal-wrap">
+      <div className="ctp-cal">
+        <div className="ctp-cal-head">
+          <button type="button" className="icon-btn" onClick={() => shift(-1)} aria-label="Previous month"><ChevronLeft size={16} /></button>
+          <b>{first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</b>
+          <button type="button" className="icon-btn" onClick={() => shift(1)} aria-label="Next month"><ChevronRight size={16} /></button>
+          {month !== today.slice(0, 7) && <button type="button" className="btn btn-sm btn-ghost" onClick={() => { setMonth(today.slice(0, 7)); setPicked(today); }}>Today</button>}
+        </div>
+        <div className="ctp-cal-grid">
+          {WEEKDAYS.map((w) => <div key={w} className="ctp-cal-wd">{w}</div>)}
+          {cells.map((day) => {
+            const list = byDay[day] || [];
+            const out = day.slice(0, 7) !== month;
+            return (
+              <div key={day} role="button" tabIndex={0} aria-label={`${fmtDay(day, { weekday: 'long', day: 'numeric', month: 'long' })}${list.length ? `, ${list.length} post${list.length > 1 ? 's' : ''}` : ''}`}
+                className={`ctp-day ${out ? 'out' : ''} ${day === today ? 'today' : ''} ${day === picked ? 'picked' : ''} ${over === day ? 'over' : ''} ${day < today ? 'past' : ''}`}
+                onClick={() => setPicked(day)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setPicked(day); } }}
+                onDragOver={(e) => { if (dragging) { e.preventDefault(); setOver(day); } }}
+                onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setOver(null); }}
+                onDrop={(e) => { e.preventDefault(); drop(day); }}>
+                <span className="ctp-day-n">{Number(day.slice(8))}</span>
+                <button type="button" className="ctp-day-add" onClick={(e) => { e.stopPropagation(); onCreate({ date: day }); }} disabled={busy} aria-label="New post on this day" title="New post on this day"><Plus size={13} /></button>
+                <div className="ctp-day-list">{list.map(chip)}</div>
+                {list.length > 0 && <span className="ctp-day-dots">{list.slice(0, 4).map((c) => <i key={c.id} style={{ background: statusOf(c.status).color }} />)}</span>}
+              </div>
+            );
+          })}
+        </div>
+        <div className="ctp-day-panel">
+          <div className="ctp-day-panel-head">
+            <b>{picked === today ? 'Today' : fmtDay(picked, { weekday: 'long', day: 'numeric', month: 'long' })}</b>
+            <button type="button" className="btn btn-sm" onClick={() => onCreate({ date: picked })} disabled={busy}><Plus size={14} /> Post on this day</button>
+          </div>
+          {pickedList.length ? <div className="ctp-day-panel-list">{pickedList.map(chip)}</div> : <div className="hint">Nothing planned for this day.</div>}
+        </div>
+      </div>
+      <aside className="ctp-unscheduled"
+        onDragOver={(e) => { if (dragging) { e.preventDefault(); setOver('none'); } }}
+        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setOver(null); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          const c = items.find((x) => x.id === dragging);
+          setDragging(null); setOver(null);
+          if (c && c.date && c.status !== 'posted') onMove(c.id, { date: '', time: '' });
+        }}>
+        <div className={`ctp-unscheduled-head ${over === 'none' ? 'over' : ''}`}><Clock size={13} /> Not scheduled <span className="count">{unscheduled.length}</span></div>
+        <p className="hint">{isTouch() ? 'Open a post to give it a day.' : 'Drag a post onto a day — or back here to unschedule it.'}</p>
+        <div className="ctp-unscheduled-list">{unscheduled.map(chip)}</div>
+      </aside>
+    </div>
+  );
+}
+
+function ListView({ items, today, onOpen, onMove }) {
+  const list = [...items].sort(planOrder);
+  return (
+    <div className="ctp-list">
+      {list.map((c) => {
+        const s = statusOf(c.status);
+        return (
+          <div key={c.id} className="ctp-row" role="button" tabIndex={0} onClick={() => onOpen(c)} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(c); }}>
+            <span className="ctp-row-thumb">{c.media[0] ? <Cover c={c} /> : <Megaphone size={15} />}</span>
+            <span className="ctp-row-main">
+              <b className={c.title ? '' : 'untitled'}>{c.title || 'Untitled post'}</b>
+              <span className="ctp-card-meta"><Plats c={c} /><span className="ctp-fmt">{FORMATS[c.format]?.label}</span><When c={c} today={today} /></span>
+            </span>
+            {c.status === 'posted' && (c.metrics.views != null || c.metrics.likes != null) && (
+              <span className="ctp-row-nums">
+                {c.metrics.views != null && <span className="ctp-num"><Eye size={12} /> {fmtNum(c.metrics.views)}</span>}
+                {c.metrics.likes != null && <span className="ctp-num"><Heart size={12} /> {fmtNum(c.metrics.likes)}</span>}
+              </span>
+            )}
+            <select className="ctp-row-status" value={c.status} aria-label="Stage" style={{ '--st': s.color }}
+              onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} onChange={(e) => onMove(c.id, { status: e.target.value })}>
+              {STATUSES.map((x) => <option key={x.key} value={x.key}>{x.one}</option>)}
+            </select>
+          </div>
+        );
+      })}
+    </div>
+  );
+}

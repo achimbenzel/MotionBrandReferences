@@ -4,7 +4,7 @@ import {
   PencilRuler, ListTodo, FlaskConical, Clapperboard, Plus, ArrowRight, CalendarRange, AppWindow,
   AlertTriangle, Image as ImageIcon, UploadCloud, Database, Flag, CalendarClock, MonitorSmartphone,
   Library, Search, Sparkles, Target, CheckCircle2, Layers, Settings2, GripVertical, EyeOff, Eye, Columns2, RectangleHorizontal, Check,
-  MoreHorizontal, Building2, Timer, NotebookPen,
+  MoreHorizontal, Building2, Timer, NotebookPen, Megaphone, Trophy,
 } from 'lucide-react';
 import { api, planFileUrl, dashboardFileUrl } from '../lib/api.js';
 import { gradientCss, PLAN_GRADIENTS, PLAN_STATUSES, TABS, tagColor } from '../lib/types.js';
@@ -70,12 +70,6 @@ function elapsed(p) {
   if (!s || !e || e <= s) return null;
   return Math.max(0, Math.min(1, (today0() - s) / (e - s)));
 }
-// Its to-dos (in to-do blocks): done / all.
-function todoCount(p) {
-  const items = (p.blocks || []).filter((b) => b.type === 'todos').flatMap((b) => b.items || []);
-  return { done: items.filter((t) => t.done).length, all: items.length };
-}
-
 // Counts up to a number when it first shows (not with reduced motion).
 function useCountUp(value, ms = 900) {
   const [shown, setShown] = useState(value);
@@ -207,11 +201,10 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
   const later = due.filter((x) => x !== next).slice(0, 4);
   const thisWeek = allDue.filter((x) => x.days >= 0 && x.days <= 7).length;
 
-  // To-dos: plan to-do blocks + board cards (a "Done" list counts as done).
-  const planTodos = (plans || []).filter((p) => p.status !== 'archived').map(todoCount).reduce((a, b) => ({ done: a.done + b.done, all: a.all + b.all }), { done: 0, all: 0 });
-  const boardDone = (board?.columns || []).filter((c) => DONE_LIST.test(c.name.trim())).reduce((n, c) => n + c.cards.length, 0);
-  const todosAll = planTodos.all + boardCards;
-  const todosDone = planTodos.done + boardDone;
+  // To-dos: the cards on the To-Do board only (a "Done" list counts as done) —
+  // a project's own checklists (e.g. a template's to-do block) aren't counted.
+  const todosAll = boardCards;
+  const todosDone = (board?.columns || []).filter((c) => DONE_LIST.test(c.name.trim())).reduce((n, c) => n + c.cards.length, 0);
   const todosOpen = todosAll - todosDone;
 
   // The next two weeks from this Monday: what's due each day.
@@ -240,6 +233,8 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
     { key: 'software', icon: AppWindow, title: 'Software', sub: softCount ? plural(softCount, 'app') : 'Plugins, scripts & more', to: '/software', accent: 'linear-gradient(120deg,#7b4397,#dc2430)', glow: '#dc2430' },
     { key: 'time', icon: Timer, title: 'Time Tracker', sub: 'Hours per project & client', to: '/time', accent: 'linear-gradient(120deg,#11998e,#38ef7d)', glow: '#2fd08a' },
     { key: 'notes', icon: NotebookPen, title: 'Notes', sub: 'Ideas, notes & pictures', to: '/notes', accent: 'linear-gradient(120deg,#c471f5,#fa71cd)', glow: '#d876e8' },
+    { key: 'content', icon: Megaphone, title: 'Content', sub: 'Plan posts for Instagram, TikTok & X', to: '/content', accent: 'linear-gradient(120deg,#feda75,#d62976 55%,#4f5bd5)', glow: '#e1306c' },
+    { key: 'achievements', icon: Trophy, title: 'Achievements', sub: 'Milestones, XP & your level', to: '/achievements', accent: 'linear-gradient(120deg,#7c5cff,#2fcaa9)', glow: '#7c5cff' },
   ];
   const openSearch = () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, metaKey: true, bubbles: true }));
   // ---- The widgets: your layout, arranging, and what each one shows ----
