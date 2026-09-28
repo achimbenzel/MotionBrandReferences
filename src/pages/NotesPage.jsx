@@ -28,11 +28,17 @@ export default function NotesPage({ reloadKey }) {
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const [changed, setChanged] = useState(0);
+  useEffect(() => {
+    const on = () => setChanged((n) => n + 1);
+    window.addEventListener('notes:changed', on);
+    return () => window.removeEventListener('notes:changed', on);
+  }, []);
   useEffect(() => {
     let alive = true;
     api.listNotes().then((n) => { if (alive) setNotes(n); }).catch((e) => { if (alive) setError(e.message); });
     return () => { alive = false; };
-  }, [reloadKey]);
+  }, [reloadKey, changed]);
 
   const create = async () => {
     if (busy) return;

@@ -49,7 +49,10 @@ export default function NoteDetail() {
   noteRef.current = note;
   useEffect(() => () => {
     const n = noteRef.current;
-    if (n && n.id === id && !n.title.trim() && !n.body.trim() && !n.images.length) api.removeNoteIfEmpty(id).catch(() => {});
+    if (n && n.id === id && !n.title.trim() && !n.body.trim() && !n.images.length) {
+      // The list may already be loading — tell it once the note is gone.
+      api.removeNoteIfEmpty(id).then((r) => { if (r?.removed) window.dispatchEvent(new CustomEvent('notes:changed')); }).catch(() => {});
+    }
   }, [id]);
 
   // Title and text: saved together shortly after typing.
