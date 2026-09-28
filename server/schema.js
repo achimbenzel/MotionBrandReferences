@@ -446,6 +446,8 @@ export const MOCKUP_LIGHTS = ['studio', 'product', 'daylight', 'golden', 'overca
 export const MOCKUP_2D = ['browser', 'ig-post', 'ig-story', 'ig-profile', 'x-post', 'x-profile', 'app-icon', 'avatars', 'yt-channel', 'li-page'];
 const MOCKUP_BG = ['transparent', 'color', 'gradient', 'environment'];
 const SHADOWS = ['contact', 'sun', 'both', 'none'];
+const TONES = ['neutral', 'filmic', 'soft'];       // how the render is developed (tone mapping)
+const GLASSES = ['glossy', 'antiglare', 'off'];    // a screen's cover glass
 const KEY_NAME = /^[a-zA-Z][\w-]{0,30}$/;
 // Keyframes: [{ t (s), v }] sorted by time.
 const keyList = (list, min, max) => (Array.isArray(list) ? list : [])
@@ -525,6 +527,8 @@ export function normalizeMockupItem(it, i = 0) {
     videoStart: num(it?.videoStart, 0, 86400, 0), // a screen video: where in it the animation starts (s)
     sound: !!it?.sound,                     // play / export the screen video's sound
     volume: num(it?.volume, 0, 1, 1),
+    glass: GLASSES.includes(it?.glass) ? it.glass : 'glossy', // the screen's cover glass: what it reflects
+    reflect: num(it?.reflect, 0, 1, 0.5),   // …how strongly (0.5 = like real glass)
     obj: it?.device === 'object' ? normalizeObject(it?.obj) || normalizeObject({ type: 'card' }) : null,
     // An object's other printed faces (back, sides, top …); its front is `content`.
     faces: mapOf(it?.faces, placedContent),
@@ -586,6 +590,7 @@ export function normalizeMockup(m) {
       strength: num(light.strength, 0, 1, 0.6),
       hdri: str(light.hdri, 40),         // your own HDRI (setup 'hdri')
       blur: num(light.blur, 0, 1, 0.35), // how soft the Room background is
+      tone: TONES.includes(light.tone) ? light.tone : 'neutral',
     },
     animation: {
       preset: MOCKUP_ANIMATIONS.includes(anim.preset) ? anim.preset : 'none',

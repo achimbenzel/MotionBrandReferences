@@ -14,8 +14,9 @@ import MediaPicker from '../components/mockups/MediaPicker.jsx';
 import ScreenFitter from '../components/mockups/ScreenFitter.jsx';
 import Timeline from '../components/mockups/Timeline.jsx';
 import {
-  MockupStage, FRAMES, VIEW_LABELS, MOTIONS_LABELS, CAMERA_MOVES, LOOPING, loadModel, guessScreen, buildModel, modelJoints, guessHinge, valueAt,
+  MockupStage, FRAMES, VIEW_LABELS, MOTIONS_LABELS, CAMERA_MOVES, LOOPING, TONES, loadModel, guessScreen, buildModel, modelJoints, guessHinge, valueAt,
 } from '../lib/mockup3d/stage.js';
+import { GLASS } from '../lib/mockup3d/screen.js';
 import { LIGHT_SETUPS, loadHdriTexture, analyseHdri, hdriPreview } from '../lib/mockup3d/lighting.js';
 import { buildDevice } from '../lib/mockup3d/devices.js';
 import { recordVideo, videoFormats } from '../lib/mockup3d/video.js';
@@ -303,6 +304,13 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
     if (!st) return;
     for (const it of mRef.current.items) st.setItemTimeline(it.id, { hingeAngle: it.hingeAngle, hingeKeys: it.keys?.hinge || [], videoStart: it.videoStart, sound: it.sound, volume: it.volume });
   }, [tlKey, structKey, built]);
+  // The screens' cover glass (what they reflect).
+  const glassKey = JSON.stringify(items.map((it) => [it.id, it.glass, it.reflect]));
+  useEffect(() => {
+    const st = stageRef.current;
+    if (!st) return;
+    for (const it of mRef.current.items) st.setItemGlass(it.id, { glass: it.glass, reflect: it.reflect });
+  }, [glassKey, structKey, built]);
   const animKey = JSON.stringify(anim);
   useEffect(() => { stageRef.current?.setAnimation(mRef.current.animation); }, [animKey]);
   useEffect(() => {
@@ -840,6 +848,14 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
                   </div>
                 </>
               )}
+              {sel.device === 'custom' && (
+                <>
+                  <Seg label="Glass" value={sel.glass || 'glossy'} options={Object.entries(GLASS).map(([k, g]) => [k, g.label])} onChange={(v) => patchItem(sel.id, { glass: v })} />
+                  {sel.glass !== 'off' && (
+                    <label className="mke-range" title="How much of the room and the lights the screen reflects — 50% is real glass">Reflections <Range min="0" max="1" step="0.05" value={sel.reflect ?? 0.5} onChange={(e) => patchItem(sel.id, { reflect: Number(e.target.value) })} /> <span>{Math.round((sel.reflect ?? 0.5) * 100)}%</span></label>
+                  )}
+                </>
+              )}
               {sel.content?.kind === 'video' && (
                 <div className="mke-video">
                   <label className="mke-range">Starts at
@@ -878,6 +894,7 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
             <input ref={hdriInput} type="file" accept=".hdr,.exr,.jpg,.jpeg,.png,.webp,.avif" className="visually-hidden-input" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; importHdri(f); }} />
             <label className="mke-range">Turn light <Range min="-180" max="180" value={light.rotation} onChange={(e) => setLight({ rotation: Number(e.target.value) })} /> <span>{light.rotation}°</span></label>
             <label className="mke-range">Brightness <Range min="0.3" max="2.5" step="0.05" value={light.exposure} onChange={(e) => setLight({ exposure: Number(e.target.value) })} /> <span>{Math.round(light.exposure * 100)}%</span></label>
+            <Seg label="Look" value={light.tone || 'neutral'} options={Object.entries(TONES).map(([k, [l]]) => [k, l])} onChange={(v) => setLight({ tone: v })} />
             <div className="mke-subhead">Shadow</div>
             <div className="segmented mke-seg" role="group" aria-label="Shadow">
               {SHADOW_MODES.map(([k, label]) => <button key={k} type="button" className={light.shadow === k ? 'on' : ''} onClick={() => setLight({ shadow: k })}>{label}</button>)}

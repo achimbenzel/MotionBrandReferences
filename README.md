@@ -786,6 +786,13 @@ model…*, *3D · Business card / Poster / Box / Mug* or *2D · ‹type›*.
   image gallery, font screenshots, colour examples, logo no-go), software
   pictures or the Inbox. **Fill screen**
   crops to fit, **Show whole** keeps it all.
+  **Glass**: the screen sits behind a cover glass that reflects the room —
+  the light setup's soft boxes, windows or your HDRI, faint straight on and
+  stronger at a slant, plus a soft sheen from behind the camera that sweeps
+  across as the device turns (**Turn light** moves the reflections too).
+  **Glossy**, **Anti-glare** (a soft haze, like a nano-texture display) or
+  **Off**; **Reflections** sets how much (50% ≈ real glass). Even a big soft
+  box stays a veil over the design, never a white-out.
   For a video, **Starts at** picks the part that plays (also by dragging its
   clip in the timeline) and **Sound on** plays its sound — in the preview and
   in the exported video, with its own volume.
@@ -805,7 +812,10 @@ model…*, *3D · Business card / Poster / Box / Mug* or *2D · ‹type›*.
   to a studio-like exposure and its brightest spot (the sun, a window) becomes
   the key light that casts the sun shadow — then kept in your library with a
   small preview (Mockups page → *Your HDRIs*, delete → Trash). **Turn light**
-  rotates it around the scene, **Brightness** sets the exposure. **Shadow**: **Soft**
+  rotates it around the scene, **Brightness** sets the exposure, **Look** how the
+  picture is developed: **Neutral** (the default — screens, prints and brand
+  colours stay true), **Filmic** (more contrast) or **Soft** (AgX, gentle
+  highlights). **Shadow**: **Soft**
   (a contact shadow as under a soft box), **Sun** (a sharp one from the key
   light), **Both** or **None**, with its **Strength**.
 - **Camera**: drag to turn, scroll / pinch to zoom, right-drag to move — or a
@@ -829,7 +839,9 @@ model…*, *3D · Business card / Poster / Box / Mug* or *2D · ‹type›*.
   of the timeline: 720p–4K, 24 / 30 / 60 fps, **MP4** (H.264 + AAC) or
   **WebM** (VP9 + Opus), rendered frame by frame so it's smooth on any
   computer, with the screen videos' sound where it is on (MP4 where the
-  browser can encode it — Chrome, Edge, Safari). **Save to project** puts the
+  browser can encode it — Chrome, Edge, Safari). Exports are drawn larger and
+  scaled down (**supersampling**: up to 2× — a 4K picture from about 5.4K, a
+  1080p video from 4K) for clean edges and fine lines. **Save to project** puts the
   file into a “Mockups” moodboard of any project (or a new one); the quick
   **Save to project** button saves a 4K PNG.
 - **The built-in devices are gone** (iPhone, iPad, MacBook … drawn by the app)

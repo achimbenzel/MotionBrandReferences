@@ -54,7 +54,7 @@ router.post('/api/mockups', async (req, res) => {
 // fields at the top change the first device.
 const SCENE_FIELDS = ['name', 'camera', 'frame', 'background', 'shadow', 'light', 'animation'];
 const DEVICE_FIELDS = ['device', 'modelId', 'color', 'landscape', 'lying', 'lid', 'url', 'fit', 'adjust', 'logo', 'hidden', 'size', 'x', 'z', 'rotY',
-  'hingeAngle', 'keys', 'videoStart', 'sound', 'volume', 'obj'];
+  'hingeAngle', 'keys', 'videoStart', 'sound', 'volume', 'obj', 'glass', 'reflect'];
 router.patch('/api/mockups/:id', async (req, res) => {
   const body = req.body || {};
   const updated = await mutateDB((db) => {

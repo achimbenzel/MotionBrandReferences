@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { clone as cloneWithSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { screenMaterial, fitScreen } from './screen.js';
+import { screenMaterial, fitScreen, glassMaterial, setGlass } from './screen.js';
 import { fitPrint, releasePrint } from './print.js';
 import { LIGHT_SETUPS, makeEnvironment, lightDir, ContactShadow } from './lighting.js';
 import { FRAMES } from './catalog.js';
@@ -39,6 +39,9 @@ export const VIEW_LABELS = {
 export const MOTIONS_LABELS = { none: 'None', turntable: 'Turntable 360°', sway: 'Sway', float: 'Float' };
 export const CAMERA_MOVES = { orbit: 'Orbit', push: 'Push in', pull: 'Pull out', reveal: 'Reveal', rise: 'Rise' };
 export const LOOPING = new Set(['turntable', 'sway', 'float']);
+// How the picture is developed from the scene's light: neutral keeps colours
+// (screens, prints) true, filmic has more contrast, soft (AgX) rolls off gently.
+export const TONES = { neutral: ['Neutral', THREE.NeutralToneMapping], filmic: ['Filmic', THREE.ACESFilmicToneMapping], soft: ['Soft', THREE.AgXToneMapping] };
 
 const LOGO_PART = /logo|apple_?mark|brand_?mark/i;
 export const isLogoPart = (name) => LOGO_PART.test(name || '');
@@ -176,6 +179,27 @@ export function guessHinge(object, node, screenMesh) {
 }
 export const guessHingeAxis = (object, node) => guessHinge(object, node).axis;
 
+/** The cover glass: the screen's shape once more, in front of it (skinned along with it when the screen is). */
+function addGlass(screen) {
+  const mat = glassMaterial();
+  let g;
+  if (screen.isSkinnedMesh) {
+    g = new THREE.SkinnedMesh(screen.geometry, mat);
+    g.bind(screen.skeleton, screen.bindMatrix);
+    g.bindMode = screen.bindMode;
+    g.position.copy(screen.position); g.quaternion.copy(screen.quaternion); g.scale.copy(screen.scale);
+    screen.parent.add(g);
+  } else {
+    g = new THREE.Mesh(screen.geometry, mat);
+    screen.add(g);
+  }
+  g.name = '';
+  g.userData.glass = true;
+  g.castShadow = false; g.receiveShadow = false;
+  g.renderOrder = 2;
+  return g;
+}
+
 /** An imported model (a loaded Object3D) as a device: scaled to `size` cm, its screen part showing the picture. */
 export function buildModel(object, { screenMesh, size = 25 } = {}) {
   const group = new THREE.Group();
@@ -192,7 +216,7 @@ export function buildModel(object, { screenMesh, size = 25 } = {}) {
   const screens = [];
   if (target?.isMesh) {
     target.material = screenMaterial();
-    screens.push({ mesh: target, aspect: uvAspect(target), turn: 0, guide: null });
+    screens.push({ mesh: target, aspect: uvAspect(target), turn: 0, guide: null, glass: addGlass(target) });
   }
   return { group, screens, lying: false };
 }
@@ -214,8 +238,8 @@ export class MockupStage {
     const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
     r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     r.outputColorSpace = THREE.SRGBColorSpace;
-    r.toneMapping = THREE.ACESFilmicToneMapping;
-    r.toneMappingExposure = 1.05;
+    r.toneMapping = THREE.NeutralToneMapping; // (the scene's look sets it — setLight)
+    r.toneMappingExposure = 1;
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.PCFShadowMap;
     r.setClearColor(0x000000, 0);
@@ -604,6 +628,14 @@ export class MockupStage {
     this.applyItem(it);
   }
 
+  /** The screen's cover glass: { glass: 'glossy' | 'antiglare' | 'off', reflect: 0–1 }. */
+  setItemGlass(id, opts) {
+    const it = this.items.get(id);
+    if (!it) return;
+    it.glass = { ...opts };
+    this.applyItem(it);
+  }
+
   applyItem(it) {
     for (const s of it.screens || []) {
       // A screen / print shows the item's content ("front"), a printed face its own picture.
@@ -615,6 +647,7 @@ export class MockupStage {
       };
       if (s.print) fitPrint(s.material || s.mesh.material, media?.texture || null, opts);
       else fitScreen(s.mesh.material, media?.texture || null, opts);
+      if (s.glass) setGlass(s.glass.material, it.glass);
     }
     this.dirty = true;
   }
@@ -637,7 +670,7 @@ export class MockupStage {
     const out = [];
     const screens = new Set((it?.screens || []).map((s) => s.mesh));
     it?.group?.traverse((o) => {
-      if (!o.isMesh || !o.name || screens.has(o) || out.some((p) => p.name === o.name)) return;
+      if (!o.isMesh || !o.name || o.userData.glass || screens.has(o) || out.some((p) => p.name === o.name)) return;
       out.push({ name: o.name, logo: isLogoPart(o.name) || isLogoPart([].concat(o.material)[0]?.name) });
     });
     return out;
@@ -650,7 +683,7 @@ export class MockupStage {
     const off = new Set(hidden);
     const screens = new Set((it.screens || []).map((s) => s.mesh));
     it.group.traverse((o) => {
-      if (!o.isMesh || screens.has(o)) return;
+      if (!o.isMesh || screens.has(o) || o.userData.glass) return;
       const isLogo = isLogoPart(o.name) || isLogoPart([].concat(o.material)[0]?.name);
       o.visible = !off.has(o.name) && (logo || !isLogo);
     });
@@ -740,6 +773,7 @@ export class MockupStage {
     const rot = THREE.MathUtils.degToRad(this.light.rotation || 0);
     this.scene.environmentRotation.set(0, rot, 0);
     this.scene.backgroundRotation.set(0, rot, 0);
+    this.renderer.toneMapping = (TONES[this.light.tone] || TONES.neutral)[1];
     this.renderer.toneMappingExposure = (setup.exposure || 1) * (this.light.exposure || 1);
     const mode = this.light.shadow;
     const k = this.light.strength ?? 0.6;
@@ -994,16 +1028,30 @@ export class MockupStage {
     return Math.min(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE), gl.getParameter(gl.MAX_VIEWPORT_DIMS)[0], 8192);
   }
 
-  /** Render at width × height from now on (and with another background, if given); returns restore(). */
-  beginRender(width, height, background) {
+  /**
+   * Render at width × height from now on (and with another background, if
+   * given); returns restore(). Up to `maxPixels` it's drawn larger (up to
+   * twice) and scaled down — smoother edges, finer lines; frame() hands out
+   * the finished picture.
+   */
+  beginRender(width, height, background, { maxPixels = 16.6e6 } = {}) {
     const r = this.renderer;
     const prev = { size: r.getSize(new THREE.Vector2()), ratio: r.getPixelRatio(), bg: this.bg };
-    const k = Math.min(1, this.maxExport() / Math.max(width, height));
+    const max = this.maxExport();
+    const k = Math.min(1, max / Math.max(width, height));
+    const w = Math.max(1, Math.round(width * k)); const h = Math.max(1, Math.round(height * k));
+    const ss = Math.max(1, Math.min(2, max / Math.max(w, h), Math.sqrt(maxPixels / (w * h))));
     r.setPixelRatio(1);
-    r.setSize(Math.round(width * k), Math.round(height * k), false);
+    r.setSize(Math.round(w * ss), Math.round(h * ss), false);
+    if (ss > 1.05) {
+      const canvas = this.out?.canvas || document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      this.out = { canvas, w, h };
+    } else this.out = null;
     this.selBox.visible = false;
     if (background && prev.bg) this.setBackground(background);
     return () => {
+      this.out = null;
       if (background && prev.bg) this.setBackground(prev.bg);
       r.setPixelRatio(prev.ratio);
       r.setSize(prev.size.x, prev.size.y, false);
@@ -1012,12 +1060,25 @@ export class MockupStage {
     };
   }
 
+  /** The rendered export frame: the canvas, or its scaled-down copy when drawn larger. */
+  frame() {
+    const c = this.renderer.domElement;
+    if (!this.out) return c;
+    const { canvas, w, h } = this.out;
+    const x = canvas.getContext('2d');
+    x.clearRect(0, 0, w, h);
+    x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+    x.drawImage(c, 0, 0, w, h);
+    return canvas;
+  }
+
   /** Render the frame at width × height → PNG (or `type`) Blob; `background` overrides the scene's. */
   toBlob(width, height, type = 'image/png', quality, background) {
     const restore = this.beginRender(width, height, background);
     this.draw();
     // toBlob copies the pixels right away, so the canvas can go back to its size at once.
-    const blob = new Promise((res) => this.renderer.domElement.toBlob(res, type, quality));
+    const out = this.frame();
+    const blob = new Promise((res) => out.toBlob(res, type, quality));
     restore();
     return blob;
   }
@@ -1035,7 +1096,7 @@ export class MockupStage {
     videos.forEach((v) => v.pause());
     this.exporting = { base };
     this.controls.enabled = false;
-    const restore = this.beginRender(width, height, background);
+    const restore = this.beginRender(width, height, background, { maxPixels: 8.4e6 }); // a 1080p video: drawn at 4K
     try {
       const frames = Math.max(1, Math.round(duration * fps));
       for (let i = 0; i < frames; i += 1) {
@@ -1055,7 +1116,7 @@ export class MockupStage {
         // Printed faces show their own copies of a video texture.
         for (const it of this.items.values()) for (const sc of it.screens || []) { const mp = (sc.material || sc.mesh.material).map; if (sc.print && mp?.isVideoTexture) mp.needsUpdate = true; }
         this.draw();
-        await onFrame(this.renderer.domElement, t, i, frames);
+        await onFrame(this.frame(), t, i, frames);
       }
     } finally {
       this.exporting = null;

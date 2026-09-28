@@ -184,22 +184,23 @@ test('several devices per scene: items with their own screens; older single-devi
 
 test('timeline, hinge, sound, light: keyframes sorted and bounded, legacy shadow read as a light setting', async () => {
   const m = (await srv.api('/api/mockups', { method: 'POST', json: { device: 'custom', shadow: false } })).data.mockup;
-  assert.deepEqual(m.light, { setup: 'studio', rotation: 0, exposure: 1, shadow: 'none', strength: 0.6, hdri: '', blur: 0.35 });
+  assert.deepEqual(m.light, { setup: 'studio', rotation: 0, exposure: 1, shadow: 'none', strength: 0.6, hdri: '', blur: 0.35, tone: 'neutral' });
+  assert.deepEqual([m.items[0].glass, m.items[0].reflect], ['glossy', 0.5]); // a screen has glass unless you say otherwise
   const main = m.items[0].id;
   const r = await srv.api(`/api/mockups/${m.id}`, {
     method: 'PATCH',
     json: {
-      light: { setup: 'golden', rotation: 45, exposure: 9, shadow: 'both' },
+      light: { setup: 'golden', rotation: 45, exposure: 9, shadow: 'both', tone: 'soft' },
       animation: { duration: 8, camera: [{ t: 5, position: [1, 2, 3] }, { t: 1, position: [0, 1, 9], target: [0, 1, 0], fov: 40 }, { t: 2, position: 'nope' }] },
-      items: [{ id: main, device: 'custom', hingeAngle: -25, keys: { hinge: [{ t: 3, v: 20 }, { t: 0, v: -60 }, { t: 'x', v: 1 }] }, videoStart: 12.5, sound: true, volume: 3 }],
+      items: [{ id: main, device: 'custom', hingeAngle: -25, keys: { hinge: [{ t: 3, v: 20 }, { t: 0, v: -60 }, { t: 'x', v: 1 }] }, videoStart: 12.5, sound: true, volume: 3, glass: 'mirror', reflect: 0.8 }],
     },
   });
   const s = r.data.mockup;
-  assert.deepEqual(s.light, { setup: 'golden', rotation: 45, exposure: 3, shadow: 'both', strength: 0.6, hdri: '', blur: 0.35 });
+  assert.deepEqual(s.light, { setup: 'golden', rotation: 45, exposure: 3, shadow: 'both', strength: 0.6, hdri: '', blur: 0.35, tone: 'soft' });
   assert.deepEqual(s.animation.camera.map((k) => k.t), [1, 5]);
   assert.deepEqual(s.animation.camera[0], { t: 1, position: [0, 1, 9], target: [0, 1, 0], fov: 40 });
   const it = s.items[0];
-  assert.deepEqual([it.hingeAngle, it.videoStart, it.sound, it.volume], [-25, 12.5, true, 1]);
+  assert.deepEqual([it.hingeAngle, it.videoStart, it.sound, it.volume, it.glass, it.reflect], [-25, 12.5, true, 1, 'glossy', 0.8]);
   assert.deepEqual(it.keys.hinge, [{ t: 0, v: -60 }, { t: 3, v: 20 }]);
 
   // Imported models remember their hinge.

@@ -49,6 +49,66 @@ export function screenMaterial() {
 
 export { contentBox };
 
+// The cover glass over a screen: black, so all it adds is what it reflects —
+// the room, the soft boxes, the sun — faint straight on and stronger at a
+// slant, as on a real display. On top of the room, a big soft card behind
+// the camera (the photographer's white V-flat) leaves a gentle sheen that
+// sweeps across the screen as the device turns. Glossy is a mirror-like
+// pane, anti-glare (nano-texture) a soft haze.
+export const GLASS = {
+  glossy: { label: 'Glossy', roughness: 0.035, soft: 0.16 },
+  antiglare: { label: 'Anti-glare', roughness: 0.42, soft: 0.5 },
+  off: { label: 'Off', roughness: 0.035, soft: 0.16 },
+};
+
+const GLASS_CARD = /* glsl */`
+  {
+    // The reflected view ray (view space: +z is behind the camera, +y up). The
+    // card fills the upper left behind the camera; its soft edge runs
+    // diagonally, so it crosses the screen as a gradient.
+    vec3 rv = reflect( - geometryViewDir, geometryNormal );
+    float edge = dot( rv, vec3( -0.6, 0.8, 0.0 ) ) - 0.5;
+    float card = smoothstep( - glassSoft, glassSoft, edge ) * smoothstep( -0.2, 0.35, rv.z );
+    float fres = 0.04 + 0.96 * pow( 1.0 - saturate( dot( geometryNormal, geometryViewDir ) ), 5.0 );
+    outgoingLight += vec3( glassSheen * card * ( 0.3 + 3.0 * fres ) );
+    // A mockup shows the design: even a big soft box in the glass stays a
+    // veil over it (a soft limit, not a hard cut).
+    outgoingLight = glassMax * ( 1.0 - exp( - outgoingLight / glassMax ) );
+  }
+  #include <opaque_fragment>
+`;
+
+export function glassMaterial() {
+  const m = new THREE.MeshPhysicalMaterial({
+    color: 0x000000, metalness: 0, roughness: GLASS.glossy.roughness, ior: 1.5,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, // just in front of the picture
+  });
+  const uniforms = { glassSheen: { value: 0.1 }, glassSoft: { value: GLASS.glossy.soft }, glassMax: { value: 0.15 } };
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, uniforms);
+    sh.fragmentShader = `uniform float glassSheen;\nuniform float glassSoft;\nuniform float glassMax;\n${sh.fragmentShader.replace('#include <opaque_fragment>', GLASS_CARD)}`;
+  };
+  m.customProgramCacheKey = () => 'glass-v4';
+  m.userData.glass = uniforms;
+  return m;
+}
+
+/** `glass`: glossy | antiglare | off; `reflect` 0–1 (0.5 = as bright as real glass, 1 = twice). */
+export function setGlass(mat, { glass = 'glossy', reflect = 0.5 } = {}) {
+  const g = GLASS[glass] || GLASS.glossy;
+  mat.visible = glass !== 'off' && reflect > 0;
+  mat.roughness = g.roughness;
+  mat.envMapIntensity = reflect * 2;
+  mat.specularIntensity = Math.min(1, reflect * 2);
+  const u = mat.userData.glass;
+  if (u) {
+    u.glassSheen.value = reflect * (glass === 'antiglare' ? 0.1 : 0.14);
+    u.glassSoft.value = g.soft;
+    u.glassMax.value = Math.max(0.001, reflect * 0.14); // 50%: at most ~7 % of white over the picture
+  }
+}
+
 /**
  * Point a screen material at a texture. `screenAspect` = the screen's width /
  * height (in its UV space), `contentAspect` = the picture's, `turn` = quarter
