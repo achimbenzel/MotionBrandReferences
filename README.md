@@ -1093,8 +1093,16 @@ render the selected pairing live.
 Pick a size — **85 × 55 mm** or **89 × 51 mm** — then upload and **crop** a
 **front** and **back** image to that ratio. In the grid the two sides are shown
 stacked (front over back); the detail page shows both large, with fullscreen,
-plus a **rotatable 3D view** (a real cuboid with a thin white edge for
-thickness) you can drag to spin and flip between front/back.
+plus a **3D view** (three.js, loaded only there): the card at its real size
+and thickness with your front and back printed on it, in soft studio light,
+floating over its own shadow (upright when the design is). **Drag** to turn it
+— it swings on a little when you let go; on a desktop it leans towards the
+pointer — **double-click** or **Show back / Show front** flips it, **Reset**
+brings it back. **Paper** sets the finish (**matte** with a fine paper grain,
+**silk**, **gloss** with a lacquer that catches the light), the thickness
+(0.4 / 0.8 / 1.4 mm), the **edge** (paper white, black, **gold** or **silver
+foil**, or the design's own colour) and **square or round corners** — saved
+with the card (`paper` in `db.json`). **↓** saves the view as a transparent PNG.
 
 ### Colors
 Add an **example image** plus colors entered in **any one** format — HEX, RGB,

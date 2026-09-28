@@ -1453,67 +1453,22 @@ img { max-width: 100%; display: block; }
 }
 .bc-upload-preview img { width: 100%; height: 100%; object-fit: cover; }
 
-/* Business-card 3D flip view — real cuboid with white edges, sharp corners */
-.bc3d { display: flex; flex-direction: column; gap: 14px; }
+/* Business-card 3D view (three.js — src/lib/card3d.js) */
+.bc3d { display: flex; flex-direction: column; gap: 12px; }
 .bc3d-scene {
   position: relative;
-  perspective: 1600px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 320px;
-  padding: 46px 0;
-  cursor: grab;
-  user-select: none;
-  touch-action: none;
+  height: clamp(300px, 40vw, 460px);
   border-radius: var(--radius);
-  background: radial-gradient(120% 120% at 50% 25%, var(--surface) 0%, var(--bg) 80%);
+  background:
+    radial-gradient(70% 55% at 50% 30%, color-mix(in srgb, var(--surface) 88%, #fff 12%) 0%, transparent 70%),
+    linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%);
   border: 1px solid var(--border);
   overflow: hidden;
 }
-.bc3d-scene:active { cursor: grabbing; }
-.bc3d-card {
-  position: relative;
-  z-index: 1;
-  transform-style: preserve-3d;
-  will-change: transform;
-}
-.bc3d-face, .bc3d-edge { position: absolute; top: 50%; left: 50%; }
-.bc3d-face {
-  width: var(--w); height: var(--h);
-  margin-left: calc(var(--w) / -2);
-  margin-top: calc(var(--h) / -2);
-  overflow: hidden;
-  background: var(--surface-2);
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  display: grid;
-  place-items: center;
-}
-.bc3d-face img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.bc3d-face.front { transform: translateZ(calc(var(--t) / 2)); }
-.bc3d-face.back { transform: rotateY(180deg) translateZ(calc(var(--t) / 2)); }
-.bc3d-empty { color: var(--text-faint); font-size: 14px; }
-/* white side faces = card thickness */
-.bc3d-edge { background: #fff; }
-.bc3d-edge.lr { width: var(--t); height: var(--h); margin-left: calc(var(--t) / -2); margin-top: calc(var(--h) / -2); }
-.bc3d-edge.tb { width: var(--w); height: var(--t); margin-left: calc(var(--w) / -2); margin-top: calc(var(--t) / -2); }
-.bc3d-edge.left { transform: rotateY(-90deg) translateZ(calc(var(--w) / 2)); }
-.bc3d-edge.right { transform: rotateY(90deg) translateZ(calc(var(--w) / 2)); }
-.bc3d-edge.top { transform: rotateX(90deg) translateZ(calc(var(--h) / 2)); }
-.bc3d-edge.bottom { transform: rotateX(-90deg) translateZ(calc(var(--h) / 2)); }
-.bc3d-shadow {
-  position: absolute;
-  bottom: 26px; left: 50%;
-  transform: translateX(-50%);
-  width: 55%; height: 26px;
-  border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(0, 0, 0, .5), rgba(0, 0, 0, 0));
-  filter: blur(3px);
-  z-index: 0;
-  pointer-events: none;
-}
-.bc3d-controls { display: flex; align-items: center; gap: 12px; justify-content: center; }
+.bc3d-canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; user-select: none; }
+.bc3d-canvas.grabbing { cursor: grabbing; }
+.bc3d-fail { display: grid; place-items: center; padding: 24px; text-align: center; color: var(--text-muted); font-size: 13px; }
+.bc3d-controls { display: flex; align-items: center; gap: 8px 10px; justify-content: center; flex-wrap: wrap; }
 
 /* ---------------------------------------------------- Logo recolour + switch */
 .logo-mask {

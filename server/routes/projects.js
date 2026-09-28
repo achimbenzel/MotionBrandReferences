@@ -6,7 +6,7 @@ import { DATA_DIR, TRASH_DIR, TYPES } from '../config.js';
 import { readDB, mutateDB } from '../db.js';
 import { moveInto, replaceImage, safeRm, moveToTrash, extOf } from '../files.js';
 import { upload, parseJSON } from '../upload.js';
-import { str, normalizeSegments, normalizeMarkers, normalizeWaveform, videoDim } from '../schema.js';
+import { str, normalizeSegments, normalizeMarkers, normalizeWaveform, normalizeCardPaper, videoDim } from '../schema.js';
 import { createRouter, HttpError } from '../http.js';
 import { parseVideoLink, fetchVideoMeta, downloadThumb } from '../videoLinks.js';
 
@@ -169,7 +169,7 @@ router.post('/api/projects', upload.any(), async (req, res) => {
 
 // ---- Update (notes / tags / colors / meta) --------------------------------
 const EDITABLE = ['title', 'year', 'category', 'notes', 'tags', 'colors', 'bg', 'scale', 'variant', 'renditions', 'original', 'rendition', 'url', 'segments',
-  'markers', 'width', 'height', 'duration', 'waveform'];
+  'markers', 'width', 'height', 'duration', 'waveform', 'paper'];
 router.patch('/api/projects/:id', async (req, res) => {
   const updated = await mutateDB((db) => {
     const project = db.projects.find((p) => p.id === req.params.id);
@@ -187,6 +187,8 @@ router.patch('/api/projects/:id', async (req, res) => {
         // Labeled video sections (Hook / Problem / Reveal …). Each carries a
         // start time and a section type; the first is pinned to 0.
         project.segments = normalizeSegments(req.body.segments);
+      } else if (key === 'paper') { // business card: the paper in the 3D view
+        project.paper = normalizeCardPaper(req.body.paper);
       } else if (key === 'waveform') {
         project.waveform = normalizeWaveform(req.body.waveform);
       } else if (key === 'markers') {

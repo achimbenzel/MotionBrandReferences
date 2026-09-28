@@ -89,6 +89,20 @@ test('create, edit, delete to trash and restore a project', async () => {
   assert.equal((await srv.api(`/api/projects/${id}`)).data.project.notes, 'hello');
 });
 
+test('business card: its paper for the 3D view is kept, unknown values fall back', async () => {
+  const fd = new FormData();
+  fd.append('type', 'businesscard');
+  fd.append('title', 'Studio card');
+  fd.append('front', new Blob([png(85, 55, [20, 20, 20])], { type: 'image/png' }), 'front.png');
+  const { id } = (await srv.api('/api/projects', { method: 'POST', body: fd })).data.project;
+  let r = await srv.api(`/api/projects/${id}`, { method: 'PATCH', json: { paper: { finish: 'gloss', thickness: 'xthick', edge: 'gold', corners: 'round' } } });
+  assert.deepEqual(r.data.project.paper, { finish: 'gloss', thickness: 'xthick', edge: 'gold', corners: 'round' });
+  r = await srv.api(`/api/projects/${id}`, { method: 'PATCH', json: { paper: { finish: 'velvet', edge: 'gold' } } });
+  assert.deepEqual(r.data.project.paper, { finish: 'matte', thickness: 'std', edge: 'gold', corners: 'square' });
+  r = await srv.api(`/api/projects/${id}`, { method: 'PATCH', json: { paper: 'nope' } });
+  assert.equal(r.data.project.paper, null);
+});
+
 test('plan blocks: add, edit, move and remove', async () => {
   let plan = (await srv.api('/api/plans/plan3')).data.plan;
   const added = await srv.api('/api/plans/plan3/blocks', { method: 'POST', json: { type: 'table' } });

@@ -295,6 +295,12 @@ export const normalizeWaveform = (w) => {
   if (!Array.isArray(w.peaks) || !w.peaks.length) return null;
   return { peaks: w.peaks.slice(0, 4000).map((x) => Math.round(num(x, 0, 100, 0))), duration: num(w.duration, 0, 86400, 0) };
 };
+// A business card's paper in the 3D view: finish, thickness, edge colour, corners.
+const PAPER = { finish: ['matte', 'silk', 'gloss'], thickness: ['std', 'thick', 'xthick'], edge: ['paper', 'black', 'gold', 'silver', 'design'], corners: ['square', 'round'] };
+export const normalizeCardPaper = (p) => {
+  if (!p || typeof p !== 'object') return null;
+  return Object.fromEntries(Object.entries(PAPER).map(([k, ok]) => [k, ok.includes(p[k]) ? p[k] : ok[0]]));
+};
 export const videoDim = (v) => { const n = Math.round(Number(v)); return Number.isFinite(n) && n > 0 && n <= 20000 ? n : null; };
 
 export function normalizeSegments(arr) {
