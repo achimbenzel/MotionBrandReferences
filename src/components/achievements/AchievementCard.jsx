@@ -4,7 +4,7 @@ import {
   Clapperboard, Box, Brush, GraduationCap, PartyPopper, TrendingUp, Headphones, Tv, Laptop, Lightbulb, Coffee, Compass, Lock,
 } from 'lucide-react';
 import { achievementFileUrl } from '../../lib/api.js';
-import { RARITIES, fmtDate, fmtValue, progressOf } from '../../lib/achievements.js';
+import { RARITIES, HOLO, fmtDate, fmtValue, progressOf } from '../../lib/achievements.js';
 
 // "A person you know": lucide has no user-with-star, so one on top of the other.
 const UserStar = ({ size = 24, ...rest }) => (
@@ -35,23 +35,39 @@ export function Badge({ a, iconUrl, size = 62 }) {
   return <span className={`ach-badge ${a.icon.type === 'image' && img ? 'pic' : ''}`} style={{ width: size, height: size }}>{inner}</span>;
 }
 
+// The tilt that follows the pointer (holo cards): where it is, as CSS variables.
+const tilt = (e) => {
+  const el = e.currentTarget;
+  const r = el.getBoundingClientRect();
+  const x = (e.clientX - r.left) / r.width; const y = (e.clientY - r.top) / r.height;
+  el.style.setProperty('--mx', `${x * 100}%`); el.style.setProperty('--my', `${y * 100}%`);
+  el.style.setProperty('--rx', `${(0.5 - y) * 10}deg`); el.style.setProperty('--ry', `${(x - 0.5) * 12}deg`);
+};
+const untilt = (e) => { for (const k of ['--mx', '--my', '--rx', '--ry']) e.currentTarget.style.removeProperty(k); };
+
 /**
  * One achievement, like a collectible card: a frame in its rarity, the
  * badge, the name, what it takes — and the day it was reached (or how far
- * you are / locked).
+ * you are / locked). Diamond and up, quests and dream quests shimmer (holo)
+ * once reached. `showcase` shows it as reached (the editor's preview).
  */
-export default function AchievementCard({ a, metrics, onClick, glow = false, iconUrl, stickerUrl, as = 'button' }) {
+export default function AchievementCard({ a, metrics, onClick, glow = false, iconUrl, stickerUrl, as = 'button', showcase = false }) {
   const r = RARITIES[a.rarity] || RARITIES.stone;
   const sticker = stickerUrl !== undefined ? stickerUrl : achievementFileUrl(a, a.sticker);
   const p = progressOf(a, metrics);
+  const got = !!a.achievedAt || showcase;
+  const holo = got && HOLO.has(a.rarity);
   const Tag = as;
   return (
-    <Tag type={as === 'button' ? 'button' : undefined} className={`ach-card r-${a.rarity} ${a.achievedAt ? 'got' : 'locked'} ${glow ? 'glow' : ''}`}
-      onClick={onClick} style={{ '--rc': r.color }} title={as === 'button' ? `${r.label} · ${r.xp} XP` : undefined}>
+    <Tag type={as === 'button' ? 'button' : undefined} className={`ach-card r-${a.rarity} ${got ? 'got' : 'locked'} ${holo ? 'holo' : ''} ${glow ? 'glow' : ''}`}
+      onClick={onClick} style={{ '--rc': r.color }} title={as === 'button' ? `${r.label} · ${r.xp} XP` : undefined}
+      onPointerMove={holo ? tilt : undefined} onPointerLeave={holo ? untilt : undefined}>
       <span className="ach-paper">
-        {sticker && <img className="ach-sticker" src={sticker} alt="" draggable={false} />}
         <span className="ach-rarity">{r.label}</span>
-        <Badge a={a} iconUrl={iconUrl} />
+        <span className="ach-badge-wrap">
+          <Badge a={a} iconUrl={iconUrl} />
+          {!got && <span className="ach-lock" aria-hidden="true"><Lock size={11} strokeWidth={2.5} /></span>}
+        </span>
         <b className={`ach-title ${a.title ? '' : 'untitled'}`}>{a.title || 'Untitled'}</b>
         {a.description && <span className="ach-desc">{a.description}</span>}
         <span className="ach-foot">
@@ -61,9 +77,24 @@ export default function AchievementCard({ a, metrics, onClick, glow = false, ico
                 <span className="ach-bar"><i style={{ width: `${Math.max(2, p * 100)}%` }} /></span>
                 <span>{fmtValue(a.metric, metrics?.[a.metric] || 0)} / {fmtValue(a.metric, a.target)}</span>
               </span>
-            ) : <><Lock size={10} /> Locked</>}
+            ) : <><Lock size={10} /> {showcase ? 'Not reached yet' : 'Locked'}</>}
         </span>
       </span>
+      {holo && <span className="ach-holo" aria-hidden="true"><i /></span>}
+      {sticker && <img className="ach-sticker" src={sticker} alt="" draggable={false} />}
     </Tag>
+  );
+}
+
+/** Your rank as an emblem: a hexagon in the tier's colours with the division (1–3). */
+export function RankEmblem({ rank, size = 88 }) {
+  return (
+    <span className={`ach-emblem r-${rank.tier} ${HOLO.has(rank.tier) ? 'holo' : ''}`} style={{ width: size, '--rc': RARITIES[rank.tier].color }} title={rank.label}>
+      <span className="ach-emblem-in">
+        <b style={{ fontSize: Math.round(size * 0.36) }}>{rank.div}</b>
+        <small style={{ fontSize: Math.max(8, Math.round(size * 0.1)) }}>{RARITIES[rank.tier].label}</small>
+      </span>
+      <span className="ach-emblem-pips">{[1, 2, 3].map((d) => <i key={d} className={d <= rank.div ? 'on' : ''} />)}</span>
+    </span>
   );
 }

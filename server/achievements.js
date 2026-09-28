@@ -1,24 +1,34 @@
-// Achievements: the numbers they unlock from, the unlocking itself, and a
-// starter set (revenue, followers, clients, content, special quests).
+// Achievements: the numbers they unlock from, the unlocking itself, and
+// quest ideas the editor offers (the achievements themselves are all yours).
 
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
+/** What the app itself counts: the biggest invoice, paid invoices, clients, delivered client projects, posted content. */
+export function appCounts(db) {
+  const invoices = (db.clients || []).flatMap((c) => c.invoices || []);
+  return {
+    deal: Math.max(0, ...invoices.map((i) => i.amount || 0)),
+    revenue: Math.round(invoices.filter((i) => i.status === 'paid').reduce((n, i) => n + (i.amount || 0), 0) * 100) / 100,
+    clients: (db.clients || []).length,
+    projects: (db.plans || []).filter((p) => p.clientId && (p.status === 'delivered' || p.status === 'archived')).length,
+    posts: (db.content || []).filter((c) => c.status === 'posted').length,
+  };
+}
+
 /**
- * What the app knows (+ what you did before using it): the biggest single
- * deal (an invoice), revenue paid, clients, delivered client projects,
- * posted content — and the followers you keep up to date yourself.
+ * The numbers achievements unlock from: what the app counts + what you did
+ * before using it (the biggest deal is the bigger of the two), and the
+ * followers you keep up to date yourself.
  */
 export function achievementMetrics(db) {
   const st = db.achievementStats;
-  const invoices = (db.clients || []).flatMap((c) => c.invoices || []);
-  const paid = invoices.filter((i) => i.status === 'paid').reduce((n, i) => n + (i.amount || 0), 0);
-  const delivered = (db.plans || []).filter((p) => p.clientId && (p.status === 'delivered' || p.status === 'archived')).length;
+  const app = appCounts(db);
   return {
-    deal: Math.max(st.earlier.deal, ...invoices.map((i) => i.amount || 0), 0),
-    revenue: Math.round((st.earlier.revenue + paid) * 100) / 100,
-    clients: st.earlier.clients + (db.clients || []).length,
-    projects: st.earlier.projects + delivered,
-    posts: st.earlier.posts + (db.content || []).filter((c) => c.status === 'posted').length,
+    deal: Math.max(st.earlier.deal, app.deal),
+    revenue: Math.round((st.earlier.revenue + app.revenue) * 100) / 100,
+    clients: st.earlier.clients + app.clients,
+    projects: st.earlier.projects + app.projects,
+    posts: st.earlier.posts + app.posts,
     'followers:instagram': st.followers.instagram,
     'followers:tiktok': st.followers.tiktok,
     'followers:x': st.followers.x,
@@ -43,41 +53,10 @@ export const dueToUnlock = (db) => {
   return db.achievements.some((a) => !a.achievedAt && a.metric && a.target != null && m[a.metric] >= a.target);
 };
 
-// ---- The starter set -------------------------------------------------------------------
-const K = (n) => (n >= 1000 ? `${n / 1000}K` : String(n));
-const de = (n) => n.toLocaleString('de-DE');
-const TIERS = ['stone', 'bronze', 'silver', 'gold', 'emerald', 'diamond', 'mythic', 'mythic'];
-const tiers = (group, metric, steps, make) => steps.map(([n, date], i) => ({
-  group, metric, target: n, rarity: TIERS[i], icon: { type: 'text', text: K(n) }, achievedAt: date || '', order: i, ...make(n),
-}));
-const quest = (title, description, symbol, rarity, order, achievedAt = '') => ({
-  group: 'Special Quests', title, description, rarity, icon: { type: 'symbol', symbol }, order, achievedAt,
+// ---- Quest ideas ----------------------------------------------------------------------
+const quest = (title, description, symbol, rarity, order) => ({
+  group: 'Special Quests', title, description, rarity, icon: { type: 'symbol', symbol }, order,
 });
-
-export const STARTER_ACHIEVEMENTS = [
-  ...tiers('Umsatz', 'deal', [[500, '2024-10-21'], [1000, '2025-08-05'], [3000], [5000], [10000], [25000], [50000], [100000]],
-    (n) => ({ title: `Der ${de(n)}€-Deal`, description: `Deal über ${de(n)}€ abgeschlossen.` })),
-  ...tiers('Instagram', 'followers:instagram', [[100, '2023-08-30'], [500, '2023-10-06'], [1000, '2024-01-10'], [2000, '2024-02-21'], [5000], [10000], [100000], [500000]],
-    (n) => ({ title: `${K(n)} Follower erreicht`, description: `${de(n)} Follower auf Instagram erreicht.` })),
-  ...tiers('Kundenstamm', 'projects', [[1, '2023-08-13'], [5, '2023-10-25'], [25, '2024-02-09'], [50, '2024-10-03'], [100], [200], [300], [500]],
-    (n) => (n === 1 ? { title: 'Der erste Kunde', description: 'Den ersten Kunden betreut.' }
-      : { title: `${n} Kunden betreut`, description: `${n} Kundenprojekte erfolgreich abgeschlossen.` })),
-  ...tiers('Content', 'posts', [[1], [10], [50], [100], [250], [500]],
-    (n) => (n === 1 ? { title: 'Der erste Post', description: 'Den ersten geplanten Post veröffentlicht.' }
-      : { title: `${n} Posts veröffentlicht`, description: `${n} Posts aus dem Content-Plan veröffentlicht.` })),
-  quest('Album Cover Design', 'Album Cover für Musiker/Band mit Bekanntheitsgrad.', 'image', 'quest', 0),
-  quest('Album Cover Design', 'Album Cover für Musiker/Band, die ich selber gerne höre.', 'image', 'dream', 1),
-  quest('Visualizer Design', 'Visualizer oder Bühnenvisualizer für Musiker/Band mit Bekanntheitsgrad.', 'monitor', 'quest', 2),
-  quest('Visualizer Design', 'Visualizer oder Bühnenvisualizer für Musiker/Band, die ich selber gerne höre.', 'monitor', 'dream', 3),
-  quest('Bekannte Persönlichkeit', 'Gearbeitet für eine Person mit Bekanntheitsgrad.', 'user-star', 'quest', 4),
-  quest('Bekannte Persönlichkeit', 'Gearbeitet für eine Person, für die ich gerne arbeiten möchte.', 'user-star', 'dream', 5),
-  quest('Bekannte Marke', 'Gearbeitet für eine Marke mit Bekanntheitsgrad.', 'building', 'quest', 6),
-  quest('Bekannte Marke', 'Gearbeitet für eine Marke, für die ich gerne arbeiten möchte.', 'building', 'dream', 7),
-  quest('Dienstreise', 'Dienstreise mit Hotel und Übernachtung.', 'car', 'quest', 8, '2025-07-17'),
-  quest('Dienstreise', 'Dienstreise mit Hotel und Übernachtung im Ausland.', 'plane', 'dream', 9),
-  quest('Game Assets erstellen', 'Assets für ein Game erstellt, das veröffentlicht wurde.', 'gamepad', 'quest', 10),
-  quest('Game Assets erstellen', 'Assets für ein Game erstellt, das veröffentlicht wurde — und auf die ich richtig stolz bin.', 'gamepad', 'dream', 11),
-];
 
 /** More quests that fit the job — offered when adding one (the editor shows them). */
 export const QUEST_IDEAS = [

@@ -765,7 +765,7 @@ export function normalizeDashboardFocus(v) {
   const seen = new Set();
   return { items: items.filter((it) => { const k = JSON.stringify([it.kind, it.id, it.itemId]); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 5) };
 }
-export const DASHBOARD_WIDGETS = ['focus', 'timer', 'next', 'continue', 'urgent', 'tools', 'pipeline', 'rhythm', 'inspiration', 'note'];
+export const DASHBOARD_WIDGETS = ['focus', 'timer', 'next', 'continue', 'urgent', 'tools', 'pipeline', 'rhythm', 'inspiration', 'note', 'achievements'];
 /** The dashboard's widgets in your order: [{ id, hidden, size: 'full' | 'half' }] (unknown ones dropped; [] = the default). */
 export function normalizeDashboardLayout(v) {
   const seen = new Set();

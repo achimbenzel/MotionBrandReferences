@@ -1,53 +1,51 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Trophy, MoreHorizontal, Sparkles, ChevronDown, Target } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Plus, Trophy, Layers, ChevronDown } from 'lucide-react';
 import { api } from '../lib/api.js';
-import { RARITIES, RARITY_ORDER, METRICS, xpOf, levelOf, titleOf, progressOf, fmtValue } from '../lib/achievements.js';
+import { RARITIES, RARITY_ORDER, xpOf, rankOf } from '../lib/achievements.js';
 import { useToast } from '../components/Toast.jsx';
-import Menu from '../components/Menu.jsx';
-import PlatformIcon from '../components/content/PlatformIcon.jsx';
-import AchievementCard, { Badge } from '../components/achievements/AchievementCard.jsx';
+import AchievementCard, { RankEmblem } from '../components/achievements/AchievementCard.jsx';
 import AchievementEditor from '../components/achievements/AchievementEditor.jsx';
+import AchievementSeries from '../components/achievements/AchievementSeries.jsx';
+import AchievementStats from '../components/achievements/AchievementStats.jsx';
 
 const FILTERS = [{ key: 'all', label: 'All' }, { key: 'got', label: 'Unlocked' }, { key: 'locked', label: 'To go' }];
-const FOLLOWERS = ['instagram', 'tiktok', 'x', 'youtube'];
-const EARLIER = ['deal', 'revenue', 'clients', 'projects', 'posts'];
 const load = (k, fallback) => { try { return localStorage.getItem(k) || fallback; } catch { return fallback; } };
+const store = (k, v) => { try { localStorage.setItem(k, v); } catch { /* private window */ } };
+const xpSum = (list) => list.reduce((n, a) => n + xpOf(a), 0);
 
 /**
  * Achievements: milestones as collectible cards — reached ones count as XP
- * (the rarer, the more) towards your level. Some unlock by themselves from
- * the app's numbers (invoices, clients, delivered projects, posted content,
- * the followers you note down); quests you tick off yourself.
+ * (the rarer, the more) towards your rank, Stone 1 to Mythic 3. Some unlock
+ * by themselves from your numbers (followers, deals, clients, delivered
+ * projects, posts); quests you tick off yourself.
  */
 export default function AchievementsPage({ reloadKey }) {
   const toast = useToast();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [filter, setFilterState] = useState(() => (FILTERS.some((x) => x.key === load('achFilter', '')) ? load('achFilter', '') : 'all'));
+  const [numbersOpen, setNumbersOpen] = useState(() => load('achNumbers', 'open') === 'open');
   const [editor, setEditor] = useState(null); // { a } | { group }
-  const [celebrate, setCelebrate] = useState(null); // { list, levelUp }
+  const [series, setSeries] = useState(false);
+  const [celebrate, setCelebrate] = useState(null); // { list, rankUp }
   const [glow, setGlow] = useState(() => new Set());
-  const [busy, setBusy] = useState(false);
-  const [numbersOpen, setNumbersOpen] = useState(false);
-  const setFilter = (v) => { setFilterState(v); try { localStorage.setItem('achFilter', v); } catch { /* private window */ } };
-  const dataRef = useRef(null);
-  dataRef.current = data;
+  const setFilter = (v) => { setFilterState(v); store('achFilter', v); };
+  const toggleNumbers = () => setNumbersOpen((o) => { store('achNumbers', o ? 'closed' : 'open'); return !o; });
 
-  // Fresh data; newly unlocked ones get their moment (and a level up, when there's one).
+  // Fresh data; newly unlocked ones get their moment (and a new rank, when there's one).
   const take = (d, unlocked = d.unlocked || []) => {
-    const before = dataRef.current;
     setData(d);
     if (!unlocked.length) return;
     const list = d.achievements.filter((a) => unlocked.includes(a.id));
-    const xp = (l) => l.reduce((n, a) => n + xpOf(a), 0);
-    const lvBefore = before ? levelOf(xp(before.achievements.filter((a) => !unlocked.includes(a.id)))).level : levelOf(xp(d.achievements) - xp(list)).level;
-    const lvNow = levelOf(xp(d.achievements)).level;
-    setCelebrate({ list, levelUp: lvNow > lvBefore ? lvNow : 0 });
+    const xpNow = xpSum(d.achievements);
+    const before = rankOf(xpNow - xpSum(list));
+    const now = rankOf(xpNow);
+    setCelebrate({ list, rankUp: now.index > before.index ? now : null });
     setGlow(new Set(unlocked));
     setTimeout(() => setGlow(new Set()), 6000);
   };
   const reload = async (unlocked) => {
-    try { const d = await api.getAchievements(); take(d, unlocked ? [...new Set([...unlocked, ...d.unlocked])] : d.unlocked); }
+    try { const d = await api.getAchievements(); take(d, [...new Set([...(unlocked || []), ...d.unlocked])]); }
     catch (e) { setError(e.message); }
   };
   useEffect(() => {
@@ -57,10 +55,6 @@ export default function AchievementsPage({ reloadKey }) {
   }, [reloadKey]);
 
   const list = useMemo(() => data?.achievements || [], [data]);
-  const metrics = useMemo(() => data?.metrics || {}, [data]);
-  const xp = list.reduce((n, a) => n + xpOf(a), 0);
-  const lv = levelOf(xp);
-  const got = list.filter((a) => a.achievedAt).length;
   const groups = useMemo(() => {
     const out = [];
     for (const a of list) {
@@ -70,18 +64,7 @@ export default function AchievementsPage({ reloadKey }) {
     }
     return out;
   }, [list]);
-  const next = useMemo(() => list.map((a) => ({ a, p: progressOf(a, metrics) })).filter((x) => x.p != null && x.p < 1)
-    .sort((x, y) => y.p - x.p).slice(0, 3), [list, metrics]);
-  const openQuests = list.filter((a) => !a.achievedAt && !a.metric).length;
 
-  const addStarter = async () => {
-    setBusy(true);
-    try {
-      const d = await api.addStarterAchievements();
-      take(d);
-      toast(d.added ? `${d.added} achievements added` : 'You have them all already');
-    } catch (e) { toast(`Could not add them: ${e.message}`, 'error'); } finally { setBusy(false); }
-  };
   const remove = async (a) => {
     try {
       const { trashId } = await api.removeAchievement(a.id);
@@ -91,85 +74,76 @@ export default function AchievementsPage({ reloadKey }) {
     } catch (e) { toast(`Could not delete: ${e.message}`, 'error'); }
   };
   const saveStats = async (patch) => {
-    try { take(await api.updateAchievementStats(patch)); } catch (e) { toast(`Could not save: ${e.message}`, 'error'); }
+    try { take(await api.updateAchievementStats(patch)); } catch (e) { toast(`Could not save: ${e.message}`, 'error'); throw e; }
   };
 
   if (error) return <div className="center-msg">Couldn’t load: {error}</div>;
   if (!data) return <div className="spinner" />;
 
+  const metrics = data.metrics;
+  const xp = xpSum(list);
+  const rank = rankOf(xp);
+  const got = list.filter((a) => a.achievedAt).length;
+  const openQuests = list.filter((a) => !a.achievedAt && !a.metric).length;
   const shown = (items) => items.filter((a) => filter === 'all' || (filter === 'got' ? !!a.achievedAt : !a.achievedAt));
-  const pct = lv.to > lv.from ? ((xp - lv.from) / (lv.to - lv.from)) * 100 : 0;
+  const newButtons = (
+    <>
+      <button type="button" className="btn" onClick={() => setSeries(true)} title="Several milestones on one number at once — e.g. TikTok followers 100, 500, 1K …"><Layers size={16} /> New series</button>
+      <button type="button" className="btn btn-primary" onClick={() => setEditor({ group: '' })}><Plus size={16} /> New achievement</button>
+    </>
+  );
 
   return (
     <div className="ach-page">
       <div className="page-head-row">
         <div className="page-head">
           <h1>Achievements</h1>
-          <p>Your milestones as a designer — every one you reach is XP towards your next level.</p>
+          <p>Your milestones as a designer — every one you reach is XP towards your next rank.</p>
         </div>
-        <div className="ach-head-tools">
-          <button type="button" className="btn btn-primary" onClick={() => setEditor({ group: '' })}><Plus size={16} /> New achievement</button>
-          {list.length > 0 && (
-            <Menu align="right" trigger={<button type="button" className="icon-btn" aria-label="More"><MoreHorizontal size={16} /></button>}
-              items={[{ label: 'Add the starter set (the missing ones)', icon: <Sparkles size={15} />, onClick: addStarter, disabled: busy }]} />
-          )}
+        <div className="ach-head-tools">{newButtons}</div>
+      </div>
+
+      <section className="ach-hero" aria-label="Your rank" style={{ '--rc': RARITIES[rank.tier].color }}>
+        <RankEmblem rank={rank} size={92} />
+        <div className="ach-hero-main">
+          <div className="ach-hero-title"><em>Rank</em><b>{rank.label}</b><span>{xp.toLocaleString()} XP</span></div>
+          <div className="ach-xpbar" role="progressbar" aria-valuemin={rank.from} aria-valuemax={rank.to} aria-valuenow={xp}><i style={{ width: `${rank.progress * 100}%` }} /></div>
+          <div className="ach-hero-sub">
+            <span>{rank.top ? 'The top rank — legend.' : `${(rank.to - xp).toLocaleString()} XP to ${rank.next.label}`}</span>
+            <span>{got} / {list.length} unlocked{openQuests ? ` · ${openQuests} open quest${openQuests > 1 ? 's' : ''}` : ''}</span>
+          </div>
         </div>
+        {list.length > 0 && (
+          <div className="ach-collection" aria-label="By rarity">
+            {RARITY_ORDER.map((k) => {
+              const all = list.filter((a) => a.rarity === k);
+              if (!all.length) return null;
+              const n = all.filter((a) => a.achievedAt).length;
+              return (
+                <span key={k} className={`ach-gem r-${k} ${n ? '' : 'none'}`} style={{ '--rc': RARITIES[k].color }} title={`${RARITIES[k].label}: ${n} of ${all.length} · ${RARITIES[k].xp} XP each`}>
+                  <i /> {n}<small>/{all.length}</small>
+                </span>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <div className={`ach-numbers ${numbersOpen ? 'open' : ''}`}>
+        <button type="button" className="ach-numbers-toggle" onClick={toggleNumbers} aria-expanded={numbersOpen}>
+          <b>Your numbers</b><span>Type a number and press Enter — every milestone it reaches unlocks.</span>
+          <ChevronDown size={16} className="ach-numbers-chev" />
+        </button>
+        {numbersOpen && <AchievementStats data={data} onSave={saveStats} />}
       </div>
 
       {list.length ? (
         <>
-          <section className="ach-hero" aria-label="Your level">
-            <div className="ach-level" style={{ '--p': `${pct}%` }}>
-              <span><small>Level</small><b>{lv.level}</b></span>
-            </div>
-            <div className="ach-hero-main">
-              <div className="ach-hero-title"><b>{titleOf(lv.level)}</b><span>{xp.toLocaleString()} XP</span></div>
-              <div className="ach-xpbar" role="progressbar" aria-valuemin={lv.from} aria-valuemax={lv.to} aria-valuenow={xp}><i style={{ width: `${pct}%` }} /></div>
-              <div className="ach-hero-sub">
-                <span>{(lv.to - xp).toLocaleString()} XP to level {lv.level + 1}</span>
-                <span>{got} / {list.length} unlocked{openQuests ? ` · ${openQuests} open quest${openQuests > 1 ? 's' : ''}` : ''}</span>
-              </div>
-            </div>
-            <div className="ach-collection" aria-label="By rarity">
-              {RARITY_ORDER.map((k) => {
-                const all = list.filter((a) => a.rarity === k);
-                if (!all.length) return null;
-                const n = all.filter((a) => a.achievedAt).length;
-                return (
-                  <span key={k} className={`ach-gem r-${k} ${n ? '' : 'none'}`} style={{ '--rc': RARITIES[k].color }} title={`${RARITIES[k].label}: ${n} of ${all.length} · ${RARITIES[k].xp} XP each`}>
-                    <i /> {n}<small>/{all.length}</small>
-                  </span>
-                );
-              })}
-            </div>
-          </section>
-
-          {next.length > 0 && (
-            <section className="ach-next" aria-label="Next up">
-              <div className="ach-section-head"><Target size={13} /> Next up</div>
-              <div className="ach-next-list">
-                {next.map(({ a, p }) => (
-                  <button key={a.id} type="button" className="ach-next-item" style={{ '--rc': RARITIES[a.rarity].color }} onClick={() => setEditor({ a })}>
-                    <Badge a={a} size={40} />
-                    <span className="ach-next-main">
-                      <b>{a.title}</b>
-                      <span className="ach-bar"><i style={{ width: `${Math.max(2, p * 100)}%` }} /></span>
-                      <span className="ach-next-sub">{fmtValue(a.metric, metrics[a.metric])} / {fmtValue(a.metric, a.target)} · +{RARITIES[a.rarity].xp} XP</span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
-
-          <Numbers data={data} open={numbersOpen} onToggle={() => setNumbersOpen((o) => !o)} onSave={saveStats} />
-
           <div className="ach-tools">
             <div className="segmented segmented-sm" role="group" aria-label="Show">
               {FILTERS.map((x) => <button key={x.key} type="button" className={filter === x.key ? 'on' : ''} onClick={() => setFilter(x.key)}>{x.label}</button>)}
             </div>
           </div>
-
           <div className="ach-groups">
             {groups.map((g) => {
               const items = shown(g.items);
@@ -197,11 +171,11 @@ export default function AchievementsPage({ reloadKey }) {
         <div className="empty ach-empty">
           <Trophy size={30} />
           <h3>No achievements yet</h3>
-          <p>Start with a set that fits your work — revenue deals, Instagram followers, clients, posts and special quests (album covers, visualizers, known brands …), with the days you already reached them. Or add your own.</p>
-          <div className="ach-empty-actions">
-            <button type="button" className="btn btn-primary" onClick={addStarter} disabled={busy}><Sparkles size={16} /> Start with the starter set</button>
-            <button type="button" className="btn" onClick={() => setEditor({ group: '' })}><Plus size={16} /> Add your own</button>
-          </div>
+          <p>
+            Add your milestones: a <b>series</b> on one number — Instagram, TikTok or X followers, deals, clients, delivered projects, posts —
+            unlocks step by step by itself; a single achievement or a <b>quest</b> (an album cover, a known brand …) you tick off yourself.
+          </p>
+          <div className="ach-empty-actions">{newButtons}</div>
         </div>
       )}
 
@@ -210,67 +184,17 @@ export default function AchievementsPage({ reloadKey }) {
           onClose={() => setEditor(null)} onDelete={remove}
           onSaved={(unlocked) => { setEditor(null); reload(unlocked); }} />
       )}
+      {series && (
+        <AchievementSeries groups={groups.map((g) => g.name)} metrics={metrics} existing={list} onClose={() => setSeries(false)}
+          onSaved={(d) => { setSeries(false); take(d); toast(`${d.added} achievement${d.added === 1 ? '' : 's'} added`); }} />
+      )}
       {celebrate && <Celebration {...celebrate} metrics={metrics} onClose={() => setCelebrate(null)} />}
     </div>
   );
 }
 
-/** Followers (you keep them up to date) and what you did before the app — saved when you leave a field. */
-function Numbers({ data, open, onToggle, onSave }) {
-  const { stats, metrics } = data;
-  const [draft, setDraft] = useState({});
-  const commit = (group, key) => {
-    const k = `${group}.${key}`;
-    if (!(k in draft)) return;
-    const v = Math.max(0, Number(draft[k]) || 0);
-    setDraft((d) => { const x = { ...d }; delete x[k]; return x; });
-    if (v !== stats[group][key]) onSave({ [group]: { [key]: v } });
-  };
-  const input = (group, key, label, extra) => {
-    const k = `${group}.${key}`;
-    return (
-      <label key={k} className="ach-num">
-        <span>{label}</span>
-        <input className="input" type="number" min="0" inputMode="numeric" value={k in draft ? draft[k] : stats[group][key] || ''} placeholder="0"
-          onChange={(e) => setDraft((d) => ({ ...d, [k]: e.target.value }))} onBlur={() => commit(group, key)}
-          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
-        {extra && <small>{extra}</small>}
-      </label>
-    );
-  };
-  const inApp = (key) => (key === 'deal' ? metrics.deal : metrics[key] - stats.earlier[key]);
-  return (
-    <section className={`ach-numbers ${open ? 'open' : ''}`}>
-      <button type="button" className="ach-numbers-toggle" onClick={onToggle} aria-expanded={open}>
-        <span><b>Your numbers</b> — followers and what came before the app</span>
-        <span className="ach-numbers-peek">
-          {FOLLOWERS.filter((p) => stats.followers[p]).map((p) => <span key={p}><PlatformIcon platform={p} size={12} /> {stats.followers[p].toLocaleString()}</span>)}
-        </span>
-        <ChevronDown size={16} className="ach-numbers-chev" />
-      </button>
-      {open && (
-        <div className="ach-numbers-body">
-          <div>
-            <div className="ach-section-head">Followers <em>— keep them up to date, milestones unlock from them</em></div>
-            <div className="ach-num-grid">
-              {FOLLOWERS.map((p) => input('followers', p, <><PlatformIcon platform={p} size={12} /> {METRICS[`followers:${p}`].label}</>))}
-            </div>
-          </div>
-          <div>
-            <div className="ach-section-head">Before the app <em>— added to what the app counts</em></div>
-            <div className="ach-num-grid">
-              {EARLIER.map((k) => input('earlier', k, METRICS[k].earlier,
-                k === 'deal' ? `Biggest invoice in the app: ${fmtValue('deal', inApp(k))}` : `+ ${fmtValue(k, inApp(k))} ${METRICS[k].app} = ${fmtValue(k, metrics[k])}`))}
-            </div>
-          </div>
-        </div>
-      )}
-    </section>
-  );
-}
-
-/** The moment: the card(s) just unlocked, the XP — and the new level. */
-function Celebration({ list, levelUp, metrics, onClose }) {
+/** The moment: the card(s) just unlocked, the XP — and the new rank. */
+function Celebration({ list, rankUp, metrics, onClose }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape' || e.key === 'Enter') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -288,7 +212,11 @@ function Celebration({ list, levelUp, metrics, onClose }) {
         </div>
         {list.length > 3 && <div className="ach-celebrate-more">+ {list.length - 3} more</div>}
         <div className="ach-celebrate-xp">+{xp.toLocaleString()} XP</div>
-        {levelUp > 0 && <div className="ach-celebrate-level">Level {levelUp} — {titleOf(levelUp)}</div>}
+        {rankUp && (
+          <div className="ach-celebrate-rank" style={{ '--rc': RARITIES[rankUp.tier].color }}>
+            <RankEmblem rank={rankUp} size={46} /><span><small>New rank</small><b>{rankUp.label}</b></span>
+          </div>
+        )}
         <button type="button" className="btn btn-primary" onClick={onClose}>Nice!</button>
       </div>
     </div>

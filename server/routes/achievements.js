@@ -9,7 +9,7 @@ import { upload } from '../upload.js';
 import { normalizeAchievement, normalizeAchievementStats, str, isDay, RARITIES, ACHIEVEMENT_METRICS } from '../schema.js';
 import { createRouter, HttpError } from '../http.js';
 import { sourceAsUpload, IMAGE_EXT } from '../sources.js';
-import { achievementMetrics, unlockReached, dueToUnlock, STARTER_ACHIEVEMENTS, QUEST_IDEAS } from '../achievements.js';
+import { achievementMetrics, appCounts, unlockReached, dueToUnlock, QUEST_IDEAS } from '../achievements.js';
 
 const router = createRouter();
 export default router;
@@ -24,7 +24,7 @@ const sorted = (list) => {
 };
 const payload = (db, unlocked = []) => ({
   achievements: sorted(db.achievements),
-  stats: db.achievementStats, metrics: achievementMetrics(db), unlocked, ideas: QUEST_IDEAS,
+  stats: db.achievementStats, metrics: achievementMetrics(db), app: appCounts(db), unlocked, ideas: QUEST_IDEAS,
 });
 
 // Everything — and whatever has been reached meanwhile unlocks now (`unlocked`: their ids).
@@ -141,19 +141,23 @@ router.patch('/api/achievement-stats', async (req, res) => {
   res.json(payload(await readDB(), out));
 });
 
-// The starter set (revenue, Instagram, clients, content, special quests) —
-// those you don't have yet (same group and title), with the dates you reached them.
-router.post('/api/achievements/starter', async (_req, res) => {
+// Several at once — a series of milestones on one number (100, 500, 1K … followers).
+router.post('/api/achievements/batch', async (req, res) => {
+  const items = Array.isArray(req.body?.items) ? req.body.items.filter((x) => x && typeof x === 'object').slice(0, 50) : [];
+  if (!items.length) throw new HttpError(400, 'items_required', 'Nothing to add.');
   const out = await mutateDB((db) => {
-    const have = new Set(db.achievements.map((a) => `${a.group}\n${a.title}\n${a.description}`));
-    let added = 0;
-    for (const s of STARTER_ACHIEVEMENTS) {
-      const a = normalizeAchievement({ ...s, id: nanoid(10), createdAt: Date.now(), updatedAt: Date.now() });
-      if (have.has(`${a.group}\n${a.title}\n${a.description}`)) continue;
+    const now = Date.now();
+    const next = {};
+    for (const b of items) {
+      const a = normalizeAchievement({ id: nanoid(10), createdAt: now, updatedAt: now });
+      apply(a, b);
+      if (!('order' in b)) {
+        next[a.group] ??= Math.max(0, ...db.achievements.filter((x) => x.group === a.group).map((x) => x.order + 1));
+        a.order = next[a.group]++;
+      }
       db.achievements.push(a);
-      added += 1;
     }
-    return { added, unlocked: unlockReached(db) };
+    return unlockReached(db);
   });
-  res.status(201).json({ ...payload(await readDB(), out.unlocked), added: out.added });
+  res.status(201).json({ ...payload(await readDB(), out), added: items.length });
 });

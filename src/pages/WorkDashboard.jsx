@@ -18,6 +18,7 @@ import QuickNote from '../components/dashboard/QuickNote.jsx';
 import FocusToday from '../components/dashboard/FocusToday.jsx';
 import FocusTimer from '../components/dashboard/FocusTimer.jsx';
 import ContinueWork from '../components/dashboard/ContinueWork.jsx';
+import AchievementsWidget from '../components/dashboard/AchievementsWidget.jsx';
 import { useSortable, moveItem } from '../lib/useSortable.js';
 
 const DEFAULT_BANNER = 'linear-gradient(120deg,#6a11cb,#2575fc)';
@@ -33,6 +34,7 @@ const WIDGETS = [
   { id: 'rhythm', label: 'Your rhythm', size: 'full' },
   { id: 'inspiration', label: 'Inspiration', size: 'half' },
   { id: 'note', label: 'Quick note', size: 'half' },
+  { id: 'achievements', label: 'Achievements', size: 'full' },
 ];
 const WIDGET = Object.fromEntries(WIDGETS.map((w) => [w.id, w]));
 // Your saved order first; widgets added since then join at the end.
@@ -286,6 +288,7 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
       case 'rhythm': return <ActivityMap reloadKey={reloadKey} compact={w.size === 'half'} />;
       case 'inspiration': return <Inspiration projects={refs} sources={w.sources} />;
       case 'note': return settings ? <QuickNote initial={settings.dashboardNote || ''} /> : null;
+      case 'achievements': return <AchievementsWidget reloadKey={reloadKey} compact={w.size === 'half'} />;
       case 'next': return plans === null ? null : (
           <div className="dash-focus" id="dash-next">
             <div className={`dash-next ${next ? '' : 'is-free'} ${next && next.days < 0 ? 'overdue' : ''}`}

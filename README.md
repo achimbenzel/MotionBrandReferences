@@ -400,6 +400,9 @@ it and show it again; your layout is saved. The widgets:
   everything. The choice is saved with your layout.
 - **Quick note** — a scratchpad for today's focus or an idea, saved as you
   type.
+- **Achievements** — your rank (Stone 1 … Mythic 3) and XP, how many you've
+  unlocked (and this year), open quests, the latest one and the one you're
+  closest to; anything a number just unlocked shows on top.
 
 Sections rise in one after the other; with *reduce motion* on in the system
 nothing moves.
@@ -1051,37 +1054,45 @@ Posts are stored in `data/db.json` (`content`), their pictures and videos in
 **Achievements** (sidebar, under Content) turns your milestones into
 collectible cards — a paper card in a frame of its **rarity**, a round
 **badge** (a short text like “10K”, a symbol or your own picture), the name,
-what it takes and the day you reached it. Locked ones stay faded and show how
-far you are.
+what it takes and the day you reached it. Ones you haven't reached yet stay
+grey and faint (with a lock on the badge) and show how far you are.
+**Diamond**, **Mythic**, **Quest** and **Dream quest** cards shimmer with an
+animated **holo** sheen once reached (a glare and a slight tilt follow the
+pointer; still when the system asks for reduced motion).
 
 - **Rarity = XP**: Stone 10 · Bronze 25 · Silver 50 · Gold 100 · Emerald 200 ·
   Diamond 400 · Mythic 800 · Quest 150 · Dream quest 300. Reached ones add up
-  to your **level** (level 2 at 100 XP, 3 at 300, 4 at 600 … — Rookie,
-  Apprentice, Designer, Pro, Expert, Master, Legend), shown on top with the
-  XP bar and how many of each rarity you have.
-- **They unlock by themselves** when an achievement has a number: the
-  **biggest single deal** (your invoices), **revenue paid**, **clients**,
-  **delivered client projects**, **posts** marked posted in Content, and your
-  **followers** on Instagram, TikTok, X and YouTube. Under **Your numbers**
-  you keep the followers up to date and add what came **before the app** (so
-  a count doesn't start at zero). Reached ones never lock again. **Next up**
-  shows the three you're closest to.
-- **Quests** you tick off yourself (set the day, or **Today**). Unlocking one —
-  by a number or by hand — gets its moment: the card flips in with its XP (and
-  your new level, if there is one).
-- **Start with the starter set** (also in **⋯**, adding only the missing
-  ones): revenue deals from 500 € to 100K, Instagram followers from 100 to
-  500K, client projects from the first one to 500, posts from the first to
-  500 — each tier a rarer frame — and **Special Quests** as quest / dream-quest
-  pairs (album cover, visualizer, a known person, a known brand, a business
-  trip, game assets), with the days you already reached them.
-- **Your own**: **New achievement** (or **Add to …** in a group) opens the
-  editor with the card as it will look — name, what it takes, **group**,
-  **rarity**, the badge, an optional **sticker** (an event's or a client's
-  logo on the corner; upload or from the app), the number it unlocks at and
-  the day it was reached. It suggests quests that fit the work (showreel,
-  returning client, referral, retainer, a higher rate, a viral post, featured,
-  a talk, your own product, an award). Delete goes to the Trash (with Undo).
+  to your **rank** — **Stone 1–3, Bronze 1–3, Silver, Gold, Emerald, Diamond,
+  Mythic 1–3** (Stone 2 at 100 XP, Stone 3 at 300, Bronze 1 at 600 … Mythic 3
+  at 21,000) — shown as an emblem with the XP bar and how many of each rarity
+  you have.
+- **Your numbers** — a tile per number: your **followers** on Instagram,
+  TikTok, X and YouTube (you keep them up to date) and your work — **biggest
+  single deal** (your invoices), **revenue paid**, **clients**, **client projects
+  delivered** and **posts** published in Content. Clients and client projects
+  are counted apart. Each tile shows the total and where it comes from (e.g.
+  “95 before the app + 3 delivered in the app”) and the next milestone on it.
+  Click a number to change it (for your work: what came **before the app**);
+  while you type, the tile lists what it would unlock — **Enter** saves and
+  unlocks them (dated today; change a day on the card if you know it).
+  Reached ones never lock again.
+- **New series** — several milestones on one number in one go: pick what it
+  counts (e.g. TikTok followers), the group, a name pattern (`{n}` = 2K,
+  `{N}` = 2,000), and the steps, each with its rarity (rising from Stone by
+  default). Steps you already have are skipped; the ones your number already
+  reaches unlock right away.
+- **New achievement** (or **Add to …** in a group) opens the editor with the
+  card as it will look — name, what it takes, **group**, **rarity**, the badge,
+  an optional **sticker** (an event's or a client's logo on the corner; upload
+  or from the app), a number it unlocks at, and the day it was reached. It
+  suggests quests that fit the work (showreel, returning client, referral,
+  retainer, a higher rate, a viral post, featured, a talk, your own product,
+  an award). Delete goes to the Trash (with Undo).
+- Unlocking — by a number or by hand — gets its moment: the card flips in
+  with its XP (and your new rank, if there is one).
+- The **dashboard** has an **Achievements** widget: your rank and XP, how many
+  you have (and this year), open quests, the latest one you reached and the one
+  you're closest to.
 
 Achievements are stored in `data/db.json` (`achievements`, your numbers in
 `achievementStats`), their pictures in `data/achievement/<id>/`.
@@ -1378,7 +1389,7 @@ lookup off with `LINK_LOOKUP=off`).
   ├── unused.js       # unused-file scan
   ├── zip.js          # dependency-free ZIP64 export/import
   ├── xlsx.js         # dependency-free .xlsx writer (time sheet export)
-  ├── achievements.js # what achievements unlock from, the starter set
+  ├── achievements.js # what achievements unlock from, quest ideas
   └── routes/         # projects (references), projects (projects), clients, software, board, mockups, time, notes, content, achievements, trash, search, settings, library, maintenance
   ```
 - **Tests:** `npm test` starts the real server against throwaway data folders —

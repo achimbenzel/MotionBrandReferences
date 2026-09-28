@@ -122,7 +122,7 @@ export default function AchievementEditor({ a, group = '', groups, metrics, idea
         </div>
         <div className="modal-body ach-editor-body">
           <div className="ach-editor-preview">
-            <AchievementCard a={preview} metrics={metrics} as="div" iconUrl={picUrl('icon')} stickerUrl={picUrl('sticker')} />
+            <AchievementCard a={preview} metrics={metrics} as="div" showcase iconUrl={picUrl('icon')} stickerUrl={picUrl('sticker')} />
             <div className="ach-editor-xp">{RARITIES[f.rarity].label} · <b>{RARITIES[f.rarity].xp} XP</b></div>
           </div>
           <div className="ach-editor-form">

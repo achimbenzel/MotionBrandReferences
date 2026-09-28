@@ -548,7 +548,7 @@ export const api = {
   },
   async removeAchievementImage(id, slot) { return request(`/api/achievements/${id}/image?slot=${slot}`, { method: 'DELETE' }); },
   async updateAchievementStats(patch) { return request('/api/achievement-stats', { method: 'PATCH', json: patch }); }, // → like getAchievements
-  async addStarterAchievements() { return request('/api/achievements/starter', { method: 'POST' }); }, // → like getAchievements + { added }
+  async addAchievements(items) { return request('/api/achievements/batch', { method: 'POST', json: { items } }); }, // → like getAchievements + { added }
 
   // --- Time tracker ---
   // → { entries, running, activities } — all, or one project's / client's ({ plan } / { client }).
