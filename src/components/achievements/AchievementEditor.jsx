@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, UploadCloud, Library, Trash2, Lightbulb, CalendarCheck, Type, Shapes, ImageIcon } from 'lucide-react';
+import { X, UploadCloud, Library, Trash2, Lightbulb, CalendarCheck, Type, Shapes, ImageIcon, Swords } from 'lucide-react';
 import { api, achievementFileUrl } from '../../lib/api.js';
 import { isTouch } from '../../lib/useMedia.js';
 import { RARITIES, RARITY_ORDER, METRICS, fmtValue } from '../../lib/achievements.js';
@@ -20,7 +20,7 @@ const fields = (a) => ({
  * takes, group, rarity (worth XP), the badge (text, a symbol or a picture), a
  * sticker, a number that unlocks it by itself — and when it was reached.
  */
-export default function AchievementEditor({ a, group = '', groups, metrics, ideas = [], existing = [], onClose, onSaved, onDelete }) {
+export default function AchievementEditor({ a, group = '', groups, metrics, pack = [], ideas = [], existing = [], onClose, onSaved, onDelete }) {
   const toast = useToast();
   const [picker, pick] = useFromApp();
   const [f, setF] = useState(() => (a ? fields(a) : blank(group)));
@@ -94,6 +94,7 @@ export default function AchievementEditor({ a, group = '', groups, metrics, idea
   const now = f.metric ? metrics?.[f.metric] || 0 : null;
   const reached = f.metric && Number(f.target) > 0 && now >= Number(f.target);
   const have = new Set(existing.map((x) => `${x.title}\n${x.description}`));
+  const freshPack = a ? [] : pack.filter((i) => !have.has(`${i.title}\n${i.description}`));
   const freshIdeas = a ? [] : ideas.filter((i) => !have.has(`${i.title}\n${i.description}`));
   const takeIdea = (i) => {
     setF({ ...blank(i.group), title: i.title, description: i.description, rarity: i.rarity, icon: { ...blank().icon, ...i.icon } });
@@ -126,12 +127,28 @@ export default function AchievementEditor({ a, group = '', groups, metrics, idea
             <div className="ach-editor-xp">{RARITIES[f.rarity].label} · <b>{RARITIES[f.rarity].xp} XP</b></div>
           </div>
           <div className="ach-editor-form">
-            {freshIdeas.length > 0 && (
+            {freshPack.length + freshIdeas.length > 0 && (
               <div className="ach-ideas">
-                <div className="ach-ideas-head"><Lightbulb size={13} /> Quests that fit your work</div>
-                <div className="ach-ideas-list">
-                  {freshIdeas.map((i) => <button key={`${i.title}${i.description}`} type="button" className="chip" onClick={() => takeIdea(i)} title={i.description}>{i.title}</button>)}
-                </div>
+                {freshPack.length > 0 && (
+                  <>
+                    <div className="ach-ideas-head"><Swords size={13} /> Special Quests <em>— each as a quest and as a dream quest</em></div>
+                    <div className="ach-ideas-list">
+                      {freshPack.map((i) => (
+                        <button key={`${i.title}${i.description}`} type="button" className={`chip ach-idea r-${i.rarity}`} onClick={() => takeIdea(i)} title={i.description}>
+                          {i.title}{i.rarity === 'dream' && <span>Dream</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {freshIdeas.length > 0 && (
+                  <>
+                    <div className="ach-ideas-head"><Lightbulb size={13} /> More quests that fit your work</div>
+                    <div className="ach-ideas-list">
+                      {freshIdeas.map((i) => <button key={`${i.title}${i.description}`} type="button" className={`chip ach-idea r-${i.rarity}`} onClick={() => takeIdea(i)} title={i.description}>{i.title}</button>)}
+                    </div>
+                  </>
+                )}
               </div>
             )}
             <div className="field">
@@ -198,7 +215,7 @@ export default function AchievementEditor({ a, group = '', groups, metrics, idea
                   </label>
                 )}
               </div>
-              {f.metric && <div className="hint">Now: {fmtValue(f.metric, now)}{METRICS[f.metric].follower ? ' — update your followers under “Your numbers”' : ''}.</div>}
+              {f.metric && <div className="hint">Now: {fmtValue(f.metric, now)} — change it under “Your numbers”.</div>}
               {reached && !f.achievedAt && <div className="hint ach-reached-hint">Already reached — it unlocks today when you save. Set the day you got there, if you know it.</div>}
             </div>
 

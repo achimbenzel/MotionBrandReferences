@@ -548,6 +548,7 @@ export const api = {
   },
   async removeAchievementImage(id, slot) { return request(`/api/achievements/${id}/image?slot=${slot}`, { method: 'DELETE' }); },
   async updateAchievementStats(patch) { return request('/api/achievement-stats', { method: 'PATCH', json: patch }); }, // → like getAchievements
+  async addQuestPack() { return request('/api/achievements/starter', { method: 'POST' }); }, // the Special Quests pack → like getAchievements + { added }
   async addAchievements(items) { return request('/api/achievements/batch', { method: 'POST', json: { items } }); }, // → like getAchievements + { added }
 
   // --- Time tracker ---

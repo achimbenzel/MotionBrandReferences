@@ -1,5 +1,5 @@
 // Achievements: rarities (and the XP each is worth), your rank, and the
-// numbers an achievement can unlock by itself.
+// numbers (yours to type in) an achievement can unlock by itself.
 
 export const RARITIES = {
   stone: { label: 'Stone', xp: 10, color: '#8a8a92' },
@@ -41,11 +41,11 @@ export const METRICS = {
   'followers:tiktok': { label: 'TikTok followers', short: 'TikTok', follower: 'tiktok', group: 'TikTok', title: '{n} Follower auf TikTok' },
   'followers:x': { label: 'X followers', short: 'X', follower: 'x', group: 'X', title: '{n} Follower auf X' },
   'followers:youtube': { label: 'YouTube subscribers', short: 'YouTube', follower: 'youtube', group: 'YouTube', title: '{n} Abonnenten auf YouTube' },
-  deal: { label: 'Biggest single deal', short: 'Biggest deal', unit: '€', app: 'biggest invoice in the app', earlier: 'Biggest deal before the app', group: 'Umsatz', title: 'Der {N}-Deal' },
-  revenue: { label: 'Revenue paid (all together)', short: 'Revenue paid', unit: '€', app: 'paid invoices in the app', earlier: 'Revenue before the app', group: 'Umsatz gesamt', title: '{N} Umsatz' },
-  clients: { label: 'Clients (people / companies you work for)', short: 'Clients', app: 'clients in the app', earlier: 'Clients before the app', group: 'Kundenstamm', title: '{n} Kunden' },
-  projects: { label: 'Client projects delivered', short: 'Client projects', app: 'delivered in the app', earlier: 'Client projects before the app', group: 'Projekte', title: '{n} Kundenprojekte' },
-  posts: { label: 'Posts published', short: 'Posts', app: 'posted in Content', earlier: 'Posts before the app', group: 'Content', title: '{n} Posts' },
+  deal: { label: 'Biggest single deal', short: 'Biggest deal', unit: '€', group: 'Umsatz', title: 'Der {N}-Deal' },
+  revenue: { label: 'Revenue (all together)', short: 'Revenue', unit: '€', group: 'Umsatz gesamt', title: '{N} Umsatz' },
+  clients: { label: 'Clients (people / companies you worked for)', short: 'Clients', group: 'Kundenstamm', title: '{n} Kunden' },
+  projects: { label: 'Client projects (done)', short: 'Client projects', group: 'Projekte', title: '{n} Kundenprojekte' },
+  posts: { label: 'Posts published', short: 'Posts', group: 'Content', title: '{n} Posts' },
 };
 export const FOLLOWER_METRICS = ['followers:instagram', 'followers:tiktok', 'followers:x', 'followers:youtube'];
 export const WORK_METRICS = ['deal', 'revenue', 'clients', 'projects', 'posts'];

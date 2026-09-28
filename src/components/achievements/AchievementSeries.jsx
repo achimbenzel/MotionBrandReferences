@@ -77,7 +77,7 @@ export default function AchievementSeries({ groups, metrics, existing, onClose, 
                 <optgroup label="Followers">{FOLLOWER_METRICS.map((k) => <option key={k} value={k}>{METRICS[k].label}</option>)}</optgroup>
                 <optgroup label="Your work">{WORK_METRICS.map((k) => <option key={k} value={k}>{METRICS[k].label}</option>)}</optgroup>
               </select>
-              <div className="hint">Now: {fmtValue(metric, now)}{METRICS[metric].follower ? ' — change it under “Your numbers”' : ''}.</div>
+              <div className="hint">Now: {fmtValue(metric, now)} — change it under “Your numbers”.</div>
             </div>
             <div className="row-2">
               <div className="field">

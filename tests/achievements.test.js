@@ -1,5 +1,6 @@
-// Achievements: your own, a series at once, unlocking by the numbers (biggest
-// deal, followers, clients, delivered projects, posts), pictures, Trash and back.
+// Achievements: your own, a series at once, the Special Quests pack, unlocking
+// by the numbers you type in (followers, deals, clients, projects, posts),
+// pictures, Trash and back.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -39,37 +40,53 @@ test('achievements: own ones, a series, unlocking by the numbers', async () => {
     ...series('Projekte', 'projects', [[1, 'stone'], [100, 'mythic']], (n) => `${n} Projekte`),
     ...series('Content', 'posts', [[1, 'stone']], () => 'Der erste Post'),
   ] } });
+  assert.equal((await srv.api('/api/achievements')).data.achievements.length, 1 + 5 + 8);
+
+  // The Special Quests pack: quest and dream quest pairs with their descriptions — and not twice.
+  r = await srv.api('/api/achievements/starter', { method: 'POST' });
+  assert.equal(r.status, 201);
+  assert.equal(r.data.added, 12);
+  const quests = r.data.achievements.filter((a) => a.group === 'Special Quests');
+  assert.equal(quests.length, 13); // + the Dienstreise of your own (no description)
+  const album = quests.find((a) => a.title === 'Album Cover Design' && a.rarity === 'dream');
+  assert.deepEqual([album.description, album.icon.type, album.icon.symbol], ['Album Cover für Musiker/Band, die ich selber gerne höre.', 'symbol', 'image']);
+  assert.equal(quests.find((a) => a.title === 'Dienstreise' && a.rarity === 'quest' && a.description).achievedAt, '2025-07-17');
+  assert.equal(r.data.pack.length, 12);
+  assert.equal((await srv.api('/api/achievements/starter', { method: 'POST' })).data.added, 0);
   const count = (await srv.api('/api/achievements')).data.achievements.length;
-  assert.equal(count, 1 + 5 + 8);
 
   // Followers you keep up to date: 2,900 unlocks everything up to 2K today (5K not yet);
   // reached ones stay reached.
-  r = await srv.api('/api/achievement-stats', { method: 'PATCH', json: { followers: { instagram: 2900 }, earlier: { projects: 95 } } });
+  r = await srv.api('/api/achievement-stats', { method: 'PATCH', json: { followers: { instagram: 2900 } } });
   const got = (t) => r.data.achievements.find((a) => a.title === t).achievedAt;
   assert.deepEqual(['100 Follower', '500 Follower', '1K Follower', '2K Follower', '5K Follower'].map(got), [today(), today(), today(), today(), '']);
-  assert.equal(r.data.unlocked.length, 5); // …and the first client project (95 before the app)
+  assert.equal(r.data.unlocked.length, 4);
   assert.equal(r.data.metrics['followers:instagram'], 2900);
   r = await srv.api('/api/achievement-stats', { method: 'PATCH', json: { followers: { instagram: 10 } } });
   assert.equal(got('2K Follower'), today());
 
-  // Clients and client projects are counted apart: 95 projects before the app + a delivered one.
+  // Nothing is counted from the app: a client, an invoice, a delivered project and a posted
+  // post change none of the numbers…
   const client = (await srv.api('/api/clients', { method: 'POST', json: { name: 'Acme' } })).data.client;
   const fd = new FormData(); fd.append('files', new Blob(['%PDF-1.4'], { type: 'application/pdf' }), 'inv.pdf'); fd.append('amount', '3200');
   await srv.api(`/api/clients/${client.id}/invoices`, { method: 'POST', body: fd });
   const plan = (await srv.api('/api/plans', { method: 'POST', json: { name: 'Reel', clientId: client.id } })).data.plan;
   await srv.api(`/api/plans/${plan.id}`, { method: 'PATCH', json: { status: 'delivered' } });
+  await srv.api('/api/content', { method: 'POST', json: { title: 'First reel', status: 'posted' } });
   r = await srv.api('/api/achievements');
-  assert.deepEqual([r.data.metrics.deal, r.data.metrics.clients, r.data.metrics.projects], [3200, 1, 96]);
-  assert.deepEqual([r.data.app.deal, r.data.app.clients, r.data.app.projects, r.data.stats.earlier.projects], [3200, 1, 1, 95]); // the parts
-  assert.deepEqual(['Der 3K€-Deal', 'Der 5K€-Deal', '1 Kunden', '3 Kunden', '1 Projekte', '100 Projekte'].map(got), [today(), '', today(), '', today(), '']);
-  assert.ok(r.data.unlocked.length >= 3);
-  assert.deepEqual((await srv.api('/api/achievements')).data.unlocked, []); // only once
+  assert.deepEqual(['deal', 'revenue', 'clients', 'projects', 'posts'].map((k) => r.data.metrics[k]), [0, 0, 0, 0, 0]);
+  assert.deepEqual(r.data.unlocked, []);
+  assert.ok(!('app' in r.data));
 
-  // A posted content item counts too.
-  const post = (await srv.api('/api/content', { method: 'POST', json: { title: 'First reel', status: 'posted' } })).data.item;
-  assert.equal(post.status, 'posted');
-  r = await srv.api('/api/achievements');
-  assert.equal(got('Der erste Post'), today());
+  // …they're yours to type in: clients and client projects apart.
+  r = await srv.api('/api/achievement-stats', { method: 'PATCH', json: { numbers: { deal: 3200, clients: 1, projects: 95, posts: 1 } } });
+  assert.deepEqual([r.data.metrics.deal, r.data.metrics.clients, r.data.metrics.projects, r.data.stats.numbers.projects], [3200, 1, 95, 95]);
+  assert.deepEqual(['Der 3K€-Deal', 'Der 5K€-Deal', '1 Kunden', '3 Kunden', '1 Projekte', '100 Projekte', 'Der erste Post'].map(got), [today(), '', today(), '', today(), '', today()]);
+  assert.equal(r.data.unlocked.length, 5);
+  assert.deepEqual((await srv.api('/api/achievements')).data.unlocked, []); // only once
+  // (the older name of these numbers still works)
+  r = await srv.api('/api/achievement-stats', { method: 'PATCH', json: { earlier: { projects: 99 } } });
+  assert.equal(r.data.metrics.projects, 99);
 
   // Icon picture and sticker; the whole achievement to Trash and back.
   const pic = new FormData(); pic.append('image', new Blob([PNG], { type: 'image/png' }), 'parookaville.png');
@@ -84,4 +101,11 @@ test('achievements: own ones, a series, unlocking by the numbers', async () => {
   await srv.api(`/api/trash/${r.data.trashId}/restore`, { method: 'POST' });
   const back = (await srv.api('/api/achievements')).data.achievements.find((a) => a.id === trip.id);
   assert.ok(back.sticker && exists(path.join(srv.dataDir, 'achievement', trip.id, back.sticker)));
+});
+
+test('achievements: numbers saved under their older name carry over', async () => {
+  const { normalizeAchievementStats } = await import('../server/schema.js');
+  const s = normalizeAchievementStats({ followers: { instagram: 2900 }, earlier: { projects: 95, clients: 12 } });
+  assert.deepEqual([s.followers.instagram, s.numbers.projects, s.numbers.clients, s.numbers.deal], [2900, 95, 12, 0]);
+  assert.ok(!('earlier' in s));
 });

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Trophy, Layers, ChevronDown } from 'lucide-react';
+import { Plus, Trophy, Layers, ChevronDown, Swords } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { RARITIES, RARITY_ORDER, xpOf, rankOf } from '../lib/achievements.js';
 import { useToast } from '../components/Toast.jsx';
@@ -73,6 +73,13 @@ export default function AchievementsPage({ reloadKey }) {
       toast(`“${a.title || 'Achievement'}” moved to Trash`, 'ok', { label: 'Undo', onClick: async () => { await api.restoreTrash(trashId); reload(); } });
     } catch (e) { toast(`Could not delete: ${e.message}`, 'error'); }
   };
+  const addPack = async () => {
+    try {
+      const d = await api.addQuestPack();
+      take(d);
+      toast(d.added ? `${d.added} Special Quests added` : 'You have all Special Quests already');
+    } catch (e) { toast(`Could not add them: ${e.message}`, 'error'); }
+  };
   const saveStats = async (patch) => {
     try { take(await api.updateAchievementStats(patch)); } catch (e) { toast(`Could not save: ${e.message}`, 'error'); throw e; }
   };
@@ -86,8 +93,14 @@ export default function AchievementsPage({ reloadKey }) {
   const got = list.filter((a) => a.achievedAt).length;
   const openQuests = list.filter((a) => !a.achievedAt && !a.metric).length;
   const shown = (items) => items.filter((a) => filter === 'all' || (filter === 'got' ? !!a.achievedAt : !a.achievedAt));
+  const packMissing = (data.pack || []).filter((q) => !list.some((a) => a.group === q.group && a.title === q.title && a.description === q.description)).length;
   const newButtons = (
     <>
+      {packMissing > 0 && (
+        <button type="button" className="btn" onClick={addPack} title={`${packMissing} quests and dream quests: album cover, visualizer, a known person, a known brand, a business trip, game assets`}>
+          <Swords size={16} /> Special Quests
+        </button>
+      )}
       <button type="button" className="btn" onClick={() => setSeries(true)} title="Several milestones on one number at once — e.g. TikTok followers 100, 500, 1K …"><Layers size={16} /> New series</button>
       <button type="button" className="btn btn-primary" onClick={() => setEditor({ group: '' })}><Plus size={16} /> New achievement</button>
     </>
@@ -172,15 +185,15 @@ export default function AchievementsPage({ reloadKey }) {
           <Trophy size={30} />
           <h3>No achievements yet</h3>
           <p>
-            Add your milestones: a <b>series</b> on one number — Instagram, TikTok or X followers, deals, clients, delivered projects, posts —
-            unlocks step by step by itself; a single achievement or a <b>quest</b> (an album cover, a known brand …) you tick off yourself.
+            Start with the <b>Special Quests</b> (album cover, visualizer, a known brand …), add a <b>series</b> on one of your numbers —
+            Instagram, TikTok or X followers, deals, clients, client projects, posts — that unlocks step by step, or a single achievement.
           </p>
           <div className="ach-empty-actions">{newButtons}</div>
         </div>
       )}
 
       {editor && (
-        <AchievementEditor a={editor.a} group={editor.group} groups={groups.map((g) => g.name)} metrics={metrics} ideas={data.ideas} existing={list}
+        <AchievementEditor a={editor.a} group={editor.group} groups={groups.map((g) => g.name)} metrics={metrics} pack={data.pack} ideas={data.ideas} existing={list}
           onClose={() => setEditor(null)} onDelete={remove}
           onSaved={(unlocked) => { setEditor(null); reload(unlocked); }} />
       )}

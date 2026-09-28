@@ -7,9 +7,9 @@ import PlatformIcon from '../content/PlatformIcon.jsx';
 const WORK_ICON = { deal: Coins, revenue: TrendingUp, clients: Building2, projects: Briefcase, posts: Megaphone };
 
 /**
- * Your numbers, one tile each: followers (you keep them up to date) and your
- * work — what the app counts plus what came before it. Typing a number shows
- * what it would unlock; Enter saves it (and unlocks them).
+ * Your numbers, one tile each — followers and your work, all typed in by you
+ * (nothing is counted from the app). Typing a number shows what it would
+ * unlock; Enter saves it (and unlocks them).
  */
 export default function AchievementStats({ data, onSave }) {
   return (
@@ -19,7 +19,7 @@ export default function AchievementStats({ data, onSave }) {
         <div className="ach-stats-grid">{FOLLOWER_METRICS.map((m) => <StatTile key={m} metric={m} data={data} onSave={onSave} />)}</div>
       </div>
       <div className="ach-stats-row">
-        <div className="ach-section-head">Your work <em>— what the app counts, plus what came before it</em></div>
+        <div className="ach-section-head">Your work <em>— yours to keep up to date too</em></div>
         <div className="ach-stats-grid">{WORK_METRICS.map((m) => <StatTile key={m} metric={m} data={data} onSave={onSave} />)}</div>
       </div>
     </section>
@@ -27,17 +27,15 @@ export default function AchievementStats({ data, onSave }) {
 }
 
 function StatTile({ metric, data, onSave }) {
-  const { stats, metrics, app = {}, achievements } = data;
+  const { stats, metrics, achievements } = data;
   const m = METRICS[metric];
   const platform = m.follower;
   const [edit, setEdit] = useState(null); // the number being typed (string) or null
   const [busy, setBusy] = useState(false);
 
-  // Followers: the number itself. Your work: what came before the app (the app adds its own).
-  const stored = platform ? stats.followers[platform] : stats.earlier[metric];
-  const totalFor = (v) => (platform ? v : metric === 'deal' ? Math.max(v, app.deal || 0) : v + (app[metric] || 0));
+  const stored = platform ? stats.followers[platform] : stats.numbers[metric];
   const typed = edit == null ? null : Math.max(0, Math.round(Number(edit) || 0));
-  const total = typed == null ? metrics[metric] : totalFor(typed);
+  const total = typed == null ? metrics[metric] : typed;
   const unlocks = typed == null ? [] : wouldUnlock(achievements, metric, total);
   const next = nextOn(achievements, metric);
   const Icon = WORK_ICON[metric];
@@ -46,7 +44,7 @@ function StatTile({ metric, data, onSave }) {
     if (typed == null || busy) return;
     if (typed === stored) { setEdit(null); return; }
     setBusy(true);
-    try { await onSave(platform ? { followers: { [platform]: typed } } : { earlier: { [metric]: typed } }); setEdit(null); } finally { setBusy(false); }
+    try { await onSave(platform ? { followers: { [platform]: typed } } : { numbers: { [metric]: typed } }); setEdit(null); } finally { setBusy(false); }
   };
   const start = () => setEdit(String(stored || ''));
 
@@ -55,14 +53,14 @@ function StatTile({ metric, data, onSave }) {
       <div className="ach-stat-head">
         <span className="ach-stat-icon">{platform ? <PlatformIcon platform={platform} size={15} /> : <Icon size={15} />}</span>
         <span className="ach-stat-label">{m.short}</span>
-        {edit == null && <button type="button" className="ach-stat-edit" onClick={start} aria-label={`Change ${m.short}`} title={platform ? 'Change' : 'Change what came before the app'}><Pencil size={13} /></button>}
+        {edit == null && <button type="button" className="ach-stat-edit" onClick={start} aria-label={`Change ${m.short}`} title="Change"><Pencil size={13} /></button>}
       </div>
       {edit == null ? (
-        <button type="button" className="ach-stat-value" onClick={start} title={platform ? 'Change' : 'Change what came before the app'}>{fmtValue(metric, metrics[metric])}</button>
+        <button type="button" className="ach-stat-value" onClick={start} title="Change">{fmtValue(metric, metrics[metric])}</button>
       ) : (
         <form className="ach-stat-form" onSubmit={(e) => { e.preventDefault(); save(); }}>
           <label>
-            <span>{platform ? m.label : m.earlier}</span>
+            <span>{m.label}</span>
             <input className="input" type="number" min="0" inputMode="numeric" value={edit} disabled={busy} autoFocus onFocus={(e) => e.target.select()}
               onChange={(e) => setEdit(e.target.value)} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setEdit(null); } }} />
           </label>
@@ -72,7 +70,6 @@ function StatTile({ metric, data, onSave }) {
       )}
       {edit != null ? (
         <div className={`ach-stat-preview ${unlocks.length ? 'on' : ''}`}>
-          {!platform && <span>= {fmtValue(metric, total)} {metric === 'deal' ? '(the bigger one counts)' : 'in total'}</span>}
           {unlocks.length ? (
             <>
               <span className="ach-stat-unlocks"><Sparkles size={12} /> Unlocks {unlocks.length}</span>
@@ -82,13 +79,6 @@ function StatTile({ metric, data, onSave }) {
         </div>
       ) : (
         <>
-          {!platform && (
-            <div className="ach-stat-parts">
-              {metric === 'deal'
-                ? <>before the app {fmtValue(metric, stats.earlier.deal)} · {m.app} {fmtValue(metric, app.deal || 0)}</>
-                : <>{fmtValue(metric, stats.earlier[metric])} before the app + {fmtValue(metric, app[metric] || 0)} {m.app}</>}
-            </div>
-          )}
           {next ? (
             <div className="ach-stat-next" title={next.title}>
               <span className="ach-bar"><i style={{ width: `${Math.max(2, Math.min(1, metrics[metric] / next.target) * 100)}%` }} /></span>

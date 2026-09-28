@@ -1066,16 +1066,19 @@ pointer; still when the system asks for reduced motion).
   Mythic 1–3** (Stone 2 at 100 XP, Stone 3 at 300, Bronze 1 at 600 … Mythic 3
   at 21,000) — shown as an emblem with the XP bar and how many of each rarity
   you have.
-- **Your numbers** — a tile per number: your **followers** on Instagram,
-  TikTok, X and YouTube (you keep them up to date) and your work — **biggest
-  single deal** (your invoices), **revenue paid**, **clients**, **client projects
-  delivered** and **posts** published in Content. Clients and client projects
-  are counted apart. Each tile shows the total and where it comes from (e.g.
-  “95 before the app + 3 delivered in the app”) and the next milestone on it.
-  Click a number to change it (for your work: what came **before the app**);
-  while you type, the tile lists what it would unlock — **Enter** saves and
-  unlocks them (dated today; change a day on the card if you know it).
-  Reached ones never lock again.
+- **Your numbers** — a tile per number, all **typed in by you** (nothing is
+  counted from the app's clients, invoices, projects or posts): your
+  **followers** on Instagram, TikTok, X and YouTube, and your work — **biggest
+  single deal**, **revenue**, **clients**, **client projects** and **posts**.
+  Each tile shows the number and the next milestone on it. Click a number to
+  change it; while you type, the tile lists what it would unlock — **Enter**
+  saves and unlocks them (dated today; change a day on the card if you know
+  it). Reached ones never lock again.
+- **Special Quests** — the pack to start with (the button shows while some of
+  it is missing and adds only those): album cover, visualizer, a known person,
+  a known brand, a business trip, game assets — each as a **quest** (e.g. for
+  a musician people know) and as a **dream quest** (for one you love
+  yourself), with their descriptions; the business trip is already reached.
 - **New series** — several milestones on one number in one go: pick what it
   counts (e.g. TikTok followers), the group, a name pattern (`{n}` = 2K,
   `{N}` = 2,000), and the steps, each with its rarity (rising from Stone by
@@ -1084,10 +1087,11 @@ pointer; still when the system asks for reduced motion).
 - **New achievement** (or **Add to …** in a group) opens the editor with the
   card as it will look — name, what it takes, **group**, **rarity**, the badge,
   an optional **sticker** (an event's or a client's logo on the corner; upload
-  or from the app), a number it unlocks at, and the day it was reached. It
-  suggests quests that fit the work (showreel, returning client, referral,
-  retainer, a higher rate, a viral post, featured, a talk, your own product,
-  an award). Delete goes to the Trash (with Undo).
+  or from the app), a number it unlocks at, and the day it was reached. As
+  templates it offers the Special Quests you don't have yet and more quests
+  that fit the work (showreel, returning client, referral, retainer, a higher
+  rate, a viral post, featured, a talk, your own product, an award). Delete
+  goes to the Trash (with Undo).
 - Unlocking — by a number or by hand — gets its moment: the card flips in
   with its XP (and your new rank, if there is one).
 - The **dashboard** has an **Achievements** widget: your rank and XP, how many
@@ -1095,7 +1099,8 @@ pointer; still when the system asks for reduced motion).
   you're closest to.
 
 Achievements are stored in `data/db.json` (`achievements`, your numbers in
-`achievementStats`), their pictures in `data/achievement/<id>/`.
+`achievementStats` — numbers saved by the previous version as “before the
+app” are kept as your numbers), their pictures in `data/achievement/<id>/`.
 
 ### Inbox (share from your phone)
 Everything you come across on the go — a screenshot, a screen recording, an
@@ -1389,7 +1394,7 @@ lookup off with `LINK_LOOKUP=off`).
   ├── unused.js       # unused-file scan
   ├── zip.js          # dependency-free ZIP64 export/import
   ├── xlsx.js         # dependency-free .xlsx writer (time sheet export)
-  ├── achievements.js # what achievements unlock from, quest ideas
+  ├── achievements.js # what achievements unlock from, Special Quests, quest ideas
   └── routes/         # projects (references), projects (projects), clients, software, board, mockups, time, notes, content, achievements, trash, search, settings, library, maintenance
   ```
 - **Tests:** `npm test` starts the real server against throwaway data folders —

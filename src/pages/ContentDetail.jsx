@@ -74,19 +74,10 @@ export default function ContentDetail() {
       try {
         const saved = await api.updateContent(cid, body);
         if ('status' in body) setItem((c) => (c && c.id === saved.id ? { ...c, status: saved.status, date: saved.date, postedAt: saved.postedAt } : c));
-        if (body.status === 'posted') celebrate();
       } catch (e) { toast(`Could not save: ${e.message}`, 'error'); }
     }, { immediate: now });
   };
 
-  // Out now: a post can be the one that unlocks an achievement ("50 posts").
-  const celebrate = async () => {
-    try {
-      const { achievements, unlocked } = await api.getAchievements();
-      const got = achievements.filter((a) => unlocked.includes(a.id));
-      if (got.length) toast(`🏆 Achievement unlocked: ${got.map((a) => a.title).join(', ')}`, 'ok', { label: 'Show', onClick: () => navigate('/achievements') });
-    } catch { /* not worth an error */ }
-  };
   const addFiles = async (files) => {
     const list = mediaFiles(files);
     if (!list.length) return;

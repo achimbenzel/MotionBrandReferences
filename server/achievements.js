@@ -1,38 +1,18 @@
-// Achievements: the numbers they unlock from, the unlocking itself, and
-// quest ideas the editor offers (the achievements themselves are all yours).
+// Achievements: the numbers they unlock from, the unlocking itself, the
+// Special Quests pack and more quest ideas the editor offers.
 
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
-/** What the app itself counts: the biggest invoice, paid invoices, clients, delivered client projects, posted content. */
-export function appCounts(db) {
-  const invoices = (db.clients || []).flatMap((c) => c.invoices || []);
-  return {
-    deal: Math.max(0, ...invoices.map((i) => i.amount || 0)),
-    revenue: Math.round(invoices.filter((i) => i.status === 'paid').reduce((n, i) => n + (i.amount || 0), 0) * 100) / 100,
-    clients: (db.clients || []).length,
-    projects: (db.plans || []).filter((p) => p.clientId && (p.status === 'delivered' || p.status === 'archived')).length,
-    posts: (db.content || []).filter((c) => c.status === 'posted').length,
-  };
-}
-
 /**
- * The numbers achievements unlock from: what the app counts + what you did
- * before using it (the biggest deal is the bigger of the two), and the
- * followers you keep up to date yourself.
+ * The numbers achievements unlock from — all yours to keep up to date
+ * (nothing is counted from the app): followers per platform, the biggest
+ * deal, revenue, clients, client projects, posts.
  */
 export function achievementMetrics(db) {
-  const st = db.achievementStats;
-  const app = appCounts(db);
+  const { numbers: n, followers: f } = db.achievementStats;
   return {
-    deal: Math.max(st.earlier.deal, app.deal),
-    revenue: Math.round((st.earlier.revenue + app.revenue) * 100) / 100,
-    clients: st.earlier.clients + app.clients,
-    projects: st.earlier.projects + app.projects,
-    posts: st.earlier.posts + app.posts,
-    'followers:instagram': st.followers.instagram,
-    'followers:tiktok': st.followers.tiktok,
-    'followers:x': st.followers.x,
-    'followers:youtube': st.followers.youtube,
+    deal: n.deal, revenue: n.revenue, clients: n.clients, projects: n.projects, posts: n.posts,
+    'followers:instagram': f.instagram, 'followers:tiktok': f.tiktok, 'followers:x': f.x, 'followers:youtube': f.youtube,
   };
 }
 
@@ -53,10 +33,26 @@ export const dueToUnlock = (db) => {
   return db.achievements.some((a) => !a.achievedAt && a.metric && a.target != null && m[a.metric] >= a.target);
 };
 
-// ---- Quest ideas ----------------------------------------------------------------------
-const quest = (title, description, symbol, rarity, order) => ({
-  group: 'Special Quests', title, description, rarity, icon: { type: 'symbol', symbol }, order,
+// ---- Special Quests (a pack to start with) and more quest ideas -------------------------
+const quest = (title, description, symbol, rarity, order, achievedAt = '') => ({
+  group: 'Special Quests', title, description, rarity, icon: { type: 'symbol', symbol }, order, achievedAt,
 });
+
+/** The Special Quests pack: a quest and its dream version each (the business trip already reached). */
+export const SPECIAL_QUESTS = [
+  quest('Album Cover Design', 'Album Cover für Musiker/Band mit Bekanntheitsgrad.', 'image', 'quest', 0),
+  quest('Album Cover Design', 'Album Cover für Musiker/Band, die ich selber gerne höre.', 'image', 'dream', 1),
+  quest('Visualizer Design', 'Visualizer oder Bühnenvisualizer für Musiker/Band mit Bekanntheitsgrad.', 'monitor', 'quest', 2),
+  quest('Visualizer Design', 'Visualizer oder Bühnenvisualizer für Musiker/Band, die ich selber gerne höre.', 'monitor', 'dream', 3),
+  quest('Bekannte Persönlichkeit', 'Gearbeitet für eine Person mit Bekanntheitsgrad.', 'user-star', 'quest', 4),
+  quest('Bekannte Persönlichkeit', 'Gearbeitet für eine Person, für die ich gerne arbeiten möchte.', 'user-star', 'dream', 5),
+  quest('Bekannte Marke', 'Gearbeitet für eine Marke mit Bekanntheitsgrad.', 'building', 'quest', 6),
+  quest('Bekannte Marke', 'Gearbeitet für eine Marke, für die ich gerne arbeiten möchte.', 'building', 'dream', 7),
+  quest('Dienstreise', 'Dienstreise mit Hotel und Übernachtung.', 'car', 'quest', 8, '2025-07-17'),
+  quest('Dienstreise', 'Dienstreise mit Hotel und Übernachtung im Ausland.', 'plane', 'dream', 9),
+  quest('Game Assets erstellen', 'Assets für ein Game erstellt, das veröffentlicht wurde.', 'gamepad', 'quest', 10),
+  quest('Game Assets erstellen', 'Assets für ein Game erstellt, das veröffentlicht wurde — und auf die ich richtig stolz bin.', 'gamepad', 'dream', 11),
+];
 
 /** More quests that fit the job — offered when adding one (the editor shows them). */
 export const QUEST_IDEAS = [

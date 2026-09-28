@@ -9,7 +9,7 @@ import { upload } from '../upload.js';
 import { normalizeAchievement, normalizeAchievementStats, str, isDay, RARITIES, ACHIEVEMENT_METRICS } from '../schema.js';
 import { createRouter, HttpError } from '../http.js';
 import { sourceAsUpload, IMAGE_EXT } from '../sources.js';
-import { achievementMetrics, appCounts, unlockReached, dueToUnlock, QUEST_IDEAS } from '../achievements.js';
+import { achievementMetrics, unlockReached, dueToUnlock, SPECIAL_QUESTS, QUEST_IDEAS } from '../achievements.js';
 
 const router = createRouter();
 export default router;
@@ -24,7 +24,7 @@ const sorted = (list) => {
 };
 const payload = (db, unlocked = []) => ({
   achievements: sorted(db.achievements),
-  stats: db.achievementStats, metrics: achievementMetrics(db), app: appCounts(db), unlocked, ideas: QUEST_IDEAS,
+  stats: db.achievementStats, metrics: achievementMetrics(db), unlocked, pack: SPECIAL_QUESTS, ideas: QUEST_IDEAS,
 });
 
 // Everything — and whatever has been reached meanwhile unlocks now (`unlocked`: their ids).
@@ -127,14 +127,14 @@ router.delete('/api/achievements/:id', async (req, res) => {
   res.json({ ok: true, trashId });
 });
 
-// Your numbers: followers per platform, and what you did before the app.
+// Your numbers: followers per platform, deals, revenue, clients, client projects, posts.
 router.patch('/api/achievement-stats', async (req, res) => {
   const out = await mutateDB((db) => {
     const cur = db.achievementStats;
     const b = req.body || {};
     db.achievementStats = normalizeAchievementStats({
       followers: { ...cur.followers, ...(b.followers && typeof b.followers === 'object' ? b.followers : {}) },
-      earlier: { ...cur.earlier, ...(b.earlier && typeof b.earlier === 'object' ? b.earlier : {}) },
+      numbers: { ...cur.numbers, ...(b.earlier && typeof b.earlier === 'object' ? b.earlier : {}), ...(b.numbers && typeof b.numbers === 'object' ? b.numbers : {}) },
     });
     return unlockReached(db);
   });
@@ -160,4 +160,21 @@ router.post('/api/achievements/batch', async (req, res) => {
     return unlockReached(db);
   });
   res.status(201).json({ ...payload(await readDB(), out), added: items.length });
+});
+
+// The Special Quests pack — the ones you don't have yet (same group, title and description).
+router.post('/api/achievements/starter', async (_req, res) => {
+  const out = await mutateDB((db) => {
+    const key = (a) => `${a.group}\n${a.title}\n${a.description}`;
+    const have = new Set(db.achievements.map(key));
+    let added = 0;
+    for (const q of SPECIAL_QUESTS) {
+      const a = normalizeAchievement({ ...q, id: nanoid(10), createdAt: Date.now(), updatedAt: Date.now() });
+      if (have.has(key(a))) continue;
+      db.achievements.push(a);
+      added += 1;
+    }
+    return { added, unlocked: unlockReached(db) };
+  });
+  res.status(201).json({ ...payload(await readDB(), out.unlocked), added: out.added });
 });

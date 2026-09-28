@@ -993,9 +993,10 @@ export function normalizeAchievementStats(s) {
   const o = s && typeof s === 'object' ? s : {};
   const n = (v) => Math.round(num(v, 0, 1e12, 0));
   const f = o.followers && typeof o.followers === 'object' ? o.followers : {};
-  const e = o.earlier && typeof o.earlier === 'object' ? o.earlier : {};
+  // Your numbers, all typed in by you (`earlier` is their older name — then only "before the app").
+  const e = o.numbers && typeof o.numbers === 'object' ? o.numbers : o.earlier && typeof o.earlier === 'object' ? o.earlier : {};
   return {
     followers: { instagram: n(f.instagram), tiktok: n(f.tiktok), x: n(f.x), youtube: n(f.youtube) },
-    earlier: { deal: n(e.deal), revenue: n(e.revenue), clients: n(e.clients), projects: n(e.projects), posts: n(e.posts) },
+    numbers: { deal: n(e.deal), revenue: n(e.revenue), clients: n(e.clients), projects: n(e.projects), posts: n(e.posts) },
   };
 }
