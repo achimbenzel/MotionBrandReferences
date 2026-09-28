@@ -168,65 +168,75 @@
         return h;
     }
 
-    // One-event action: Layers panel menu > Hide Others
+    // Event of a one-step action: Layers panel menu > Hide Others
     // (plug-in ai_plugin_Layer, menu uid 7 / string id 23).
-    function hideOthersAction() {
+    var HIDE_OTHERS_EVENT = [
+        "/useRulersIn1stQuadrant 0",
+        "/internalName (ai_plugin_Layer)",
+        "/localizedName [", "5", "4c61796572", "]",
+        "/isOpen 0",
+        "/isOn 1",
+        "/hasDialog 0",
+        "/parameterCount 3",
+        "/parameter-1 {", "/key 1836411236", "/showInPalette -1",
+        "/type (integer)", "/value 7", "}",
+        "/parameter-2 {", "/key 1937008996", "/showInPalette -1",
+        "/type (integer)", "/value 23", "}",
+        "/parameter-3 {", "/key 1851878757", "/showInPalette -1",
+        "/type (ustring)", "/value [", "11", "48696465204f7468657273", "]", "}"
+    ].join("\n");
+
+    // Wrap one event block into a complete one-action set (.aia text)
+    function actionText(setName, actName, eventBlock) {
         return [
             "/version 3",
-            "/name [", String(ACTION_SET.length), hex(ACTION_SET), "]",
+            "/name [", String(setName.length), hex(setName), "]",
             "/isOpen 0",
             "/actionCount 1",
             "/action-1 {",
-            "/name [", String(ACTION_NAME.length), hex(ACTION_NAME), "]",
+            "/name [", String(actName.length), hex(actName), "]",
             "/keyIndex 0",
             "/colorIndex 0",
             "/isOpen 0",
             "/eventCount 1",
             "/event-1 {",
-            "/useRulersIn1stQuadrant 0",
-            "/internalName (ai_plugin_Layer)",
-            "/localizedName [", "5", "4c61796572", "]",
-            "/isOpen 0",
-            "/isOn 1",
-            "/hasDialog 0",
-            "/parameterCount 3",
-            "/parameter-1 {", "/key 1836411236", "/showInPalette -1",
-            "/type (integer)", "/value 7", "}",
-            "/parameter-2 {", "/key 1937008996", "/showInPalette -1",
-            "/type (integer)", "/value 23", "}",
-            "/parameter-3 {", "/key 1851878757", "/showInPalette -1",
-            "/type (ustring)", "/value [", "11", "48696465204f7468657273", "]", "}",
+            eventBlock,
             "}",
             "}"
         ].join("\n");
     }
 
-    function unloadTempSet() {
+    function unloadTempSet(setName) {
         // Loop: a crashed earlier run may have left more than one copy
         for (var i = 0; i < 5; i++) {
-            try { app.unloadAction(ACTION_SET, ""); } catch (e) { return; }
+            try { app.unloadAction(setName, ""); } catch (e) { return; }
         }
     }
 
-    function playHideOthers() {
-        var f = new File(Folder.temp + "/LayerHandler_hideOthers.aia");
+    // Load the event as a temporary action set, play it, unload it again
+    function playEvent(setName, actName, eventBlock) {
+        var f = new File(Folder.temp + "/" + setName + ".aia");
         var level = app.userInteractionLevel;
         var ok = false;
         try {
             app.userInteractionLevel = UserInteractionLevel.DONTDISPLAYALERTS;
             if (f.open("w")) {
-                f.write(hideOthersAction());
+                f.write(actionText(setName, actName, eventBlock));
                 f.close();
-                unloadTempSet();
+                unloadTempSet(setName);
                 app.loadAction(f);
-                app.doScript(ACTION_NAME, ACTION_SET, false);
+                app.doScript(actName, setName, false);
                 ok = true;
             }
         } catch (e) { ok = false; }
-        unloadTempSet();
+        unloadTempSet(setName);
         try { f.remove(); } catch (e2) {}
         try { app.userInteractionLevel = level; } catch (e3) {}
         return ok;
+    }
+
+    function playHideOthers() {
+        return playEvent(ACTION_SET, ACTION_NAME, HIDE_OTHERS_EVENT);
     }
 
     // A visible layer whose sublayers are partly hidden is only the parent
@@ -393,6 +403,241 @@
         var tops = selectionTops(doc);
         var layers = tops.list.length ? layersOf(doc, tops) : [];
         return { objects: tops.list.length, layers: layers.length, text: tops.text };
+    }
+
+    // --------------------------------------- highlighted rows ("Collect")
+    // Highlighted OBJECT rows are just as invisible to scripts. Once the
+    // user has recorded the Layers panel command "Collect in New Layer" as
+    // an action and handed LayerHandler the saved .aia (LH_learnCollect),
+    // Split plays that command: everything highlighted lands in one new
+    // layer, which tells exactly which rows were highlighted. Every moved
+    // object and layer is then put back where it was (from a snapshot
+    // taken just before), and only then does the split run.
+    var COLLECT_SET  = "LayerHandler_collect";
+    var COLLECT_NAME = "Collect";
+
+    function readText(f) {
+        f.encoding = "UTF-8";
+        if (!f.open("r")) { return null; }
+        var t = f.read();
+        f.close();
+        return t;
+    }
+
+    function writeText(f, text) {
+        f.encoding = "UTF-8";
+        if (!f.open("w")) { return false; }
+        f.write(text);
+        f.close();
+        return true;
+    }
+
+    // Kept outside the extension folder so updates do not forget it
+    function collectFile() {
+        var dir = new Folder(Folder.userData + "/LayerHandler");
+        if (!dir.exists) { dir.create(); }
+        return new File(dir.fsName + "/collect-event.txt");
+    }
+
+    function learnedCollect() {
+        try {
+            var f = collectFile();
+            if (!f.exists) { return null; }
+            var t = readText(f);
+            return t && t.indexOf("(ai_plugin_Layer)") > -1 ? t : null;
+        } catch (e) { return null; }
+    }
+
+    // Inner text of the first Layers panel event in an exported action set
+    function extractLayerEvent(txt) {
+        var at = txt.indexOf("(ai_plugin_Layer)");
+        if (at < 0) { return null; }
+        var start = txt.lastIndexOf("/event-", at);
+        if (start < 0) { return null; }
+        var open = txt.indexOf("{", start);
+        if (open < 0 || open > at) { return null; }
+        var depth = 0;
+        for (var i = open; i < txt.length; i++) {
+            var ch = txt.charAt(i);
+            if (ch === "{") { depth++; }
+            else if (ch === "}") {
+                depth--;
+                if (depth === 0) { return trim(txt.substring(open + 1, i)); }
+            }
+        }
+        return null;
+    }
+
+    // The command name stored in the event (key 'name' = 1851878757)
+    function eventName(block) {
+        var m = block.match(/\/key 1851878757[\s\S]*?\/value \[\s*\d+\s+([0-9a-fA-F\s]+)\]/);
+        if (!m) { return ""; }
+        var h = m[1].replace(/\s+/g, "");
+        var enc = "";
+        for (var i = 0; i + 1 < h.length; i += 2) { enc += "%" + h.substr(i, 2); }
+        try { return decodeURIComponent(enc); } catch (e) { return ""; }
+    }
+
+    // Front-to-back children of every layer and group, so a probe can be
+    // undone exactly
+    function snapshot(doc) {
+        var snap = { layers: [], containers: [] };
+        function items(container, isLayer) {
+            var list = [];
+            var n = 0;
+            try { n = container.pageItems.length; } catch (e) { n = 0; }
+            for (var i = 0; i < n; i++) {
+                var it = container.pageItems[i];
+                if (isLayer) {
+                    try { if (it.parent.typename !== "Layer") { continue; } } catch (e2) {}
+                }
+                list.push({ item: it, key: itemKey(it) });
+            }
+            snap.containers.push({ container: container, list: list });
+            for (var k = 0; k < list.length; k++) {
+                var t = "";
+                try { t = list[k].item.typename; } catch (e3) {}
+                if (t === "GroupItem") { items(list[k].item, false); }
+            }
+        }
+        function layers(parent) {
+            var list = [];
+            var n = 0;
+            try { n = parent.layers.length; } catch (e) { n = 0; }
+            for (var i = 0; i < n; i++) { list.push(parent.layers[i]); }
+            snap.layers.push({ parent: parent, list: list });
+            for (var k = 0; k < list.length; k++) {
+                items(list[k], true);
+                layers(list[k]);
+            }
+        }
+        layers(doc);
+        return snap;
+    }
+
+    function knownLayer(snap, L) {
+        for (var i = 0; i < snap.layers.length; i++) {
+            var list = snap.layers[i].list;
+            for (var k = 0; k < list.length; k++) { if (list[k] == L) { return true; } }
+        }
+        return false;
+    }
+
+    function inList(list, obj) {
+        for (var i = 0; i < list.length; i++) { if (list[i] == obj) { return true; } }
+        return false;
+    }
+
+    // Move with a retry that briefly unlocks/unhides the object and the
+    // container it goes into
+    function moveBack(obj, rel, where, container) {
+        try { obj.move(rel, where); return; } catch (e) {}
+        var undo = [];
+        function release(o) {
+            try { if (o.locked) { o.locked = false; undo.push([o, "locked", true]); } } catch (e1) {}
+            try {
+                if (o.typename === "Layer") {
+                    if (!o.visible) { o.visible = true; undo.push([o, "visible", false]); }
+                } else if (o.hidden) { o.hidden = false; undo.push([o, "hidden", true]); }
+            } catch (e2) {}
+        }
+        release(obj);
+        if (container) { release(container); }
+        try { obj.move(rel, where); }
+        finally {
+            for (var i = undo.length - 1; i >= 0; i--) {
+                try { undo[i][0][undo[i][1]] = undo[i][2]; } catch (e3) {}
+            }
+        }
+    }
+
+    // Put collected objects and layers back in their snapshot order
+    // (bottom-up: each one goes in front of the neighbour that was behind it)
+    function restoreSnapshot(snap, movedKeys, movedLayers) {
+        var i, k, next, rec;
+        for (i = 0; i < snap.containers.length; i++) {
+            rec = snap.containers[i];
+            next = null;
+            for (k = rec.list.length - 1; k >= 0; k--) {
+                var e = rec.list[k];
+                if (e.key !== null && movedKeys[e.key] === true) {
+                    if (next) { moveBack(e.item, next, ElementPlacement.PLACEBEFORE, rec.container); }
+                    else { moveBack(e.item, rec.container, ElementPlacement.PLACEATEND, rec.container); }
+                }
+                next = e.item;
+            }
+        }
+        for (i = 0; i < snap.layers.length; i++) {
+            rec = snap.layers[i];
+            next = null;
+            for (k = rec.list.length - 1; k >= 0; k--) {
+                var L = rec.list[k];
+                if (inList(movedLayers, L)) {
+                    if (next) { moveBack(L, next, ElementPlacement.PLACEBEFORE, null); }
+                    else {
+                        // Last in its parent: go behind the nearest sibling
+                        // that stayed, else to the end of the parent
+                        var prev = null;
+                        for (var j = k - 1; j >= 0 && !prev; j--) {
+                            if (!inList(movedLayers, rec.list[j])) { prev = rec.list[j]; }
+                        }
+                        if (prev) { moveBack(L, prev, ElementPlacement.PLACEAFTER, null); }
+                        else { moveBack(L, rec.parent, ElementPlacement.PLACEATEND, null); }
+                    }
+                }
+                next = L;
+            }
+        }
+    }
+
+    // null = not set up; otherwise { items, layers } that were highlighted
+    // (both empty when the command did nothing). Throws if the document
+    // could not be put back.
+    function probeHighlighted(doc) {
+        var block = learnedCollect();
+        if (!block) { return null; }
+        var snap = snapshot(doc);
+        playEvent(COLLECT_SET, COLLECT_NAME, block);
+
+        var flat = [];
+        layerTree(doc, 0, flat);
+        var N = null, i;
+        for (i = 0; i < flat.length; i++) {
+            if (!knownLayer(snap, flat[i].layer)) { N = flat[i].layer; break; }
+        }
+        var res = { items: [], layers: [] };
+        if (!N) { return res; }
+
+        var keys = {};
+        for (i = 0; i < N.pageItems.length; i++) {
+            var it = N.pageItems[i];
+            res.items.push(it);
+            var k = itemKey(it);
+            if (k !== null) { keys[k] = true; }
+        }
+        for (i = 0; i < N.layers.length; i++) { res.layers.push(N.layers[i]); }
+
+        restoreSnapshot(snap, keys, res.layers);
+        if (N.pageItems.length === 0 && N.layers.length === 0) { N.remove(); }
+        else {
+            throw new Error("Could not put everything back after reading the Layers panel " +
+                            "- press Undo (Ctrl/Cmd+Z) a few times.");
+        }
+        return res;
+    }
+
+    // Same shape as selectionTops(), built from a list of objects
+    function topsOf(list) {
+        var res = { list: [], keys: {}, text: false };
+        for (var i = 0; i < list.length; i++) {
+            var t = topItem(list[i]);
+            if (!t || containsItem(res, t)) { continue; }
+            var k = itemKey(t);
+            if (k === null) { res.keys = null; }
+            else if (res.keys) { res.keys[k] = true; }
+            res.list.push(t);
+        }
+        return res;
     }
 
     // ------------------------------------------------------------ split plan
@@ -644,7 +889,21 @@
 
             var jobs = [], i, k, c;
             var fromSelection = tops.list.length > 0;
-            if (fromSelection) {
+            var fromPanel = false;
+            var wholeLayers = null;
+            if (!fromSelection) {
+                // Nothing on the artboard: read the highlighted rows
+                var probe = null;
+                try { probe = probeHighlighted(doc); }
+                catch (eProbe) { return fail(String(eProbe.message || eProbe)); }
+                if (probe && probe.items.length) {
+                    tops = topsOf(probe.items);
+                    fromPanel = tops.list.length > 0;
+                } else if (probe && probe.layers.length) {
+                    wholeLayers = probe.layers;
+                }
+            }
+            if (fromSelection || fromPanel) {
                 var held = layersOf(doc, tops);
                 for (i = 0; i < held.length; i++) {
                     var items = directItems(held[i]);
@@ -657,16 +916,16 @@
                     if (any) { jobs.push({ layer: held[i], items: items, flags: flags }); }
                 }
             } else {
-                var t = targetLayers(doc);
-                for (i = 0; i < t.layers.length; i++) {
-                    var all = directItems(t.layers[i]);
+                if (!wholeLayers) { wholeLayers = targetLayers(doc).layers; }
+                for (i = 0; i < wholeLayers.length; i++) {
+                    var all = directItems(wholeLayers[i]);
                     var on = [];
                     for (k = 0; k < all.length; k++) { on.push(true); }
-                    if (all.length) { jobs.push({ layer: t.layers[i], items: all, flags: on }); }
+                    if (all.length) { jobs.push({ layer: wholeLayers[i], items: all, flags: on }); }
                 }
             }
             if (!jobs.length) {
-                return fail(fromSelection
+                return fail(fromSelection || fromPanel
                     ? "Could not find the selected objects in their layers."
                     : "The selected layer has no objects to split.");
             }
@@ -779,11 +1038,52 @@
                 layers: plans.length,
                 skipped: skipped,
                 fromSelection: fromSelection,
-                source: fromSelection ? "selection" : srcLabel
+                fromPanel: fromPanel,
+                source: fromSelection || fromPanel ? "objects" : srcLabel
             });
         } catch (err) {
             return fail("Split error: " + err);
         }
+    };
+
+    // ------------------------------------------------------------------------
+    // LH_learnCollect: pick the saved action set (.aia) in which the user
+    // recorded Layers panel menu > Collect in New Layer; its event is kept
+    // in the user data folder. LH_collectInfo reports the current state.
+    // ------------------------------------------------------------------------
+    $.global.LH_learnCollect = function () {
+        try {
+            var f = File.openDialog("LayerHandler: pick the saved action (.aia) with \"Collect in New Layer\"");
+            if (!f) { return jval({ ok: false, cancelled: true }); }
+            var txt = readText(f);
+            var block = txt ? extractLayerEvent(txt) : null;
+            if (!block) {
+                return fail("No Layers panel command in that file - record Layers panel menu > Collect in New Layer.");
+            }
+            var name = eventName(block);
+            // A wrong command here would run on every Split - ask when the
+            // name does not look like Collect (EN / DE / FR / ES / IT / JA)
+            if (!/collect|sammeln|rassembler|reunir|raccogli|\u96c6\u3081/i.test(name)) {
+                if (!confirm("The command in this file is \"" + (name || "unknown") + "\".\n" +
+                             "LayerHandler expects \"Collect in New Layer\". Use it anyway?")) {
+                    return jval({ ok: false, cancelled: true });
+                }
+            }
+            if (!writeText(collectFile(), block)) { return fail("Could not save the setup."); }
+            return jval({ ok: true, learned: true, name: name });
+        } catch (err) {
+            return fail("Setup error: " + err);
+        }
+    };
+
+    $.global.LH_collectInfo = function () {
+        var b = learnedCollect();
+        return jval({ ok: true, learned: !!b, name: b ? eventName(b) : "" });
+    };
+
+    $.global.LH_forgetCollect = function () {
+        try { var f = collectFile(); if (f.exists) { f.remove(); } } catch (e) {}
+        return jval({ ok: true, learned: false });
     };
 
     // ------------------------------------------------------------------------

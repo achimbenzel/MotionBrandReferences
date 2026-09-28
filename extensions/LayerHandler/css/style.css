@@ -31,6 +31,7 @@
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
+[hidden] { display: none !important; }
 
 html, body {
   height: 100%;
@@ -425,6 +426,18 @@ select:focus { outline: none; border-color: rgba(var(--color-accent-rgb), .6); }
 .btn svg { width: 12px; height: 12px; }
 .btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .btn.ghost.icon-only { flex: none; width: 30px; padding: 0; }
+.btn.ghost.sm { flex: none; }
+.btn.ghost.sm.icon-only { width: 26px; }
+.lc-foot .btn.ghost.sm { flex: 1; }
+
+/* Small state value in an option row (e.g. Panel rows on/off) */
+.val {
+  flex: 1; min-width: 0;
+  font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.val.on { color: var(--accent); }
 
 .btn.ghost {
   flex: 1;

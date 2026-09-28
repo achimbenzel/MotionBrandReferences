@@ -144,8 +144,17 @@
         <label class="tg"><input type="checkbox" id="keepColor"><span class="track"></span>Keep layer color</label>
       </div>
 
+      <div class="row sub" title="Use object rows highlighted in the Layers panel. Needs a one-time setup: record Layers panel menu &gt; Collect in New Layer as an action, save it (.aia) and pick it here.">
+        <span class="lbl">Panel</span>
+        <span class="val mono" id="collectState">off</span>
+        <button id="btn-learn" class="btn ghost sm">Set up&hellip;</button>
+        <button id="btn-forget" class="btn ghost sm icon-only" title="Turn off - forget the recorded command" hidden>
+          <svg viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+
       <div class="readout mono" id="splitReadout"><span class="rt">select a layer or objects</span></div>
-      <div class="hint">Only some objects? Select them on the artboard</div>
+      <div class="hint" id="splitHint">Only some objects? Select them on the artboard</div>
     </div>
   </section>
 

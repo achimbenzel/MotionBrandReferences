@@ -119,17 +119,56 @@ in the layer. Groups and compound paths stay intact.
   in its layer. Selecting a path inside a group splits out the whole group.
   Selections spanning several layers are handled layer by layer.
 
-**Selected vs. highlighted.** "Selected" means selected on the artboard:
-click the objects with the Selection tool (Shift adds), or in the Layers
-panel click each object's target circle / the selection square at the
-right edge of its row (Shift-click adds). Clicking an object's *name* in
-the Layers panel only highlights the row - Illustrator does not tell
-scripts about highlighted object rows, so they count as "no selection" and
-the whole layer is split.
+**Selected vs. highlighted.** Objects can be picked two ways:
+
+- **Selected on the artboard** - click them with the Selection tool (Shift
+  adds), or in the Layers panel click each object's target circle / the
+  selection square at the right edge of its row. Always works, and always
+  wins when something is selected.
+- **Highlighted in the Layers panel** - click the object rows by name
+  (Shift / Ctrl/Cmd-click for several). Illustrator does not tell scripts
+  about highlighted object rows, so this needs the one-time setup below.
+  Without it, highlighted rows count as "no selection" and the whole layer
+  is split.
+
+#### One-time setup: highlighted Layers panel rows
+
+LayerHandler learns the Layers panel command **Collect in New Layer** from
+an action you record once:
+
+1. Open a document and highlight any object row in the Layers panel (the
+   command is greyed out otherwise).
+2. **Window > Actions**, panel menu **New Set...** (any name), then
+   **New Action...** (any name) and **Record**.
+3. Layers panel menu **Collect in New Layer**.
+4. Stop recording (square button) and undo the collect in your document.
+5. Select the set in the Actions panel, panel menu **Save Actions...**, and
+   save the `.aia` anywhere.
+6. In LayerHandler open the Split options, and next to **Panel** click
+   **Set up...** and pick that `.aia`. Panel switches to **on**.
+
+From then on, with nothing selected on the artboard, **Split highlighted**
+uses the rows highlighted in the Layers panel: highlighted object rows are
+split out (the rest stays in its layer, stacking unchanged), highlighted
+layer rows are split completely. How it works: Split plays Collect in New
+Layer, reads what landed in the new layer - exactly the highlighted rows -,
+puts every object and layer back where it was, and then splits. Undo after
+such a split takes a few more steps.
+
+Notes:
+- Collect in New Layer only takes rows from one layer at a time
+  (Illustrator's own limit) - highlight objects within one layer.
+- A highlighted row inside a group splits out the whole group, like a
+  selection does.
+- The learned command is stored outside the extension, so updates keep it:
+  `%APPDATA%\LayerHandler\collect-event.txt` (Windows) or
+  `~/Library/Application Support/LayerHandler/collect-event.txt` (macOS).
+  The **x** next to Panel switches it off again.
 
 The button always says what it is about to do - **Split 3 objects** (the
-selection) or **Split all 37** (every object of the highlighted layer) -
-and follows the artboard selection live, so check it before clicking.
+artboard selection), **Split highlighted** (Layers panel rows, after the
+setup) or **Split all 37** (every object of the highlighted layer) - and
+follows the artboard selection live, so check it before clicking.
 
 The stacking order never changes: an object that was in front of another
 stays in front of it. When split-out objects overlap objects that stay
@@ -144,6 +183,7 @@ The Split options:
 | Into            | **Layers (in place)** - top-level/sibling layers, ideal for After Effects import; **Sublayers** - inside the source layer |
 | Names           | **From objects** - the object's name, the first line of a text frame, the linked file name or the type (Path, Group, Compound Path ...); **From name field** - the Rename name + numbering settings |
 | Keep layer color | New layers get the source layer's color instead of Illustrator's automatic next color |
+| Panel           | Use rows highlighted in the Layers panel - **off** until the one-time setup above |
 
 Hidden or locked source layers (and locked objects) are handled: they are
 released for the move and the new layers come out hidden/locked the same way.
@@ -179,8 +219,11 @@ Notes:
 - **"Host did not respond"** - reopen the panel (Window > Extensions);
   the ExtendScript engine reloads with it.
 - **Split took the whole layer instead of a few objects** - the objects were
-  only highlighted in the Layers panel, not selected (see "Selected vs.
-  highlighted" above). The button reads "Split all ..." in that case.
+  only highlighted in the Layers panel and the Panel setup is off (see
+  "Selected vs. highlighted" above). The button reads "Split all ..." then.
+- **Split highlighted did not split the highlighted rows** - check that the
+  learned command is Collect in New Layer (hover **on** next to Panel) and
+  that the rows sit in one layer.
 - **Only one layer gets renamed** - check the stats line after refresh; if
   it says "(active)", the Hide Others action could not run. Make sure a
   document is open and not in isolation mode.

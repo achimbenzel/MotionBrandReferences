@@ -32,6 +32,7 @@
   var custom = null;   // last custom color, shown on the Custom button
   var loaded = null;   // last host detection (see LH_detect)
   var live = null;     // artboard selection right now (see LH_state poll)
+  var collect = { learned: false, name: "" };  // Layers panel rows set up?
   var busy = false;
   var polling = false;
   var POLL_MS = 1200;
@@ -50,7 +51,9 @@
     preview: $("preview"), nameSummary: $("nameSummary"),
     splitInto: $("splitInto"), splitNames: $("splitNames"),
     keepColor: $("keepColor"), split: $("btn-split"),
-    splitLabel: $("splitLabel"), splitReadout: $("splitReadout")
+    splitLabel: $("splitLabel"), splitReadout: $("splitReadout"),
+    splitHint: $("splitHint"), collectState: $("collectState"),
+    learn: $("btn-learn"), forget: $("btn-forget")
   };
 
   // ----------------------------------------------------------- host bridge
@@ -317,6 +320,7 @@
     if (s.objects > 0) {
       txt = "\u2192 " + plural(s.objects, "layer", "layers") + " \u00b7 rest stays";
     } else {
+      if (collect.learned) { return "highlighted rows"; }
       if (!loaded) { return "select a layer or objects"; }
       var total = wholeCount();
       if (total === 0) { return "no objects in the selected layer"; }
@@ -334,11 +338,60 @@
     // Short enough for a 200 px panel; the readout in the options says more
     if (s.text) { label = "Leave text editing"; }
     else if (s.objects > 0) { label = "Split " + plural(s.objects, "object", "objects"); }
+    else if (collect.learned) { label = "Split highlighted"; }
     else if (loaded) { label = "Split all " + wholeCount(); }
     else { label = "Split whole layer"; }
     el.splitLabel.textContent = label;
     el.split.disabled = busy || s.text;
     setReadout(el.splitReadout, splitText());
+
+    el.collectState.textContent = collect.learned ? "on" : "off";
+    el.collectState.title = collect.learned
+      ? "Uses: " + (collect.name || "Layers panel command")
+      : "Highlighted Layers panel rows are not used yet";
+    el.collectState.classList.toggle("on", collect.learned);
+    el.learn.textContent = collect.learned ? "Replace\u2026" : "Set up\u2026";
+    el.forget.hidden = !collect.learned;
+    el.splitHint.textContent = collect.learned
+      ? "No artboard selection: highlighted rows are split"
+      : "Some objects only: select them on the artboard (or set up Panel)";
+  }
+
+  // ------------------------------------------------ Layers panel rows setup
+  function loadCollectInfo() {
+    evalJSX("typeof $.global.LH_collectInfo === 'function' ? $.global.LH_collectInfo() : ''", function (d) {
+      if (d && d.ok) {
+        collect = { learned: !!d.learned, name: d.name || "" };
+        paintSplit();
+      }
+    });
+  }
+
+  function learnCollect() {
+    if (busy) { return; }
+    showStatus("Setup: Actions panel > New Set + New Action, record Layers panel menu > " +
+               "Collect in New Layer (with a row highlighted), stop, Save Actions\u2026 - " +
+               "then pick that .aia file", true);
+    ensureHost(function () {
+      evalJSX("$.global.LH_learnCollect()", function (d) {
+        if (!d) { showStatus("Host did not respond."); return; }
+        if (d.cancelled) { return; }   // keep the steps on screen
+        if (!d.ok) { showStatus(d.msg || "Setup failed."); return; }
+        collect = { learned: true, name: d.name || "" };
+        paintSplit();
+        showStatus("Panel rows on \u00b7 " + (d.name || "command learned"), true);
+      });
+    });
+  }
+
+  function forgetCollect() {
+    ensureHost(function () {
+      evalJSX("$.global.LH_forgetCollect()", function () {
+        collect = { learned: false, name: "" };
+        paintSplit();
+        showStatus("Panel rows off", true);
+      });
+    });
   }
 
   function useDetection(d) {
@@ -414,7 +467,9 @@
         setBusy(false);
         if (!data) { showStatus("Host did not respond."); return; }
         if (!data.ok) { showStatus(data.msg || "Split failed."); return; }
-        var head = data.fromSelection
+        var head = data.fromPanel
+          ? plural(data.created, "highlighted object", "highlighted objects")
+          : data.fromSelection
           ? plural(data.created, "selected object", "selected objects")
           : data.layers > 1 ? data.layers + " whole layers"
           : "Whole layer" + (data.source ? " \u201c" + data.source + "\u201d" : "");
@@ -497,6 +552,8 @@
     el.split.addEventListener("click", splitLayers);
     el.clear.addEventListener("click", clearForm);
     el.custom.addEventListener("click", pickCustom);
+    el.learn.addEventListener("click", learnCollect);
+    el.forget.addEventListener("click", forgetCollect);
 
     el.name.addEventListener("keydown", function (e) {
       if (e.key === "Enter" || e.keyCode === 13) { e.preventDefault(); applyLayers(false); }
@@ -541,6 +598,7 @@
   renderPreview();
   paintSplit();
   refresh(); // read whatever is selected when the panel opens
+  ensureHost(loadCollectInfo);
   setInterval(poll, POLL_MS);
   window.addEventListener("focus", poll);
   document.addEventListener("mouseenter", poll);
