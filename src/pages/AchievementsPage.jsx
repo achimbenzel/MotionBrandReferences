@@ -7,6 +7,7 @@ import AchievementCard, { RankEmblem } from '../components/achievements/Achievem
 import AchievementEditor from '../components/achievements/AchievementEditor.jsx';
 import AchievementSeries from '../components/achievements/AchievementSeries.jsx';
 import AchievementStats from '../components/achievements/AchievementStats.jsx';
+import AchievementInspect from '../components/achievements/AchievementInspect.jsx';
 
 const FILTERS = [{ key: 'all', label: 'All' }, { key: 'got', label: 'Unlocked' }, { key: 'locked', label: 'To go' }];
 const load = (k, fallback) => { try { return localStorage.getItem(k) || fallback; } catch { return fallback; } };
@@ -29,6 +30,11 @@ export default function AchievementsPage({ reloadKey }) {
   const [series, setSeries] = useState(false);
   const [celebrate, setCelebrate] = useState(null); // { list, rankUp }
   const [glow, setGlow] = useState(() => new Set());
+  // Edit on: a click opens the editor and every group has its "Add to …" tile.
+  // Off: a click shows the card big (to turn round), and the collection stays just cards.
+  const [editMode, setEditModeState] = useState(() => load('achEdit', 'off') === 'on');
+  const [inspect, setInspect] = useState(null); // an index into the cards shown
+  const setEditMode = (on) => { setEditModeState(on); store('achEdit', on ? 'on' : 'off'); };
   const setFilter = (v) => { setFilterState(v); store('achFilter', v); };
   const toggleNumbers = () => setNumbersOpen((o) => { store('achNumbers', o ? 'closed' : 'open'); return !o; });
 
@@ -94,6 +100,8 @@ export default function AchievementsPage({ reloadKey }) {
   const openQuests = list.filter((a) => !a.achievedAt && !a.metric).length;
   const shown = (items) => items.filter((a) => filter === 'all' || (filter === 'got' ? !!a.achievedAt : !a.achievedAt));
   const packMissing = (data.pack || []).filter((q) => !list.some((a) => a.group === q.group && a.title === q.title && a.description === q.description)).length;
+  const cards = groups.flatMap((g) => shown(g.items));
+  const open = (a) => (editMode ? setEditor({ a }) : setInspect(cards.findIndex((x) => x.id === a.id)));
   const newButtons = (
     <>
       {packMissing > 0 && (
@@ -113,7 +121,15 @@ export default function AchievementsPage({ reloadKey }) {
           <h1>Achievements</h1>
           <p>Your milestones as a designer — every one you reach is XP towards your next rank.</p>
         </div>
-        <div className="ach-head-tools">{newButtons}</div>
+        <div className="ach-head-tools">
+          {list.length > 0 && (
+            <button type="button" role="switch" aria-checked={editMode} className={`ach-switch ${editMode ? 'on' : ''}`} onClick={() => setEditMode(!editMode)}
+              title={editMode ? 'Edit is on: a click edits a card' : 'Edit is off: a click shows the card big'}>
+              <span className="ach-switch-track"><i /></span> Edit
+            </button>
+          )}
+          {newButtons}
+        </div>
       </div>
 
       <section className="ach-hero" aria-label="Your rank" style={{ '--rc': RARITIES[rank.tier].color }}>
@@ -170,8 +186,8 @@ export default function AchievementsPage({ reloadKey }) {
                     <span className="ach-group-bar"><i style={{ width: `${(n / g.items.length) * 100}%` }} /></span>
                   </header>
                   <div className="ach-grid">
-                    {items.map((a) => <AchievementCard key={a.id} a={a} metrics={metrics} glow={glow.has(a.id)} onClick={() => setEditor({ a })} />)}
-                    {filter !== 'got' && (
+                    {items.map((a) => <AchievementCard key={a.id} a={a} metrics={metrics} glow={glow.has(a.id)} onClick={() => open(a)} />)}
+                    {editMode && filter !== 'got' && (
                       <button type="button" className="ach-add" onClick={() => setEditor({ group: g.name })}><Plus size={20} /><span>Add to {g.name}</span></button>
                     )}
                   </div>
@@ -200,6 +216,10 @@ export default function AchievementsPage({ reloadKey }) {
       {series && (
         <AchievementSeries groups={groups.map((g) => g.name)} metrics={metrics} existing={list} onClose={() => setSeries(false)}
           onSaved={(d) => { setSeries(false); take(d); toast(`${d.added} achievement${d.added === 1 ? '' : 's'} added`); }} />
+      )}
+      {inspect != null && cards[inspect] && (
+        <AchievementInspect list={cards} index={inspect} metrics={metrics} onIndex={setInspect} onClose={() => setInspect(null)}
+          onEdit={(a) => { setInspect(null); setEditor({ a }); }} />
       )}
       {celebrate && <Celebration {...celebrate} metrics={metrics} onClose={() => setCelebrate(null)} />}
     </div>

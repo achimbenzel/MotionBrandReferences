@@ -4,7 +4,7 @@ import {
   Clapperboard, Box, Brush, GraduationCap, PartyPopper, TrendingUp, Headphones, Tv, Laptop, Lightbulb, Coffee, Compass, Lock,
 } from 'lucide-react';
 import { achievementFileUrl } from '../../lib/api.js';
-import { RARITIES, HOLO, fmtDate, fmtValue, progressOf } from '../../lib/achievements.js';
+import { RARITIES, HOLO, SHINE, fmtDate, fmtValue, progressOf } from '../../lib/achievements.js';
 
 // "A person you know": lucide has no user-with-star, so one on top of the other.
 const UserStar = ({ size = 24, ...rest }) => (
@@ -46,22 +46,36 @@ const tilt = (e) => {
 const untilt = (e) => { for (const k of ['--mx', '--my', '--rx', '--ry']) e.currentTarget.style.removeProperty(k); };
 
 /**
+ * The frame's shine: a light that runs along it (Silver, Gold, Emerald) — or,
+ * on holo cards, a rainbow foil that circles it with glitter (Pokémon-style).
+ */
+function FrameFx({ foil }) {
+  return <span className={`ach-frame-fx ${foil ? 'foil' : 'shine'}`} aria-hidden="true"><i />{foil && <b />}</span>;
+}
+const looks = (a, got) => ({ holo: got && HOLO.has(a.rarity), shine: got && SHINE.has(a.rarity) });
+
+/**
  * One achievement, like a collectible card: a frame in its rarity, the
  * badge, the name, what it takes — and the day it was reached (or how far
- * you are / locked). Diamond and up, quests and dream quests shimmer (holo)
- * once reached. `showcase` shows it as reached (the editor's preview).
+ * you are / locked). Once reached, the frame shines from Silver up; Diamond,
+ * Mythic, quests and dream quests are holo — a sheen over the paper, foil
+ * and glitter on the frame and the badge ring. `showcase` shows it as reached
+ * (the editor's preview); `still` leaves the tilt to whoever holds it (the
+ * big view).
  */
-export default function AchievementCard({ a, metrics, onClick, glow = false, iconUrl, stickerUrl, as = 'button', showcase = false }) {
+export default function AchievementCard({ a, metrics, onClick, glow = false, iconUrl, stickerUrl, as = 'button', showcase = false, still = false }) {
   const r = RARITIES[a.rarity] || RARITIES.stone;
   const sticker = stickerUrl !== undefined ? stickerUrl : achievementFileUrl(a, a.sticker);
   const p = progressOf(a, metrics);
   const got = !!a.achievedAt || showcase;
-  const holo = got && HOLO.has(a.rarity);
+  const { holo, shine } = looks(a, got);
   const Tag = as;
+  const moves = holo && !still;
   return (
-    <Tag type={as === 'button' ? 'button' : undefined} className={`ach-card r-${a.rarity} ${got ? 'got' : 'locked'} ${holo ? 'holo' : ''} ${glow ? 'glow' : ''}`}
+    <Tag type={as === 'button' ? 'button' : undefined} className={`ach-card r-${a.rarity} ${got ? 'got' : 'locked'} ${holo ? 'holo' : ''} ${still ? 'still' : ''} ${glow ? 'glow' : ''}`}
       onClick={onClick} style={{ '--rc': r.color }} title={as === 'button' ? `${r.label} · ${r.xp} XP` : undefined}
-      onPointerMove={holo ? tilt : undefined} onPointerLeave={holo ? untilt : undefined}>
+      onPointerMove={moves ? tilt : undefined} onPointerLeave={moves ? untilt : undefined}>
+      {(holo || shine) && <FrameFx foil={holo} />}
       <span className="ach-paper">
         <span className="ach-rarity">{r.label}</span>
         <span className="ach-badge-wrap">
@@ -79,10 +93,31 @@ export default function AchievementCard({ a, metrics, onClick, glow = false, ico
               </span>
             ) : <><Lock size={10} /> {showcase ? 'Not reached yet' : 'Locked'}</>}
         </span>
+        {holo && <span className="ach-holo" aria-hidden="true"><i /></span>}
       </span>
-      {holo && <span className="ach-holo" aria-hidden="true"><i /></span>}
       {sticker && <img className="ach-sticker" src={sticker} alt="" draggable={false} />}
     </Tag>
+  );
+}
+
+/** The back of a card (the big view turns it round): its rarity, XP, group and day. */
+export function CardBack({ a }) {
+  const r = RARITIES[a.rarity] || RARITIES.stone;
+  const got = !!a.achievedAt;
+  const { holo, shine } = looks(a, got);
+  return (
+    <div className={`ach-card ach-back r-${a.rarity} ${got ? 'got' : 'locked'} ${holo ? 'holo' : ''} still`} style={{ '--rc': r.color }} aria-hidden="true">
+      {(holo || shine) && <FrameFx foil={holo} />}
+      <span className="ach-back-in">
+        <span className="ach-back-emblem"><Trophy size={30} /></span>
+        <b>{r.label}</b>
+        <span className="ach-back-xp">{r.xp} XP</span>
+        <span className="ach-back-group">{a.group}</span>
+        <span className="ach-back-day">{got ? `Unlocked ${fmtDate(a.achievedAt)}` : 'Not reached yet'}</span>
+        <span className="ach-back-brand">Confinium · Achievements</span>
+        {holo && <span className="ach-holo"><i /></span>}
+      </span>
+    </div>
   );
 }
 

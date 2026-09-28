@@ -13,8 +13,9 @@ export const RARITIES = {
   dream: { label: 'Dream quest', xp: 300, color: '#e0b95a' },
 };
 export const RARITY_ORDER = Object.keys(RARITIES);
-/** The rarities that shimmer (holo) once reached. */
+/** The rarities that shimmer once reached: holo foil (paper, frame and badge ring) — and a shining frame from Silver up. */
 export const HOLO = new Set(['diamond', 'mythic', 'quest', 'dream']);
+export const SHINE = new Set(['silver', 'gold', 'emerald']);
 export const xpOf = (a) => (a.achievedAt ? RARITIES[a.rarity]?.xp || 0 : 0);
 
 // Your rank: Stone 1–3, Bronze 1–3 … Mythic 1–3. Rank i (0 = Stone 1) starts

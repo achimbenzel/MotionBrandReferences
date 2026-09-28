@@ -1056,9 +1056,19 @@ collectible cards — a paper card in a frame of its **rarity**, a round
 **badge** (a short text like “10K”, a symbol or your own picture), the name,
 what it takes and the day you reached it. Ones you haven't reached yet stay
 grey and faint (with a lock on the badge) and show how far you are.
-**Diamond**, **Mythic**, **Quest** and **Dream quest** cards shimmer with an
-animated **holo** sheen once reached (a glare and a slight tilt follow the
-pointer; still when the system asks for reduced motion).
+Once reached, the frame **shines** from **Silver** up (a light runs along
+it); **Diamond**, **Mythic**, **Quest** and **Dream quest** cards are
+**holo**: a soft rainbow sheen over the paper, and on the frame and the
+badge ring a strong, circling rainbow **foil full of glitter**, like a holo
+trading card (a glare and a slight tilt follow the pointer; everything holds
+still when the system asks for reduced motion).
+
+- **Edit switch** (top right): **off**, a click shows the card **big** — it
+  leans towards the pointer (the light and the holo move with it), **drag**
+  it to turn it all the way round to its **back** (rarity, XP, group, day),
+  let go and it settles; **Turn**, **Edit**, ← / → for the next card, Esc to
+  close. **On**, a click opens the editor and every group has its **Add to …**
+  tile (with the switch off they're hidden). The choice is remembered.
 
 - **Rarity = XP**: Stone 10 · Bronze 25 · Silver 50 · Gold 100 · Emerald 200 ·
   Diamond 400 · Mythic 800 · Quest 150 · Dream quest 300. Reached ones add up
