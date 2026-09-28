@@ -31,6 +31,8 @@ const MockupOpen = lazy(() => import('./pages/MockupOpen.jsx'));
 const TimeTracker = lazy(() => import('./pages/TimeTracker.jsx'));
 const ClientsPage = lazy(() => import('./pages/ClientsPage.jsx'));
 const ClientDetail = lazy(() => import('./pages/ClientDetail.jsx'));
+const NotesPage = lazy(() => import('./pages/NotesPage.jsx'));
+const NoteDetail = lazy(() => import('./pages/NoteDetail.jsx'));
 import { TABS, isWorkPath, WORK_HOME } from './lib/types.js';
 import { useMediaQuery, DESKTOP } from './lib/useMedia.js';
 
@@ -135,6 +137,8 @@ function Shell() {
                 <Route path="/time" element={<TimeTracker />} />
                 <Route path="/clients" element={<ClientsPage reloadKey={reloadKey} />} />
                 <Route path="/clients/:id" element={<ClientDetail onNewPlan={createPlan} />} />
+                <Route path="/notes" element={<NotesPage reloadKey={reloadKey} />} />
+                <Route path="/notes/:id" element={<NoteDetail />} />
                 <Route path="/inbox" element={<InboxPage />} />
                 <Route path="/trash" element={<TrashPage />} />
                 <Route path="/settings" element={<SettingsPage />} />

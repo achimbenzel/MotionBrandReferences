@@ -4,7 +4,7 @@ import {
   PencilRuler, ListTodo, FlaskConical, Clapperboard, Plus, ArrowRight, CalendarRange, AppWindow,
   AlertTriangle, Image as ImageIcon, UploadCloud, Database, Flag, CalendarClock, MonitorSmartphone,
   Library, Search, Sparkles, Target, CheckCircle2, Layers, Settings2, GripVertical, EyeOff, Eye, Columns2, RectangleHorizontal, Check,
-  MoreHorizontal, Building2, Timer,
+  MoreHorizontal, Building2, Timer, NotebookPen,
 } from 'lucide-react';
 import { api, planFileUrl, dashboardFileUrl } from '../lib/api.js';
 import { gradientCss, PLAN_GRADIENTS, PLAN_STATUSES, TABS, tagColor } from '../lib/types.js';
@@ -239,6 +239,7 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
     { key: 'logotester', icon: FlaskConical, title: 'Brand Tester', sub: 'Test a logo, keep the sheet', to: '/logo-tester', accent: 'linear-gradient(120deg,#f83600,#f9d423)', glow: '#ff8a1f' },
     { key: 'software', icon: AppWindow, title: 'Software', sub: softCount ? plural(softCount, 'app') : 'Plugins, scripts & more', to: '/software', accent: 'linear-gradient(120deg,#7b4397,#dc2430)', glow: '#dc2430' },
     { key: 'time', icon: Timer, title: 'Time Tracker', sub: 'Hours per project & client', to: '/time', accent: 'linear-gradient(120deg,#11998e,#38ef7d)', glow: '#2fd08a' },
+    { key: 'notes', icon: NotebookPen, title: 'Notes', sub: 'Ideas, notes & pictures', to: '/notes', accent: 'linear-gradient(120deg,#c471f5,#fa71cd)', glow: '#d876e8' },
   ];
   const openSearch = () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, metaKey: true, bubbles: true }));
   // ---- The widgets: your layout, arranging, and what each one shows ----

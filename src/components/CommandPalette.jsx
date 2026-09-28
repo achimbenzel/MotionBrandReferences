@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, CornerDownLeft, FileText, Film, Square, CreditCard, Palette, Images, Type,
-  PencilRuler, FolderOpen, Trash2, LayoutGrid, FlaskConical, Ban, Settings, Inbox, Clapperboard, MonitorSmartphone, Building2, Clock,
+  PencilRuler, FolderOpen, Trash2, LayoutGrid, FlaskConical, Ban, Settings, Inbox, Clapperboard, MonitorSmartphone, Building2, Clock, NotebookPen,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { TABS } from '../lib/types.js';
@@ -17,6 +17,7 @@ const NAV = [
   { kind: 'nav', title: 'Clients', subtitle: 'Work mode · who you work for', to: '/clients', icon: Building2 },
   { kind: 'nav', title: 'Projects', subtitle: 'Work mode', to: '/plan', icon: PencilRuler },
   { kind: 'nav', title: 'Time Tracker', subtitle: 'Work mode · hours & Excel export', to: '/time', icon: Clock },
+  { kind: 'nav', title: 'Notes', subtitle: 'Work mode · notes with pictures', to: '/notes', icon: NotebookPen },
   { kind: 'nav', title: 'Brand Tester', subtitle: 'Work mode · logo tests', to: '/logo-tester', icon: FlaskConical },
   { kind: 'nav', title: 'Storyboards', subtitle: 'Work mode · all storyboards', to: '/storyboards', icon: Clapperboard },
   { kind: 'nav', title: 'New storyboard', subtitle: 'For a project, from a template', to: '/storyboards?new', icon: Clapperboard },
@@ -60,6 +61,7 @@ export default function CommandPalette({ onClose }) {
     else if (item.kind === 'project') navigate(`/project/${item.id}`);
     else if (item.kind === 'plan') navigate(`/plan/${item.id}`);
     else if (item.kind === 'client') navigate(`/clients/${item.id}`);
+    else if (item.kind === 'note') navigate(`/notes/${item.id}`);
     else if (item.kind === 'gallery') navigate(`/gallery/${item.id}`);
     onClose();
   };
@@ -106,6 +108,7 @@ function Ico({ item }) {
   if (item.kind === 'nav') { const I = item.icon; return <I size={17} />; }
   if (item.kind === 'plan') return <PencilRuler size={17} />;
   if (item.kind === 'client') return <Building2 size={17} />;
+  if (item.kind === 'note') return <NotebookPen size={17} />;
   if (item.kind === 'gallery') return <FolderOpen size={17} />;
   const I = TYPE_ICON[item.type] || FileText;
   return <I size={17} />;

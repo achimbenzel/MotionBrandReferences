@@ -310,8 +310,8 @@ A toggle switches between two modes:
 
 - **Work** — the **default** mode (left in the toggle), your working area. It
   opens on a **Dashboard** and holds **Clients**, **Projects**, **Software**,
-  the **To-Do board**, the **Brand Tester**, **Storyboards**, **Mockups** and
-  the **Time Tracker** (see below).
+  the **To-Do board**, the **Brand Tester**, **Storyboards**, **Mockups**,
+  the **Time Tracker** and **Notes** (see below).
 - **Reference** — the library (Branding, Motion Design, Logos, Business Cards,
   Colors, Image Gallery, Fonts, Logo No Go).
 
@@ -360,7 +360,7 @@ it and show it again; your layout is saved. The widgets:
   who and how old they turn); a day opens its project (or the client).
 - **Urgent** to-dos from the board and every project.
 - **Your tools** — Clients, Projects, To-Do Board, Storyboards, Mockups,
-  Brand Tester, Software, Time Tracker — with a light that follows the pointer.
+  Brand Tester, Software, Time Tracker, Notes — with a light that follows the pointer.
 - **Pipeline** — your projects by status as one bar and per stage (Briefing →
   Concept → Design → Production → Review → Delivered); a stage opens the project
   list filtered to it.
@@ -945,6 +945,27 @@ and client.
 Entries are stored in `data/db.json` (`timeEntries`), so they're part of the
 library export / import.
 
+### Notes
+**Notes** (sidebar, under Time Tracker) is for everything that isn't a
+project, a to-do or a reference — ideas, notes from a call, prices, a list of
+fonts to try.
+
+- **The list** — every note as a card with its title, the first lines and the
+  first picture as a cover; **pinned** notes on top, then the one you changed
+  last. The search box filters by title and text (⌘K finds notes too).
+- **A note** — a title and the text, saved as you type. **Pin** it, give it a
+  **colour** (the card and the sheet take its tint) or **delete** it (Trash,
+  with Undo). A “New note” you leave without writing anything simply goes
+  away.
+- **Pictures** — **upload** them, **paste** one anywhere on the page
+  (⌘V / Ctrl-V — a screenshot straight from the clipboard), **drop** files on
+  the page or take one that's **already in the app** (a reference, a mockup
+  render…). A click opens a picture big; drag them to reorder; **✕** removes
+  one (Trash, with Undo — it comes back in the same place).
+
+Notes are stored in `data/db.json` (`notes`), their pictures in
+`data/note/<id>/images/`, so both are part of the library export / import.
+
 ### Inbox (share from your phone)
 Everything you come across on the go — a screenshot, a screen recording, an
 Instagram / Behance / YouTube link, a quick idea — goes into the **Inbox**
@@ -1137,7 +1158,7 @@ it, the Work / Reference toggle, the section list (with icons, current one
 highlighted), an **Add** button, and a footer with **Settings**, **Trash** and
 the storage meter. In **Work** mode the section list is **Dashboard**,
 **Clients**, **Projects**, **Software**, **To-Dos**, **Brand Tester**,
-**Storyboards**, **Mockups** and **Time Tracker**; a running focus timer or time tracker shows
+**Storyboards**, **Mockups**, **Time Tracker** and **Notes**; a running focus timer or time tracker shows
 as a small pill under the search.
 The collapse button folds the sidebar into a slim **rail of icons** (names show
 as tooltips; Work and Reference stand one above the other) for a wider canvas;
@@ -1229,7 +1250,7 @@ lookup off with `LINK_LOOKUP=off`).
   ├── unused.js       # unused-file scan
   ├── zip.js          # dependency-free ZIP64 export/import
   ├── xlsx.js         # dependency-free .xlsx writer (time sheet export)
-  └── routes/         # projects (references), projects (projects), clients, software, board, mockups, time, trash, search, settings, library, maintenance
+  └── routes/         # projects (references), projects (projects), clients, software, board, mockups, time, notes, trash, search, settings, library, maintenance
   ```
 - **Tests:** `npm test` starts the real server against throwaway data folders —
   including a library with every data shape older versions wrote — and checks

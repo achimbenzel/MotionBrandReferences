@@ -72,6 +72,14 @@ router.get('/api/search', async (req, res) => {
       thumb: c.logo ? `/data/client/${c.id}/${c.logo}` : null, score,
     });
   }
+  for (const n of db.notes || []) {
+    const hay = [n.title, n.body, ...(n.images || []).map((i) => i.name)].filter(Boolean).join(' ').toLowerCase();
+    const score = scoreMatch(terms, n.title || '', hay);
+    if (score > 0) results.push({
+      kind: 'note', id: n.id, title: n.title || 'Untitled note', subtitle: 'Note',
+      thumb: n.images?.[0]?.file ? `/data/note/${n.id}/${n.images[0].file}` : null, score,
+    });
+  }
   for (const g of db.galleries) {
     const hay = [g.name, TYPE_LABEL[g.type], g.type].filter(Boolean).join(' ').toLowerCase();
     const score = scoreMatch(terms, g.name || '', hay);

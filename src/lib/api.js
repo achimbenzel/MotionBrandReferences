@@ -504,6 +504,22 @@ export const api = {
   async updateInvoice(id, invoiceId, patch) { return request(`/api/clients/${id}/invoices/${invoiceId}`, { method: 'PATCH', json: patch }); }, // → { client, invoice }
   async removeInvoice(id, invoiceId) { return request(`/api/clients/${id}/invoices/${invoiceId}`, { method: 'DELETE' }); }, // → { client, trashId }
 
+  // --- Notes ---
+  async listNotes() { const { notes } = await request('/api/notes'); return notes; },
+  async getNote(id) { const { note } = await request(`/api/notes/${id}`); return note; },
+  async createNote(body = {}) { const { note } = await request('/api/notes', { method: 'POST', json: body }); return note; },
+  async updateNote(id, patch) { const { note } = await request(`/api/notes/${id}`, { method: 'PATCH', json: patch }); return note; },
+  async removeNote(id) { return request(`/api/notes/${id}`, { method: 'DELETE' }); }, // → { trashId }
+  async removeNoteIfEmpty(id) { return request(`/api/notes/${id}?ifEmpty=1`, { method: 'DELETE' }); }, // no Trash; a note with anything in it stays
+  // Pictures: Files, or { source } for one that's already in the app. → { note, images }
+  async addNoteImages(id, files) {
+    if (files && !Array.isArray(files) && files.source) return request(`/api/notes/${id}/images`, { method: 'POST', json: { source: files.source } });
+    const fd = new FormData();
+    for (const f of files) fd.append('images', f, f.name || 'pasted.png');
+    return request(`/api/notes/${id}/images`, { method: 'POST', body: fd });
+  },
+  async removeNoteImage(id, imageId) { return request(`/api/notes/${id}/images/${imageId}`, { method: 'DELETE' }); }, // → { note, trashId }
+
   // --- Time tracker ---
   // → { entries, running, activities } — all, or one project's / client's ({ plan } / { client }).
   async getTime(q) {
@@ -577,6 +593,7 @@ export const mockupModelUrl = (model) => (model?.file ? `/data/mockup-model/${mo
 export const mockupHdriUrl = (h, file = h?.file) => (file ? `/data/mockup-hdri/${h.id}/${file}` : null);
 
 export const clientFileUrl = (c, rel) => (c && rel ? `/data/client/${c.id}/${rel}` : null);
+export const noteFileUrl = (n, rel) => (n && rel ? `/data/note/${n.id}/${rel}` : null);
 
 export function planFileUrl(plan, relPath) {
   if (!relPath) return null;

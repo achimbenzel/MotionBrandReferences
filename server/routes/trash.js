@@ -9,6 +9,7 @@ import { softDir } from './software.js';
 import { inboxDir } from './inbox.js';
 import { mockupDir, modelDir, hdriDir } from './mockups.js';
 import { clientDir } from './clients.js';
+import { noteDir } from './notes.js';
 
 const router = createRouter();
 export default router;
@@ -42,7 +43,9 @@ const trashThumb = (t) => {
             : t.kind === 'orphans' ? firstImage(t.data.rels)
               : t.kind === 'inbox' ? firstImage([t.data.file])
                 : t.kind === 'mockup' ? t.data.thumb
-                  : t.kind === 'client' ? t.data.logo : null;
+                  : t.kind === 'client' ? t.data.logo
+                    : t.kind === 'note' ? t.data.images?.[0]?.file
+                      : t.kind === 'noteImage' ? t.data.image?.file : null;
   return rel ? `/data/trash/${t.trashId}/${rel}` : null;
 };
 
@@ -50,6 +53,8 @@ function describe(t) {
   switch (t.kind) {
     case 'plan': return { title: t.data.name || 'Untitled project', subtitle: 'Project' };
     case 'client': return { title: t.data.name || 'Client', subtitle: 'Client' };
+    case 'note': return { title: t.data.title || 'Untitled note', subtitle: 'Note' };
+    case 'noteImage': return { title: t.data.image?.name || 'Picture', subtitle: `Picture · ${t.data.noteTitle || 'Note'}` };
     case 'invoice': return { title: t.data.invoice?.number ? `Invoice ${t.data.invoice.number}` : (t.data.invoice?.name || 'Invoice'), subtitle: `Invoice · ${t.data.clientName || 'Client'}` };
     case 'gallery': return { title: t.data.name || 'Gallery', subtitle: `Gallery · ${TYPE_LABEL[t.data.type] || t.data.type}` };
     case 'software': return { title: t.data.name || 'Software', subtitle: 'Software' };
@@ -139,6 +144,15 @@ router.post('/api/trash/:trashId/restore', async (req, res) => {
         if (e.project === data.name) e.project = '';
       }
       move = { from, to: clientDir(data.id) };
+    } else if (entry.kind === 'note') {
+      if (!Array.isArray(db.notes)) db.notes = [];
+      if (!db.notes.some((n) => n.id === data.id)) db.notes.push(data);
+      move = { from, to: noteDir(data.id) };
+    } else if (entry.kind === 'noteImage') {
+      const n = (db.notes || []).find((x) => x.id === data.noteId);
+      if (!n) { gone = true; return null; }
+      if (!n.images.some((i) => i.id === data.image.id)) n.images.splice(Math.min(data.index ?? n.images.length, n.images.length), 0, data.image);
+      rels = { base: noteDir(n.id), list: data.rels };
     } else if (entry.kind === 'invoice') {
       const c = (db.clients || []).find((x) => x.id === data.clientId);
       if (!c) { gone = true; return null; }
@@ -151,7 +165,7 @@ router.post('/api/trash/:trashId/restore', async (req, res) => {
     return entry;
   });
   if (gone === 'name') return res.status(409).json({ error: 'name_taken', message: 'You have another client with that name now — rename it first.' });
-  if (gone) return res.status(409).json({ error: 'target_gone', message: 'The project, block or client this item belonged to no longer exists.' });
+  if (gone) return res.status(409).json({ error: 'target_gone', message: 'The project, block, client or note this item belonged to no longer exists.' });
   if (!restored) return res.status(404).json({ error: 'not_found' });
   if (move) await restoreFromTrash(move.from, move.to);
   if (rels) {
