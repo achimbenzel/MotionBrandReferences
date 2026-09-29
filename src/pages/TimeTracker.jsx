@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Clock, Play, Square, X, Plus, FileSpreadsheet, Pencil, Copy, Trash2, MoreHorizontal, Check, CalendarDays, Timer, Briefcase, Tag, Download, Building2,
+  Pause, Coffee,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
-import { useTimeTracker, tracker, fmtElapsed, dayKey, hhmm } from '../lib/timeTracker.js';
+import { useTimeTracker, tracker, fmtElapsed, fmtPause, segmentsOf, dayKey, hhmm } from '../lib/timeTracker.js';
 import { whoOf, entryLabel } from '../lib/clients.js';
 
 const OTHER = '__other__';
@@ -82,6 +83,7 @@ function EntryEditor({ initial, plans, clients, activities, onSave, onCancel }) 
         <label className="tt-f"><span>From</span><input type="time" className="input" value={e.start} onChange={(ev) => set({ start: ev.target.value })} /></label>
         <label className="tt-f"><span>To</span><input type="time" className="input" value={e.end} onChange={(ev) => set({ end: ev.target.value })} /></label>
         <span className="tt-f tt-dur"><span>Duration</span><b>{fmtHM(min)}</b></span>
+        {e.pause > 0 && <span className="tt-f tt-dur tt-dur-pause" title="Paused while it was tracked — not in the time"><span>Pause</span><b><Coffee size={13} /> {fmtPause(e.pause * 60000)}</b></span>}
       </div>
       <div className="tt-editor-row">
         <label className="tt-f grow"><span>Client / project</span><ProjectPick plans={plans} clients={clients} planId={e.planId} clientId={e.clientId} project={e.project} onChange={set} /></label>
@@ -222,6 +224,16 @@ export default function TimeTracker() {
     if (!activities.some((x) => x.toLowerCase() === a.toLowerCase())) await tracker.setActivities([...activities, a]).catch(() => {});
     changeLive({ activity: a });
   };
+  const pause = async () => { try { await tracker.pause(); } catch (e) { toast(`Could not pause: ${e.message}`, 'error'); } };
+  const resume = async () => { try { await tracker.resume(); } catch (e) { toast(`Could not go on: ${e.message}`, 'error'); } };
+  // "Pause since" — pressed late: the pause began earlier.
+  const editPause = async (v) => {
+    if (!running?.pausedAt || !/^\d\d:\d\d$/.test(v)) return;
+    const [h, m] = v.split(':').map(Number);
+    const d = new Date(running.pausedAt); d.setHours(h, m, 0, 0);
+    if (d.getTime() > Date.now()) d.setDate(d.getDate() - 1);
+    try { await tracker.pause(d.getTime()); } catch (e) { toast(e.message, 'error'); }
+  };
   const editStart = async (v) => {
     if (!running || !/^\d\d:\d\d$/.test(v)) return;
     const [h, m] = v.split(':').map(Number);
@@ -266,13 +278,18 @@ export default function TimeTracker() {
       </div>
 
       {/* The live tracker */}
-      <section className={`tt-live ${running ? 'running' : ''}`}>
+      <section className={`tt-live ${running ? 'running' : ''} ${t.paused ? 'paused' : ''}`}>
         <div className="tt-live-main">
           <div className="tt-clock" aria-live="off">
-            <span className="tt-clock-dot" aria-hidden="true" />
+            <span className="tt-clock-dot" aria-hidden="true">{t.paused && <Pause size={8} fill="currentColor" strokeWidth={0} />}</span>
             <b>{fmtElapsed(running ? t.elapsed : 0)}</b>
             {running ? (
-              <label className="tt-since">since <input type="time" value={hhmm(running.startedAt)} onChange={(e) => editStart(e.target.value)} aria-label="Started at" /></label>
+              <span className="tt-clock-sub">
+                <label className="tt-since">since <input type="time" value={hhmm(running.startedAt)} onChange={(e) => editStart(e.target.value)} aria-label="Started at" /></label>
+                {t.paused ? (
+                  <label className="tt-since tt-pause-since"><Coffee size={12} /> Pause since <input type="time" value={hhmm(running.pausedAt)} onChange={(e) => editPause(e.target.value)} aria-label="Pause since" /> <b>{fmtElapsed(t.pauseNow)}</b></label>
+                ) : t.pausedTotal >= 1000 && <span className="tt-since tt-pause-sum"><Coffee size={12} /> {fmtPause(t.pausedTotal)} paused</span>}
+              </span>
             ) : <span className="tt-since">Ready when you are</span>}
           </div>
           <div className="tt-live-fields">
@@ -282,12 +299,16 @@ export default function TimeTracker() {
           <div className="tt-live-actions">
             {running ? (
               <>
+                {t.paused
+                  ? <button type="button" className="btn tt-resume" onClick={resume} disabled={busy}><Play size={15} fill="currentColor" /> Go on</button>
+                  : <button type="button" className="btn tt-pause" onClick={pause} disabled={busy}><Pause size={15} fill="currentColor" /> Pause</button>}
                 <button type="button" className="btn tt-stop" onClick={stop} disabled={busy}><Square size={15} fill="currentColor" /> Stop</button>
                 <button type="button" className="icon-btn" onClick={() => tracker.discard().catch((e) => toast(e.message, 'error'))} title="Discard (don't save)" aria-label="Discard"><X size={16} /></button>
               </>
             ) : <button type="button" className="btn btn-primary tt-start" onClick={start} disabled={busy}><Play size={15} fill="currentColor" /> Start</button>}
           </div>
         </div>
+        {running && (t.paused || t.pausedTotal >= 1000) && <TrackLine r={running} worked={t.elapsed} />}
         <div className="tt-acts" role="group" aria-label="Activity">
           <Tag size={13} className="tt-acts-ico" />
           {activities.map((a) => <button key={a} type="button" className={`tt-act ${draft.activity === a ? 'on' : ''}`} onClick={() => pickActivity(a)}>{a}</button>)}
@@ -374,7 +395,10 @@ export default function TimeTracker() {
           ) : (
             <div key={e.id} className="tt-row">
               <button type="button" className="tt-row-main" onClick={() => setEditing(e.id)} title="Edit">
-                <span className="tt-row-time">{e.start}–{e.end}</span>
+                <span className="tt-row-time">
+                  {e.start}–{e.end}
+                  {e.pause > 0 && <span className="tt-row-pause" title={`Paused ${fmtPause(e.pause * 60000)} while it was tracked — not in the time`}><Coffee size={11} /> {fmtPause(e.pause * 60000)} pause</span>}
+                </span>
                 <span className="tt-row-dur">{fmtHM(minutesOf(e))}</span>
                 <span className="tt-row-what">
                   <span className="tt-row-project">{planById[e.planId]?.avatarEmoji ? `${planById[e.planId].avatarEmoji} ` : ''}{labelOf(e)}</span>
@@ -403,6 +427,38 @@ export default function TimeTracker() {
             actF, period === 'all' ? 'all time' : period === 'custom' ? `${from || '…'} – ${to || '…'}` : PERIODS.find((x) => x[0] === period)?.[1].toLowerCase(),
           ].filter(Boolean).join(' · ')} />
       )}
+    </div>
+  );
+}
+
+/**
+ * The session so far as a line: the time worked and the pauses between —
+ * each pause with its length —, and the entry it'll make (start + time worked).
+ */
+function TrackLine({ r, worked }) {
+  const now = Date.now();
+  const segs = segmentsOf(r, now);
+  const total = Math.max(1, now - r.startedAt);
+  const pauses = segs.filter((x) => x.kind === 'pause');
+  return (
+    <div className="tt-line">
+      <div className="tt-line-bar" role="img" aria-label={`Worked ${fmtElapsed(worked)}, ${pauses.length} pause${pauses.length === 1 ? '' : 's'}`}>
+        {segs.map((x) => (
+          <span key={`${x.kind}${x.from}`} className={`tt-seg ${x.kind} ${x.open ? 'open' : ''}`} style={{ flexGrow: x.to - x.from }}
+            title={`${x.kind === 'pause' ? 'Pause' : 'Worked'} ${hhmm(x.from)}–${x.open ? 'now' : hhmm(x.to)} · ${fmtPause(x.to - x.from)}`}>
+            {x.kind === 'pause' && (x.to - x.from) / total > 0.07 && <em><Coffee size={10} /> {fmtPause(x.to - x.from)}</em>}
+          </span>
+        ))}
+      </div>
+      <div className="tt-line-meta">
+        <span className="tt-line-ends">{hhmm(r.startedAt)}</span>
+        <span className="tt-line-pauses">
+          {pauses.map((p) => (
+            <span key={p.from} className={`tt-pchip ${p.open ? 'open' : ''}`}><Coffee size={11} /> {hhmm(p.from)}–{p.open ? 'now' : hhmm(p.to)} · <b>{fmtPause(p.to - p.from)}</b></span>
+          ))}
+        </span>
+        <span className="tt-line-ends" title="The entry it makes: the start plus the time worked — pauses left out">entry {hhmm(r.startedAt)}–{hhmm(r.startedAt + worked)}</span>
+      </div>
     </div>
   );
 }

@@ -5110,6 +5110,37 @@ span.sbe-cut > button:first-child { display: inline-flex; align-items: center; g
 .tt-live-actions { display: flex; align-items: center; gap: 6px; }
 .tt-start, .tt-stop { min-width: 112px; justify-content: center; height: 40px; font-size: 14.5px; }
 .tt-stop { background: var(--danger); border-color: transparent; color: #fff; }
+.tt-pause, .tt-resume { min-width: 104px; justify-content: center; height: 40px; font-size: 14.5px; }
+.tt-pause { border-color: rgba(251, 191, 36, .45); color: #fbbf24; background: rgba(251, 191, 36, .08); }
+.tt-pause:hover { background: rgba(251, 191, 36, .16); }
+.tt-resume { background: #fbbf24; border-color: transparent; color: #2a1d00; }
+.tt-resume:hover { background: #fcd34d; }
+/* Paused: the clock stands still in amber, the pause counts up beside it */
+.tt-live.paused { border-color: rgba(251, 191, 36, .45); }
+.tt-live.paused::before { background: radial-gradient(90% 120% at 0% 0%, rgba(251, 191, 36, .14), transparent 60%); }
+.tt-live.paused .tt-clock b { color: #fbbf24; }
+.tt-live.paused .tt-clock-dot { display: grid; place-items: center; background: #fbbf24; color: #2a1d00; box-shadow: 0 0 0 4px rgba(251, 191, 36, .18); animation: none; }
+.tt-clock-sub { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.tt-pause-since { color: #fbbf24; }
+.tt-pause-since b { font-family: var(--font-mono); font-size: 12.5px; }
+.tt-pause-since input { border-color: rgba(251, 191, 36, .4); }
+.tt-pause-sum { color: #fbbf24; }
+/* The session as a line: work and pauses */
+.tt-line { position: relative; display: flex; flex-direction: column; gap: 7px; margin-top: 14px; }
+.tt-line-bar { display: flex; gap: 2px; height: 22px; border-radius: 7px; overflow: hidden; }
+.tt-seg { position: relative; display: flex; align-items: center; justify-content: center; min-width: 3px; overflow: hidden; }
+.tt-seg.work { background: color-mix(in srgb, var(--danger) 55%, var(--surface-3)); }
+.tt-seg.pause { background: repeating-linear-gradient(135deg, rgba(251, 191, 36, .5) 0 5px, rgba(251, 191, 36, .28) 5px 10px); }
+.tt-seg.pause.open { animation: tt-pause-glow 1.6s ease-in-out infinite; }
+@keyframes tt-pause-glow { 50% { filter: brightness(1.35); } }
+.tt-seg em { display: inline-flex; align-items: center; gap: 3px; padding: 0 6px; border-radius: 999px; background: rgba(20, 16, 4, .7); color: #fcd34d; font-style: normal; font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+.tt-line-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11.5px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.tt-line-pauses { flex: 1; display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; }
+.tt-pchip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; background: rgba(251, 191, 36, .12); color: #fbbf24; }
+.tt-pchip b { color: #fcd34d; }
+.tt-pchip.open { box-shadow: inset 0 0 0 1px rgba(251, 191, 36, .5); }
+.tt-dur-pause b { display: inline-flex; align-items: center; gap: 5px; color: #fbbf24; }
+@media (prefers-reduced-motion: reduce) { .tt-seg.pause.open { animation: none; } }
 .tt-stop:hover { background: #ff6b70; }
 .tt-project { display: flex; gap: 6px; min-width: 0; }
 .tt-project select { flex: 1 1 auto; min-width: 0; }
@@ -5170,7 +5201,11 @@ span.sbe-cut > button:first-child { display: inline-flex; align-items: center; g
   padding: 10px 8px 10px 14px; border: 0; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; border-radius: 10px;
 }
 .tt-row-main:hover { background: rgba(255, 255, 255, .025); }
-.tt-row-time { font-size: 13px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.tt-row-time { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; font-size: 13px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.tt-row-pause {
+  display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 999px; white-space: nowrap;
+  background: rgba(251, 191, 36, .13); color: #fbbf24; font-size: 11px; font-weight: 600;
+}
 .tt-row-dur { font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .tt-row-what { display: flex; flex-direction: column; min-width: 0; }
 .tt-row-project { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -5218,6 +5253,9 @@ span.sbe-cut > button:first-child { display: inline-flex; align-items: center; g
   border: 1px solid rgba(242, 85, 90, .35); background: rgba(242, 85, 90, .1); color: var(--text);
 }
 .track-pill-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--danger); animation: tt-pulse 1.6s ease-in-out infinite; box-shadow: 0 0 0 3px rgba(242, 85, 90, .18); }
+.track-pill.paused { border-color: rgba(251, 191, 36, .45); }
+.track-pill.paused .track-pill-time { color: #fbbf24; }
+.track-pill-paused { flex: none; color: #fbbf24; }
 .track-pill-time { font-family: var(--font-mono); font-size: 12.5px; font-weight: 700; letter-spacing: -0.02em; }
 .track-pill-what { flex: 1; min-width: 0; font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
 .track-pill.compact { width: auto; padding: 4px 8px; gap: 6px; }
@@ -5233,6 +5271,8 @@ span.sbe-cut > button:first-child { display: inline-flex; align-items: center; g
 .plan-time > button:hover { color: var(--text); background: var(--surface-2); }
 .plan-time > button + button { border-left: 1px solid var(--border); }
 .plan-time.running { border-color: rgba(242, 85, 90, .4); }
+.plan-time.running.paused { border-color: rgba(251, 191, 36, .45); }
+.plan-time.running.paused .mono { color: #fbbf24; }
 .plan-time .mono { font-family: var(--font-mono); font-weight: 500; letter-spacing: -0.02em; }
 .plan-time.running .plan-time-go { color: var(--danger); }
 

@@ -581,6 +581,8 @@ export const api = {
   async removeTimeEntry(id) { return request(`/api/time/entries/${id}`, { method: 'DELETE' }); }, // → { trashId }
   async timeStart(body) { return request('/api/time/start', { method: 'POST', json: body }); },
   async timeUpdateRunning(patch) { return request('/api/time/running', { method: 'PATCH', json: patch }); },
+  async timePause(at) { return request('/api/time/pause', { method: 'POST', json: at ? { at } : {} }); },
+  async timeResume() { return request('/api/time/resume', { method: 'POST' }); },
   async timeStop(body) { return request('/api/time/stop', { method: 'POST', json: body }); }, // → { entry, running, activities }
   async setTimeActivities(activities) { return request('/api/time/activities', { method: 'PUT', json: { activities } }); },
   timeExportUrl(q) { return `/api/time/export.xlsx?${new URLSearchParams(Object.entries(q).filter(([, v]) => v))}`; },

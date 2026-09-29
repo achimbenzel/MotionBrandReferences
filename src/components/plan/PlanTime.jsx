@@ -40,7 +40,7 @@ export default function PlanTime({ plan, toast, onChange }) {
   const label = budget ? budgetText(plan, used) : `${(total / 60).toFixed(1)} h${amount ? ` · ${fmtMoney(amount, currency)}` : ''}`;
 
   return (
-    <span className={`plan-time ${mine ? 'running' : ''} ${budget ? `budget-${budget.level}` : ''}`}>
+    <span className={`plan-time ${mine ? 'running' : ''} ${mine && t.paused ? 'paused' : ''} ${budget ? `budget-${budget.level}` : ''}`}>
       <button type="button" onClick={() => navigate(`/time?plan=${plan.id}`)} title="Tracked time — show the entries">
         <Clock size={13} /> {mine ? <span className="mono">{fmtElapsed(t.elapsed)}</span> : label}
         {budget && <span className="plan-time-bar" aria-hidden="true"><span style={{ width: `${Math.min(100, budget.ratio * 100)}%` }} /></span>}

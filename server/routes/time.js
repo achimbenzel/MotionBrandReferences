@@ -4,7 +4,7 @@
 import { nanoid } from 'nanoid';
 import { readDB, mutateDB } from '../db.js';
 import {
-  str, normalizeTimeEntry, normalizeTimeTracker, isDay, isTimeOfDay, entryMinutes,
+  str, normalizeTimeEntry, normalizeTimeTracker, isDay, isTimeOfDay, entryMinutes, pausedMs,
 } from '../schema.js';
 import { createRouter } from '../http.js';
 import { buildXlsx, excelDate, excelTime } from '../xlsx.js';
@@ -120,6 +120,7 @@ router.patch('/api/time/running', async (req, res) => {
     if (r.planId) r.clientId = null;
     for (const k of ['project', 'activity', 'details']) if (k in b) r[k] = b[k];
     if (Number.isFinite(b.startedAt) && b.startedAt <= Date.now()) r.startedAt = b.startedAt;
+    if (r.pausedAt && r.pausedAt < r.startedAt) r.pausedAt = r.startedAt; // a pause can't begin before it started
     t.running = normalizeTimeTracker({ running: r }).running;
     db.timeTracker = t;
     return t;
@@ -128,7 +129,44 @@ router.patch('/api/time/running', async (req, res) => {
   res.json(tracker);
 });
 
-// Stop → an entry (the browser says the local date and times). Under a minute: nothing saved.
+// Pause and go on: the time paused doesn't count (the entry ends that much earlier).
+// `at`: when the pause began, if not now (forgot to press it) — also to move a running pause's start.
+router.post('/api/time/pause', async (req, res) => {
+  const at = req.body?.at;
+  const tracker = await mutateDB((db) => {
+    const t = normalizeTimeTracker(db.timeTracker);
+    if (!t.running) return null;
+    const r = t.running;
+    const now = Date.now();
+    const lastEnd = r.pauses.length ? r.pauses[r.pauses.length - 1].to : r.startedAt; // not into the pause before
+    if (Number.isFinite(at)) r.pausedAt = Math.min(now, Math.max(lastEnd, r.startedAt, Math.round(at)));
+    else if (!r.pausedAt) r.pausedAt = now;
+    db.timeTracker = t;
+    return t;
+  });
+  if (!tracker) return res.status(409).json({ error: 'not_running' });
+  res.json(tracker);
+});
+
+router.post('/api/time/resume', async (_req, res) => {
+  const tracker = await mutateDB((db) => {
+    const t = normalizeTimeTracker(db.timeTracker);
+    if (!t.running) return null;
+    const r = t.running;
+    if (r.pausedAt) {
+      const now = Date.now();
+      if (now - r.pausedAt >= 1000) r.pauses = [...r.pauses, { from: r.pausedAt, to: now }].slice(-200);
+      r.pausedAt = 0;
+    }
+    db.timeTracker = t;
+    return t;
+  });
+  if (!tracker) return res.status(409).json({ error: 'not_running' });
+  res.json(tracker);
+});
+
+// Stop → an entry (the browser says the local date and times: the end is the
+// start plus the time worked, pauses left out). Under a minute worked: nothing saved.
 router.post('/api/time/stop', async (req, res) => {
   const b = req.body || {};
   const out = await mutateDB((db) => {
@@ -136,8 +174,10 @@ router.post('/api/time/stop', async (req, res) => {
     if (!t.running) return null;
     const r = t.running;
     let entry = null;
-    if (!b.discard && isDay(b.date) && isTimeOfDay(b.start) && isTimeOfDay(b.end) && Date.now() - r.startedAt >= 60000) {
-      entry = applyEntry(db, normalizeTimeEntry({ id: nanoid(10), createdAt: Date.now() }), {
+    const now = Date.now();
+    const paused = pausedMs(r, now);
+    if (!b.discard && isDay(b.date) && isTimeOfDay(b.start) && isTimeOfDay(b.end) && now - r.startedAt - paused >= 60000) {
+      entry = applyEntry(db, normalizeTimeEntry({ id: nanoid(10), createdAt: now, pause: Math.round(paused / 60000) }), {
         date: b.date, start: b.start, end: b.end, planId: r.planId, clientId: r.clientId, project: r.project, activity: r.activity, details: 'details' in b ? b.details : r.details,
       });
       db.timeEntries.push(entry);

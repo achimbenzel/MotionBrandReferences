@@ -1000,6 +1000,15 @@ and client.
   anything under a minute isn't saved. The running tracker lives on the
   server, so it keeps going when you close the tab or switch devices.
   Times are your browser's local time; a session over midnight is fine.
+- **Pause** — while it runs, **Pause** stops the clock (it turns amber, the
+  pause counts up beside it — *Pause since* can be set earlier if you pressed
+  it late) and **Go on** carries on. Paused time doesn't count: the entry
+  starts when you started and **ends that much earlier** — start 10:00, 20 min
+  work, 5 min pause, 20 min work → **10:00–10:40**. A line under the clock
+  shows the session: the time worked and each pause (striped, with its
+  length and from–to), and the entry it'll make. The saved entry keeps the
+  pause's length as a chip under its time (“☕ 5 min pause”); the pill in the
+  sidebar and a project's clock chip show a paused tracker in amber.
 - **From the project or client** — the clock chip in a project's header starts
   / stops the tracker for that project and shows its hours (or its budget);
   **Track time** on a client's page tracks time for the client itself.

@@ -63,6 +63,37 @@ test('running tracker: start, change, stop into an entry (the browser gives the 
   assert.deepEqual(r.data.activities, ['Design', 'Colour grading']);
 });
 
+test('pause: the time paused is left out — the entry ends that much earlier and keeps the pause’s length', async () => {
+  const min = 60000;
+  let r = await srv.api('/api/time/start', { method: 'POST', json: { activity: 'Design', startedAt: Date.now() - 45 * min } });
+  assert.deepEqual([r.data.running.pausedAt, r.data.running.pauses], [0, []]);
+  // A pause since 25 min ago (pressed late), then on again.
+  r = await srv.api('/api/time/pause', { method: 'POST', json: { at: Date.now() - 25 * min } });
+  assert.ok(Math.abs(r.data.running.pausedAt - (Date.now() - 25 * min)) < 5000);
+  r = await srv.api('/api/time/pause', { method: 'POST', json: {} }); // pressing it again keeps its start
+  assert.ok(Math.abs(r.data.running.pausedAt - (Date.now() - 25 * min)) < 5000);
+  r = await srv.api('/api/time/resume', { method: 'POST' });
+  assert.equal(r.data.running.pausedAt, 0);
+  assert.equal(r.data.running.pauses.length, 1);
+  assert.ok(Math.abs(r.data.running.pauses[0].to - r.data.running.pauses[0].from - 25 * min) < 5000);
+  // A pause can't start before the one before ended, nor before the start.
+  r = await srv.api('/api/time/pause', { method: 'POST', json: { at: Date.now() - 60 * min } });
+  assert.equal(r.data.running.pausedAt, r.data.running.pauses[0].to);
+  r = await srv.api('/api/time/resume', { method: 'POST' });
+  // Stopped: 45 min in all, ~25 paused → the entry gets the pause's minutes.
+  r = await srv.api('/api/time/stop', { method: 'POST', json: { date: '2026-07-21', start: '10:00', end: '10:20' } });
+  assert.deepEqual([r.data.entry.start, r.data.entry.end], ['10:00', '10:20']);
+  assert.ok([25, 26].includes(r.data.entry.pause), String(r.data.entry.pause));
+  // Worked under a minute (the rest was a pause): nothing saved.
+  await srv.api('/api/time/start', { method: 'POST', json: { startedAt: Date.now() - 90000 } });
+  await srv.api('/api/time/pause', { method: 'POST', json: { at: Date.now() - 60000 } });
+  r = await srv.api('/api/time/stop', { method: 'POST', json: { date: '2026-07-21', start: '11:00', end: '11:00' } });
+  assert.equal(r.data.entry, null);
+  // Nothing running: 409; an older entry reads with no pause.
+  assert.equal((await srv.api('/api/time/pause', { method: 'POST' })).status, 409);
+  assert.ok((await srv.api('/api/time')).data.entries.filter((e) => e.date !== '2026-07-21').every((e) => e.pause === 0));
+});
+
 test('export: an .xlsx with the log (filters, frozen header, drop-downs, duration formulas), a summary and a hidden list sheet', async () => {
   const res = await fetch(`${srv.base}/api/time/export.xlsx?from=2026-08-01&to=2026-08-31&lang=de`);
   assert.equal(res.status, 200);
