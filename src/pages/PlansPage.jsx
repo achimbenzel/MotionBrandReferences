@@ -90,14 +90,14 @@ export default function PlansPage({ reloadKey, onNewPlan }) {
     const cmp = sort === 'hours' ? (a, b) => (minutesByPlan[b.id] || 0) - (minutesByPlan[a.id] || 0) || byName(a, b) : SORTS[sort].cmp;
     return found.filter((p) => (filter ? (p.status || '') === filter : p.status !== 'archived')).sort(cmp);
   }, [found, filter, sort, minutesByPlan]);
+  // Pinned ones show on top as well — they keep their place in the list below too.
   const pinned = shown.filter((p) => p.pinned);
-  const rest = shown.filter((p) => !p.pinned);
   const groups = useMemo(() => {
-    const out = clients.map((c) => ({ client: c, list: rest.filter((p) => p.clientId === c.id) })).filter((g) => g.list.length);
-    const loose = rest.filter((p) => clientOf(p) === NONE);
+    const out = clients.map((c) => ({ client: c, list: shown.filter((p) => p.clientId === c.id) })).filter((g) => g.list.length);
+    const loose = shown.filter((p) => clientOf(p) === NONE);
     if (loose.length) out.push({ client: null, list: loose });
     return out;
-  }, [clients, rest]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [clients, shown]); // eslint-disable-line react-hooks/exhaustive-deps
   const narrowed = !!(filter || clientFilter || needle);
   const clientCounts = useMemo(() => {
     const m = {};
@@ -150,11 +150,6 @@ export default function PlansPage({ reloadKey, onNewPlan }) {
       </div>
     );
   };
-  const newTile = (clientId, label = 'New project') => (
-    <button key="new" className="gallery-new" onClick={() => onNewPlan(clientId ? { clientId } : undefined)}>
-      <Plus size={26} /><span>{label}</span>
-    </button>
-  );
   const noneMatch = (
     <div className="hint projects-none">
       No project matches. {narrowed && <button type="button" className="btn btn-sm btn-ghost" onClick={() => { setQ(''); setParams({}, { replace: true }); }}><X size={13} /> Clear filters</button>}
@@ -231,22 +226,15 @@ export default function PlansPage({ reloadKey, onNewPlan }) {
                         </button>
                       ) : <span className="project-group-client none"><Building2 size={15} /><b>Without a client</b><span className="count">{g.list.length}</span></span>}
                     </div>
-                    <div className="grid">
-                      {g.list.map((p) => card(p, false))}
-                      {!narrowed && newTile(g.client?.id)}
-                    </div>
+                    <div className="grid">{g.list.map((p) => card(p, false))}</div>
                   </section>
                 ))}
                 {narrowed && !shown.length && noneMatch}
-                {!narrowed && !groups.some((g) => !g.client) && <div className="grid project-group-free">{newTile(null, 'New project')}</div>}
               </>
             ) : (
               <section className="project-group">
-                {pinned.length > 0 && rest.length > 0 && <div className="project-group-head"><span className="project-group-client none"><b>Others</b><span className="count">{rest.length}</span></span></div>}
-                <div className="grid">
-                  {rest.map((p) => card(p, true))}
-                  {!narrowed && newTile(null)}
-                </div>
+                {pinned.length > 0 && shown.length > 0 && <div className="project-group-head"><span className="project-group-client none"><b>All projects</b><span className="count">{shown.length}</span></span></div>}
+                <div className="grid">{shown.map((p) => card(p, true))}</div>
                 {narrowed && !shown.length && noneMatch}
               </section>
             )}

@@ -18,7 +18,7 @@ const served = async (planId, rel) => (await fetch(`${srv.base}/data/plan/${plan
 
 test('templates are listed and each adds up to its target length', async () => {
   const { data } = await srv.api('/api/storyboard-templates');
-  assert.deepEqual(data.templates.map((t) => t.key), ['launch', 'social', 'sting']);
+  assert.deepEqual(data.templates.map((t) => [t.key, t.target, t.own]), [['launch', 30, false], ['launch45', 45, false], ['launch60', 60, false], ['sting', 5, false]]);
   const plan = await newPlan('Template sums');
   for (const t of data.templates) {
     const r = await srv.api(`/api/plans/${plan.id}/storyboards`, { method: 'POST', json: { template: t.key } });
@@ -35,6 +35,39 @@ test('templates are listed and each adds up to its target length', async () => {
   assert.deepEqual([...new Set(launch.shots.map((s) => s.section))], ['hook', 'problem', 'reveal', 'features', 'proof', 'cta', 'outro']);
   assert.equal((await srv.api(`/api/plans/${plan.id}/storyboards`, { method: 'POST', json: { template: 'nope' } })).status, 400);
   assert.equal((await srv.api('/api/plans/nope/storyboards', { method: 'POST', json: {} })).status, 404);
+});
+
+test('your own templates: saved from a storyboard (text, no pictures), updated under the same name, deleted', async () => {
+  const plan = await newPlan('Own template');
+  const { block } = (await srv.api(`/api/plans/${plan.id}/storyboards`, { method: 'POST', json: { title: 'Reel', aspect: '9:16' } })).data;
+  await srv.api(`/api/plans/${plan.id}/blocks/${block.id}`, { method: 'PATCH', json: { target: 20, shots: [
+    { id: 'a', duration: 2, section: 'hook', visual: 'Big type', vo: 'Stop.', camera: 'Push in', status: 'approved', image: `blocks/${block.id}/x.png` },
+    { id: 'b', duration: 18, section: 'reveal', visual: 'The product', onscreen: 'NOVA' },
+  ] } });
+  assert.equal((await srv.api('/api/storyboard-templates', { method: 'POST', json: { planId: plan.id, blockId: block.id, label: ' ' } })).status, 400);
+  let r = await srv.api('/api/storyboard-templates', { method: 'POST', json: { planId: plan.id, blockId: block.id, label: 'My reel' } });
+  assert.equal(r.status, 201);
+  const t = r.data.template;
+  assert.deepEqual([t.label, t.own, t.shots, t.target, t.aspect, t.sections], ['My reel', true, 2, 20, '9:16', ['hook', 'reveal']]);
+  assert.match(t.key, /^own-/);
+  // a new storyboard from it: the texts, no picture, no status
+  const made = (await srv.api(`/api/plans/${plan.id}/storyboards`, { method: 'POST', json: { template: t.key } })).data.block;
+  assert.deepEqual(made.shots.map((x) => [x.section, x.duration, x.visual, x.vo, x.camera, x.onscreen, x.image, x.status]),
+    [['hook', 2, 'Big type', 'Stop.', 'Push in', '', null, ''], ['reveal', 18, 'The product', '', '', 'NOVA', null, '']]);
+  assert.deepEqual([made.aspect, made.target], ['9:16', 20]);
+  // the same name again replaces it
+  r = await srv.api('/api/storyboard-templates', { method: 'POST', json: { planId: plan.id, blockId: made.id, label: 'my reel', description: 'Two shots' } });
+  assert.equal(r.status, 200);
+  assert.equal(r.data.template.key, t.key);
+  let list = (await srv.api('/api/storyboard-templates')).data.templates;
+  assert.equal(list.filter((x) => x.own).length, 1);
+  assert.equal(list.at(-1).description, 'Two shots');
+  // built-ins stay; yours go
+  assert.equal((await srv.api('/api/storyboard-templates/launch', { method: 'DELETE' })).status, 400);
+  assert.equal((await srv.api(`/api/storyboard-templates/${t.key}`, { method: 'DELETE' })).status, 200);
+  list = (await srv.api('/api/storyboard-templates')).data.templates;
+  assert.ok(!list.some((x) => x.own));
+  assert.equal((await srv.api(`/api/plans/${plan.id}/storyboards`, { method: 'POST', json: { template: t.key } })).status, 400);
 });
 
 test('shot fields: camera, transition, texts kept; section and status only known values', async () => {

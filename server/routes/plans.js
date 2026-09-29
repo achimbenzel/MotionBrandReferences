@@ -10,10 +10,10 @@ import { upload } from '../upload.js';
 import {
   BLOCK_TYPES, BLOCK_TITLES, BLOCK_TABS, BLOCK_WIDTHS, PLAN_STATUSES, STORYBOARD_ASPECTS, normalizeField, normalizeShot, normalizeAudio,
   normalizeLine, normalizeTarget, normalizePace, normalizeVersion, normalizeDeliverable, normTags, str, normalizeBeat, normalizeCutdowns,
-  normalizeBudget, normalizeRate,
+  normalizeBudget, normalizeRate, normalizeStoryboardTemplate,
 } from '../schema.js';
 import { resolveClient } from './clients.js';
-import { STORYBOARD_TEMPLATES, storyboardTemplate, templateInfo } from '../storyboards.js';
+import { STORYBOARD_TEMPLATES, storyboardTemplate, templateInfo, templateShots, TEMPLATE_SHOT_FIELDS } from '../storyboards.js';
 import { BUILTIN_TEMPLATES, builtinTemplate, planFromTemplate, templateFromPlan, templateSummary } from '../templates.js';
 import { createRouter } from '../http.js';
 import { sourceAsUpload } from '../sources.js';
@@ -306,8 +306,46 @@ router.post('/api/plans/:id/archive', async (req, res) => {
 });
 
 // --- Storyboards ---
-router.get('/api/storyboard-templates', (_req, res) => {
-  res.json({ templates: STORYBOARD_TEMPLATES.map(templateInfo) });
+// The built-in templates, then yours (oldest first).
+router.get('/api/storyboard-templates', async (_req, res) => {
+  const db = await readDB();
+  res.json({ templates: [...STORYBOARD_TEMPLATES, ...[...db.storyboardTemplates].sort((a, b) => a.createdAt - b.createdAt)].map(templateInfo) });
+});
+
+// A storyboard saved as a template of your own: its shots (section, duration
+// and text — no pictures), format and target length. Saving under the name of
+// one of your templates replaces it (that's how a template is updated).
+router.post('/api/storyboard-templates', async (req, res) => {
+  const label = str(req.body.label, 120).trim();
+  if (!label) return res.status(400).json({ error: 'name_required', message: 'Give the template a name.' });
+  const out = await mutateDB((db) => {
+    const plan = db.plans.find((p) => p.id === req.body.planId);
+    const b = plan && findBlock(plan, req.body.blockId);
+    if (b?.type !== 'storyboard') return null;
+    const t = normalizeStoryboardTemplate({
+      label, description: str(req.body.description, 400).trim() || `${(b.shots || []).length} shots, saved from “${b.title || 'Storyboard'}”.`,
+      aspect: b.aspect, target: b.target,
+      shots: (b.shots || []).map((s) => ({ section: s.section, duration: s.duration, ...Object.fromEntries(TEMPLATE_SHOT_FIELDS.map((k) => [k, s[k]])) })),
+    });
+    const i = db.storyboardTemplates.findIndex((x) => x.label.toLowerCase() === label.toLowerCase());
+    if (i === -1) db.storyboardTemplates.push(t);
+    else { t.key = db.storyboardTemplates[i].key; t.createdAt = db.storyboardTemplates[i].createdAt; db.storyboardTemplates[i] = t; }
+    return { template: templateInfo(t), replaced: i !== -1 };
+  });
+  if (!out) return res.status(404).json({ error: 'not_found' });
+  res.status(out.replaced ? 200 : 201).json(out);
+});
+
+router.delete('/api/storyboard-templates/:key', async (req, res) => {
+  if (STORYBOARD_TEMPLATES.some((t) => t.key === req.params.key)) return res.status(400).json({ error: 'builtin_template', message: 'Built-in templates can’t be deleted.' });
+  const ok = await mutateDB((db) => {
+    const i = db.storyboardTemplates.findIndex((t) => t.key === req.params.key);
+    if (i === -1) return false;
+    db.storyboardTemplates.splice(i, 1);
+    return true;
+  });
+  if (!ok) return res.status(404).json({ error: 'not_found' });
+  res.json({ ok: true });
 });
 
 // A new storyboard in a plan: empty, from a template, or a copy of another
@@ -319,7 +357,7 @@ router.post('/api/plans/:id/storyboards', async (req, res) => {
   if (!plan) return res.status(404).json({ error: 'not_found' });
   const src = req.body.from ? findBlock(plan, req.body.from) : null;
   if (req.body.from && src?.type !== 'storyboard') return res.status(404).json({ error: 'not_found' });
-  const tpl = !src && req.body.template ? storyboardTemplate(req.body.template) : null;
+  const tpl = !src && req.body.template ? storyboardTemplate(req.body.template, db.storyboardTemplates) : null;
   if (!src && req.body.template && !tpl) return res.status(400).json({ error: 'unknown_template' });
 
   const id = nanoid(8);
@@ -331,7 +369,7 @@ router.post('/api/plans/:id/storyboards', async (req, res) => {
   let audio = null;
   let beat = null;
   let cutdowns = [];
-  if (tpl) shots = tpl.shots.map(([section, duration, visual]) => ({ section, duration, visual }));
+  if (tpl) shots = templateShots(tpl);
   if (src) {
     const dir = blockDir(plan.id, id);
     const copy = async (rel) => {

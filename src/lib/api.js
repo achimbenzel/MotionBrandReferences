@@ -277,6 +277,11 @@ export const api = {
     const { templates } = await request('/api/storyboard-templates');
     return templates;
   },
+  // A storyboard saved as a template of your own (the same name replaces it) → { template, replaced }
+  async saveStoryboardTemplate(planId, blockId, { label, description } = {}) {
+    return request('/api/storyboard-templates', { method: 'POST', json: { planId, blockId, label, description } });
+  },
+  async removeStoryboardTemplate(key) { return request(`/api/storyboard-templates/${encodeURIComponent(key)}`, { method: 'DELETE' }); },
   // New storyboard in a plan: { title, aspect, template } or a copy { from: blockId, aspect } → { plan, block }
   async createStoryboard(planId, body) {
     return request(`/api/plans/${planId}/storyboards`, { method: 'POST', json: body });

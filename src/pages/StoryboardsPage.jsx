@@ -53,7 +53,7 @@ export default function StoryboardsPage() {
         <div className="empty">
           <Clapperboard size={30} />
           <h3>No storyboards yet</h3>
-          <p>Start one for a project — empty, or from the launch video, social cut or logo sting template.</p>
+          <p>Start one for a project — empty, from a launch video (30, 45 or 60 s) or logo sting template, or from one of your own.</p>
           <button className="btn btn-primary" onClick={() => setCreating(true)}><Plus size={16} /> New storyboard</button>
         </div>
       )}

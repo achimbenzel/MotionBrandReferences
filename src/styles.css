@@ -3979,6 +3979,13 @@ img { max-width: 100%; display: block; }
 .nsb-tpl-title { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; }
 .nsb-tpl-desc { font-size: 12.5px; color: var(--text-muted); line-height: 1.4; }
 .nsb-tpl-meta { font-size: 11.5px; color: var(--text-faint); }
+.nsb-tpl-wrap { position: relative; display: flex; }
+.nsb-tpl-wrap > .nsb-tpl { flex: 1; min-width: 0; }
+.nsb-tpl.own { padding-right: 38px; }
+.nsb-tpl.own .nsb-tpl-title svg { color: #c4b5fd; }
+.nsb-tpl-x { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border: 0; background: none; color: var(--text-faint); }
+.nsb-tpl-x:hover { color: var(--danger); background: var(--surface-2); }
+.new-sb .nsb-templates + .hint { margin-top: 8px; }
 @media (max-width: 520px) { .nsb-templates { grid-template-columns: minmax(0, 1fr); } }
 
 /* Storyboards page */
@@ -5338,7 +5345,6 @@ button.project-group-client:hover { background: var(--surface-2); }
 .project-group-client .count { font-size: 12px; color: var(--text-faint); font-weight: 600; }
 .project-group-go { color: var(--text-faint); opacity: 0; transition: opacity .15s; }
 .project-group-client:hover .project-group-go { opacity: 1; }
-.project-group-free { margin-top: -10px; }
 
 /* Dashboard calendar: birthdays */
 .dash-cal-dots i.bday, .dash-cal-legend i.bday { background: #ff9fd6; box-shadow: 0 0 0 2px rgba(255, 159, 214, .25); }

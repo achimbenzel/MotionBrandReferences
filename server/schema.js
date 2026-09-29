@@ -21,7 +21,7 @@ export const CURRENCIES = new Set(['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'CAD', 'AU
 
 export const emptyDB = () => ({
   schemaVersion: SCHEMA_VERSION, projects: [], galleries: [], plans: [], planTemplates: [], software: [], trash: [], inbox: [], mockups: [], mockupModels: [], mockupHdris: [], timeEntries: [], clients: [], notes: [],
-  content: [], achievements: [],
+  content: [], achievements: [], storyboardTemplates: [],
   settings: { storageLimitBytes: DEFAULT_STORAGE_LIMIT },
 });
 
@@ -96,6 +96,26 @@ export const normalizeShot = (s, blockId) => ({
   // A voice-over recorded for this shot (plays from the shot's start).
   voice: normalizeVoice(s?.voice, blockId),
 });
+/**
+ * A storyboard template of your own (saved from a storyboard): its shots
+ * without pictures — section, duration and the text fields.
+ */
+const TEMPLATE_TEXT = { visual: 4000, vo: 4000, onscreen: 2000, sfx: 2000, notes: 4000, size: 40, camera: 60, transition: 60 };
+export function normalizeStoryboardTemplate(t) {
+  return {
+    key: typeof t?.key === 'string' && /^own-[\w-]{1,40}$/.test(t.key) ? t.key : `own-${nanoid(8)}`,
+    label: str(t?.label, 120).trim() || 'My template',
+    description: str(t?.description, 400),
+    aspect: STORYBOARD_ASPECTS.includes(t?.aspect) ? t.aspect : '16:9',
+    target: num(t?.target, 1, 3600, null),
+    shots: (Array.isArray(t?.shots) ? t.shots : []).filter((s) => s && typeof s === 'object').slice(0, 300).map((s) => ({
+      section: SEGMENT_KINDS.includes(s.section) ? s.section : '',
+      duration: num(s.duration, 0.1, 600, 2),
+      ...Object.fromEntries(Object.entries(TEMPLATE_TEXT).map(([k, max]) => [k, str(s[k], max)])),
+    })),
+    createdAt: num(t?.createdAt, 0, 1e14, Date.now()),
+  };
+}
 function normalizeVoice(v, blockId) {
   const file = blockFile(blockId, v?.file);
   return file ? { file, duration: num(v?.duration, 0, 600, 0), volume: num(v?.volume, 0, 1, 1) } : null;
@@ -650,6 +670,7 @@ export function normalizeDB(db) {
   if (!Array.isArray(db.software)) db.software = [];
   if (!Array.isArray(db.trash)) db.trash = [];
   if (!Array.isArray(db.planTemplates)) db.planTemplates = [];
+  db.storyboardTemplates = (Array.isArray(db.storyboardTemplates) ? db.storyboardTemplates : []).filter((t) => t && typeof t === 'object').map(normalizeStoryboardTemplate);
   if (!Array.isArray(db.inbox)) db.inbox = [];
   if (!Array.isArray(db.mockups)) db.mockups = [];
   if (!Array.isArray(db.mockupModels)) db.mockupModels = [];

@@ -504,14 +504,15 @@ case — is one client), so nothing has to be typed again.
 ### Projects
 Your projects (formerly *Plans*) — for a client or just for you. The
 **Projects** page shows them **by client** (each client's projects together,
-“Without a client” last, a **New project** tile in each group with that client
-set) or **All** in one grid; the status chips filter both. Cards show the
+“Without a client” last) or **All** in one grid; the status chips filter both.
+A new project starts from **New project** in the sidebar. Cards show the
 hours tracked (against the budget, with a thin bar, when there is one).
 
 - **Pin** the projects you're on right now — the pin on a card (on hover, or
   always on a phone), or the pin next to **Edit** on the project's page. Pinned
-  projects stand in their own **Pinned** group at the top (in both views) and
-  come first in every project list and picker (time tracker, pickers …).
+  projects show in a **Pinned** group at the top (in both views) — like a
+  copy: they keep their place in the list below as well — and come first in
+  every project list and picker (time tracker, pickers …).
 - **Find** a project by name, client or status, filter by **client** (or
   “Without a client”) and by **status** (the chips count what's left after
   the other filters), and **sort** by **Recently added**, **Deadline**
@@ -742,7 +743,16 @@ same step), a starting point and the format:
 - **Empty**,
 - **Launch video · 30 s** — Hook → Problem → Product reveal → Features →
   Proof → Call to action → Logo outro, 11 shots with suggested timings,
-- **Social cut · 15 s · 9:16** and **Logo sting · 5 s**.
+- **Launch video · 45 s** — the same story with room to breathe: the product
+  in context, a one-line demo and a customer moment (14 shots),
+- **Launch video · 60 s** — the full story: a longer hook and problem, name
+  and claim, four features and a demo, two proofs, where to get it (19 shots),
+- **Logo sting · 5 s**,
+- **your own templates**: in a storyboard, **⋯ → Save as template…** keeps its
+  shots (section, length and texts — no pictures), format and target length
+  under a name (the name of one of yours replaces it). They're listed after
+  the built-in ones, marked as yours, with a bin to delete them (storyboards
+  made from a template stay as they are).
 
 A storyboard is stored in its project (as its storyboard block), so the project and
 the Storyboards page always show the same thing.

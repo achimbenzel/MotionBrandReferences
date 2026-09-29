@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Play, Printer, MoreHorizontal, UploadCloud, Library, Plus, Music, X, LayoutGrid, List, SquareChartGantt,
   ImagePlus, Image as ImageIcon, CornerDownRight, Copy as CopyIcon, ArrowUp, ArrowDown, Trash2, Clapperboard, PencilRuler,
-  PenLine, Scissors, Film, GripVertical, Pencil, Activity, Magnet,
+  PenLine, Scissors, Film, GripVertical, Pencil, Activity, Magnet, Bookmark,
 } from 'lucide-react';
 import { api, planFileUrl } from '../lib/api.js';
 import { useSaver, useRefreshOnReturn, whenSaved } from '../lib/autosave.js';
@@ -65,6 +65,7 @@ export default function StoryboardEditor() {
   const [drawing, setDrawing] = useState(null);  // { shotId, over } — the drawing pad
   const [exporting, setExporting] = useState(null); // { formats } — the video export dialog
   const [renamingCut, setRenamingCut] = useState(null);
+  const [savingTpl, setSavingTpl] = useState(false);
   const [beatBusy, setBeatBusy] = useState(false);
   const gridRef = useRef(null);
   const listRef = useRef(null);
@@ -400,6 +401,8 @@ export default function StoryboardEditor() {
             items={[
               ...ASPECTS.map((a) => ({ label: `Copy as ${a} version`, icon: <CopyIcon size={15} />, onClick: () => duplicate(a) })),
               { separator: true },
+              { label: 'Save as template…', icon: <Bookmark size={15} />, onClick: () => setSavingTpl(true), disabled: !shots.length },
+              { separator: true },
               { label: 'Draw a new shot…', icon: <PenLine size={15} />, onClick: () => setDrawing({ shotId: null, over: false }) },
               { label: 'Open the project', icon: <PencilRuler size={15} />, onClick: back },
               { label: 'Delete storyboard', icon: <Trash2 size={15} />, danger: true, onClick: removeStoryboard },
@@ -594,6 +597,18 @@ export default function StoryboardEditor() {
             note: `${cut ? cut.name : 'The master'} · ${fmtClock(total)} · ${playShots.length} shots${block.audio ? ' · with the music' : ''}${playShots.some((x) => x.voice) ? ' · with the recorded voice-overs' : ''}. Dissolves and fades are shown where the storyboard says so.`,
           }]}
           onExport={runVideo} onClose={() => setExporting(null)} />
+      )}
+      {savingTpl && (
+        <GalleryNameModal title="Save as a storyboard template" initialName={block.title || ''} submitLabel="Save template" placeholder="e.g. Product reel · 20 s"
+          hint="Its shots — section, length and texts, no pictures — with the format and the target length. The name of one of your templates replaces it."
+          onSubmit={async (label) => {
+            try {
+              await saver.flush();
+              const { replaced } = await api.saveStoryboardTemplate(planId, blockId, { label });
+              toast(replaced ? `Template “${label}” updated` : `Saved — “${label}” is now under New storyboard`);
+              setSavingTpl(false);
+            } catch (e) { toast(`Could not save the template: ${e.message}`, 'error'); }
+          }} onClose={() => setSavingTpl(false)} />
       )}
       {renamingCut && (
         <GalleryNameModal title="Rename cutdown" initialName={renamingCut.name} submitLabel="Save" placeholder="e.g. 15 s social cut"

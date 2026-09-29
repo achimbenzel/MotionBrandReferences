@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { X, Clapperboard, Plus } from 'lucide-react';
+import { X, Clapperboard, Plus, Trash2, Bookmark } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { ASPECTS } from '../../lib/storyboard.js';
 import { isTouch } from '../../lib/useMedia.js';
+import { useConfirm } from '../ConfirmDialog.jsx';
 
 const NEW_PLAN = '__new';
 
@@ -22,6 +23,7 @@ export default function NewStoryboardModal({ plans, planId: initialPlan = '', on
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [dialog, ask] = useConfirm();
 
   useEffect(() => { api.listStoryboardTemplates().then(setTemplates).catch(() => setTemplates([])); }, []);
   useEffect(() => { if (!planId && open[0]) setPlanId(open[0].id); }, [open, planId]);
@@ -48,6 +50,16 @@ export default function NewStoryboardModal({ plans, planId: initialPlan = '', on
   };
 
   const choices = [{ key: '', label: 'Empty', description: 'Start with no shots.' }, ...templates];
+  const removeTemplate = (t) => ask({
+    title: 'Delete this template?', message: `“${t.label}” goes from the list. Storyboards made from it stay as they are.`, confirmLabel: 'Delete', danger: true,
+    onConfirm: async () => {
+      try {
+        await api.removeStoryboardTemplate(t.key);
+        setTemplates((l) => l.filter((x) => x.key !== t.key));
+        if (template === t.key) setTemplate('launch');
+      } catch (e) { setError(e.message); }
+    },
+  });
   return (
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
       <div className="modal new-sb" role="dialog" aria-modal="true" aria-label="New storyboard">
@@ -79,13 +91,17 @@ export default function NewStoryboardModal({ plans, planId: initialPlan = '', on
             <label>Start from</label>
             <div className="nsb-templates">
               {choices.map((t) => (
-                <button key={t.key || 'empty'} type="button" className={`nsb-tpl ${template === t.key ? 'on' : ''}`} onClick={() => { setTemplate(t.key); setAspect(null); }}>
-                  <span className="nsb-tpl-title">{t.key ? <Clapperboard size={14} /> : <Plus size={14} />} {t.label}</span>
-                  <span className="nsb-tpl-desc">{t.description}</span>
-                  {t.shots ? <span className="nsb-tpl-meta">{t.shots} shots · {t.target} s · {t.aspect}</span> : null}
-                </button>
+                <div key={t.key || 'empty'} className="nsb-tpl-wrap">
+                  <button type="button" className={`nsb-tpl ${template === t.key ? 'on' : ''} ${t.own ? 'own' : ''}`} onClick={() => { setTemplate(t.key); setAspect(null); }}>
+                    <span className="nsb-tpl-title">{t.own ? <Bookmark size={14} /> : t.key ? <Clapperboard size={14} /> : <Plus size={14} />} {t.label}</span>
+                    <span className="nsb-tpl-desc">{t.description}</span>
+                    {t.shots ? <span className="nsb-tpl-meta">{t.own ? 'Yours · ' : ''}{t.shots} shots{t.target ? ` · ${t.target} s` : ''} · {t.aspect}</span> : null}
+                  </button>
+                  {t.own && <button type="button" className="icon-btn nsb-tpl-x" onClick={() => removeTemplate(t)} aria-label={`Delete the template ${t.label}`} title="Delete this template"><Trash2 size={13} /></button>}
+                </div>
               ))}
             </div>
+            <div className="hint">Your own: open a storyboard and choose <b>⋯ → Save as template</b> — its shots, texts and length, without pictures.</div>
           </div>
           <div className="row-2">
             <div className="field">
@@ -107,6 +123,7 @@ export default function NewStoryboardModal({ plans, planId: initialPlan = '', on
           <button className="btn btn-primary" onClick={create} disabled={!canCreate}><Clapperboard size={15} /> {busy ? 'Creating…' : 'Create storyboard'}</button>
         </div>
       </div>
+      {dialog}
     </div>
   );
 }
