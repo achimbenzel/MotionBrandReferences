@@ -219,6 +219,15 @@ test('dashboard: what you changed last, focus minutes, today\'s focus, widget la
   assert.deepEqual(r.data.settings.dashboardLayout, [{ id: 'inspiration', hidden: false, size: 'half', sources: ['motion', 'branding'] }, { id: 'note', hidden: false, size: 'full' }]);
   r = await srv.api('/api/settings', { method: 'PATCH', json: { dashboardLayout: [{ id: 'inspiration', size: 'half', sources: ['nope'] }] } });
   assert.deepEqual(r.data.settings.dashboardLayout, [{ id: 'inspiration', hidden: false, size: 'half' }]);
+  // Weekly to-dos: a weekday (0 = Monday … 6 = Sunday), the text, the day last ticked.
+  r = await srv.api('/api/settings', { method: 'PATCH', json: { weeklyTodos: [
+    { id: 'w1', day: 6, text: 'Backup', doneOn: '2026-09-27' }, { id: 'w1', day: 9, text: 'Invoices' }, { day: 0, text: 'Plan the week', doneOn: 'soon' }, 'nope',
+  ], dashboardLayout: [{ id: 'weekly', size: 'half' }] } });
+  const weekly = r.data.settings.weeklyTodos;
+  assert.deepEqual(weekly.map((t) => [t.day, t.text, t.doneOn]), [[6, 'Backup', '2026-09-27'], [0, 'Invoices', ''], [0, 'Plan the week', '']]);
+  assert.equal(weekly[0].id, 'w1');
+  assert.ok(weekly[1].id !== 'w1' && weekly[2].id);
+  assert.deepEqual(r.data.settings.dashboardLayout, [{ id: 'weekly', hidden: false, size: 'half' }]);
 
   // Ticking one to-do of a plan leaves the others alone.
   const todos = (await srv.api('/api/plans/plan3/blocks', { method: 'POST', json: { type: 'todos' } })).data.plan.blocks.at(-1);

@@ -19,12 +19,14 @@ import FocusToday from '../components/dashboard/FocusToday.jsx';
 import FocusTimer from '../components/dashboard/FocusTimer.jsx';
 import ContinueWork from '../components/dashboard/ContinueWork.jsx';
 import AchievementsWidget from '../components/dashboard/AchievementsWidget.jsx';
+import WeeklyTodos from '../components/dashboard/WeeklyTodos.jsx';
 import { useSortable, moveItem } from '../lib/useSortable.js';
 
 const DEFAULT_BANNER = 'linear-gradient(120deg,#6a11cb,#2575fc)';
 // The widgets below the hero, in their first order and size (yours is saved in settings).
 const WIDGETS = [
   { id: 'focus', label: 'Today’s focus', size: 'half' },
+  { id: 'weekly', label: 'Weekly to-dos', size: 'half' },
   { id: 'timer', label: 'Focus timer', size: 'half' },
   { id: 'next', label: 'Next up & two weeks', size: 'full' },
   { id: 'continue', label: 'Continue where you left off', size: 'full' },
@@ -37,11 +39,16 @@ const WIDGETS = [
   { id: 'achievements', label: 'Achievements', size: 'full' },
 ];
 const WIDGET = Object.fromEntries(WIDGETS.map((w) => [w.id, w]));
-// Your saved order first; widgets added since then join at the end.
+// Your saved order; a widget added since then joins right after the one it
+// follows by default (Weekly to-dos next to Today's focus), or first.
 function layoutOf(saved) {
   const list = (Array.isArray(saved) ? saved : []).filter((w) => WIDGET[w.id]);
-  const have = new Set(list.map((w) => w.id));
-  return [...list, ...WIDGETS.filter((w) => !have.has(w.id)).map((w) => ({ id: w.id, hidden: false, size: w.size }))];
+  WIDGETS.forEach((w, i) => {
+    if (list.some((x) => x.id === w.id)) return;
+    const before = WIDGETS.slice(0, i).reverse().find((p) => list.some((x) => x.id === p.id));
+    list.splice(before ? list.findIndex((x) => x.id === before.id) + 1 : 0, 0, { id: w.id, hidden: false, size: w.size });
+  });
+  return list;
 }
 const DAY = 86400000;
 
@@ -283,6 +290,7 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
   const renderWidget = (w) => {
     switch (w.id) {
       case 'focus': return <FocusToday board={board} setBoard={setBoard} plans={plans} setPlans={setPlans} settings={settings} setSettings={setSettings} />;
+      case 'weekly': return <WeeklyTodos settings={settings} setSettings={setSettings} editing={editing} onCustomize={() => setEditing(true)} />;
       case 'timer': return <FocusTimer />;
       case 'continue': return <ContinueWork reloadKey={reloadKey} />;
       case 'rhythm': return <ActivityMap reloadKey={reloadKey} compact={w.size === 'half'} />;
@@ -541,7 +549,7 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
                   <button type="button" className="icon-btn" onClick={() => setWidget(w.id, { hidden: true })} title="Hide" aria-label={`Hide ${WIDGET[w.id].label}`}><EyeOff size={15} /></button>
                 </div>
               )}
-              <div className="dash-w-body">{content || <div className="dash-w-empty">{EMPTY_HINT[w.id] || 'Nothing to show right now.'}</div>}</div>
+              <div className={`dash-w-body ${w.id === 'weekly' ? 'live' : ''}`}>{content || <div className="dash-w-empty">{EMPTY_HINT[w.id] || 'Nothing to show right now.'}</div>}</div>
             </div>
           );
         })}

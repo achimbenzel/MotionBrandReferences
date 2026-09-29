@@ -398,6 +398,12 @@ it and show it again; your layout is saved. The widgets:
   Logos…; each shows how many of its references have a picture). The widget
   then says so (“Inspiration · Motion Design”); **All sections** goes back to
   everything. The choice is saved with your layout.
+- **Weekly to-dos** — apart from the board: things for a weekday that come
+  back every week (every Sunday: *Backup*). Today's ones show big, to tick
+  off (a tick holds for that day; next week it's open again); underneath,
+  the week at a glance — done, **missed** (still tickable) and still to come.
+  Set them up with **Customize**: one or more for each weekday (empty ones
+  go when you're done).
 - **Quick note** — a scratchpad for today's focus or an idea, saved as you
   type.
 - **Achievements** — your rank (Stone 1 … Mythic 3) and XP, how many you've
@@ -1059,8 +1065,8 @@ grey and faint (with a lock on the badge) and show how far you are.
 Once reached, the frame **shines** from **Silver** up (a light runs along
 it); **Diamond**, **Mythic**, **Quest** and **Dream quest** cards are
 **holo**: a soft rainbow sheen over the paper, and on the frame and the
-badge ring a strong, circling rainbow **foil full of glitter**, like a holo
-trading card (a glare and a slight tilt follow the pointer; everything holds
+badge ring a strong rainbow **foil full of glitter**, like a holo trading
+card (it circles the frame; the badge ring holds still) (a glare and a slight tilt follow the pointer; everything holds
 still when the system asks for reduced motion).
 
 - **Edit switch** (top right): **off**, a click shows the card **big** — it

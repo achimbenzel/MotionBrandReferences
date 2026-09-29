@@ -680,6 +680,7 @@ export function normalizeDB(db) {
   if (typeof db.settings.dashboardNote !== 'string') db.settings.dashboardNote = ''; // the dashboard's quick note
   if (!CURRENCIES.has(db.settings.currency)) db.settings.currency = 'EUR';             // hourly rates, invoices
   db.settings.dashboardFocus = normalizeDashboardFocus(db.settings.dashboardFocus);
+  db.settings.weeklyTodos = normalizeWeeklyTodos(db.settings.weeklyTodos);
   db.settings.dashboardLayout = normalizeDashboardLayout(db.settings.dashboardLayout);
   return db;
 }
@@ -765,7 +766,23 @@ export function normalizeDashboardFocus(v) {
   const seen = new Set();
   return { items: items.filter((it) => { const k = JSON.stringify([it.kind, it.id, it.itemId]); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 5) };
 }
-export const DASHBOARD_WIDGETS = ['focus', 'timer', 'next', 'continue', 'urgent', 'tools', 'pipeline', 'rhythm', 'inspiration', 'note', 'achievements'];
+/**
+ * Weekly to-dos (apart from the board): something for a weekday — every Sunday
+ * "Backup" — { id, day (0 = Monday … 6 = Sunday), text, doneOn (the date it was
+ * last ticked; it's open again the next week) }.
+ */
+export function normalizeWeeklyTodos(v) {
+  const seen = new Set();
+  return (Array.isArray(v) ? v : []).filter((t) => t && typeof t === 'object').slice(0, 70).map((t) => {
+    const id = typeof t.id === 'string' && DASH_ID.test(t.id) && !seen.has(t.id) ? t.id : nanoid(8);
+    seen.add(id);
+    return {
+      id, day: Number.isInteger(t.day) && t.day >= 0 && t.day <= 6 ? t.day : 0, text: str(t.text, 200),
+      doneOn: typeof t.doneOn === 'string' && DASH_DAY.test(t.doneOn) ? t.doneOn : '',
+    };
+  });
+}
+export const DASHBOARD_WIDGETS = ['focus', 'weekly', 'timer', 'next', 'continue', 'urgent', 'tools', 'pipeline', 'rhythm', 'inspiration', 'note', 'achievements'];
 /** The dashboard's widgets in your order: [{ id, hidden, size: 'full' | 'half' }] (unknown ones dropped; [] = the default). */
 export function normalizeDashboardLayout(v) {
   const seen = new Set();
