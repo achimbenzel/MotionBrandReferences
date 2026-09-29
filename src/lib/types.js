@@ -51,6 +51,7 @@ export const WORK_TABS = [
   { key: 'storyboards', label: 'Storyboards', path: '/storyboards' },
   { key: 'mockups', label: 'Mockups', path: '/mockups' },
   { key: 'time', label: 'Time Tracker', path: '/time' },
+  { key: 'expenses', label: 'Expenses', path: '/expenses' },
   { key: 'notes', label: 'Notes', path: '/notes' },
   { key: 'content', label: 'Content', path: '/content' },
   { key: 'achievements', label: 'Achievements', path: '/achievements' },

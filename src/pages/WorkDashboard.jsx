@@ -4,7 +4,7 @@ import {
   PencilRuler, ListTodo, FlaskConical, Clapperboard, Plus, ArrowRight, CalendarRange, AppWindow,
   AlertTriangle, Image as ImageIcon, UploadCloud, Database, Flag, CalendarClock, MonitorSmartphone,
   Library, Search, Sparkles, Target, CheckCircle2, Layers, Settings2, GripVertical, EyeOff, Eye, Columns2, RectangleHorizontal, Check,
-  MoreHorizontal, Building2, Timer, NotebookPen, Megaphone, Trophy,
+  MoreHorizontal, Building2, Timer, NotebookPen, Megaphone, Trophy, Wallet,
 } from 'lucide-react';
 import { api, planFileUrl, dashboardFileUrl } from '../lib/api.js';
 import { gradientCss, PLAN_GRADIENTS, PLAN_STATUSES, TABS, tagColor } from '../lib/types.js';
@@ -20,6 +20,7 @@ import FocusTimer from '../components/dashboard/FocusTimer.jsx';
 import ContinueWork from '../components/dashboard/ContinueWork.jsx';
 import AchievementsWidget from '../components/dashboard/AchievementsWidget.jsx';
 import WeeklyTodos from '../components/dashboard/WeeklyTodos.jsx';
+import MoneyWidget from '../components/dashboard/MoneyWidget.jsx';
 import { useSortable, moveItem } from '../lib/useSortable.js';
 
 const DEFAULT_BANNER = 'linear-gradient(120deg,#6a11cb,#2575fc)';
@@ -33,6 +34,7 @@ const WIDGETS = [
   { id: 'urgent', label: 'Urgent', size: 'full' },
   { id: 'tools', label: 'Your tools', size: 'full' },
   { id: 'pipeline', label: 'Pipeline', size: 'full' },
+  { id: 'money', label: 'Money this month', size: 'full' },
   { id: 'rhythm', label: 'Your rhythm', size: 'full' },
   { id: 'inspiration', label: 'Inspiration', size: 'half' },
   { id: 'note', label: 'Quick note', size: 'half' },
@@ -241,6 +243,7 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
     { key: 'logotester', icon: FlaskConical, title: 'Brand Tester', sub: 'Test a logo, keep the sheet', to: '/logo-tester', accent: 'linear-gradient(120deg,#f83600,#f9d423)', glow: '#ff8a1f' },
     { key: 'software', icon: AppWindow, title: 'Software', sub: softCount ? plural(softCount, 'app') : 'Plugins, scripts & more', to: '/software', accent: 'linear-gradient(120deg,#7b4397,#dc2430)', glow: '#dc2430' },
     { key: 'time', icon: Timer, title: 'Time Tracker', sub: 'Hours per project & client', to: '/time', accent: 'linear-gradient(120deg,#11998e,#38ef7d)', glow: '#2fd08a' },
+    { key: 'expenses', icon: Wallet, title: 'Expenses', sub: 'Costs & what to earn a month', to: '/expenses', accent: 'linear-gradient(120deg,#f7971e,#f5576c)', glow: '#f5776c' },
     { key: 'notes', icon: NotebookPen, title: 'Notes', sub: 'Ideas, notes & pictures', to: '/notes', accent: 'linear-gradient(120deg,#c471f5,#fa71cd)', glow: '#d876e8' },
     { key: 'content', icon: Megaphone, title: 'Content', sub: 'Plan posts for Instagram, TikTok & X', to: '/content', accent: 'linear-gradient(120deg,#feda75,#d62976 55%,#4f5bd5)', glow: '#e1306c' },
     { key: 'achievements', icon: Trophy, title: 'Achievements', sub: 'Milestones, XP & your level', to: '/achievements', accent: 'linear-gradient(120deg,#7c5cff,#2fcaa9)', glow: '#7c5cff' },
@@ -297,6 +300,7 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
       case 'inspiration': return <Inspiration projects={refs} sources={w.sources} />;
       case 'note': return settings ? <QuickNote initial={settings.dashboardNote || ''} /> : null;
       case 'achievements': return <AchievementsWidget reloadKey={reloadKey} compact={w.size === 'half'} />;
+      case 'money': return <MoneyWidget reloadKey={reloadKey} compact={w.size === 'half'} />;
       case 'next': return plans === null ? null : (
           <div className="dash-focus" id="dash-next">
             <div className={`dash-next ${next ? '' : 'is-free'} ${next && next.days < 0 ? 'overdue' : ''}`}

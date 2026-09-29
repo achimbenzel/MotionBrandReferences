@@ -683,6 +683,8 @@ export function normalizeDB(db) {
   db.notes = db.notes.filter((n) => n && typeof n === 'object').map(normalizeNote);
   if (!Array.isArray(db.content)) db.content = [];                    // social media posts being planned
   db.content = db.content.filter((c) => c && typeof c === 'object').map(normalizeContent);
+  if (!Array.isArray(db.expenses)) db.expenses = [];                  // what the business costs
+  db.expenses = db.expenses.filter((e) => e && typeof e === 'object').map(normalizeExpense);
   if (!Array.isArray(db.contentLibrary)) db.contentLibrary = [];      // saved hooks, hashtag sets, calls to action
   db.contentLibrary = db.contentLibrary.filter((x) => x && typeof x === 'object').map(normalizeContentSnippet).filter((x) => x.text.trim());
   if (!Array.isArray(db.achievements)) db.achievements = [];          // milestones (gamified)
@@ -707,6 +709,7 @@ export function normalizeDB(db) {
   db.settings.imageUploads = normalizeImageUploads(db.settings.imageUploads);
   db.settings.contentProfile = normalizeContentProfile(db.settings.contentProfile);
   db.settings.contentPillars = normalizeContentPillars(db.settings.contentPillars);
+  db.settings.finance = normalizeFinance(db.settings.finance);
   db.settings.contentRhythm = normalizeContentRhythm(db.settings.contentRhythm);
   db.settings.dashboardLayout = normalizeDashboardLayout(db.settings.dashboardLayout);
   return db;
@@ -822,6 +825,39 @@ export function normalizeImageUploads(v) {
     quality: Math.round(num(o.quality, 50, 100, 85)),
   };
 }
+// ---- Expenses: what the business costs (subscriptions, insurance …) ------------------
+export const EXPENSE_CATEGORY_KEYS = ['software', 'insurance', 'health', 'office', 'phone', 'hardware', 'taxes', 'accounting', 'marketing', 'learning', 'travel', 'other'];
+export const EXPENSE_INTERVALS = ['month', 'quarter', 'half', 'year', 'once'];
+export function normalizeExpense(e) {
+  const amount = Number(e?.amount);
+  return {
+    id: typeof e?.id === 'string' && ID.test(e.id) ? e.id : nanoid(10),
+    name: str(e?.name, 120),
+    category: EXPENSE_CATEGORY_KEYS.includes(e?.category) ? e.category : 'other',
+    amount: Number.isFinite(amount) && amount > 0 ? Math.round(Math.min(amount, 1e9) * 100) / 100 : 0,
+    interval: EXPENSE_INTERVALS.includes(e?.interval) ? e.interval : 'month',
+    start: isDay(e?.start) ? e.start : new Date().toISOString().slice(0, 10), // the first payment (its day of the month is the payment day)
+    end: isDay(e?.end) ? e.end : '',                                         // the last payment on or before this day ('' = runs on)
+    share: Math.round(num(e?.share, 0, 100, 100)),                           // the business part, in %
+    notice: Math.round(num(e?.notice, 0, 730, 0)),                           // days' notice to cancel before it renews
+    link: str(e?.link, 500).trim(),
+    notes: str(e?.notes, 2000),
+    createdAt: num(e?.createdAt, 0, 1e14, 0) || Date.now(),
+    updatedAt: num(e?.updatedAt, 0, 1e14, 0) || Date.now(),
+  };
+}
+/** What you want to earn with it: your pay (net, a month), tax on profit, a reserve, your hourly rate, weeks off a year. */
+export function normalizeFinance(v) {
+  const o = v && typeof v === 'object' ? v : {};
+  return {
+    salary: Math.round(num(o.salary, 0, 1e7, 0)),
+    taxRate: Math.round(num(o.taxRate, 0, 80, 30)),
+    reserve: Math.round(num(o.reserve, 0, 100, 10)),
+    rate: Math.round(num(o.rate, 0, 1e5, 0) * 100) / 100,
+    weeksOff: Math.round(num(o.weeksOff, 0, 20, 6)),
+  };
+}
+
 /** Your content pillars — the themes you post about: [{ id, name, color }]. */
 export function normalizeContentPillars(v) {
   const seen = new Set();
@@ -863,7 +899,7 @@ export function normalizeContentProfile(v) {
   const o = v && typeof v === 'object' ? v : {};
   return { name: str(o.name, 60).trim(), handle: str(o.handle, 40).replace(/^@+/, '').replace(/[^\w.]/g, '').slice(0, 30) };
 }
-export const DASHBOARD_WIDGETS = ['focus', 'weekly', 'timer', 'next', 'continue', 'urgent', 'tools', 'pipeline', 'rhythm', 'inspiration', 'note', 'achievements'];
+export const DASHBOARD_WIDGETS = ['focus', 'weekly', 'timer', 'next', 'continue', 'urgent', 'tools', 'pipeline', 'money', 'rhythm', 'inspiration', 'note', 'achievements'];
 /** The dashboard's widgets in your order: [{ id, hidden, size: 'full' | 'half' }] (unknown ones dropped; [] = the default). */
 export function normalizeDashboardLayout(v) {
   const seen = new Set();

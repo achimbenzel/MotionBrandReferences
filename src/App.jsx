@@ -29,6 +29,7 @@ const StoryboardEditor = lazy(() => import('./pages/StoryboardEditor.jsx'));
 const MockupsPage = lazy(() => import('./pages/MockupsPage.jsx'));
 const MockupOpen = lazy(() => import('./pages/MockupOpen.jsx'));
 const TimeTracker = lazy(() => import('./pages/TimeTracker.jsx'));
+const ExpensesPage = lazy(() => import('./pages/ExpensesPage.jsx'));
 const ClientsPage = lazy(() => import('./pages/ClientsPage.jsx'));
 const ClientDetail = lazy(() => import('./pages/ClientDetail.jsx'));
 const NotesPage = lazy(() => import('./pages/NotesPage.jsx'));
@@ -139,6 +140,7 @@ function Shell() {
                 <Route path="/mockups" element={<MockupsPage />} />
                 <Route path="/mockups/:id" element={<MockupOpen />} />
                 <Route path="/time" element={<TimeTracker />} />
+                <Route path="/expenses" element={<ExpensesPage reloadKey={reloadKey} />} />
                 <Route path="/clients" element={<ClientsPage reloadKey={reloadKey} />} />
                 <Route path="/clients/:id" element={<ClientDetail onNewPlan={createPlan} />} />
                 <Route path="/notes" element={<NotesPage reloadKey={reloadKey} />} />

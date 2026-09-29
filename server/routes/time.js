@@ -221,8 +221,8 @@ const MONEY_FMT = {
 };
 const xmlAttr = (v) => v.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 // Header colours: the app's own (near-black, teal line) or a classic office blue.
-const LOOK = { app: { head: '1B1B1E', line: '2EC5D3', band: 'EAF8FA', tab: '2EC5D3' }, classic: { head: '2F5597', line: '1F3864', band: 'DDE6F3', tab: '2F5597' } };
-function styles(look, currency) {
+export const LOOK = { app: { head: '1B1B1E', line: '2EC5D3', band: 'EAF8FA', tab: '2EC5D3' }, classic: { head: '2F5597', line: '1F3864', band: 'DDE6F3', tab: '2F5597' } };
+export function styles(look, currency) {
   return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
     + `<numFmts count="4"><numFmt numFmtId="164" formatCode="yyyy-mm-dd"/><numFmt numFmtId="165" formatCode="hh:mm"/><numFmt numFmtId="166" formatCode="0.00"/><numFmt numFmtId="167" formatCode="${xmlAttr(MONEY_FMT[currency] || MONEY_FMT.EUR)}"/></numFmts>`
     + '<fonts count="5">'

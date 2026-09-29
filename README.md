@@ -314,7 +314,7 @@ The picture is copied to its new place, so the original stays where it was.
 
 A **Settings** page (in the sidebar footer above Trash, the storage **⋯** menu,
 or the palette) has a **Library** section — data-format migration, unused-file
-cleanup and backups (see above) — and lists every **keyboard shortcut** — ⌘K search, the fullscreen
+cleanup, backups (see above) and **Stored pictures** (below) — and lists every **keyboard shortcut** — ⌘K search, the fullscreen
 viewer's scroll-zoom / drag / arrows, Motion's `,` `.` frame stepping, reference
 `←`/`→` navigation — plus per-browser **preferences**. The **video player
 volume** (and mute) is remembered across reloads in this browser, and can be
@@ -347,6 +347,22 @@ library import — are never touched, and neither are pictures shared to the
 Inbox straight from another app on your phone. Stored in the settings
 (`imageUploads`).
 
+### Stored pictures: make them smaller afterwards
+
+**Settings → Library → Stored pictures → Make smaller…** does the same for
+pictures that are **already in the library**: pick from what size on (e.g.
+from 500 KB), which areas (**references**, **projects**, **notes**,
+**content**, **Inbox**, and software / achievements / the dashboard banner), and
+the format, size and quality. It lists what it finds (biggest first, with what
+each belongs to), then goes through them one by one in the browser — with a
+progress bar and *Stop after this one*. A picture is only replaced when the new
+one is clearly smaller (at least 8 %); its name changes (e.g. `cover-s.webp`)
+and every place that names it — its reference, a project's block, a `/data/`
+link in a text — follows. **Logos, mockups and client logos are never
+touched** (they must stay exact). The originals go to the **Trash** as one
+item ("12 pictures before they were made smaller"): **Undo** in the dialog or
+**Restore** there puts every original and its name back.
+
 ---
 
 ## Modes: Work & Reference
@@ -356,7 +372,7 @@ A toggle switches between two modes:
 - **Work** — the **default** mode (left in the toggle), your working area. It
   opens on a **Dashboard** and holds **Clients**, **Projects**, **Software**,
   the **To-Do board**, the **Brand Tester**, **Storyboards**, **Mockups**,
-  the **Time Tracker**, **Notes**, **Content** and **Achievements** (see below).
+  the **Time Tracker**, **Expenses**, **Notes**, **Content** and **Achievements** (see below).
 - **Reference** — the library (Branding, Motion Design, Logos, Business Cards,
   Colors, Image Gallery, Fonts, Logo No Go).
 
@@ -406,10 +422,15 @@ it and show it again; your layout is saved. The widgets:
   who and how old they turn); a day opens its project (or the client).
 - **Urgent** to-dos from the board and every project.
 - **Your tools** — Clients, Projects, To-Do Board, Storyboards, Mockups,
-  Brand Tester, Software, Time Tracker, Notes, Content, Achievements — with a light that follows the pointer.
+  Brand Tester, Software, Time Tracker, Expenses, Notes, Content, Achievements — with a light that follows the pointer.
 - **Pipeline** — your projects by status as one bar and per stage (Briefing →
   Concept → Design → Production → Review → Delivered); a stage opens the project
   list filtered to it.
+- **Money this month** — what this month has to bring in (see
+  [Expenses](#expenses)) against what you've invoiced so far, with a bar, what's
+  still missing and the days left; the costs of the month, what still goes out
+  and the average a month; and the next payments and cancel-by days (a click
+  opens that expense). Without expenses it invites you to add some.
 - **Your rhythm** — a GitHub-style map of the last 26 weeks (15 on a phone):
   a square per day, dark → bright with how much you did — every save, and the
   references, projects, mockups and Inbox shares you added. Hover a day for its
@@ -752,7 +773,9 @@ same step), a starting point and the format:
   shots (section, length and texts — no pictures), format and target length
   under a name (the name of one of yours replaces it). They're listed after
   the built-in ones, marked as yours, with a bin to delete them (storyboards
-  made from a template stay as they are).
+  made from a template stay as they are). The **pencil** on one of yours
+  renames it and changes its description (in place, Enter saves, Esc cancels;
+  a name another of yours already has is refused).
 
 A storyboard is stored in its project (as its storyboard block), so the project and
 the Storyboards page always show the same thing.
@@ -1042,8 +1065,55 @@ and client.
 Entries are stored in `data/db.json` (`timeEntries`), so they're part of the
 library export / import.
 
+### Expenses
+**Expenses** (sidebar, under Time Tracker) is what your business costs —
+subscriptions, insurance, health insurance and pension, hardware, your phone,
+the tax advisor … — and what has to come in each month to cover it and pay you.
+
+- **An expense**: name (typing offers common ones — Adobe Creative Cloud,
+  Maxon One, Betriebshaftpflicht, Künstlersozialkasse, Steuerberater … — and
+  brings their category along), **category** (software & subscriptions,
+  insurance, health & pension, office & rent, phone & internet, hardware,
+  taxes & fees, bank & accounting, marketing, learning, travel, other),
+  **amount**, how often it's paid (**monthly, quarterly, every 6 months,
+  yearly** or **one-time**), the **first payment** (its day of the month is the
+  payday; the 31st becomes the month's last day), an optional **end**, the
+  **business part** in % (a phone used 50 % for work counts half), the
+  **notice** to cancel in days, a **link** (the account or contract) and
+  **notes**. The editor shows what it comes to a year.
+- **Price changes…** — a new amount from a day on: the old one ends the day
+  before, a copy starts with the new price, so the past stays right.
+  **Duplicate**, and **Delete** (to the Trash, with Undo).
+- **Year** (← 2026 →): the year's total (business part; with private parts
+  too, if there are any), **⌀ a month** and what's running per month now,
+  **to earn a month**, and this month so far — invoiced against the target,
+  paid, and what still goes out.
+- **Month by month** — bars for what goes out (business part) and what you
+  invoiced, with a dashed line for what has to come in; hover a month for its
+  payments. **By category** — the year per category with its share.
+- **What has to come in** — your **pay a month** (net), the **tax on profit**
+  (30 % by default), a **reserve** on top (10 %), your **hourly rate** and
+  **weeks off** a year: costs ⌀ a month + pay + the tax on it + reserve = **to
+  earn a month**, and with a rate the **billable hours** a month and a week
+  that takes. Saved as you type.
+- **Coming up** — the payments of the next 45 days and **cancel-by** days (the
+  next payment minus the notice) of the next 60, in yellow; a click opens it.
+  In the list, a cancel-by within 30 days is yellow too.
+- **The list** — **Running / Ended / All** and a search, grouped by category
+  with each group's year; every row shows its rhythm, since when, the business
+  part, the next payment, the cancel-by day, the amount and the year.
+- **Export** — the year as **Excel** (German or English): every payment with
+  date, name, category, rhythm, amount, business % and business amount (as
+  formulas, with totals that follow a filter), and a summary sheet by category
+  and by month.
+- Invoices (for "invoiced") come from your [clients](#clients). Expenses are
+  in the ⌘K search, and the dashboard has a **Money this month** widget.
+
+Stored in `data/db.json` (`expenses`; the calculator in `settings.finance`),
+so they're part of the library export / import.
+
 ### Notes
-**Notes** (sidebar, under Time Tracker) is for everything that isn't a
+**Notes** (sidebar, under Expenses) is for everything that isn't a
 project, a to-do or a reference — ideas, notes from a call, prices, a list of
 fonts to try.
 
@@ -1232,7 +1302,17 @@ still when the system asks for reduced motion).
   rate, a viral post, featured, a talk, your own product, an award). Delete
   goes to the Trash (with Undo).
 - Unlocking — by a number or by hand — gets its moment: the card flips in
-  with its XP (and your new rank, if there is one).
+  with its XP (and your new rank, if there is one). When **one number unlocks
+  several at once** (e.g. 1K, 5K and 10K followers), **Set the dates** there
+  lists them smallest first with a day each (today by default, never in the
+  future) — or *One day for all* — and warns when a bigger milestone would be
+  dated before a smaller one.
+- **Order** (with the Edit switch on): **drag** a card to another place in its
+  group or into another group (dropping on a group's *Add* tile puts it last);
+  in the editor, **← n / m →** moves it within its group (also on a phone).
+  A group's **⋯** (or a double-click on its name) **renames** it — a name
+  another group already has joins the two — and moves the whole group **up**
+  or **down**. Renames have **Undo**.
 - The **dashboard** has an **Achievements** widget: your rank and XP, how many
   you have (and this year), open quests, the latest one you reached and the one
   you're closest to.
@@ -1418,6 +1498,13 @@ a new logo you can check you're not accidentally resembling one. Upload an
 an **“Avoid designs that resemble this”** banner and a **“Why it's a no-go”**
 notes field for its history / what to steer clear of.
 
+### Pin references
+Every reference (all sections) can be **pinned**: the pin on a card (top left,
+on hover — always shown once pinned), **Pin** in a masonry picture's menu or
+in its page's **Edit ⋯** menu. Pinned ones stay **on top** of their section
+under **Pinned**, the rest follow under **All**; search and filters still
+apply. Stored as `pinned` on the reference.
+
 ### Galleries (All / Galleries)
 Every section has an **All / Galleries** toggle. Under **Galleries** you create
 named collections (e.g. "Green Tech Companies"), open one, and add or remove
@@ -1441,7 +1528,7 @@ it, the Work / Reference toggle, the section list (with icons, current one
 highlighted), an **Add** button, and a footer with **Settings**, **Trash** and
 the storage meter. In **Work** mode the section list is **Dashboard**,
 **Clients**, **Projects**, **Software**, **To-Dos**, **Brand Tester**,
-**Storyboards**, **Mockups**, **Time Tracker**, **Notes**, **Content** and **Achievements**; a running focus timer or time tracker shows
+**Storyboards**, **Mockups**, **Time Tracker**, **Expenses**, **Notes**, **Content** and **Achievements**; a running focus timer or time tracker shows
 as a small pill under the search.
 The collapse button folds the sidebar into a slim **rail of icons** (names show
 as tooltips; Work and Reference stand one above the other) for a wider canvas;
