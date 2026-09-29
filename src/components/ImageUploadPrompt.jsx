@@ -45,7 +45,7 @@ function OptimizeDialog({ files, prefs, onDone }) {
       const out = [];
       for (const f of files) {
         if (run.current !== id) return;
-        out.push(await optimizeImage(f, { format, maxEdge, quality }).catch(() => ({ file: f, before: f.size, after: f.size, changed: false, note: 'can’t be read here' })));
+        out.push(await optimizeImage(f, { format, maxEdge, quality }));
         if (run.current === id) setResults([...out]);
       }
       if (run.current === id) setBusy(false);

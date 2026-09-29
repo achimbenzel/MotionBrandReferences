@@ -57,6 +57,7 @@ const hasAlpha = (ctx, w, h) => {
   const sc = s.getContext('2d');
   sc.drawImage(ctx.canvas, 0, 0, s.width, s.height);
   const d = sc.getImageData(0, 0, s.width, s.height).data;
+  s.width = 0; s.height = 0;
   for (let i = 3; i < d.length; i += 4) if (d[i] < 250) return true;
   return false;
 };
@@ -65,36 +66,54 @@ const EXT = { 'image/webp': '.webp', 'image/jpeg': '.jpg', 'image/png': '.png' }
 /**
  * One picture, made smaller → { file, width, height, before, after, changed, note }.
  * Pictures with transparency never become JPEG (WebP, or they keep their format);
- * a result that isn't smaller keeps the original.
+ * a result that isn't smaller keeps the original. Should the browser stumble
+ * (short of memory with a huge picture) it tries once more — or keeps the original.
  */
 export async function optimizeImage(file, prefs) {
+  const first = await attempt(file, prefs);
+  if (!first.failed) return first;
+  await new Promise((r) => { setTimeout(r, 300); });
+  const again = await attempt(file, prefs);
+  return again.failed ? { file, before: file.size, after: file.size, changed: false, note: 'couldn’t be worked out here' } : again;
+}
+
+async function attempt(file, prefs) {
   const p = { ...IMAGE_DEFAULTS, ...prefs };
   const same = (note = '') => ({ file, before: file.size, after: file.size, changed: false, note });
   if (!canOptimize(file)) return same('stays as it is');
-  let bmp;
-  try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch { return same('can’t be read here'); }
-  const { width: w0, height: h0 } = bmp;
-  const k = p.maxEdge && Math.max(w0, h0) > p.maxEdge ? p.maxEdge / Math.max(w0, h0) : 1;
-  const w = Math.max(1, Math.round(w0 * k)); const h = Math.max(1, Math.round(h0 * k));
-  const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
-  const ctx = canvas.getContext('2d');
-  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(bmp, 0, 0, w, h);
-  bmp.close?.();
-  const from = RASTER.test(file.type) ? file.type : `image/${(RASTER_EXT.exec(file.name)?.[1] || 'png').toLowerCase().replace('jpg', 'jpeg')}`;
-  const alpha = from !== 'image/jpeg' && hasAlpha(ctx, w, h);
-  let type = p.format === 'webp' ? 'image/webp' : p.format === 'jpeg' ? 'image/jpeg' : from;
-  let note = '';
-  if (type === 'image/jpeg' && alpha) { type = (await canEncode('image/webp')) ? 'image/webp' : from; note = 'has transparency — no JPEG'; }
-  if (type === 'image/webp' && !(await canEncode('image/webp'))) { type = alpha ? from : 'image/jpeg'; note = 'this browser can’t write WebP'; }
-  if (!EXT[type]) type = alpha ? 'image/png' : 'image/jpeg'; // bmp / avif → something every browser writes
-  if (k === 1 && type === from && type === 'image/png') return same('PNG, already its size');
-  const blob = await new Promise((res) => { canvas.toBlob(res, type, p.quality / 100); });
-  if (!blob || blob.size >= file.size) return { ...same(note || 'already small'), width: w0, height: h0 };
-  const name = `${(file.name || 'picture').replace(/\.[^.]+$/, '')}${EXT[blob.type] || '.jpg'}`;
-  const out = new File([blob], name, { type: blob.type, lastModified: Date.now() });
-  markHandled(out);
-  return { file: out, width: w, height: h, before: file.size, after: out.size, changed: true, note };
+  let bmp = null;
+  const canvas = document.createElement('canvas');
+  try {
+    bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const { width: w0, height: h0 } = bmp;
+    const k = p.maxEdge && Math.max(w0, h0) > p.maxEdge ? p.maxEdge / Math.max(w0, h0) : 1;
+    const w = Math.max(1, Math.round(w0 * k)); const h = Math.max(1, Math.round(h0 * k));
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(bmp, 0, 0, w, h);
+    bmp.close?.(); bmp = null;
+    const from = RASTER.test(file.type) ? file.type : `image/${(RASTER_EXT.exec(file.name)?.[1] || 'png').toLowerCase().replace('jpg', 'jpeg')}`;
+    const alpha = from !== 'image/jpeg' && hasAlpha(ctx, w, h);
+    let type = p.format === 'webp' ? 'image/webp' : p.format === 'jpeg' ? 'image/jpeg' : from;
+    let note = '';
+    if (type === 'image/jpeg' && alpha) { type = (await canEncode('image/webp')) ? 'image/webp' : from; note = 'has transparency — no JPEG'; }
+    if (type === 'image/webp' && !(await canEncode('image/webp'))) { type = alpha ? from : 'image/jpeg'; note = 'this browser can’t write WebP'; }
+    if (!EXT[type]) type = alpha ? 'image/png' : 'image/jpeg'; // bmp / avif → something every browser writes
+    if (k === 1 && type === from && type === 'image/png') return same('PNG, already its size');
+    const blob = await new Promise((res) => { canvas.toBlob(res, type, p.quality / 100); });
+    if (!blob) return { failed: true };
+    if (blob.size >= file.size) return { ...same(note || 'already small'), width: w0, height: h0 };
+    const name = `${(file.name || 'picture').replace(/\.[^.]+$/, '')}${EXT[blob.type] || '.jpg'}`;
+    const out = new File([blob], name, { type: blob.type, lastModified: Date.now() });
+    markHandled(out);
+    return { file: out, width: w, height: h, before: file.size, after: out.size, changed: true, note };
+  } catch {
+    return { failed: true };
+  } finally {
+    bmp?.close?.();
+    canvas.width = 0; canvas.height = 0; // give the memory back right away
+  }
 }
 
 /**
