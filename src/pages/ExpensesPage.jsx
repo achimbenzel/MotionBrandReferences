@@ -11,7 +11,7 @@ import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
 import {
   EXPENSE_CATEGORIES, EXPENSE_IDEAS, INTERVALS, categoryOf, intervalOf, paymentsIn, yearOf, monthlyOf, nextPayment, cancelBy, monthsOf,
-  targetOf, isActive, todayIso,
+  targetOf, isActive, todayIso, VIEWS, partOf, inView,
 } from '../lib/expenses.js';
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => new Date(2024, i, 1).toLocaleDateString(undefined, { month: 'short' }));
@@ -20,11 +20,13 @@ const addDays = (iso, n) => { const [y, m, d] = iso.split('-').map(Number); cons
 const load = (k, f) => { try { return localStorage.getItem(k) || f; } catch { return f; } };
 const save = (k, v) => { try { localStorage.setItem(k, v); } catch { /* private window */ } };
 const AHEAD = 45; // days of "coming up"
+const VIEW_WORD = { business: 'business', private: 'private', both: 'business + private' };
 
 /**
  * Expenses: what the business costs — subscriptions, insurance, hardware …
  * each with its amount and rhythm (monthly, yearly …, or once), its business
- * part and notice period. Per year and month, by category; what's coming up
+ * part (the rest is private) and notice period. Per year and month, by
+ * category — the business part, the private part or both; what's coming up
  * (and what to cancel in time) — and what has to come in each month to cover
  * it all and pay you, against what you've invoiced.
  */
@@ -40,6 +42,8 @@ export default function ExpensesPage({ reloadKey }) {
   const [show, setShowState] = useState(() => load('exShow', 'active')); // active | ended | all
   const [q, setQ] = useState('');
   const setShow = (v) => { setShowState(v); save('exShow', v); };
+  const [view, setViewState] = useState(() => { const v = load('exView', 'business'); return VIEWS.some((x) => x.key === v) ? v : 'business'; });
+  const setView = (v) => { setViewState(v); save('exView', v); };
 
   useEffect(() => {
     let alive = true;
@@ -59,11 +63,12 @@ export default function ExpensesPage({ reloadKey }) {
   const finance = data?.finance || {};
 
   const sums = useMemo(() => {
-    let all = 0; let business = 0; let recurring = 0;
+    let all = 0; let business = 0; let priv = 0; let recurring = 0; let count = 0;
     for (const e of list) {
       const y = yearOf(e, year);
-      all += y.all; business += y.business;
-      if (isActive(e, today)) recurring += monthlyOf(e) * (e.share ?? 100) / 100;
+      all += y.all; business += y.business; priv += y.private;
+      if (y.count && inView(e, view)) count += 1;
+      if (isActive(e, today)) recurring += monthlyOf(e) * partOf(e, view);
     }
     const months = monthsOf(list, year);
     const invoiced = Array(12).fill(0); const paid = Array(12).fill(0);
@@ -72,26 +77,33 @@ export default function ExpensesPage({ reloadKey }) {
       const m = Number(i.date.slice(5, 7)) - 1;
       invoiced[m] += i.amount; if (i.status === 'paid') paid[m] += i.amount;
     }
-    const byCat = EXPENSE_CATEGORIES.map((c) => ({ ...c, sum: list.filter((e) => e.category === c.key).reduce((n, e) => n + yearOf(e, year).business, 0) }))
-      .filter((c) => c.sum > 0).sort((a, b) => b.sum - a.sum);
-    return { all, business, recurring, months, invoiced, paid, byCat };
-  }, [list, year, data, today]);
+    const byCat = EXPENSE_CATEGORIES.map((c) => {
+      const ys = list.filter((e) => e.category === c.key).map((e) => yearOf(e, year));
+      const b = ys.reduce((n, y) => n + y.business, 0); const p = ys.reduce((n, y) => n + y.private, 0);
+      return { ...c, business: b, private: p, sum: view === 'business' ? b : view === 'private' ? p : b + p };
+    }).filter((c) => c.sum > 0).sort((a, b) => b.sum - a.sum);
+    const sum = view === 'business' ? business : view === 'private' ? priv : all;
+    return { all, business, private: priv, sum, count, recurring, months, invoiced, paid, byCat };
+  }, [list, year, data, today, view]);
   const target = targetOf(sums.business / 12, finance);
   const thisMonth = Number(today.slice(5, 7)) - 1;
   const isNow = year === Number(today.slice(0, 4));
   const earned = isNow ? sums.invoiced[thisMonth] : 0;
-  const dueThisMonth = isNow ? sums.months[thisMonth].items.filter((x) => x.date >= today).reduce((n, x) => n + x.e.amount, 0) : 0;
+  const dueThisMonth = isNow ? sums.months[thisMonth].items.filter((x) => x.date >= today).reduce((n, x) => n + x.e.amount * partOf(x.e, view), 0) : 0;
+  const outOf = (m) => (view === 'business' ? m.business : view === 'private' ? m.private : m.all);
+  const salary = finance.salary || 0;
 
   // Coming up: payments in the next weeks, and what to cancel in time.
   const upcoming = useMemo(() => {
     const until = addDays(today, AHEAD);
-    const pays = list.flatMap((e) => paymentsIn(e, today, until).map((date) => ({ kind: 'pay', date, e })));
-    const cancels = list.map((e) => ({ e, date: cancelBy(e, today) })).filter((x) => x.date && x.date >= today && x.date <= addDays(today, 60)).map((x) => ({ kind: 'cancel', ...x }));
+    const mine = list.filter((e) => inView(e, view));
+    const pays = mine.flatMap((e) => paymentsIn(e, today, until).map((date) => ({ kind: 'pay', date, e })));
+    const cancels = mine.map((e) => ({ e, date: cancelBy(e, today) })).filter((x) => x.date && x.date >= today && x.date <= addDays(today, 60)).map((x) => ({ kind: 'cancel', ...x }));
     return [...cancels, ...pays].sort((a, b) => a.date.localeCompare(b.date) || (a.kind === 'cancel' ? -1 : 1)).slice(0, 8);
-  }, [list, today]);
+  }, [list, today, view]);
 
   const needle = q.trim().toLowerCase();
-  const shown = list.filter((e) => (show === 'all' || (show === 'active' ? isActive(e, today) : !isActive(e, today)))
+  const shown = list.filter((e) => inView(e, view) && (show === 'all' || (show === 'active' ? isActive(e, today) : !isActive(e, today)))
     && (!needle || `${e.name} ${e.notes} ${categoryOf(e.category).label}`.toLowerCase().includes(needle)));
   const groups = EXPENSE_CATEGORIES.map((c) => ({ ...c, items: shown.filter((e) => e.category === c.key) })).filter((g) => g.items.length);
 
@@ -138,17 +150,25 @@ export default function ExpensesPage({ reloadKey }) {
   if (error) return <div className="center-msg">Couldn’t load: {error}</div>;
   if (!data) return <div className="spinner" />;
 
-  const maxBar = Math.max(target.total, ...sums.months.map((m) => m.business), ...sums.invoiced, 1);
-  const blank = { name: '', category: 'software', amount: '', interval: 'month', start: today, end: '', share: 100, notice: 0, link: '', notes: '' };
+  // The chart: what goes out in this view; invoiced and the target beside it — under Private, your pay instead.
+  const showIn = view !== 'private';
+  const line = view === 'private' ? salary : target.total;
+  const maxBar = Math.max(line, ...sums.months.map(outOf), ...(showIn ? sums.invoiced : []), 1);
+  const privThisMonth = isNow ? sums.months[thisMonth].private : 0;
+  const privLeft = salary - sums.private / 12;
+  const blank = { name: '', category: view === 'private' ? 'home' : 'software', amount: '', interval: 'month', start: today, end: '', share: view === 'private' ? 0 : 100, notice: 0, link: '', notes: '' };
 
   return (
     <div className="ex-page">
       <div className="page-head-row">
         <div className="page-head">
           <h1>Expenses</h1>
-          <p>What your business costs — subscriptions, insurance, hardware … — per year and month, and what has to come in each month.</p>
+          <p>What your business costs — subscriptions, insurance, hardware … — and, if you like, what you pay privately: per year and month, and what has to come in each month.</p>
         </div>
         <div className="ex-head-tools">
+          <div className="segmented ex-view" role="group" aria-label="Show the costs">
+            {VIEWS.map((v) => <button key={v.key} type="button" className={view === v.key ? 'on' : ''} aria-pressed={view === v.key} onClick={() => setView(v.key)}>{v.label}</button>)}
+          </div>
           <div className="ex-year" role="group" aria-label="Year">
             <button type="button" className="icon-btn" onClick={() => setYear(year - 1)} aria-label="Previous year"><ChevronLeft size={16} /></button>
             <b>{year}</b>
@@ -166,13 +186,16 @@ export default function ExpensesPage({ reloadKey }) {
 
       <div className="ex-tiles">
         <div className="ex-tile">
-          <span>{year}</span>
-          <b>{money(sums.business)}</b>
-          <small>{list.filter((e) => yearOf(e, year).count).length} expenses{sums.all !== sums.business ? ` · ${money(sums.all)} incl. private` : ''}</small>
+          <span>{year} · {VIEW_WORD[view]}</span>
+          <b>{money(sums.sum)}</b>
+          <small>
+            {view === 'both' ? `${money(sums.business)} business + ${money(sums.private)} private`
+              : `${sums.count} expense${sums.count === 1 ? '' : 's'}${view === 'business' && sums.private > 0 ? ` · ${money(sums.private)} private` : ''}`}
+          </small>
         </div>
         <div className="ex-tile">
           <span>⌀ a month</span>
-          <b>{money(sums.business / 12)}</b>
+          <b>{money(sums.sum / 12)}</b>
           <small>running now: {money(sums.recurring)} / month</small>
         </div>
         <div className="ex-tile accent">
@@ -180,7 +203,15 @@ export default function ExpensesPage({ reloadKey }) {
           <b>{money(target.total)}</b>
           <small>{target.hours != null ? `${Math.ceil(target.hours)} h at ${money(finance.rate)}/h · ${Math.round(target.weekHours)} h a week` : 'Set your pay and rate below'}</small>
         </div>
-        {isNow && (
+        {isNow && view === 'private' && (
+          <div className="ex-tile">
+            <span><Wallet size={12} /> {MONTHS[thisMonth]} · private</span>
+            <b>{money(privThisMonth)} {salary > 0 && <em>/ {money(salary)} pay</em>}</b>
+            {salary > 0 && <span className="ex-progress priv"><i style={{ width: `${Math.min(100, (privThisMonth / salary) * 100)}%` }} /></span>}
+            <small>{salary > 0 ? `${money(salary - privThisMonth)} of your pay left` : 'Set your pay below to see what’s left'}</small>
+          </div>
+        )}
+        {isNow && view !== 'private' && (
           <div className="ex-tile">
             <span><TrendingUp size={12} /> {MONTHS[thisMonth]} so far</span>
             <b>{money(earned)} <em>/ {money(target.total)}</em></b>
@@ -193,32 +224,50 @@ export default function ExpensesPage({ reloadKey }) {
       <div className="ex-grid">
         <div className="ex-col">
           <section className="ex-card">
-            <header><CalendarClock size={14} /> <b>Month by month</b> <em>— paid out (business part) and invoiced, against what has to come in</em></header>
-            <div className="ex-chart" style={{ '--t': target.total / maxBar }}>
-              {sums.months.map((m, i) => (
-                <div key={i} className={`ex-month ${isNow && i === thisMonth ? 'now' : ''}`}
-                  title={`${MONTHS[i]}: out ${money(m.business)}${m.items.length ? ` (${m.items.map((x) => x.e.name).slice(0, 6).join(', ')}${m.items.length > 6 ? ' …' : ''})` : ''} · invoiced ${money(sums.invoiced[i])}`}>
-                  <div className="ex-bars">
-                    <i className="out" style={{ height: `${(m.business / maxBar) * 100}%` }} />
-                    <i className="in" style={{ height: `${(sums.invoiced[i] / maxBar) * 100}%` }} />
+            <header><CalendarClock size={14} /> <b>Month by month</b> <em>— {view === 'business' ? 'paid out (business part) and invoiced, against what has to come in'
+              : view === 'private' ? 'your private costs, against your pay' : 'business and private costs and invoiced, against what has to come in'}</em></header>
+            <div className="ex-chart" style={{ '--t': line / maxBar }}>
+              {sums.months.map((m, i) => {
+                const items = m.items.filter((x) => inView(x.e, view));
+                return (
+                  <div key={i} className={`ex-month ${isNow && i === thisMonth ? 'now' : ''}`}
+                    title={`${MONTHS[i]}: ${view === 'both' ? `business ${money(m.business)} + private ${money(m.private)}` : `${view} ${money(outOf(m))}`}${items.length ? ` (${items.map((x) => x.e.name).slice(0, 6).join(', ')}${items.length > 6 ? ' …' : ''})` : ''}${showIn ? ` · invoiced ${money(sums.invoiced[i])}` : ''}`}>
+                    <div className="ex-bars">
+                      <span className="ex-stack" style={{ height: `${(outOf(m) / maxBar) * 100}%` }}>
+                        {view !== 'business' && m.private > 0 && <i className="priv" style={{ flexGrow: m.private }} />}
+                        {view !== 'private' && m.business > 0 && <i className="out" style={{ flexGrow: m.business }} />}
+                      </span>
+                      {showIn && <i className="in" style={{ height: `${(sums.invoiced[i] / maxBar) * 100}%` }} />}
+                    </div>
+                    <small>{MONTHS[i]}</small>
                   </div>
-                  <small>{MONTHS[i]}</small>
-                </div>
-              ))}
-              {target.total > 0 && <span className="ex-target-line"><em>{money(target.total)}</em></span>}
+                );
+              })}
+              {line > 0 && <span className="ex-target-line"><em>{money(line)}</em></span>}
             </div>
-            <div className="ex-legend"><span><i className="out" /> paid out</span><span><i className="in" /> invoiced</span>{target.total > 0 && <span><i className="line" /> to earn a month</span>}</div>
+            <div className="ex-legend">
+              {view !== 'private' && <span><i className="out" /> {view === 'both' ? 'business' : 'paid out'}</span>}
+              {view !== 'business' && <span><i className="priv" /> {view === 'both' ? 'private' : 'paid out (private)'}</span>}
+              {showIn && <span><i className="in" /> invoiced</span>}
+              {line > 0 && <span><i className="line" /> {view === 'private' ? 'your pay' : 'to earn a month'}</span>}
+            </div>
           </section>
 
           <section className="ex-card">
-            <header><Tag size={14} /> <b>By category</b> <em>— {year}, business part</em></header>
+            <header><Tag size={14} /> <b>By category</b> <em>— {year}, {view === 'both' ? 'business and private' : `${view} part`}</em></header>
             {sums.byCat.length ? sums.byCat.map((c) => (
-              <div key={c.key} className="ex-cat">
+              <div key={c.key} className="ex-cat" title={view === 'both' ? `${c.label}: business ${money(c.business)} + private ${money(c.private)}` : undefined}>
                 <span className="ex-cat-label"><i style={{ background: c.color }} />{c.label}</span>
-                <span className="ex-cat-bar"><i style={{ width: `${(c.sum / sums.byCat[0].sum) * 100}%`, background: c.color }} /></span>
-                <span className="ex-cat-v">{money(c.sum)}<small>{Math.round((c.sum / sums.business) * 100)} %</small></span>
+                <span className={`ex-cat-bar ${view === 'both' ? 'split' : ''}`}>
+                  <span style={{ width: `${(c.sum / sums.byCat[0].sum) * 100}%` }}>
+                    {view !== 'private' && c.business > 0 && <i style={{ flexGrow: c.business, backgroundColor: c.color }} />}
+                    {view !== 'business' && c.private > 0 && <i className="priv" style={{ flexGrow: c.private, backgroundColor: c.color }} />}
+                  </span>
+                </span>
+                <span className="ex-cat-v">{money(c.sum)}<small>{Math.round((c.sum / sums.sum) * 100)} %</small></span>
               </div>
-            )) : <p className="hint">Nothing for {year} yet.</p>}
+            )) : <p className="hint">{view === 'private' ? `No private costs in ${year}.` : `Nothing for ${year} yet.`}</p>}
+            {view === 'both' && sums.private > 0 && sums.business > 0 && <div className="ex-legend"><span><i className="solid" /> business</span><span><i className="striped" /> private</span></div>}
           </section>
         </div>
 
@@ -240,6 +289,12 @@ export default function ExpensesPage({ reloadKey }) {
               <div className="total"><span>= to earn a month</span><b>{money(target.total)}</b></div>
               {target.hours != null && (
                 <p className="hint">At {money(finance.rate)}/h that’s <b>{Math.ceil(target.hours)} billable hours</b> a month — about <b>{Math.round(target.weekHours)} h a week</b> over {52 - (finance.weeksOff ?? 6)} working weeks.</p>
+              )}
+              {sums.private > 0 && (
+                <p className={`hint ex-calc-private ${salary > 0 && privLeft < 0 ? 'over' : ''}`}>
+                  Private costs, ⌀ <b>{money(sums.private / 12)}</b> a month, come out of your pay{salary > 0
+                    ? (privLeft >= 0 ? <> — <b>{money(privLeft)}</b> of it left.</> : <> — that’s <b>{money(-privLeft)}</b> more than it.</>) : '.'}
+                </p>
               )}
               <p className="hint">Health insurance and pension? Add them as expenses — they’re part of the costs. Prices before VAT.</p>
             </div>
@@ -275,23 +330,29 @@ export default function ExpensesPage({ reloadKey }) {
         </div>
       ) : groups.map((g) => (
         <section key={g.key} className="ex-group">
-          <div className="ex-group-head"><i style={{ background: g.color }} /><span>{g.label}</span><b>{money(g.items.reduce((n, e) => n + yearOf(e, year).business, 0))} <em>in {year}</em></b></div>
+          <div className="ex-group-head"><i style={{ background: g.color }} /><span>{g.label}</span><b>{money(g.items.reduce((n, e) => n + yearOf(e, year).all * partOf(e, view), 0))} <em>in {year}</em></b></div>
           {g.items.map((e) => (editing === e.id ? (
             <ExpenseEditor key={e.id} initial={e} currency={cur} onSave={saveExpense} onCancel={() => setEditing(null)} onDelete={() => remove(e)} onPrice={(a, from) => changePrice(e, a, from)} onDuplicate={() => duplicate(e)} />
           ) : (
-            <ExpenseRow key={e.id} e={e} year={year} today={today} money={money} onOpen={() => setEditing(e.id)} onLink={() => window.open(e.link, '_blank', 'noopener')} />
+            <ExpenseRow key={e.id} e={e} year={year} today={today} money={money} view={view} onOpen={() => setEditing(e.id)} onLink={() => window.open(e.link, '_blank', 'noopener')} />
           )))}
         </section>
       ))}
-      {list.length > 0 && !shown.length && <p className="hint">{needle ? `Nothing matches “${q.trim()}”.` : show === 'ended' ? 'Nothing has ended.' : 'Nothing is running.'}</p>}
+      {list.length > 0 && !shown.length && editing !== 'new' && (
+        <p className="hint">{needle ? `Nothing matches “${q.trim()}”.`
+          : !list.some((e) => inView(e, view)) ? (view === 'private'
+            ? 'No private expenses yet — add one with New expense, or set one to Private or Split in its editor.'
+            : 'No business expenses yet — they’re all private.')
+            : show === 'ended' ? 'Nothing has ended.' : 'Nothing is running.'}</p>
+      )}
       <div className="ex-foot hint">Invoices come from your <button type="button" className="ex-link" onClick={() => navigate('/clients')}>clients</button> (their dates and amounts).</div>
     </div>
   );
 }
 
-function ExpenseRow({ e, year, today, money, onOpen, onLink }) {
+function ExpenseRow({ e, year, today, money, view, onOpen, onLink }) {
   const iv = intervalOf(e.interval);
-  const y = yearOf(e, year);
+  const inYear = yearOf(e, year).all * partOf(e, view);
   const next = nextPayment(e, today);
   const cancel = cancelBy(e, today);
   const ended = !isActive(e, today);
@@ -302,7 +363,7 @@ function ExpenseRow({ e, year, today, money, onOpen, onLink }) {
         <small>
           {e.interval === 'once' ? `once · ${fmtDay(e.start, { day: 'numeric', month: 'short', year: 'numeric' })}` : `${iv.label.toLowerCase()} · since ${fmtDay(e.start, { month: 'short', year: 'numeric' })}`}
           {e.end && e.interval !== 'once' ? ` · ${ended ? 'ended' : 'ends'} ${fmtDay(e.end, { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
-          {e.share < 100 ? ` · ${e.share} % business` : ''}
+          {e.share === 0 ? ' · private' : e.share < 100 ? ` · ${e.share} % business` : ''}
           {e.notes ? ` · ${e.notes.split('\n')[0].slice(0, 60)}` : ''}
         </small>
       </span>
@@ -311,7 +372,7 @@ function ExpenseRow({ e, year, today, money, onOpen, onLink }) {
         {!ended && cancel && <span className={`ex-row-cancel ${cancel <= addDays(today, 30) ? 'soon' : ''}`}>cancel by {fmtDay(cancel)}</span>}
       </span>
       <span className="ex-row-amount"><b>{money(e.amount)}</b><small>{iv.per ? `/ ${iv.per}` : 'once'}</small></span>
-      <span className="ex-row-year"><b>{money(y.business)}</b><small>in {year}</small></span>
+      <span className="ex-row-year"><b>{money(inYear)}</b><small>{view === 'both' || e.share === 100 || (view === 'private' && e.share === 0) ? `in ${year}` : `${view} in ${year}`}</small></span>
     </div>
   );
 }
@@ -320,12 +381,21 @@ function ExpenseRow({ e, year, today, money, onOpen, onLink }) {
 function ExpenseEditor({ initial, currency, onSave, onCancel, onDelete, onPrice, onDuplicate }) {
   const [e, setE] = useState({ ...initial, amount: initial.amount === '' ? '' : String(initial.amount) });
   const [price, setPrice] = useState(null); // { amount, from } — a new price from a day on
+  const [split, setSplit] = useState(() => Number(initial.share) > 0 && Number(initial.share) < 100); // part business, part private
   const set = (p) => setE((x) => ({ ...x, ...p }));
+  const use = split ? 'split' : Number(e.share) === 0 ? 'private' : 'business';
+  const setUse = (k) => {
+    setSplit(k === 'split');
+    if (k === 'business') set({ share: 100 });
+    else if (k === 'private') set({ share: 0 });
+    else if (!(Number(e.share) > 0 && Number(e.share) < 100)) set({ share: 50 });
+  };
   const ok = e.name.trim() && Number(String(e.amount).replace(',', '.')) > 0 && e.start;
   const save = () => { if (ok) onSave(e); };
   const pickName = (v) => {
     const idea = EXPENSE_IDEAS.find(([n]) => n.toLowerCase() === v.trim().toLowerCase());
-    set({ name: v, ...(idea && !initial.id ? { category: idea[1] } : {}) });
+    if (idea && !initial.id && idea[2] != null) setSplit(false);
+    set({ name: v, ...(idea && !initial.id ? { category: idea[1], ...(idea[2] != null ? { share: idea[2] } : {}) } : {}) });
   };
   const perYear = e.interval === 'once' ? null : (Number(String(e.amount).replace(',', '.')) || 0) * (12 / (intervalOf(e.interval).months || 12));
   return (
@@ -349,14 +419,21 @@ function ExpenseEditor({ initial, currency, onSave, onCancel, onDelete, onPrice,
         {e.interval !== 'once' && <label className="ex-f"><span>Ends <em>optional</em></span><input className="input" type="date" value={e.end} min={e.start} onChange={(ev) => set({ end: ev.target.value })} /></label>}
       </div>
       <div className="ex-editor-row">
-        <label className="ex-f"><span>Business part</span><span className="ex-in"><input className="input" inputMode="numeric" value={e.share} onChange={(ev) => set({ share: ev.target.value.replace(/[^\d]/g, '').slice(0, 3) })} /><i>%</i></span></label>
+        <div className="ex-f ex-use"><span>Counts as</span>
+          <div className="segmented segmented-sm" role="group" aria-label="Counts as">
+            {[['business', 'Business'], ['private', 'Private'], ['split', 'Split']].map(([k, l]) => (
+              <button key={k} type="button" className={use === k ? 'on' : ''} aria-pressed={use === k} onClick={() => setUse(k)}>{l}</button>
+            ))}
+          </div>
+        </div>
+        {split && <label className="ex-f ex-f-s"><span>Business part</span><span className="ex-in"><input className="input" inputMode="numeric" value={e.share} onChange={(ev) => set({ share: ev.target.value.replace(/[^\d]/g, '').slice(0, 3) })} /><i>%</i></span></label>}
         {e.interval !== 'once' && (
           <label className="ex-f"><span>Notice to cancel</span><span className="ex-in"><input className="input" inputMode="numeric" value={e.notice || ''} placeholder="—" onChange={(ev) => set({ notice: ev.target.value.replace(/[^\d]/g, '').slice(0, 3) })} /><i>days</i></span></label>
         )}
         <label className="ex-f grow"><span>Link <em>account, contract</em></span><input className="input" value={e.link} placeholder="https://…" inputMode="url" onChange={(ev) => set({ link: ev.target.value })} /></label>
       </div>
       <label className="ex-f grow"><span>Notes</span><input className="input" value={e.notes} placeholder="Contract number, what it's for…" onChange={(ev) => set({ notes: ev.target.value })} /></label>
-      {perYear != null && perYear > 0 && <div className="hint ex-peryear">{fmtMoney(Math.round(perYear * 100) / 100, currency)} a year{Number(e.share) < 100 ? ` · ${fmtMoney(Math.round(perYear * Number(e.share)) / 100, currency)} of it for the business` : ''}</div>}
+      {perYear != null && perYear > 0 && <div className="hint ex-peryear">{fmtMoney(Math.round(perYear * 100) / 100, currency)} a year{use === 'private' ? ' · private' : Number(e.share) < 100 ? ` · ${fmtMoney(Math.round(perYear * Number(e.share)) / 100, currency)} of it for the business, ${fmtMoney(Math.round(perYear * (100 - Number(e.share))) / 100, currency)} private` : ''}</div>}
       {price && (
         <div className="ex-price" onKeyDown={(ev) => {
           if (ev.key !== 'Enter') return;

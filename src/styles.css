@@ -7107,8 +7107,9 @@ button.ach-card.holo:hover .ach-holo i { opacity: .8; }
 }
 
 /* ---------------------------------------------------------------- Expenses */
-.ex-page { --ex-out: #f58b7c; }
+.ex-page { --ex-out: #f58b7c; --ex-priv: #a58bff; }
 .ex-head-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ex-view button { padding: 7px 12px; }
 .ex-year { display: inline-flex; align-items: center; gap: 2px; height: 38px; padding: 0 3px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
 .ex-year b { min-width: 46px; text-align: center; font-size: 14px; font-variant-numeric: tabular-nums; }
 .ex-year .icon-btn { width: 30px; height: 30px; }
@@ -7125,6 +7126,7 @@ button.ach-card.holo:hover .ach-holo i { opacity: .8; }
 .ex-tile.accent b { color: var(--accent); }
 .ex-progress { display: block; height: 6px; margin: 2px 0; border-radius: 999px; background: rgba(255, 255, 255, .07); overflow: hidden; }
 .ex-progress i { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width .4s ease; }
+.ex-progress.priv i { background: var(--ex-priv); }
 
 .ex-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; align-items: start; margin-bottom: 28px; }
 .ex-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
@@ -7141,10 +7143,13 @@ button.ach-card.holo:hover .ach-holo i { opacity: .8; }
 .ex-month.now small { color: var(--accent); font-weight: 700; }
 .ex-month.now .ex-bars { background: rgba(255, 255, 255, .035); }
 .ex-bars { flex: 1; min-height: 0; display: flex; align-items: flex-end; justify-content: center; gap: 2px; border-radius: 6px 6px 0 0; }
-.ex-bars i { flex: 1; max-width: 14px; border-radius: 4px 4px 0 0; transform-origin: bottom; animation: ex-grow .7s cubic-bezier(.2, .7, .2, 1) both; transition: filter .15s; }
-.ex-bars i.out { background: var(--ex-out); }
-.ex-bars i.in { background: var(--accent); }
-.ex-month:hover .ex-bars i { filter: brightness(1.2); }
+.ex-bars > i, .ex-stack { flex: 1; max-width: 14px; border-radius: 4px 4px 0 0; transform-origin: bottom; animation: ex-grow .7s cubic-bezier(.2, .7, .2, 1) both; transition: filter .15s; }
+.ex-bars > i.in { background: var(--accent); }
+.ex-stack { display: flex; flex-direction: column; overflow: hidden; }
+.ex-stack i { flex: 1 1 0; min-height: 0; }
+.ex-stack i.out { background: var(--ex-out); }
+.ex-stack i.priv { background: var(--ex-priv); }
+.ex-month:hover .ex-bars > * { filter: brightness(1.2); }
 @keyframes ex-grow { from { transform: scaleY(0); } }
 .ex-target-line { position: absolute; left: 0; right: 0; bottom: calc(20px + (100% - 28px) * var(--t, 0)); border-top: 1.5px dashed rgba(46, 197, 211, .7); pointer-events: none; }
 .ex-target-line em { position: absolute; right: 0; bottom: 3px; padding: 0 5px; border-radius: 5px; background: var(--surface); font-size: 10.5px; font-style: normal; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; }
@@ -7152,6 +7157,9 @@ button.ach-card.holo:hover .ach-holo i { opacity: .8; }
 .ex-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .ex-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }
 .ex-legend i.out { background: var(--ex-out); }
+.ex-legend i.priv { background: var(--ex-priv); }
+.ex-legend i.solid { background: var(--text-muted); }
+.ex-legend i.striped { background: var(--text-muted); opacity: .5; background-image: repeating-linear-gradient(135deg, rgba(0, 0, 0, .45) 0 2px, transparent 2px 4px); }
 .ex-legend i.in { background: var(--accent); }
 .ex-legend i.line { width: 14px; height: 0; border-radius: 0; border-top: 2px dashed var(--accent); }
 
@@ -7159,7 +7167,10 @@ button.ach-card.holo:hover .ach-holo i { opacity: .8; }
 .ex-cat-label { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ex-cat-label i { flex: none; width: 8px; height: 8px; border-radius: 50%; }
 .ex-cat-bar { height: 8px; border-radius: 999px; background: rgba(255, 255, 255, .06); overflow: hidden; }
-.ex-cat-bar i { display: block; height: 100%; border-radius: inherit; transform-origin: left; animation: dash-grow .8s cubic-bezier(.2, .7, .2, 1) both; }
+.ex-cat-bar > span { display: flex; height: 100%; border-radius: inherit; overflow: hidden; transform-origin: left; animation: dash-grow .8s cubic-bezier(.2, .7, .2, 1) both; }
+.ex-cat-bar i { flex: 1 1 0; min-width: 0; }
+.ex-cat-bar.split i.priv { opacity: .5; background-image: repeating-linear-gradient(135deg, rgba(0, 0, 0, .45) 0 3px, transparent 3px 6px); }
+.ex-card > .ex-legend { margin-top: 8px; }
 .ex-cat-v { font-size: 13px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .ex-cat-v small { display: inline-block; min-width: 40px; margin-left: 6px; font-size: 11.5px; color: var(--text-faint); }
 
@@ -7176,6 +7187,7 @@ button.ach-card.holo:hover .ach-holo i { opacity: .8; }
 .ex-calc-sum > div.total { margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--border); color: var(--text); font-weight: 600; align-items: baseline; }
 .ex-calc-sum > div.total b { color: var(--accent); font-size: 19px; font-weight: 800; }
 .ex-calc-sum .hint b { color: var(--text-muted); }
+.ex-calc-private.over b { color: var(--danger); }
 
 .ex-up { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 10px; background: none; color: var(--text); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
 .ex-up:hover { background: var(--surface-3); }
@@ -7219,6 +7231,9 @@ button.ach-card.holo:hover .ach-holo i { opacity: .8; }
 .ex-editor-row { display: flex; flex-wrap: wrap; gap: 10px; }
 .ex-f { flex: 0 1 170px; }
 .ex-f.grow { flex: 1 1 240px; }
+.ex-f.ex-use { flex: 0 0 auto; }
+.ex-use .segmented { height: 42px; }
+.ex-f.ex-f-s { flex: 0 1 120px; }
 .ex-f.wide { flex-basis: 230px; }
 .ex-editor > .ex-f { flex: none; }
 .ex-editor .hint { margin: 0; }
@@ -7237,6 +7252,8 @@ button.ach-card.holo:hover .ach-holo i { opacity: .8; }
 }
 @media (max-width: 640px) {
   .ex-head-tools { width: 100%; }
+  .ex-view { order: -1; width: 100%; }
+  .ex-view button { flex: 1; }
   .ex-head-tools > .btn-primary { flex: 1; justify-content: center; }
   .ex-hide-s { display: none; }
   .ex-tiles { gap: 8px; }

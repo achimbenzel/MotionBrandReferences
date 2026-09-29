@@ -63,16 +63,16 @@ router.delete('/api/expenses/:id', async (req, res) => {
   res.json({ trashId });
 });
 
-// ---- A year as Excel: every payment (date, what, category, amount, business part) and a summary.
+// ---- A year as Excel: every payment (date, what, category, amount, business and private part) and a summary.
 const WORDS = {
   de: {
-    sheet: 'Ausgaben', summary: 'Übersicht', head: ['Datum', 'Ausgabe', 'Kategorie', 'Intervall', 'Betrag', 'Geschäftlich %', 'Geschäftlich'],
-    total: 'Summe', byCategory: 'Nach Kategorie', byMonth: 'Nach Monat', file: 'Ausgaben', category: 'Kategorie', month: 'Monat', amount: 'Betrag', business: 'Geschäftlich',
+    sheet: 'Ausgaben', summary: 'Übersicht', head: ['Datum', 'Ausgabe', 'Kategorie', 'Intervall', 'Betrag', 'Geschäftlich %', 'Geschäftlich', 'Privat'],
+    total: 'Summe', byCategory: 'Nach Kategorie', byMonth: 'Nach Monat', file: 'Ausgaben', category: 'Kategorie', month: 'Monat', amount: 'Betrag', business: 'Geschäftlich', private: 'Privat',
     intervals: { month: 'monatlich', quarter: 'vierteljährlich', half: 'halbjährlich', year: 'jährlich', once: 'einmalig' },
   },
   en: {
-    sheet: 'Expenses', summary: 'Summary', head: ['Date', 'Expense', 'Category', 'Interval', 'Amount', 'Business %', 'Business'],
-    total: 'Total', byCategory: 'By category', byMonth: 'By month', file: 'Expenses', category: 'Category', month: 'Month', amount: 'Amount', business: 'Business',
+    sheet: 'Expenses', summary: 'Summary', head: ['Date', 'Expense', 'Category', 'Interval', 'Amount', 'Business %', 'Business', 'Private'],
+    total: 'Total', byCategory: 'By category', byMonth: 'By month', file: 'Expenses', category: 'Category', month: 'Month', amount: 'Amount', business: 'Business', private: 'Private',
     intervals: { month: 'monthly', quarter: 'quarterly', half: 'every 6 months', year: 'yearly', once: 'one-time' },
   },
 };
@@ -86,11 +86,13 @@ export function expensesWorkbook(db, q = {}) {
   const rows = pays.map(({ date, e }, i) => [
     { v: excelDate(date), s: 2 }, e.name, categoryOf(e.category).label, w.intervals[e.interval] || intervalOf(e.interval).label,
     { v: e.amount, s: 11 }, { v: e.share, s: 10 }, { f: `ROUND(E${i + 2}*F${i + 2}/100,2)`, v: Math.round(e.amount * e.share) / 100, s: 11 },
+    { f: `E${i + 2}-G${i + 2}`, v: Math.round(e.amount * (100 - e.share)) / 100, s: 11 },
   ]);
   const last = rows.length + 1;
   const totals = [{ v: w.total, s: 6 }, { v: '', s: 6 }, { v: '', s: 6 }, { v: '', s: 6 },
     { f: `SUBTOTAL(109,E2:E${last})`, v: pays.reduce((n, p) => n + p.e.amount, 0), s: 12 }, { v: '', s: 6 },
-    { f: `SUBTOTAL(109,G2:G${last})`, v: pays.reduce((n, p) => n + p.e.amount * p.e.share / 100, 0), s: 12 }];
+    { f: `SUBTOTAL(109,G2:G${last})`, v: pays.reduce((n, p) => n + p.e.amount * p.e.share / 100, 0), s: 12 },
+    { f: `SUBTOTAL(109,H2:H${last})`, v: pays.reduce((n, p) => n + p.e.amount * (100 - p.e.share) / 100, 0), s: 12 }];
   const byCat = new Map();
   for (const e of db.expenses) {
     const y = yearOf(e, year);
@@ -106,17 +108,17 @@ export function expensesWorkbook(db, q = {}) {
   const summary = [
     [{ v: `${w.file} ${year}`, s: 8 }],
     [],
-    [{ v: w.byCategory, s: 1 }, { v: w.amount, s: 1 }, { v: w.business, s: 1 }],
-    ...[...byCat].sort((a, b) => b[1].all - a[1].all).map(([k, c]) => [k, { v: c.all, s: 11 }, { v: c.business, s: 11 }]),
+    [{ v: w.byCategory, s: 1 }, { v: w.amount, s: 1 }, { v: w.business, s: 1 }, { v: w.private, s: 1 }],
+    ...[...byCat].sort((a, b) => b[1].all - a[1].all).map(([k, c]) => [k, { v: c.all, s: 11 }, { v: c.business, s: 11 }, { v: c.all - c.business, s: 11 }]),
     [],
-    [{ v: w.byMonth, s: 1 }, { v: w.amount, s: 1 }, { v: w.business, s: 1 }],
-    ...months.map(([m, all, bus]) => [m, { v: all, s: 11 }, { v: bus, s: 11 }]),
+    [{ v: w.byMonth, s: 1 }, { v: w.amount, s: 1 }, { v: w.business, s: 1 }, { v: w.private, s: 1 }],
+    ...months.map(([m, all, bus]) => [m, { v: all, s: 11 }, { v: bus, s: 11 }, { v: all - bus, s: 11 }]),
   ];
   const buffer = buildXlsx({
     stylesXml: styles(LOOK.app, currency),
     sheets: [
-      { name: `${w.sheet} ${year}`, rows: [head, ...rows, totals], cols: [12, 32, 24, 16, 13, 13, 14], freeze: true, autoFilter: `A1:G${last}`, tab: LOOK.app.tab, headerHeight: 24 },
-      { name: w.summary, rows: summary, cols: [30, 14, 14] },
+      { name: `${w.sheet} ${year}`, rows: [head, ...rows, totals], cols: [12, 32, 24, 16, 13, 13, 14, 14], freeze: true, autoFilter: `A1:H${last}`, tab: LOOK.app.tab, headerHeight: 24 },
+      { name: w.summary, rows: summary, cols: [30, 14, 14, 14] },
     ],
   });
   return { buffer, filename: `${w.file}_${year}.xlsx` };

@@ -7,7 +7,8 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { startServer, tempDir } from './helpers.js';
 import { readCentralDirectory, readEntryBuffer } from '../server/zip.js';
-import { paymentsIn, yearOf, monthlyOf, nextPayment, cancelBy, monthsOf, targetOf, isActive } from '../src/lib/expenses.js';
+import { paymentsIn, yearOf, monthlyOf, nextPayment, cancelBy, monthsOf, targetOf, isActive, partOf, inView, EXPENSE_CATEGORIES } from '../src/lib/expenses.js';
+import { EXPENSE_CATEGORY_KEYS } from '../server/schema.js';
 
 let srv;
 before(async () => { srv = await startServer({ dataDir: await tempDir() }); });
@@ -20,6 +21,10 @@ test('sums: payment days (month ends kept), a year, per month, next payment, can
   assert.equal(Math.round(yearOf(cc, 2026).all * 100) / 100, 797.4);
   const ins = { amount: 240, interval: 'year', start: '2024-06-15', end: '', share: 50, notice: 30 };
   assert.deepEqual([yearOf(ins, 2026).all, yearOf(ins, 2026).business, monthlyOf(ins)], [240, 120, 20]);
+  assert.equal(yearOf(ins, 2026).private, 120);
+  const netflix = { amount: 13.99, interval: 'month', start: '2026-01-02', end: '', share: 0 };
+  assert.deepEqual([partOf(netflix, 'business'), partOf(netflix, 'private'), partOf(netflix, 'both'), partOf(ins, 'private')], [0, 1, 1, 0.5]);
+  assert.deepEqual([inView(netflix, 'business'), inView(netflix, 'private'), inView(cc, 'private'), inView(cc, 'both')], [false, true, false, true]);
   assert.equal(nextPayment(ins, '2026-06-16'), '2027-06-15');
   assert.equal(cancelBy(ins, '2026-01-01'), '2026-05-16');
   const laptop = { amount: 2400, interval: 'once', start: '2026-03-10', end: '', share: 100 };
@@ -30,6 +35,8 @@ test('sums: payment days (month ends kept), a year, per month, next payment, can
   const months = monthsOf([cc, ins, laptop], 2026);
   assert.equal(months[2].all, 66.45 + 2400);
   assert.equal(months[5].business, 66.45 + 120);
+  assert.deepEqual([months[5].private, months[2].private], [120, 0]);
+  assert.deepEqual(EXPENSE_CATEGORIES.map((c) => c.key), EXPENSE_CATEGORY_KEYS); // app and server know the same categories
   // 1,000 a month of costs, 3,000 pay, 30 % tax, 10 % reserve, 80/h, 6 weeks off.
   const t = targetOf(1000, { salary: 3000, taxRate: 30, reserve: 10, rate: 80, weeksOff: 6 });
   assert.equal(Math.round(t.gross), 4286);
@@ -77,4 +84,5 @@ test('expenses: saved and cleaned up, edited, Trash and back, found, the year as
   assert.equal((sheet.match(/Adobe CC/g) || []).length, 12); // every month of 2026
   assert.equal((sheet.match(/Haftpflicht/g) || []).length, 1); // once a year
   assert.match(sheet, /SUBTOTAL\(109,G2:G14\)/);
+  assert.match(sheet, /SUBTOTAL\(109,H2:H14\)/); // the private part too
 });

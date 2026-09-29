@@ -1068,17 +1068,34 @@ library export / import.
 ### Expenses
 **Expenses** (sidebar, under Time Tracker) is what your business costs —
 subscriptions, insurance, health insurance and pension, hardware, your phone,
-the tax advisor … — and what has to come in each month to cover it and pay you.
+the tax advisor … — and, if you like, what you pay privately (rent, car,
+streaming …), and what has to come in each month to cover it and pay you.
+
+- **Business · Private · Both** (top of the page, remembered): which costs the
+  page shows — the business part of each expense, the private part, or all of
+  it. The year and ⌀ tiles, **Month by month**, **By category**, *Coming up*
+  and the list follow (an all-private expense isn't listed under Business, an
+  all-business one not under Private). Under **Both** the month bars stack
+  business (coral) and private (violet), and each category's bar shows its
+  private part striped. Under **Private** the chart measures your private costs
+  against **your pay** (the dashed line), and the fourth tile shows this
+  month's private costs against your pay and what's left. *To earn a month*
+  always counts the business costs only — private costs come out of your pay
+  (the calculator says how much of it they take and what's left).
 
 - **An expense**: name (typing offers common ones — Adobe Creative Cloud,
-  Maxon One, Betriebshaftpflicht, Künstlersozialkasse, Steuerberater … — and
-  brings their category along), **category** (software & subscriptions,
+  Maxon One, Betriebshaftpflicht, Künstlersozialkasse, Steuerberater … and
+  private ones like Miete, Kfz-Versicherung, Deutschlandticket, Netflix — and
+  brings their category along, private ones as Private), **category** (software & subscriptions,
   insurance, health & pension, office & rent, phone & internet, hardware,
-  taxes & fees, bank & accounting, marketing, learning, travel, other),
+  taxes & fees, bank & accounting, marketing, learning, travel, home & living,
+  car & transport, leisure & streaming, other),
   **amount**, how often it's paid (**monthly, quarterly, every 6 months,
   yearly** or **one-time**), the **first payment** (its day of the month is the
-  payday; the 31st becomes the month's last day), an optional **end**, the
-  **business part** in % (a phone used 50 % for work counts half), the
+  payday; the 31st becomes the month's last day), an optional **end**, what it
+  **counts as** — **Business**, **Private** or **Split** with the business part
+  in % (a phone used 50 % for work counts half; rent with a home office 15 %) —
+  the
   **notice** to cancel in days, a **link** (the account or contract) and
   **notes**. The editor shows what it comes to a year.
 - **Price changes…** — a new amount from a day on: the old one ends the day
@@ -1103,9 +1120,9 @@ the tax advisor … — and what has to come in each month to cover it and pay y
   with each group's year; every row shows its rhythm, since when, the business
   part, the next payment, the cancel-by day, the amount and the year.
 - **Export** — the year as **Excel** (German or English): every payment with
-  date, name, category, rhythm, amount, business % and business amount (as
-  formulas, with totals that follow a filter), and a summary sheet by category
-  and by month.
+  date, name, category, rhythm, amount, business %, business and private
+  amount (as formulas, with totals that follow a filter), and a summary sheet
+  by category and by month (all, business, private).
 - Invoices (for "invoiced") come from your [clients](#clients). Expenses are
   in the ⌘K search, and the dashboard has a **Money this month** widget.
 

@@ -1,5 +1,6 @@
 // Expenses: what the business costs — subscriptions, insurance, hardware … —
-// when each is paid, what a year comes to, and what has to come in each
+// and, if you like, what you pay privately; when each is paid, what a year
+// comes to (business part, private part, both), and what has to come in each
 // month to cover it (and pay you). Plain functions, used by the app and by
 // the server's Excel export alike.
 
@@ -15,6 +16,9 @@ export const EXPENSE_CATEGORIES = [
   { key: 'marketing', label: 'Marketing', color: '#f87171' },
   { key: 'learning', label: 'Learning', color: '#c084fc' },
   { key: 'travel', label: 'Travel', color: '#4ade80' },
+  { key: 'home', label: 'Home & living', color: '#d6a36b' },
+  { key: 'mobility', label: 'Car & transport', color: '#60a5fa' },
+  { key: 'leisure', label: 'Leisure & streaming', color: '#e879f9' },
   { key: 'other', label: 'Other', color: '#8b93a7' },
 ];
 export const categoryOf = (key) => EXPENSE_CATEGORIES.find((c) => c.key === key) || EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1];
@@ -28,7 +32,21 @@ export const INTERVALS = [
 ];
 export const intervalOf = (key) => INTERVALS.find((i) => i.key === key) || INTERVALS[0];
 
-// Names to start from when typing a new one (their category comes along).
+// Business, private or both: which part of each expense counts.
+export const VIEWS = [
+  { key: 'business', label: 'Business' },
+  { key: 'private', label: 'Private' },
+  { key: 'both', label: 'Both' },
+];
+/** The part of `e` that counts in a view (0…1): its business share, the rest, or all of it. */
+export const partOf = (e, view = 'business') => {
+  const b = (e.share ?? 100) / 100;
+  return view === 'private' ? 1 - b : view === 'both' ? 1 : b;
+};
+/** Does `e` show up in a view at all (a private-only one not under Business, a business-only one not under Private)? */
+export const inView = (e, view = 'business') => view === 'both' || partOf(e, view) > 0;
+
+// Names to start from when typing a new one (their category comes along — and for private ones, 0 % business).
 export const EXPENSE_IDEAS = [
   ['Adobe Creative Cloud', 'software'], ['Maxon One / Cinema 4D', 'software'], ['Figma', 'software'], ['Frame.io', 'software'],
   ['Envato Elements', 'software'], ['Artlist / Musicbed', 'software'], ['Google Workspace', 'software'], ['Notion', 'software'],
@@ -38,6 +56,9 @@ export const EXPENSE_IDEAS = [
   ['Büro / Coworking', 'office'], ['Mobilfunk', 'phone'], ['Internet', 'phone'],
   ['Steuerberater', 'accounting'], ['Geschäftskonto', 'accounting'], ['Buchhaltungssoftware', 'accounting'], ['IHK-Beitrag', 'taxes'],
   ['Portfolio / Behance Pro', 'marketing'], ['Online-Kurse', 'learning'],
+  ['Miete / Wohnung', 'home', 0], ['Strom & Gas', 'home', 0], ['Hausratversicherung', 'insurance', 0], ['Privathaftpflicht', 'insurance', 0],
+  ['Kfz-Versicherung', 'insurance', 0], ['Auto / Leasing', 'mobility', 0], ['Deutschlandticket', 'mobility', 0],
+  ['Netflix', 'leisure', 0], ['Spotify', 'leisure', 0], ['Fitnessstudio', 'leisure', 0],
 ];
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -64,11 +85,12 @@ export function paymentsIn(e, from, to) {
   }
   return out;
 }
-/** What it costs in a year — all of it, and the business part (its share). */
+/** What it costs in a year — all of it, the business part (its share) and the private rest. */
 export function yearOf(e, year) {
   const n = paymentsIn(e, `${year}-01-01`, `${year}-12-31`).length;
   const all = n * (e.amount || 0);
-  return { count: n, all, business: all * (e.share ?? 100) / 100 };
+  const business = all * (e.share ?? 100) / 100;
+  return { count: n, all, business, private: all - business };
 }
 /** Per month, for a recurring one (a yearly 120 → 10); a one-time one → 0. */
 export const monthlyOf = (e) => (e.interval === 'once' ? 0 : (e.amount || 0) / (intervalOf(e.interval).months || 1));
@@ -89,13 +111,14 @@ export function cancelBy(e, from = todayIso()) {
   return iso(t.getFullYear(), t.getMonth() + 1, t.getDate());
 }
 
-/** Each month of a year: what's paid (all and the business part) → [{ month: 1…12, all, business, items: [{ e, date }] }]. */
+/** Each month of a year: what's paid (all, the business part, the private rest) → [{ month: 1…12, all, business, private, items: [{ e, date }] }]. */
 export function monthsOf(list, year) {
-  const months = Array.from({ length: 12 }, (_, i) => ({ month: i + 1, all: 0, business: 0, items: [] }));
+  const months = Array.from({ length: 12 }, (_, i) => ({ month: i + 1, all: 0, business: 0, private: 0, items: [] }));
   for (const e of list) {
     for (const date of paymentsIn(e, `${year}-01-01`, `${year}-12-31`)) {
       const m = months[Number(date.slice(5, 7)) - 1];
-      m.all += e.amount; m.business += e.amount * (e.share ?? 100) / 100;
+      const business = e.amount * (e.share ?? 100) / 100;
+      m.all += e.amount; m.business += business; m.private += e.amount - business;
       m.items.push({ e, date });
     }
   }

@@ -826,7 +826,8 @@ export function normalizeImageUploads(v) {
   };
 }
 // ---- Expenses: what the business costs (subscriptions, insurance …) ------------------
-export const EXPENSE_CATEGORY_KEYS = ['software', 'insurance', 'health', 'office', 'phone', 'hardware', 'taxes', 'accounting', 'marketing', 'learning', 'travel', 'other'];
+// The same keys as EXPENSE_CATEGORIES in src/lib/expenses.js (a test keeps them in step).
+export const EXPENSE_CATEGORY_KEYS = ['software', 'insurance', 'health', 'office', 'phone', 'hardware', 'taxes', 'accounting', 'marketing', 'learning', 'travel', 'home', 'mobility', 'leisure', 'other'];
 export const EXPENSE_INTERVALS = ['month', 'quarter', 'half', 'year', 'once'];
 export function normalizeExpense(e) {
   const amount = Number(e?.amount);
@@ -838,7 +839,7 @@ export function normalizeExpense(e) {
     interval: EXPENSE_INTERVALS.includes(e?.interval) ? e.interval : 'month',
     start: isDay(e?.start) ? e.start : new Date().toISOString().slice(0, 10), // the first payment (its day of the month is the payment day)
     end: isDay(e?.end) ? e.end : '',                                         // the last payment on or before this day ('' = runs on)
-    share: Math.round(num(e?.share, 0, 100, 100)),                           // the business part, in %
+    share: Math.round(num(e?.share, 0, 100, 100)),                           // the business part, in % (the rest is private; 0 = all private)
     notice: Math.round(num(e?.notice, 0, 730, 0)),                           // days' notice to cancel before it renews
     link: str(e?.link, 500).trim(),
     notes: str(e?.notes, 2000),
