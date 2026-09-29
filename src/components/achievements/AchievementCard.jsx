@@ -63,7 +63,7 @@ const looks = (a, got) => ({ holo: got && HOLO.has(a.rarity), shine: got && SHIN
  * (the editor's preview); `still` leaves the tilt to whoever holds it (the
  * big view).
  */
-export default function AchievementCard({ a, metrics, onClick, glow = false, iconUrl, stickerUrl, as = 'button', showcase = false, still = false }) {
+export default function AchievementCard({ a, metrics, onClick, glow = false, iconUrl, stickerUrl, as = 'button', showcase = false, still = false, drag, className = '' }) {
   const r = RARITIES[a.rarity] || RARITIES.stone;
   const sticker = stickerUrl !== undefined ? stickerUrl : achievementFileUrl(a, a.sticker);
   const p = progressOf(a, metrics);
@@ -72,8 +72,8 @@ export default function AchievementCard({ a, metrics, onClick, glow = false, ico
   const Tag = as;
   const moves = holo && !still;
   return (
-    <Tag type={as === 'button' ? 'button' : undefined} className={`ach-card r-${a.rarity} ${got ? 'got' : 'locked'} ${holo ? 'holo' : ''} ${still ? 'still' : ''} ${glow ? 'glow' : ''}`}
-      onClick={onClick} style={{ '--rc': r.color }} title={as === 'button' ? `${r.label} · ${r.xp} XP` : undefined}
+    <Tag type={as === 'button' ? 'button' : undefined} className={`ach-card r-${a.rarity} ${got ? 'got' : 'locked'} ${holo ? 'holo' : ''} ${still ? 'still' : ''} ${glow ? 'glow' : ''} ${className}`}
+      onClick={onClick} style={{ '--rc': r.color }} title={as === 'button' ? `${r.label} · ${r.xp} XP` : undefined} {...(drag || {})}
       onPointerMove={moves ? tilt : undefined} onPointerLeave={moves ? untilt : undefined}>
       {(holo || shine) && <FrameFx foil={holo} />}
       <span className="ach-paper">

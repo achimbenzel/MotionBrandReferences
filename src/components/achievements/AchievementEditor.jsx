@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, UploadCloud, Library, Trash2, Lightbulb, CalendarCheck, Type, Shapes, ImageIcon, Swords } from 'lucide-react';
+import { X, UploadCloud, Library, Trash2, Lightbulb, CalendarCheck, Type, Shapes, ImageIcon, Swords, ArrowLeft, ArrowRight } from 'lucide-react';
 import { api, achievementFileUrl } from '../../lib/api.js';
 import { isTouch } from '../../lib/useMedia.js';
 import { RARITIES, RARITY_ORDER, METRICS, fmtValue } from '../../lib/achievements.js';
@@ -20,7 +20,7 @@ const fields = (a) => ({
  * takes, group, rarity (worth XP), the badge (text, a symbol or a picture), a
  * sticker, a number that unlocks it by itself — and when it was reached.
  */
-export default function AchievementEditor({ a, group = '', groups, metrics, pack = [], ideas = [], existing = [], onClose, onSaved, onDelete }) {
+export default function AchievementEditor({ a, group = '', groups, metrics, pack = [], ideas = [], existing = [], onClose, onSaved, onDelete, onMove }) {
   const toast = useToast();
   const [picker, pick] = useFromApp();
   const [f, setF] = useState(() => (a ? fields(a) : blank(group)));
@@ -230,7 +230,19 @@ export default function AchievementEditor({ a, group = '', groups, metrics, pack
           </div>
         </div>
         <div className="modal-foot">
-          {a && <button type="button" className="btn btn-danger" onClick={() => onDelete(a)} disabled={busy} style={{ marginRight: 'auto' }}><Trash2 size={15} /> Delete</button>}
+          {a && <button type="button" className="btn btn-danger" onClick={() => onDelete(a)} disabled={busy}><Trash2 size={15} /> Delete</button>}
+          {a && onMove && (() => {
+            const mates = existing.filter((x) => x.group === a.group);
+            const i = mates.findIndex((x) => x.id === a.id);
+            return (
+              <span className="ach-move" title="Its place in the group">
+                <button type="button" className="icon-btn" onClick={() => onMove(a, -1)} disabled={i <= 0} aria-label="Earlier in the group"><ArrowLeft size={15} /></button>
+                <span>{i + 1} / {mates.length}</span>
+                <button type="button" className="icon-btn" onClick={() => onMove(a, 1)} disabled={i < 0 || i >= mates.length - 1} aria-label="Later in the group"><ArrowRight size={15} /></button>
+              </span>
+            );
+          })()}
+          <span style={{ marginRight: 'auto' }} />
           <button type="button" className="btn btn-ghost" onClick={onClose} disabled={busy}>Cancel</button>
           <button type="button" className="btn btn-primary" onClick={save} disabled={busy || !f.title.trim()}>{busy ? 'Saving…' : a ? 'Save' : 'Add achievement'}</button>
         </div>

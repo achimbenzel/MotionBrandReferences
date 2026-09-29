@@ -162,6 +162,73 @@ router.post('/api/achievements/batch', async (req, res) => {
   res.status(201).json({ ...payload(await readDB(), out), added: items.length });
 });
 
+// When they were reached — for several unlocked at once by one number ({ dates: { id: 'YYYY-MM-DD' } }).
+router.post('/api/achievements/dates', async (req, res) => {
+  const dates = req.body?.dates && typeof req.body.dates === 'object' ? req.body.dates : {};
+  const changed = await mutateDB((db) => {
+    let n = 0;
+    for (const a of db.achievements) {
+      if (!(a.id in dates) || !a.achievedAt || !isDay(dates[a.id])) continue; // only reached ones get a date
+      a.achievedAt = dates[a.id];
+      a.updatedAt = Date.now();
+      n += 1;
+    }
+    return n;
+  });
+  res.json({ ...payload(await readDB()), changed });
+});
+
+// Cards in a new order — within a group, or moved into another one: `ids` are the group's cards in order.
+router.post('/api/achievements/arrange', async (req, res) => {
+  const group = str(req.body?.group, 60).trim();
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids.filter((x) => typeof x === 'string') : [];
+  if (!group || !ids.length) throw new HttpError(400, 'bad_request', 'A group and its cards are needed.');
+  await mutateDB((db) => {
+    const now = Date.now();
+    const rest = db.achievements.filter((a) => a.group === group && !ids.includes(a.id)).sort((a, b) => a.order - b.order);
+    ids.forEach((id, i) => {
+      const a = db.achievements.find((x) => x.id === id);
+      if (!a) return;
+      if (a.group !== group) { a.group = group; a.updatedAt = now; }
+      a.order = i;
+    });
+    rest.forEach((a, k) => { a.order = ids.length + k; }); // the group's others after, as they were
+  });
+  res.json(payload(await readDB()));
+});
+
+// A group renamed (into another one's name: the two become one).
+router.post('/api/achievements/group', async (req, res) => {
+  const from = str(req.body?.from, 60);
+  const to = str(req.body?.to, 60).trim();
+  if (!to) throw new HttpError(400, 'name_required', 'The group needs a name.');
+  const n = await mutateDB((db) => {
+    const now = Date.now();
+    let count = 0;
+    const offset = Math.max(0, ...db.achievements.filter((a) => a.group === to).map((a) => a.order + 1));
+    for (const a of db.achievements) {
+      if (a.group !== from || from === to) continue;
+      a.group = to; a.order += offset; a.updatedAt = now; count += 1;
+    }
+    return count;
+  });
+  if (!n && from !== to) return res.status(404).json({ error: 'not_found' });
+  res.json(payload(await readDB()));
+});
+
+// The groups in a new order (the order they're shown in).
+router.post('/api/achievements/group-order', async (req, res) => {
+  const groups = Array.isArray(req.body?.groups) ? req.body.groups.map((g) => str(g, 60)) : [];
+  await mutateDB((db) => {
+    const rank = new Map(groups.map((g, i) => [g, i]));
+    const first = new Map();
+    db.achievements.forEach((a, i) => { if (!first.has(a.group)) first.set(a.group, i); });
+    const key = (a) => (rank.has(a.group) ? rank.get(a.group) : groups.length + first.get(a.group) / 1e6);
+    db.achievements = db.achievements.map((a, i) => ({ a, i })).sort((x, y) => key(x.a) - key(y.a) || x.i - y.i).map((x) => x.a);
+  });
+  res.json(payload(await readDB()));
+});
+
 // The Special Quests pack — the ones you don't have yet (same group, title and description).
 router.post('/api/achievements/starter', async (_req, res) => {
   const out = await mutateDB((db) => {

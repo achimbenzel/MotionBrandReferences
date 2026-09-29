@@ -3983,8 +3983,13 @@ img { max-width: 100%; display: block; }
 .nsb-tpl-wrap > .nsb-tpl { flex: 1; min-width: 0; }
 .nsb-tpl.own { padding-right: 38px; }
 .nsb-tpl.own .nsb-tpl-title svg { color: #c4b5fd; }
-.nsb-tpl-x { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border: 0; background: none; color: var(--text-faint); }
-.nsb-tpl-x:hover { color: var(--danger); background: var(--surface-2); }
+.nsb-tpl-tools { position: absolute; top: 6px; right: 6px; display: flex; gap: 2px; }
+.nsb-tpl-tools .icon-btn { width: 28px; height: 28px; border: 0; background: none; color: var(--text-faint); }
+.nsb-tpl-tools .icon-btn:hover { color: var(--text); background: var(--surface-2); }
+.nsb-tpl-tools .icon-btn:last-child:hover { color: var(--danger); }
+.nsb-tpl-edit { display: flex; flex-direction: column; gap: 6px; cursor: default; }
+.nsb-tpl-edit .input { height: 34px; font-size: 13.5px; }
+.nsb-tpl-edit-foot { display: flex; justify-content: flex-end; gap: 6px; }
 .new-sb .nsb-templates + .hint { margin-top: 8px; }
 @media (max-width: 520px) { .nsb-templates { grid-template-columns: minmax(0, 1fr); } }
 
@@ -6578,6 +6583,36 @@ select.ach-step-rarity { padding-left: 10px; box-shadow: inset 3px 0 0 var(--rc)
 .ach-tools { display: flex; align-items: center; gap: 10px; margin: 22px 0 16px; }
 .ach-groups { display: flex; flex-direction: column; gap: 32px; }
 .ach-group-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.ach-group-menu { flex: none; width: 30px; height: 30px; }
+.ach-group-rename { display: flex; align-items: center; gap: 4px; }
+.ach-group-rename .input { height: 34px; width: 240px; font-size: 16px; font-weight: 800; }
+.ach-group.drop { border-radius: 16px; outline: 1.5px dashed color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 8px; }
+.ach-card[draggable='true'] { cursor: grab; }
+.ach-card.dragging { opacity: .35; }
+.ach-card.drop-before { box-shadow: -6px 0 0 -2px var(--accent); }
+.ach-add.drop-here { border-color: var(--accent); color: var(--accent); }
+.ach-move { display: inline-flex; align-items: center; gap: 2px; margin-left: 8px; font-size: 12px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.ach-celebrate-actions { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.ach-celebrate-when { background: rgba(255, 255, 255, .06); }
+.ach-dates { max-width: 560px; }
+.ach-dates .modal-body { display: flex; flex-direction: column; gap: 12px; }
+.ach-dates .hint { margin: 0; }
+.ach-dates-all { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px dashed var(--border-strong); border-radius: 12px; font-size: 13.5px; }
+.ach-dates-all .input, .ach-dates-row .input { width: 170px; height: 36px; flex: none; }
+.ach-dates-list { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow-y: auto; }
+.ach-dates-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+.ach-dates-row.wrong { border-color: rgba(255, 179, 122, .6); }
+.ach-dates-dot { width: 10px; height: 10px; flex: none; border-radius: 50%; background: var(--rc); box-shadow: 0 0 0 3px color-mix(in srgb, var(--rc) 25%, transparent); }
+.ach-dates-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.ach-dates-main b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ach-dates-main small { font-size: 12px; color: var(--text-faint); }
+.ach-dates-warn { color: #ffb37a !important; }
+@media (max-width: 640px) {
+  .ach-dates-row { flex-wrap: wrap; }
+  .ach-dates-row .input, .ach-dates-all .input { width: 100%; }
+  .ach-dates-all { flex-direction: column; align-items: stretch; }
+  .ach-group-rename .input { width: 100%; }
+}
 .ach-group-head h2 { margin: 0; font-size: 19px; font-weight: 800; letter-spacing: -0.01em; }
 .ach-group-count { font-family: var(--font-mono); font-size: 12px; color: var(--text-faint); }
 .ach-group-bar { width: 120px; height: 4px; border-radius: 999px; background: rgba(255, 255, 255, .08); overflow: hidden; }

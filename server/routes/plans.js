@@ -336,6 +336,26 @@ router.post('/api/storyboard-templates', async (req, res) => {
   res.status(out.replaced ? 200 : 201).json(out);
 });
 
+// One of your templates renamed (or its description changed). Names stay unique among yours.
+router.patch('/api/storyboard-templates/:key', async (req, res) => {
+  if (STORYBOARD_TEMPLATES.some((t) => t.key === req.params.key)) return res.status(400).json({ error: 'builtin_template', message: 'Built-in templates can’t be renamed.' });
+  const b = req.body || {};
+  const out = await mutateDB((db) => {
+    const t = db.storyboardTemplates.find((x) => x.key === req.params.key);
+    if (!t) return { status: 404 };
+    if ('label' in b) {
+      const label = str(b.label, 120).trim();
+      if (!label) return { status: 400, error: 'name_required', message: 'Give the template a name.' };
+      if (db.storyboardTemplates.some((x) => x !== t && x.label.toLowerCase() === label.toLowerCase())) return { status: 409, error: 'name_taken', message: 'You have a template with that name already.' };
+      t.label = label;
+    }
+    if ('description' in b) t.description = str(b.description, 400).trim();
+    return { template: templateInfo(t) };
+  });
+  if (out.status) return res.status(out.status).json({ error: out.error || 'not_found', message: out.message });
+  res.json(out);
+});
+
 router.delete('/api/storyboard-templates/:key', async (req, res) => {
   if (STORYBOARD_TEMPLATES.some((t) => t.key === req.params.key)) return res.status(400).json({ error: 'builtin_template', message: 'Built-in templates can’t be deleted.' });
   const ok = await mutateDB((db) => {

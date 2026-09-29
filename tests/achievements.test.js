@@ -109,3 +109,40 @@ test('achievements: numbers saved under their older name carry over', async () =
   assert.deepEqual([s.followers.instagram, s.numbers.projects, s.numbers.clients, s.numbers.deal], [2900, 95, 12, 0]);
   assert.ok(!('earlier' in s));
 });
+
+test('achievements: dates for several unlocked at once, cards arranged, groups renamed and reordered', async () => {
+  const items = [100, 500, 1000].map((n, i) => ({ group: 'TikTok', metric: 'followers:tiktok', target: n, rarity: 'stone', title: `${n} TikTok`, order: i }));
+  let r = await srv.api('/api/achievements/batch', { method: 'POST', json: { items } });
+  const tt = r.data.achievements.filter((a) => a.group === 'TikTok');
+  // One number unlocks all three (today) — then each gets the day it was really reached.
+  r = await srv.api('/api/achievement-stats', { method: 'PATCH', json: { followers: { tiktok: 1200 } } });
+  assert.equal(r.data.unlocked.length, 3);
+  r = await srv.api('/api/achievements/dates', { method: 'POST', json: { dates: { [tt[0].id]: '2025-03-01', [tt[1].id]: '2025-09-12', [tt[2].id]: 'nope', nope: '2025-01-01' } } });
+  const byId = (id) => r.data.achievements.find((a) => a.id === id);
+  assert.deepEqual([byId(tt[0].id).achievedAt, byId(tt[1].id).achievedAt, byId(tt[2].id).achievedAt, r.data.changed], ['2025-03-01', '2025-09-12', today(), 2]);
+
+  // A new order in the group; one card moved into another group.
+  r = await srv.api('/api/achievements/arrange', { method: 'POST', json: { group: 'TikTok', ids: [tt[2].id, tt[0].id] } });
+  assert.deepEqual(r.data.achievements.filter((a) => a.group === 'TikTok').map((a) => a.id), [tt[2].id, tt[0].id, tt[1].id]);
+  r = await srv.api('/api/achievements/arrange', { method: 'POST', json: { group: 'Instagram', ids: [tt[1].id, ...r.data.achievements.filter((a) => a.group === 'Instagram').map((a) => a.id)] } });
+  assert.equal(r.data.achievements.find((a) => a.id === tt[1].id).group, 'Instagram');
+  assert.equal(r.data.achievements.filter((a) => a.group === 'Instagram')[0].id, tt[1].id);
+  assert.equal((await srv.api('/api/achievements/arrange', { method: 'POST', json: { group: '', ids: [] } })).status, 400);
+
+  // Renamed; renamed into an existing group → one group, the moved ones after its own.
+  r = await srv.api('/api/achievements/group', { method: 'POST', json: { from: 'TikTok', to: 'TikTok Follower' } });
+  assert.ok(r.data.achievements.some((a) => a.group === 'TikTok Follower') && !r.data.achievements.some((a) => a.group === 'TikTok'));
+  const igBefore = r.data.achievements.filter((a) => a.group === 'Instagram').map((a) => a.id);
+  r = await srv.api('/api/achievements/group', { method: 'POST', json: { from: 'TikTok Follower', to: 'Instagram' } });
+  const ig = r.data.achievements.filter((a) => a.group === 'Instagram').map((a) => a.id);
+  assert.deepEqual(ig.slice(0, igBefore.length), igBefore);
+  assert.equal(ig.length, igBefore.length + 2);
+  assert.equal((await srv.api('/api/achievements/group', { method: 'POST', json: { from: 'Instagram', to: '  ' } })).status, 400);
+
+  // Groups reordered: the named ones first, in that order.
+  const groups = [...new Set(r.data.achievements.map((a) => a.group))];
+  r = await srv.api('/api/achievements/group-order', { method: 'POST', json: { groups: [groups[groups.length - 1], groups[0]] } });
+  const now = [...new Set(r.data.achievements.map((a) => a.group))];
+  assert.deepEqual(now.slice(0, 2), [groups[groups.length - 1], groups[0]]);
+  assert.equal(now.length, groups.length);
+});

@@ -62,6 +62,15 @@ test('your own templates: saved from a storyboard (text, no pictures), updated u
   let list = (await srv.api('/api/storyboard-templates')).data.templates;
   assert.equal(list.filter((x) => x.own).length, 1);
   assert.equal(list.at(-1).description, 'Two shots');
+  // yours can be renamed (not onto another of yours, not to nothing); built-ins can't
+  await srv.api('/api/storyboard-templates', { method: 'POST', json: { planId: plan.id, blockId: made.id, label: 'Other one' } });
+  r = await srv.api(`/api/storyboard-templates/${t.key}`, { method: 'PATCH', json: { label: '  Reel · 20 s ', description: 'Hook and reveal' } });
+  assert.deepEqual([r.status, r.data.template.label, r.data.template.description, r.data.template.key], [200, 'Reel · 20 s', 'Hook and reveal', t.key]);
+  assert.equal((await srv.api(`/api/storyboard-templates/${t.key}`, { method: 'PATCH', json: { label: 'other ONE' } })).status, 409);
+  assert.equal((await srv.api(`/api/storyboard-templates/${t.key}`, { method: 'PATCH', json: { label: ' ' } })).status, 400);
+  assert.equal((await srv.api('/api/storyboard-templates/launch', { method: 'PATCH', json: { label: 'Mine' } })).status, 400);
+  const other = (await srv.api('/api/storyboard-templates')).data.templates.find((x) => x.own && x.label === 'Other one');
+  await srv.api(`/api/storyboard-templates/${other.key}`, { method: 'DELETE' });
   // built-ins stay; yours go
   assert.equal((await srv.api('/api/storyboard-templates/launch', { method: 'DELETE' })).status, 400);
   assert.equal((await srv.api(`/api/storyboard-templates/${t.key}`, { method: 'DELETE' })).status, 200);

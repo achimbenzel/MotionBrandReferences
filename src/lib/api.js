@@ -281,6 +281,7 @@ export const api = {
   async saveStoryboardTemplate(planId, blockId, { label, description } = {}) {
     return request('/api/storyboard-templates', { method: 'POST', json: { planId, blockId, label, description } });
   },
+  async updateStoryboardTemplate(key, patch) { const { template } = await request(`/api/storyboard-templates/${encodeURIComponent(key)}`, { method: 'PATCH', json: patch }); return template; },
   async removeStoryboardTemplate(key) { return request(`/api/storyboard-templates/${encodeURIComponent(key)}`, { method: 'DELETE' }); },
   // New storyboard in a plan: { title, aspect, template } or a copy { from: blockId, aspect } → { plan, block }
   async createStoryboard(planId, body) {
@@ -567,6 +568,10 @@ export const api = {
   async removeAchievementImage(id, slot) { return request(`/api/achievements/${id}/image?slot=${slot}`, { method: 'DELETE' }); },
   async updateAchievementStats(patch) { return request('/api/achievement-stats', { method: 'PATCH', json: patch }); }, // → like getAchievements
   async addQuestPack() { return request('/api/achievements/starter', { method: 'POST' }); }, // the Special Quests pack → like getAchievements + { added }
+  async setAchievementDates(dates) { return request('/api/achievements/dates', { method: 'POST', json: { dates } }); }, // { id: 'YYYY-MM-DD' } → like getAchievements
+  async arrangeAchievements(group, ids) { return request('/api/achievements/arrange', { method: 'POST', json: { group, ids } }); },
+  async renameAchievementGroup(from, to) { return request('/api/achievements/group', { method: 'POST', json: { from, to } }); },
+  async orderAchievementGroups(groups) { return request('/api/achievements/group-order', { method: 'POST', json: { groups } }); },
   async addAchievements(items) { return request('/api/achievements/batch', { method: 'POST', json: { items } }); }, // → like getAchievements + { added }
 
   // --- Time tracker ---

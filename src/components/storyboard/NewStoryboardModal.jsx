@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { X, Clapperboard, Plus, Trash2, Bookmark } from 'lucide-react';
+import { X, Clapperboard, Plus, Trash2, Bookmark, Pencil, Check } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { ASPECTS } from '../../lib/storyboard.js';
 import { isTouch } from '../../lib/useMedia.js';
@@ -24,6 +24,7 @@ export default function NewStoryboardModal({ plans, planId: initialPlan = '', on
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [dialog, ask] = useConfirm();
+  const [editing, setEditing] = useState(null); // { key, label, description } — one of yours being renamed
 
   useEffect(() => { api.listStoryboardTemplates().then(setTemplates).catch(() => setTemplates([])); }, []);
   useEffect(() => { if (!planId && open[0]) setPlanId(open[0].id); }, [open, planId]);
@@ -60,6 +61,15 @@ export default function NewStoryboardModal({ plans, planId: initialPlan = '', on
       } catch (e) { setError(e.message); }
     },
   });
+  const saveTemplate = async () => {
+    const e = editing;
+    if (!e?.label.trim()) return;
+    try {
+      const t = await api.updateStoryboardTemplate(e.key, { label: e.label.trim(), description: e.description });
+      setTemplates((l) => l.map((x) => (x.key === t.key ? t : x)));
+      setEditing(null); setError('');
+    } catch (err) { setError(err.message); }
+  };
   return (
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
       <div className="modal new-sb" role="dialog" aria-modal="true" aria-label="New storyboard">
@@ -90,16 +100,33 @@ export default function NewStoryboardModal({ plans, planId: initialPlan = '', on
           <div className="field">
             <label>Start from</label>
             <div className="nsb-templates">
-              {choices.map((t) => (
+              {choices.map((t) => (editing?.key === t.key ? (
+                <form key={t.key} className="nsb-tpl nsb-tpl-edit on" onSubmit={(e) => { e.preventDefault(); saveTemplate(); }}
+                  onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setEditing(null); } }}>
+                  <input className="input" value={editing.label} maxLength={120} autoFocus placeholder="Name" aria-label="Template name"
+                    onChange={(e) => setEditing({ ...editing, label: e.target.value })} />
+                  <input className="input" value={editing.description} maxLength={400} placeholder="What it's for (optional)" aria-label="Description"
+                    onChange={(e) => setEditing({ ...editing, description: e.target.value })} />
+                  <span className="nsb-tpl-edit-foot">
+                    <button type="button" className="btn btn-sm btn-ghost" onClick={() => setEditing(null)}>Cancel</button>
+                    <button type="submit" className="btn btn-sm btn-primary" disabled={!editing.label.trim()}><Check size={13} /> Save</button>
+                  </span>
+                </form>
+              ) : (
                 <div key={t.key || 'empty'} className="nsb-tpl-wrap">
                   <button type="button" className={`nsb-tpl ${template === t.key ? 'on' : ''} ${t.own ? 'own' : ''}`} onClick={() => { setTemplate(t.key); setAspect(null); }}>
                     <span className="nsb-tpl-title">{t.own ? <Bookmark size={14} /> : t.key ? <Clapperboard size={14} /> : <Plus size={14} />} {t.label}</span>
                     <span className="nsb-tpl-desc">{t.description}</span>
                     {t.shots ? <span className="nsb-tpl-meta">{t.own ? 'Yours · ' : ''}{t.shots} shots{t.target ? ` · ${t.target} s` : ''} · {t.aspect}</span> : null}
                   </button>
-                  {t.own && <button type="button" className="icon-btn nsb-tpl-x" onClick={() => removeTemplate(t)} aria-label={`Delete the template ${t.label}`} title="Delete this template"><Trash2 size={13} /></button>}
+                  {t.own && (
+                    <span className="nsb-tpl-tools">
+                      <button type="button" className="icon-btn" onClick={() => setEditing({ key: t.key, label: t.label, description: t.description || '' })} aria-label={`Rename the template ${t.label}`} title="Rename"><Pencil size={13} /></button>
+                      <button type="button" className="icon-btn" onClick={() => removeTemplate(t)} aria-label={`Delete the template ${t.label}`} title="Delete this template"><Trash2 size={13} /></button>
+                    </span>
+                  )}
                 </div>
-              ))}
+              )))}
             </div>
             <div className="hint">Your own: open a storyboard and choose <b>⋯ → Save as template</b> — its shots, texts and length, without pictures.</div>
           </div>

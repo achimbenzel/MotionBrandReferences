@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Trophy, Layers, ChevronDown, Swords } from 'lucide-react';
+import { Plus, Trophy, Layers, ChevronDown, Swords, CalendarDays, Pencil, ArrowUp, ArrowDown, MoreHorizontal, Check, X } from 'lucide-react';
 import { api } from '../lib/api.js';
-import { RARITIES, RARITY_ORDER, xpOf, rankOf } from '../lib/achievements.js';
+import { RARITIES, RARITY_ORDER, xpOf, rankOf, fmtValue } from '../lib/achievements.js';
+import { isTouch } from '../lib/useMedia.js';
+import Menu from '../components/Menu.jsx';
 import { useToast } from '../components/Toast.jsx';
 import AchievementCard, { RankEmblem } from '../components/achievements/AchievementCard.jsx';
 import AchievementEditor from '../components/achievements/AchievementEditor.jsx';
@@ -34,6 +36,9 @@ export default function AchievementsPage({ reloadKey }) {
   // Off: a click shows the card big (to turn round), and the collection stays just cards.
   const [editMode, setEditModeState] = useState(() => load('achEdit', 'off') === 'on');
   const [inspect, setInspect] = useState(null); // an index into the cards shown
+  const [dragging, setDragging] = useState(null); // an achievement id (Edit on: drag to reorder / move)
+  const [dropAt, setDropAt] = useState(null);     // { group, before: id | null }
+  const [renaming, setRenaming] = useState(null); // a group's name
   const setEditMode = (on) => { setEditModeState(on); store('achEdit', on ? 'on' : 'off'); };
   const setFilter = (v) => { setFilterState(v); store('achFilter', v); };
   const toggleNumbers = () => setNumbersOpen((o) => { store('achNumbers', o ? 'closed' : 'open'); return !o; });
@@ -85,6 +90,63 @@ export default function AchievementsPage({ reloadKey }) {
       take(d);
       toast(d.added ? `${d.added} Special Quests added` : 'You have all Special Quests already');
     } catch (e) { toast(`Could not add them: ${e.message}`, 'error'); }
+  };
+  // Cards in a new order / into another group; groups renamed and moved.
+  const arrange = async (group, ids) => {
+    const rank = new Map();
+    for (const a of list) if (!rank.has(a.group)) rank.set(a.group, rank.size);
+    if (!rank.has(group)) rank.set(group, rank.size);
+    const pos = new Map(ids.map((id, i) => [id, i]));
+    setData((d) => ({
+      ...d,
+      achievements: d.achievements
+        .map((a) => (pos.has(a.id) ? { ...a, group, order: pos.get(a.id) } : a.group === group ? { ...a, order: ids.length + a.order } : a))
+        .sort((x, y) => rank.get(x.group) - rank.get(y.group) || x.order - y.order),
+    }));
+    try { setData(await api.arrangeAchievements(group, ids)); } catch (e) { toast(`Could not move it: ${e.message}`, 'error'); reload(); }
+  };
+  const dropCard = (group, beforeId) => {
+    const id = dragging;
+    setDragging(null); setDropAt(null);
+    if (!id || id === beforeId) return;
+    const ids = list.filter((a) => a.group === group && a.id !== id).map((a) => a.id);
+    const at = beforeId ? ids.indexOf(beforeId) : ids.length;
+    ids.splice(at < 0 ? ids.length : at, 0, id);
+    const from = list.find((a) => a.id === id)?.group;
+    arrange(group, ids);
+    if (from && from !== group) toast(`Moved to “${group}”`);
+  };
+  const renameGroup = async (from, to) => {
+    setRenaming(null);
+    const name = to.trim();
+    if (!name || name === from) return;
+    const merge = groups.some((g) => g.name === name);
+    try {
+      setData(await api.renameAchievementGroup(from, name));
+      toast(merge ? `“${from}” joined “${name}”` : `Renamed to “${name}”`, 'ok', { label: 'Undo', onClick: async () => {
+        if (merge) { toast('Move the cards back by dragging them — the two groups are one now'); return; }
+        setData(await api.renameAchievementGroup(name, from));
+      } });
+    } catch (e) { toast(`Could not rename: ${e.message}`, 'error'); }
+  };
+  const moveGroup = async (name, dir) => {
+    const names = groups.map((g) => g.name);
+    const i = names.indexOf(name);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= names.length) return;
+    [names[i], names[j]] = [names[j], names[i]];
+    try { setData(await api.orderAchievementGroups(names)); } catch (e) { toast(e.message, 'error'); }
+  };
+  const moveCard = async (a, dir) => {
+    const ids = list.filter((x) => x.group === a.group).map((x) => x.id);
+    const i = ids.indexOf(a.id);
+    const j = i + dir;
+    if (j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    await arrange(a.group, ids);
+  };
+  const saveDates = async (dates) => {
+    try { setData(await api.setAchievementDates(dates)); toast('Dates saved'); } catch (e) { toast(`Could not save: ${e.message}`, 'error'); }
   };
   const saveStats = async (patch) => {
     try { take(await api.updateAchievementStats(patch)); } catch (e) { toast(`Could not save: ${e.message}`, 'error'); throw e; }
@@ -178,17 +240,47 @@ export default function AchievementsPage({ reloadKey }) {
               const items = shown(g.items);
               if (!items.length && filter !== 'all') return null;
               const n = g.items.filter((a) => a.achievedAt).length;
+              const gi = groups.indexOf(g);
+              const canDrag = editMode && filter === 'all' && !isTouch();
+              const dragProps = (a) => (canDrag ? {
+                draggable: true,
+                onDragStart: (e) => { setDragging(a.id); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', a.id); },
+                onDragEnd: () => { setDragging(null); setDropAt(null); },
+                onDragOver: (e) => { if (dragging && dragging !== a.id) { e.preventDefault(); e.stopPropagation(); setDropAt({ group: g.name, before: a.id }); } },
+                onDrop: (e) => { e.preventDefault(); e.stopPropagation(); dropCard(g.name, a.id); },
+              } : undefined);
               return (
-                <section key={g.name} className="ach-group">
+                <section key={g.name} className={`ach-group ${dropAt?.group === g.name ? 'drop' : ''}`}
+                  onDragOver={(e) => { if (dragging) { e.preventDefault(); setDropAt((d) => (d?.group === g.name ? d : { group: g.name, before: null })); } }}
+                  onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDropAt(null); }}
+                  onDrop={(e) => { e.preventDefault(); dropCard(g.name, null); }}>
                   <header className="ach-group-head">
-                    <h2>{g.name}</h2>
+                    {renaming === g.name ? (
+                      <form className="ach-group-rename" onSubmit={(e) => { e.preventDefault(); renameGroup(g.name, e.currentTarget.elements.name.value); }}>
+                        <input name="name" className="input" defaultValue={g.name} maxLength={60} autoFocus aria-label="Group name"
+                          onKeyDown={(e) => { if (e.key === 'Escape') setRenaming(null); }} onBlur={(e) => renameGroup(g.name, e.target.value)} />
+                        <button type="submit" className="icon-btn" aria-label="Save" onMouseDown={(e) => e.preventDefault()}><Check size={15} /></button>
+                        <button type="button" className="icon-btn" aria-label="Cancel" onMouseDown={(e) => e.preventDefault()} onClick={() => setRenaming(null)}><X size={15} /></button>
+                      </form>
+                    ) : <h2 onDoubleClick={() => editMode && setRenaming(g.name)}>{g.name}</h2>}
                     <span className="ach-group-count">{n} / {g.items.length}</span>
                     <span className="ach-group-bar"><i style={{ width: `${(n / g.items.length) * 100}%` }} /></span>
+                    {editMode && renaming !== g.name && (
+                      <Menu align="right" title={g.name} trigger={<button type="button" className="icon-btn ach-group-menu" aria-label={`${g.name} — options`}><MoreHorizontal size={16} /></button>}
+                        items={[
+                          { label: 'Rename group', icon: <Pencil size={15} />, onClick: () => setRenaming(g.name) },
+                          { label: 'Move up', icon: <ArrowUp size={15} />, disabled: gi === 0, onClick: () => moveGroup(g.name, -1) },
+                          { label: 'Move down', icon: <ArrowDown size={15} />, disabled: gi === groups.length - 1, onClick: () => moveGroup(g.name, 1) },
+                        ]} />
+                    )}
                   </header>
                   <div className="ach-grid">
-                    {items.map((a) => <AchievementCard key={a.id} a={a} metrics={metrics} glow={glow.has(a.id)} onClick={() => open(a)} />)}
+                    {items.map((a) => (
+                      <AchievementCard key={a.id} a={a} metrics={metrics} glow={glow.has(a.id)} onClick={() => open(a)} drag={dragProps(a)}
+                        className={`${dragging === a.id ? 'dragging' : ''} ${dropAt?.before === a.id ? 'drop-before' : ''}`} />
+                    ))}
                     {editMode && filter !== 'got' && (
-                      <button type="button" className="ach-add" onClick={() => setEditor({ group: g.name })}><Plus size={20} /><span>Add to {g.name}</span></button>
+                      <button type="button" className={`ach-add ${dropAt?.group === g.name && !dropAt.before ? 'drop-here' : ''}`} onClick={() => setEditor({ group: g.name })}><Plus size={20} /><span>Add to {g.name}</span></button>
                     )}
                   </div>
                 </section>
@@ -210,7 +302,7 @@ export default function AchievementsPage({ reloadKey }) {
 
       {editor && (
         <AchievementEditor a={editor.a} group={editor.group} groups={groups.map((g) => g.name)} metrics={metrics} pack={data.pack} ideas={data.ideas} existing={list}
-          onClose={() => setEditor(null)} onDelete={remove}
+          onClose={() => setEditor(null)} onDelete={remove} onMove={(a, dir) => moveCard(a, dir)}
           onSaved={(unlocked) => { setEditor(null); reload(unlocked); }} />
       )}
       {series && (
@@ -221,18 +313,25 @@ export default function AchievementsPage({ reloadKey }) {
         <AchievementInspect list={cards} index={inspect} metrics={metrics} onIndex={setInspect} onClose={() => setInspect(null)}
           onEdit={(a) => { setInspect(null); setEditor({ a }); }} />
       )}
-      {celebrate && <Celebration {...celebrate} metrics={metrics} onClose={() => setCelebrate(null)} />}
+      {celebrate && <Celebration {...celebrate} metrics={metrics} onClose={() => setCelebrate(null)} onDates={saveDates} />}
     </div>
   );
 }
 
-/** The moment: the card(s) just unlocked, the XP — and the new rank. */
-function Celebration({ list, rankUp, metrics, onClose }) {
+/**
+ * The moment: the card(s) just unlocked, the XP — and the new rank. A number
+ * that unlocks several at once (or one reached a while ago) → "When?": the
+ * day each was really reached (they unlock today unless you say otherwise).
+ */
+function Celebration({ list, rankUp, metrics, onClose, onDates }) {
+  const [dating, setDating] = useState(false);
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape' || e.key === 'Enter') onClose(); };
+    const onKey = (e) => { if (dating) return; if (e.key === 'Escape' || e.key === 'Enter') onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, dating]);
+  const byNumber = list.filter((a) => a.metric);
+  if (dating) return <UnlockDates list={byNumber} onClose={onClose} onSave={async (dates) => { await onDates(dates); onClose(); }} />;
   const xp = list.reduce((n, a) => n + (RARITIES[a.rarity]?.xp || 0), 0);
   const shown = list.slice(0, 3);
   return (
@@ -250,7 +349,65 @@ function Celebration({ list, rankUp, metrics, onClose }) {
             <RankEmblem rank={rankUp} size={46} /><span><small>New rank</small><b>{rankUp.label}</b></span>
           </div>
         )}
-        <button type="button" className="btn btn-primary" onClick={onClose}>Nice!</button>
+        <div className="ach-celebrate-actions">
+          <button type="button" className="btn btn-primary" onClick={onClose}>Nice!</button>
+          {byNumber.length > 0 && (
+            <button type="button" className="btn ach-celebrate-when" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setDating(true); }}>
+              <CalendarDays size={15} /> {byNumber.length > 1 ? 'Reached on different days? Set the dates' : 'Reached earlier? Set the date'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+
+/** The day each one was really reached — one by one, or one day for all. */
+function UnlockDates({ list, onClose, onSave }) {
+  const sorted = [...list].sort((a, b) => (a.metric === b.metric ? (a.target || 0) - (b.target || 0) : a.metric.localeCompare(b.metric)));
+  const [dates, setDates] = useState(() => Object.fromEntries(sorted.map((a) => [a.id, a.achievedAt || todayKey()])));
+  const [busy, setBusy] = useState(false);
+  const max = todayKey();
+  const setAll = (v) => { if (v) setDates(Object.fromEntries(sorted.map((a) => [a.id, v]))); };
+  // Reached in order: a later milestone can't be before an earlier one on the same number.
+  const wrong = sorted.filter((a, i) => sorted.slice(0, i).some((b) => b.metric === a.metric && dates[b.id] > dates[a.id]));
+  const save = async () => { setBusy(true); try { await onSave(dates); } finally { setBusy(false); } };
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal ach-dates" role="dialog" aria-modal="true" aria-label="When were they reached">
+        <div className="modal-head">
+          <h2><CalendarDays size={18} /> When did you reach {sorted.length > 1 ? 'them' : 'it'}?</h2>
+          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close"><X size={18} /></button>
+        </div>
+        <div className="modal-body">
+          <p className="hint">They unlocked today because your number passed them. Set the day each was really reached — the cards and their backs show it.</p>
+          {sorted.length > 1 && (
+            <label className="ach-dates-all"><span>One day for all</span>
+              <input className="input" type="date" max={max} onChange={(e) => setAll(e.target.value)} aria-label="One day for all" />
+            </label>
+          )}
+          <div className="ach-dates-list">
+            {sorted.map((a) => (
+              <label key={a.id} className={`ach-dates-row ${wrong.includes(a) ? 'wrong' : ''}`} style={{ '--rc': (RARITIES[a.rarity] || RARITIES.stone).color }}>
+                <i className="ach-dates-dot" />
+                <span className="ach-dates-main"><b>{a.title || 'Untitled'}</b><small>{a.group} · {fmtValue(a.metric, a.target)}</small></span>
+                <input className="input" type="date" value={dates[a.id]} max={max} onChange={(e) => setDates((d) => ({ ...d, [a.id]: e.target.value || max }))} aria-label={`${a.title}: reached on`} />
+              </label>
+            ))}
+          </div>
+          {wrong.length > 0 && <p className="hint ach-dates-warn">A bigger milestone is set before a smaller one on the same number — check {wrong.map((a) => `“${a.title}”`).join(', ')}.</p>}
+        </div>
+        <div className="modal-foot">
+          <button type="button" className="btn" onClick={onClose}>Keep today</button>
+          <button type="button" className="btn btn-primary" onClick={save} disabled={busy}><Check size={15} /> Save dates</button>
+        </div>
       </div>
     </div>
   );
