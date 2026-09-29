@@ -7,6 +7,7 @@ import { useToast } from '../components/Toast.jsx';
 import { useConfirm } from '../components/ConfirmDialog.jsx';
 import Range from '../components/Range.jsx';
 import { edgeLabel } from '../components/ImageUploadPrompt.jsx';
+import StoredPicturesDialog from '../components/StoredPicturesDialog.jsx';
 import { FORMATS, EDGES, IMAGE_DEFAULTS } from '../lib/imageOptimize.js';
 
 const K = (s) => <kbd className="sc-key" key={s}>{s}</kbd>;
@@ -202,6 +203,7 @@ function LibrarySection() {
   const [scan, setScan] = useState(null);     // { count, bytes, files }
   const [busy, setBusy] = useState(null);     // 'migrate' | 'scan' | 'clean'
   const [showFiles, setShowFiles] = useState(false);
+  const [shrinking, setShrinking] = useState(false);
   const [dialog, ask] = useConfirm();
 
   useEffect(() => { api.maintenanceStatus().then(setStatus).catch(() => setStatus(false)); }, []);
@@ -285,6 +287,17 @@ function LibrarySection() {
 
         <div className="pref-row pref-row-top">
           <div className="pref-main">
+            <div className="pref-title">Stored pictures</div>
+            <div className="pref-sub">
+              Pictures you added before uploads were made smaller — made smaller now, like new uploads (WebP / JPEG, a smaller size).
+              The originals go to the Trash as one item, so you can undo it.
+            </div>
+          </div>
+          <button className="btn btn-sm" onClick={() => setShrinking(true)} disabled={!!busy}><ImageDown size={14} /> Make smaller…</button>
+        </div>
+
+        <div className="pref-row pref-row-top">
+          <div className="pref-main">
             <div className="pref-title">Unused files</div>
             <div className="pref-sub">
               Files in the library folder that no project, plan or software points to any more — e.g. images older versions left behind
@@ -329,6 +342,7 @@ function LibrarySection() {
         </div>
       </div>
       {dialog}
+      {shrinking && <StoredPicturesDialog onClose={() => setShrinking(false)} />}
     </div>
   );
 }

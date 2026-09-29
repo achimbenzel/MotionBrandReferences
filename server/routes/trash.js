@@ -4,6 +4,7 @@ import { DATA_DIR, TRASH_DIR, TRASH_TTL_DAYS, TYPE_LABEL } from '../config.js';
 import { readDB, mutateDB } from '../db.js';
 import { safeRm, restoreFromTrash, moveRelPaths } from '../files.js';
 import { BLOCK_TITLES } from '../schema.js';
+import { restorePictures } from '../pictures.js';
 import { createRouter } from '../http.js';
 import { softDir } from './software.js';
 import { inboxDir } from './inbox.js';
@@ -50,7 +51,8 @@ const trashThumb = (t) => {
                       : t.kind === 'noteImage' ? t.data.image?.file
                         : t.kind === 'content' ? t.data.media?.find((m) => m.kind === 'image')?.file
                           : t.kind === 'contentMedia' ? (t.data.media?.kind === 'image' ? t.data.media.file : null)
-                            : t.kind === 'achievement' ? (t.data.iconImage || t.data.sticker) : null;
+                            : t.kind === 'achievement' ? (t.data.iconImage || t.data.sticker)
+                              : t.kind === 'pictures' ? t.data.items?.[0]?.rel : null;
   return rel ? `/data/trash/${t.trashId}/${rel}` : null;
 };
 
@@ -74,6 +76,7 @@ function describe(t) {
     case 'mockupHdri': return { title: t.data.name || 'HDRI', subtitle: 'HDRI (mockup light)' };
     case 'inbox': return { title: t.data.title || t.data.name || t.data.url || String(t.data.text || '').slice(0, 80) || 'Shared item', subtitle: 'Inbox' };
     case 'timeEntry': return { title: `${t.data.date} · ${t.data.start}–${t.data.end}${t.data.activity ? ` · ${t.data.activity}` : ''}`, subtitle: `Time entry${t.data.label ? ` · ${t.data.label}` : ''}` };
+    case 'pictures': return { title: `${t.data.items?.length || 0} picture${t.data.items?.length === 1 ? '' : 's'} before they were made smaller`, subtitle: `Originals · ${fmtBytes(t.data.before || 0)} → ${fmtBytes(t.data.after || 0)}` };
     case 'orphans': return { title: `${t.data.count} unused file${t.data.count === 1 ? '' : 's'}`, subtitle: `Cleanup · ${fmtBytes(t.data.bytes)}` };
     default: return { title: t.data.title || 'Untitled', subtitle: TYPE_LABEL[t.data.type] || t.data.type };
   }
@@ -90,12 +93,15 @@ router.post('/api/trash/:trashId/restore', async (req, res) => {
   const trashId = req.params.trashId;
   const from = path.join(TRASH_DIR, trashId);
   let move = null; let rels = null; let gone = false;
-  const restored = await mutateDB((db) => {
+  const restored = await mutateDB(async (db) => {
     const idx = db.trash.findIndex((t) => t.trashId === trashId);
     if (idx === -1) return null;
     const entry = db.trash[idx];
     const { data } = entry;
-    if (entry.kind === 'project') {
+    if (entry.kind === 'pictures') { // pictures made smaller: the originals back, and their names
+      await restorePictures(db, entry);
+      rels = { base: DATA_DIR, list: [] };
+    } else if (entry.kind === 'project') {
       db.projects.push(data);
       for (const gid of entry.galleryIds || []) {
         const g = db.galleries.find((x) => x.id === gid);

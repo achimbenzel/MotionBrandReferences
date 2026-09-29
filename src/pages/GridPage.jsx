@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Filter, X, Film, Palette, FileText, Square, CreditCard, FolderPlus, Images, Type, UploadCloud, Ban } from 'lucide-react';
+import { Plus, Filter, X, Film, Palette, FileText, Square, CreditCard, FolderPlus, Images, Type, UploadCloud, Ban, Pin } from 'lucide-react';
 import { api, fileUrl } from '../lib/api.js';
 import { lengthTag, formatOf, probeVideo } from '../lib/media.js';
 import { hexToRgb, readableText } from '../lib/color.js';
@@ -91,11 +91,19 @@ export default function GridPage({ type, reloadKey, onAdd }) {
 
   const filtered = useMemo(() => {
     if (!projects) return [];
-    if (!selected.length) return projects;
-    return projects.filter((p) => { const tags = effectiveTags(p); return selected.every((t) => tags.includes(t)); });
+    const list = selected.length ? projects.filter((p) => { const tags = effectiveTags(p); return selected.every((t) => tags.includes(t)); }) : projects;
+    return [...list].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned)); // pinned first, otherwise as they were
   }, [projects, selected]);
+  const pinnedCount = filtered.filter((p) => p.pinned).length;
 
   const toggle = (t) => setSelected((s) => (s.includes(t) ? s.filter((x) => x !== t) : [...s, t]));
+  // Pinned ones on top (a copy of the pin only: they keep their place in time otherwise).
+  const togglePin = async (p) => {
+    const pin = !p.pinned;
+    setProjects((list) => list.map((x) => (x.id === p.id ? { ...x, pinned: pin } : x)));
+    try { await api.update(p.id, { pinned: pin }); toast(pin ? `“${p.title || 'Reference'}” pinned to the top` : 'Unpinned'); }
+    catch (e) { setProjects((list) => list.map((x) => (x.id === p.id ? { ...x, pinned: !pin } : x))); toast(e.message, 'error'); }
+  };
   const filterRow = allTags.length > 0 && (
     <div className="filter-row">
       <span className="filter-label"><Filter size={14} /> Filter</span>
@@ -236,12 +244,22 @@ export default function GridPage({ type, reloadKey, onAdd }) {
               <ImageMasonry
                 projects={filtered}
                 setProjects={setProjects}
+                onPin={togglePin}
                 galleries={galleries}
                 onGalleriesChanged={refreshGalleries}
                 onNewGallery={(imageId) => setNewGallery({ imageId })}
               />
             ) : (
-              <div className="grid">{filtered.map((p) => <ProjectCard key={p.id} project={p} />)}</div>
+              <>
+                {pinnedCount > 0 && <div className="grid-section-head"><Pin size={13} /> Pinned</div>}
+                <div className="grid">{filtered.slice(0, pinnedCount || filtered.length).map((p) => <ProjectCard key={p.id} project={p} onPin={togglePin} />)}</div>
+                {pinnedCount > 0 && pinnedCount < filtered.length && (
+                  <>
+                    <div className="grid-section-head">All</div>
+                    <div className="grid">{filtered.slice(pinnedCount).map((p) => <ProjectCard key={p.id} project={p} onPin={togglePin} />)}</div>
+                  </>
+                )}
+              </>
             )
           ) : projects.length === 0 ? (
             <div className="empty">

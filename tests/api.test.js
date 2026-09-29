@@ -74,6 +74,11 @@ test('create, edit, delete to trash and restore a project', async () => {
 
   const patched = await srv.api(`/api/projects/${id}`, { method: 'PATCH', json: { notes: 'hello', tags: ['a'] } });
   assert.equal(patched.data.project.notes, 'hello');
+  // Pinned: on top of its page (a yes/no, whatever is sent).
+  assert.equal((await srv.api(`/api/projects/${id}`, { method: 'PATCH', json: { pinned: 'yes' } })).data.project.pinned, true);
+  const list = (await srv.api('/api/projects?type=imagegallery')).data.projects;
+  assert.equal(list[0].id, id);
+  assert.equal((await srv.api(`/api/projects/${id}`, { method: 'PATCH', json: { pinned: 0 } })).data.project.pinned, false);
 
   const del = await srv.api(`/api/projects/${id}`, { method: 'DELETE' });
   assert.equal(del.status, 200);

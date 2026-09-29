@@ -621,6 +621,12 @@ export const api = {
   async migrate() {
     return request('/api/maintenance/migrate', { method: 'POST' });
   },
+  // Stored pictures made smaller afterwards: the big ones, then one swapped for its smaller version.
+  async scanPictures(minKB = 500) { return request(`/api/maintenance/pictures?min=${minKB}`); }, // → { count, bytes, items, areas }
+  async replacePicture(rel, batch, file) {
+    const fd = new FormData(); fd.append('rel', rel); fd.append('batch', batch); fd.append('file', file, file.name);
+    return request('/api/maintenance/pictures/replace', { method: 'POST', body: fd }); // → { rel, before, after }
+  },
   async scanUnused() {
     return request('/api/maintenance/unused');
   },

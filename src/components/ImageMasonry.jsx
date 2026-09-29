@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MoreVertical, Trash2, FolderPlus, Plus } from 'lucide-react';
+import { MoreVertical, Trash2, FolderPlus, Plus, Pin } from 'lucide-react';
 import { api, fileUrl } from '../lib/api.js';
 import { useToast } from './Toast.jsx';
 import Menu from './Menu.jsx';
@@ -9,7 +9,7 @@ import Lightbox from './Lightbox.jsx';
  * Pinterest-style masonry of image-gallery items (name-less). Click to view
  * fullscreen; the ⋯ menu deletes or adds the image to a gallery.
  */
-export default function ImageMasonry({ projects, setProjects, galleries, onGalleriesChanged, onNewGallery }) {
+export default function ImageMasonry({ projects, setProjects, galleries, onGalleriesChanged, onNewGallery, onPin }) {
   const toast = useToast();
   const [lightbox, setLightbox] = useState(-1);
 
@@ -45,12 +45,14 @@ export default function ImageMasonry({ projects, setProjects, galleries, onGalle
           const galleryItems = [
             ...(galleries || []).map((g) => ({ label: g.name, icon: <FolderPlus size={15} />, onClick: () => addToGallery(g, p.id) })),
             { label: 'New gallery…', icon: <Plus size={15} />, onClick: () => onNewGallery?.(p.id) },
+            ...(onPin ? [{ separator: true }, { label: p.pinned ? 'Unpin' : 'Pin to the top', icon: <Pin size={15} />, onClick: () => onPin(p) }] : []),
             { separator: true },
             { label: 'Delete', icon: <Trash2 size={15} />, danger: true, onClick: () => remove(p.id) },
           ];
           return (
-            <div className="masonry-item" key={p.id}>
+            <div className={`masonry-item ${p.pinned ? 'pinned' : ''}`} key={p.id}>
               <img src={src} alt="" loading="lazy" onClick={() => setLightbox(i)} />
+              {p.pinned && <span className="masonry-pin" title="Pinned"><Pin size={12} fill="currentColor" /></span>}
               <div className="masonry-menu" onClick={(e) => e.stopPropagation()}>
                 <Menu align="right" trigger={<button className="icon-btn masonry-menu-btn"><MoreVertical size={15} /></button>} items={galleryItems} />
               </div>

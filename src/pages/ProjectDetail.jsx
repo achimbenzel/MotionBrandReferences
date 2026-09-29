@@ -1,6 +1,6 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Trash2, Pencil, Image as ImageIcon, MoreHorizontal, ChevronLeft, ChevronRight, FolderInput, PencilRuler, Megaphone } from 'lucide-react';
+import { ArrowLeft, Trash2, Pencil, Image as ImageIcon, MoreHorizontal, ChevronLeft, ChevronRight, FolderInput, PencilRuler, Megaphone, Pin, PinOff } from 'lucide-react';
 import { api, fileUrl } from '../lib/api.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
@@ -116,10 +116,18 @@ export default function ProjectDetail() {
     || (project.type === 'font' && !!project.shot);
 
   const toPlan = { label: 'Add to project…', icon: <FolderInput size={15} />, onClick: () => addToPlan('project', project.id) };
+  const togglePin = async () => {
+    const pin = !project.pinned;
+    setProject((x) => ({ ...x, pinned: pin }));
+    try { await api.update(project.id, { pinned: pin }); toast(pin ? 'Pinned to the top of its page' : 'Unpinned'); }
+    catch (e) { setProject((x) => ({ ...x, pinned: !pin })); toast(e.message, 'error'); }
+  };
+  const toPin = { label: project.pinned ? 'Unpin' : 'Pin to the top', icon: project.pinned ? <PinOff size={15} /> : <Pin size={15} />, onClick: togglePin };
   const toPost = { label: 'Post idea from it…', icon: <Megaphone size={15} />, hint: 'In Content: an idea with this reference to look at', onClick: () => makePost({ kind: 'project', projectId: project.id }) };
   const menuItems = isImage
-    ? [toPlan, toPost, { separator: true }, { label: 'Delete', icon: <Trash2 size={15} />, danger: true, onClick: remove }]
+    ? [toPin, toPlan, toPost, { separator: true }, { label: 'Delete', icon: <Trash2 size={15} />, danger: true, onClick: remove }]
     : [
+        toPin,
         toPlan,
         toPost,
         { label: 'Rename / edit details', icon: <Pencil size={15} />, onClick: () => setEditing(true) },

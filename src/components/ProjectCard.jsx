@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Palette, Square, X, Type, Film } from 'lucide-react';
+import { Play, Palette, Square, X, Type, Film, Pin } from 'lucide-react';
 import { fileUrl } from '../lib/api.js';
 import { fmtTime, formatOf } from '../lib/media.js';
 import { cardSize, logoSource, logoScale, logoActive, hostOf, setLastTab } from '../lib/types.js';
@@ -11,7 +11,7 @@ import { PROVIDER_LABEL } from '../lib/videoLinks.js';
 // Hover previews only where there is a real hover (mouse / trackpad).
 const canHover = () => typeof window !== 'undefined' && !!window.matchMedia?.('(hover: hover) and (pointer: fine)').matches;
 
-export default function ProjectCard({ project, onRemove, removeTitle = 'Remove from gallery' }) {
+export default function ProjectCard({ project, onRemove, removeTitle = 'Remove from gallery', onPin }) {
   const navigate = useNavigate();
   // A YouTube link saved while offline has no cover of its own yet: use YouTube's.
   const thumb = project.thumb ? fileUrl(project, project.thumb)
@@ -39,7 +39,14 @@ export default function ProjectCard({ project, onRemove, removeTitle = 'Remove f
     || '';
 
   return (
-    <div className="card" onClick={open} {...hover}>
+    <div className={`card ${project.pinned && onPin ? 'pinned' : ''}`} onClick={open} {...hover}>
+      {onPin && (
+        <button type="button" className={`card-pin icon-btn ${project.pinned ? 'on' : ''}`} onClick={(e) => { e.stopPropagation(); onPin(project); }}
+          aria-pressed={!!project.pinned} aria-label={project.pinned ? `Unpin ${project.title || 'reference'}` : `Pin ${project.title || 'reference'}`}
+          title={project.pinned ? 'Unpin' : 'Pin to the top'}>
+          <Pin size={14} fill={project.pinned ? 'currentColor' : 'none'} />
+        </button>
+      )}
       {onRemove && (
         <button className="card-remove icon-btn" title={removeTitle}
           onClick={(e) => { e.stopPropagation(); onRemove(); }}><X size={15} /></button>

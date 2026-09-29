@@ -20,7 +20,7 @@ router.get('/api/projects', async (req, res) => {
   if (req.query.type && TYPES.has(req.query.type)) {
     projects = projects.filter((p) => p.type === req.query.type);
   }
-  projects = [...projects].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  projects = [...projects].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || (b.createdAt || 0) - (a.createdAt || 0));
   res.json({ projects });
 });
 
@@ -169,7 +169,7 @@ router.post('/api/projects', upload.any(), async (req, res) => {
 
 // ---- Update (notes / tags / colors / meta) --------------------------------
 const EDITABLE = ['title', 'year', 'category', 'notes', 'tags', 'colors', 'bg', 'scale', 'variant', 'renditions', 'original', 'rendition', 'url', 'segments',
-  'markers', 'width', 'height', 'duration', 'waveform', 'paper'];
+  'markers', 'width', 'height', 'duration', 'waveform', 'paper', 'pinned'];
 router.patch('/api/projects/:id', async (req, res) => {
   const updated = await mutateDB((db) => {
     const project = db.projects.find((p) => p.id === req.params.id);
@@ -200,6 +200,8 @@ router.patch('/api/projects/:id', async (req, res) => {
       } else if (key === 'duration') {
         const d = Number(req.body.duration);
         if (Number.isFinite(d) && d > 0 && d < 86400) project.duration = d;
+      } else if (key === 'pinned') { // on top of its page
+        project.pinned = !!req.body.pinned;
       } else if (key === 'tags') {
         if (Array.isArray(req.body.tags)) project.tags = req.body.tags.map((t) => str(t, 80)).filter(Boolean);
       } else if (['title', 'year', 'category', 'notes', 'url'].includes(key)) {
