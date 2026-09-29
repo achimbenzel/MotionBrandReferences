@@ -121,3 +121,67 @@ test('content: idea notes, reel beats, checklist, own text per platform, cover �
   r = await srv.api('/api/settings', { method: 'PATCH', json: { contentProfile: { name: 'Achim', handle: '@@achim.motion!' } } });
   assert.deepEqual(r.data.settings.contentProfile, { name: 'Achim', handle: 'achim.motion' });
 });
+
+test('content: pillars + rhythm in the settings, a post’s pillar, the library (with Trash), posts made from the app', async () => {
+  // Pillars and a rhythm: cleaned up (bad colours, days, times; 12 pillars at most).
+  let r = await srv.api('/api/settings', {
+    method: 'PATCH',
+    json: {
+      contentPillars: [{ id: 'breakdowns', name: 'Breakdowns', color: 'purple' }, { name: 'Behind the scenes', color: 'nope' }, 'junk'],
+      contentRhythm: { goal: 3, slots: [{ day: 3, time: '18:00', pillar: 'breakdowns' }, { day: 9, time: '25:00' }, { day: 0, time: '12:30' }] },
+    },
+  });
+  const { contentPillars: pillars, contentRhythm: rhythm } = r.data.settings;
+  assert.deepEqual(pillars.map((p) => [p.name, p.color]), [['Breakdowns', 'purple'], ['Behind the scenes', 'blue']]);
+  assert.equal(rhythm.goal, 3);
+  assert.deepEqual(rhythm.slots.map((x) => [x.day, x.time, x.pillar]), [[0, '12:30', null], [3, '18:00', 'breakdowns'], [6, '', null]]);
+  // Only the goal changes; the slots stay.
+  r = await srv.api('/api/settings', { method: 'PATCH', json: { contentRhythm: { goal: 4 } } });
+  assert.deepEqual([r.data.settings.contentRhythm.goal, r.data.settings.contentRhythm.slots.length], [4, 3]);
+
+  const post = (await srv.api('/api/content', { method: 'POST', json: { title: 'Pillar post', pillar: 'breakdowns' } })).data.item;
+  assert.equal(post.pillar, 'breakdowns');
+  assert.equal((await srv.api(`/api/content/${post.id}`, { method: 'PATCH', json: { pillar: '../x' } })).data.item.pillar, null);
+
+  // The library: the same text once; used; to Trash and back.
+  r = await srv.api('/api/content-library', { method: 'POST', json: { kind: 'hook', text: 'Wait for the last frame' } });
+  assert.equal(r.status, 201);
+  const hook = r.data.item;
+  r = await srv.api('/api/content-library', { method: 'POST', json: { kind: 'hook', text: '  wait for the LAST frame ' } });
+  assert.deepEqual([r.status, r.data.existed, r.data.item.id], [200, true, hook.id]);
+  assert.equal((await srv.api('/api/content-library', { method: 'POST', json: { kind: 'spam', text: 'x' } })).status, 400);
+  await srv.api('/api/content-library', { method: 'POST', json: { kind: 'hashtags', name: 'Motion core', text: '#motiondesign #aftereffects' } });
+  r = await srv.api(`/api/content-library/${hook.id}`, { method: 'PATCH', json: { use: true } });
+  assert.equal(r.data.item.uses, 1);
+  r = await srv.api(`/api/content-library/${hook.id}`, { method: 'DELETE' });
+  assert.ok(!(await srv.api('/api/content-library')).data.items.some((x) => x.id === hook.id));
+  await srv.api(`/api/trash/${r.data.trashId}/restore`, { method: 'POST' });
+  const lib = (await srv.api('/api/content-library')).data.items;
+  assert.deepEqual(lib.map((x) => [x.kind, x.uses]), [['hook', 1], ['hashtags', 0]]);
+
+  // A post from a storyboard: its shots → beats, 9:16 → a Reel, the voice-over into the script.
+  const plan = (await srv.api('/api/plans', { method: 'POST', json: { name: 'Nordlicht launch' } })).data.plan;
+  const sb = (await srv.api(`/api/plans/${plan.id}/storyboards`, { method: 'POST', json: { title: 'Teaser', aspect: '9:16' } })).data.block;
+  await srv.api(`/api/plans/${plan.id}/blocks/${sb.id}`, {
+    method: 'PATCH',
+    json: { shots: [{ section: 'hook', duration: 1.5, visual: 'Logo slams in', onscreen: 'NORDLICHT', vo: 'Light, reinvented.' }, { duration: 4, visual: 'Aurora sweep' }, { section: 'cta', duration: 2, visual: 'End card', onscreen: 'Out now' }] },
+  });
+  r = await srv.api('/api/content/from', { method: 'POST', json: { from: { kind: 'storyboard', planId: plan.id, blockId: sb.id }, platforms: ['instagram'] } });
+  assert.equal(r.status, 201, JSON.stringify(r.data));
+  const it = r.data.item;
+  assert.deepEqual([it.title, it.format, it.planId, it.platforms, it.status], ['Teaser', 'reel', plan.id, ['instagram'], 'script']);
+  assert.deepEqual(it.beats.map((b) => [b.kind, b.screen, b.sec]), [['hook', 'NORDLICHT', 1.5], ['body', '', 4], ['cta', 'Out now', 2]]);
+  assert.match(it.script, /Light, reinvented/);
+
+  // …from the project itself, and from a reference (its picture comes along, as the idea).
+  r = await srv.api('/api/content/from', { method: 'POST', json: { from: { kind: 'plan', planId: plan.id } } });
+  assert.deepEqual([r.status, r.data.item.title, r.data.item.planId, r.data.item.status], [201, 'Nordlicht launch', plan.id, 'idea']);
+  const fd = new FormData();
+  fd.append('type', 'imagegallery'); fd.append('title', 'Swiss poster'); fd.append('image', new Blob([PNG], { type: 'image/png' }), 'poster.png');
+  const ref = (await srv.api('/api/projects', { method: 'POST', body: fd })).data.project;
+  r = await srv.api('/api/content/from', { method: 'POST', json: { from: { kind: 'project', projectId: ref.id } } });
+  assert.equal(r.status, 201);
+  assert.deepEqual([r.data.item.title, r.data.item.media.length, r.data.copied], ['Idea: Swiss poster', 1, 1]);
+  assert.ok(exists(path.join(srv.dataDir, 'content', r.data.item.id, r.data.item.media[0].file)));
+  assert.equal((await srv.api('/api/content/from', { method: 'POST', json: { from: { kind: 'mockup', mockupId: 'nope' } } })).status, 404);
+});

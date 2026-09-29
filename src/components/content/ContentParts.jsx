@@ -35,7 +35,7 @@ const PLACEHOLDER = {
  * each with what happens, the text on screen and how long it runs — adding up
  * to the length, with a note on how that length tends to do.
  */
-export function Beats({ beats, timed, onChange, onRemoved }) {
+export function Beats({ beats, timed, onChange, onRemoved, ctaPicker }) {
   const [moving, setMoving] = useState(null);
   const fresh = useRef(null);
   const total = beats.reduce((n, b) => n + (b.sec || 0), 0);
@@ -96,8 +96,11 @@ export function Beats({ beats, timed, onChange, onRemoved }) {
             <div className="ct-beat-main">
               <AutoTextarea className="input" value={b.text} placeholder={PLACEHOLDER[b.kind]} maxLength={2000} autoFocus={fresh.current === b.id}
                 onChange={(e) => set(b.id, { text: e.target.value }, true)} aria-label={`${k.label}: what happens`} />
-              <input className="input ct-beat-screen" value={b.screen} placeholder="Text on screen" maxLength={500}
-                onChange={(e) => set(b.id, { screen: e.target.value }, true)} aria-label={`${k.label}: text on screen`} />
+              <span className="ct-beat-screen-row">
+                <input className="input ct-beat-screen" value={b.screen} placeholder="Text on screen" maxLength={500}
+                  onChange={(e) => set(b.id, { screen: e.target.value }, true)} aria-label={`${k.label}: text on screen`} />
+                {b.kind === 'cta' && ctaPicker?.(b)}
+              </span>
             </div>
             {timed && (
               <label className="ct-beat-sec" title="Seconds">

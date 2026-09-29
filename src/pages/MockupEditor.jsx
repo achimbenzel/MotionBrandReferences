@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, UploadCloud, Library, X, Download, FolderInput, MoreHorizontal, Copy, Trash2, Play, Box, RotateCw,
-  FlipHorizontal, Camera, Plus, Move, Crop, LayoutGrid, Volume2, VolumeX, Sun, DoorOpen, ImagePlus,
+  FlipHorizontal, Camera, Plus, Move, Crop, LayoutGrid, Volume2, VolumeX, Sun, DoorOpen, ImagePlus, Megaphone,
 } from 'lucide-react';
 import { api, mockupFileUrl, mockupModelUrl, mockupHdriUrl } from '../lib/api.js';
 import { useSaver } from '../lib/autosave.js';
@@ -10,6 +10,7 @@ import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
 import SaveToPlanModal from '../components/SaveToPlanModal.jsx';
 import ExportDialog from '../components/ExportDialog.jsx';
+import useMakePost from '../components/content/useMakePost.js';
 import MediaPicker from '../components/mockups/MediaPicker.jsx';
 import ScreenFitter from '../components/mockups/ScreenFitter.jsx';
 import Timeline from '../components/mockups/Timeline.jsx';
@@ -604,6 +605,33 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
     }
     return st.toBlob(o.width, o.height, o.mime, o.quality, override);
   };
+  // A post in Content with this mockup in full size (2160 px on the long edge).
+  const [makePost, makingPost] = useMakePost();
+  const location = useLocation();
+  const toPost = () => makePost({
+    fields: { title: mRef.current.name, format: 'post', status: 'production', notes: `From the mockup “${mRef.current.name}”.` },
+    files: async () => {
+      const [w, h] = exportSize(mRef.current.frame, 2160);
+      const blob = await stageRef.current.toBlob(w, h);
+      if (!blob) throw new Error('The picture could not be made');
+      return [new File([blob], `${safeName(mRef.current.name)}.png`, { type: 'image/png' })];
+    },
+  }, { before: () => Promise.all([saver.flush(), flushThumb()]) });
+  // Opened with "make a post" (from Content): once the scene has loaded.
+  const postWanted = useRef(!!location.state?.makePost);
+  useEffect(() => {
+    if (!postWanted.current) return undefined;
+    postWanted.current = false;
+    navigate(location.pathname, { replace: true, state: null });
+    let ready = 0; let tries = 0;
+    const t = setInterval(() => {
+      const st = stageRef.current;
+      ready = st && !st.loadingContent && !st.animating ? ready + 1 : 0;
+      tries += 1;
+      if (ready >= 3 || tries > 80) { clearInterval(t); if (ready >= 3) toPost(); }
+    }, 400);
+    return () => clearInterval(t);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const quickPng = async () => {
     const [w, h] = exportSize(mRef.current.frame, 3840);
     return new File([await stageRef.current.toBlob(w, h)], `${safeName(mRef.current.name)}.png`, { type: 'image/png' });
@@ -646,6 +674,7 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
           <Menu align="right" title="Mockup" trigger={<button className="btn btn-sm" aria-label="Mockup options"><MoreHorizontal size={15} /></button>}
             items={[
               { label: 'Export video…', icon: <Play size={15} />, onClick: () => openExport('video') },
+              { label: 'Make a post…', icon: <Megaphone size={15} />, hint: 'In Content: this mockup in full size', disabled: makingPost, onClick: toPost },
               { label: 'Duplicate mockup', icon: <Copy size={15} />, onClick: duplicate },
               { separator: true },
               { label: 'Delete mockup', icon: <Trash2 size={15} />, danger: true, onClick: remove },

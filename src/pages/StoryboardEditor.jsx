@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Play, Printer, MoreHorizontal, UploadCloud, Library, Plus, Music, X, LayoutGrid, List, SquareChartGantt,
   ImagePlus, Image as ImageIcon, CornerDownRight, Copy as CopyIcon, ArrowUp, ArrowDown, Trash2, Clapperboard, PencilRuler,
-  PenLine, Scissors, Film, GripVertical, Pencil, Activity, Magnet, Bookmark,
+  PenLine, Scissors, Film, GripVertical, Pencil, Activity, Magnet, Bookmark, Megaphone,
 } from 'lucide-react';
 import { api, planFileUrl } from '../lib/api.js';
 import { useSaver, useRefreshOnReturn, whenSaved } from '../lib/autosave.js';
@@ -27,6 +27,7 @@ import PrintSheet from '../components/storyboard/PrintSheet.jsx';
 import DrawPad from '../components/storyboard/DrawPad.jsx';
 import ExportDialog from '../components/ExportDialog.jsx';
 import GalleryNameModal from '../components/GalleryNameModal.jsx';
+import useMakePost from '../components/content/useMakePost.js';
 
 const VIEWS = [
   { key: 'grid', label: 'Grid', icon: LayoutGrid },
@@ -51,6 +52,7 @@ export default function StoryboardEditor() {
   const navigate = useNavigate();
   const toast = useToast();
   const saver = useSaver();
+  const [makePost] = useMakePost();
   const [plan, setPlan] = useState(null);
   const [error, setError] = useState(null);
   const [view, setView] = useState(readView);
@@ -402,6 +404,7 @@ export default function StoryboardEditor() {
               ...ASPECTS.map((a) => ({ label: `Copy as ${a} version`, icon: <CopyIcon size={15} />, onClick: () => duplicate(a) })),
               { separator: true },
               { label: 'Save as template…', icon: <Bookmark size={15} />, onClick: () => setSavingTpl(true), disabled: !shots.length },
+              { label: 'Make a post…', icon: <Megaphone size={15} />, hint: 'In Content: the shots become its beats', disabled: !shots.length, onClick: () => makePost({ kind: 'storyboard', planId, blockId }, { before: () => saver.flush() }) },
               { separator: true },
               { label: 'Draw a new shot…', icon: <PenLine size={15} />, onClick: () => setDrawing({ shotId: null, over: false }) },
               { label: 'Open the project', icon: <PencilRuler size={15} />, onClick: back },

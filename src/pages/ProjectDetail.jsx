@@ -1,6 +1,6 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Trash2, Pencil, Image as ImageIcon, MoreHorizontal, ChevronLeft, ChevronRight, FolderInput, PencilRuler } from 'lucide-react';
+import { ArrowLeft, Trash2, Pencil, Image as ImageIcon, MoreHorizontal, ChevronLeft, ChevronRight, FolderInput, PencilRuler, Megaphone } from 'lucide-react';
 import { api, fileUrl } from '../lib/api.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
@@ -8,6 +8,7 @@ import EditDetailsModal from '../components/EditDetailsModal.jsx';
 import LogoOptionsModal from '../components/LogoOptionsModal.jsx';
 import { coverAspect, setLastTab } from '../lib/types.js';
 import { useAddToPlan } from '../components/AddToPlan.jsx';
+import useMakePost from '../components/content/useMakePost.js';
 
 // Per-type bodies + the (heavy, imaging-backed) thumbnail studio are split into
 // their own chunks — opening a colour project doesn't pull the branding/logo
@@ -34,6 +35,7 @@ export default function ProjectDetail() {
   const [logoOptions, setLogoOptions] = useState(false);
   const [siblings, setSiblings] = useState([]); // ids of same-type projects, in grid order
   const [planPicker, addToPlan] = useAddToPlan();
+  const [makePost] = useMakePost();
 
   useEffect(() => {
     let alive = true;
@@ -114,10 +116,12 @@ export default function ProjectDetail() {
     || (project.type === 'font' && !!project.shot);
 
   const toPlan = { label: 'Add to project…', icon: <FolderInput size={15} />, onClick: () => addToPlan('project', project.id) };
+  const toPost = { label: 'Post idea from it…', icon: <Megaphone size={15} />, hint: 'In Content: an idea with this reference to look at', onClick: () => makePost({ kind: 'project', projectId: project.id }) };
   const menuItems = isImage
-    ? [toPlan, { separator: true }, { label: 'Delete', icon: <Trash2 size={15} />, danger: true, onClick: remove }]
+    ? [toPlan, toPost, { separator: true }, { label: 'Delete', icon: <Trash2 size={15} />, danger: true, onClick: remove }]
     : [
         toPlan,
+        toPost,
         { label: 'Rename / edit details', icon: <Pencil size={15} />, onClick: () => setEditing(true) },
         ...(project.type === 'logo' ? [{ label: 'Logo options', icon: <ImageIcon size={15} />, onClick: () => setLogoOptions(true) }] : []),
         ...(canSetThumb ? [{ label: 'Change cover', icon: <ImageIcon size={15} />, onClick: () => setThumbing(true) }] : []),

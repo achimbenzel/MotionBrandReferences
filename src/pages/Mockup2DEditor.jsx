@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, UploadCloud, Library, X, Download, FolderInput, MoreHorizontal, Copy, Trash2, Crop, ImageIcon, ZoomIn, ZoomOut, Scan, Play, Pause, Volume2, VolumeX } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { ArrowLeft, UploadCloud, Library, X, Download, FolderInput, MoreHorizontal, Copy, Trash2, Crop, ImageIcon, ZoomIn, ZoomOut, Scan, Play, Pause, Volume2, VolumeX, Megaphone } from 'lucide-react';
 import { domToBlob } from 'modern-screenshot';
 import { api, mockupFileUrl } from '../lib/api.js';
 import { useSaver } from '../lib/autosave.js';
@@ -8,6 +8,7 @@ import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
 import SaveToPlanModal from '../components/SaveToPlanModal.jsx';
 import ExportDialog from '../components/ExportDialog.jsx';
+import useMakePost from '../components/content/useMakePost.js';
 import MediaPicker from '../components/mockups/MediaPicker.jsx';
 import ScreenFitter from '../components/mockups/ScreenFitter.jsx';
 import Mockup2D from '../components/mockups2d/Mockup2D.jsx';
@@ -270,6 +271,25 @@ export default function Mockup2DEditor({ initial }) {
       return await capture(el, { scale: width / el.offsetWidth, type: mime, quality, backgroundColor: null });
     } finally { if (bg) setOverride(null); }
   };
+  // A post in Content with this mockup (twice its design size, at most 2160 px wide).
+  const [makePost, makingPost] = useMakePost();
+  const location = useLocation();
+  const toPost = () => makePost({
+    fields: { title: mRef.current.name, format: 'post', status: 'production', notes: `From the mockup “${mRef.current.name}”.` },
+    files: async () => {
+      const blob = await render({ width: Math.min(2160, Math.round(W * 2)), mime: 'image/png' });
+      if (!blob) throw new Error('The picture could not be made');
+      return [new File([blob], `${safeName(mRef.current.name)}.png`, { type: 'image/png' })];
+    },
+  }, { before: () => saver.flush() });
+  const postWanted = useRef(!!location.state?.makePost);
+  useEffect(() => {
+    if (!postWanted.current) return undefined;
+    postWanted.current = false;
+    navigate(location.pathname, { replace: true, state: null });
+    const t = setTimeout(() => { if (canvasRef.current) toPost(); }, 1500); // its pictures loaded
+    return () => clearTimeout(t);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const targets = () => {
     const sizes = auto
       ? [1, 2, 3, 4].map((x) => ({ label: `${x}×`, w: Math.round(W * x), h: Math.round(H * x) }))
@@ -308,6 +328,7 @@ export default function Mockup2DEditor({ initial }) {
           <button className="btn btn-sm btn-primary" onClick={() => setExporting(true)}><Download size={14} /> Export</button>
           <Menu align="right" title="Mockup" trigger={<button className="btn btn-sm" aria-label="Mockup options"><MoreHorizontal size={15} /></button>}
             items={[
+              { label: 'Make a post…', icon: <Megaphone size={15} />, hint: 'In Content: this mockup as a picture', disabled: makingPost, onClick: toPost },
               { label: 'Duplicate mockup', icon: <Copy size={15} />, onClick: duplicate },
               { separator: true },
               { label: 'Delete mockup', icon: <Trash2 size={15} />, danger: true, onClick: remove },

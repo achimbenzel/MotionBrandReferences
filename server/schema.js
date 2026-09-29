@@ -683,6 +683,8 @@ export function normalizeDB(db) {
   db.notes = db.notes.filter((n) => n && typeof n === 'object').map(normalizeNote);
   if (!Array.isArray(db.content)) db.content = [];                    // social media posts being planned
   db.content = db.content.filter((c) => c && typeof c === 'object').map(normalizeContent);
+  if (!Array.isArray(db.contentLibrary)) db.contentLibrary = [];      // saved hooks, hashtag sets, calls to action
+  db.contentLibrary = db.contentLibrary.filter((x) => x && typeof x === 'object').map(normalizeContentSnippet).filter((x) => x.text.trim());
   if (!Array.isArray(db.achievements)) db.achievements = [];          // milestones (gamified)
   db.achievements = db.achievements.filter((a) => a && typeof a === 'object').map(normalizeAchievement);
   db.achievementStats = normalizeAchievementStats(db.achievementStats);
@@ -704,6 +706,8 @@ export function normalizeDB(db) {
   db.settings.weeklyTodos = normalizeWeeklyTodos(db.settings.weeklyTodos);
   db.settings.imageUploads = normalizeImageUploads(db.settings.imageUploads);
   db.settings.contentProfile = normalizeContentProfile(db.settings.contentProfile);
+  db.settings.contentPillars = normalizeContentPillars(db.settings.contentPillars);
+  db.settings.contentRhythm = normalizeContentRhythm(db.settings.contentRhythm);
   db.settings.dashboardLayout = normalizeDashboardLayout(db.settings.dashboardLayout);
   return db;
 }
@@ -816,6 +820,42 @@ export function normalizeImageUploads(v) {
     format: IMAGE_FORMATS.includes(o.format) ? o.format : 'webp',
     maxEdge: IMAGE_EDGES.includes(Number(o.maxEdge)) ? Number(o.maxEdge) : 2560,
     quality: Math.round(num(o.quality, 50, 100, 85)),
+  };
+}
+/** Your content pillars — the themes you post about: [{ id, name, color }]. */
+export function normalizeContentPillars(v) {
+  const seen = new Set();
+  return (Array.isArray(v) ? v : []).filter((p) => p && typeof p === 'object').map((p) => ({
+    id: typeof p.id === 'string' && ID.test(p.id) ? p.id : `p${nanoid(7)}`,
+    name: str(p.name, 40),
+    color: TAG_KEYS.has(p.color) ? p.color : 'blue',
+  })).filter((p) => !seen.has(p.id) && seen.add(p.id)).slice(0, 12);
+}
+/**
+ * Your posting rhythm: how many posts a week (0 = no goal) and fixed slots —
+ * a weekday (0 = Monday), a time, a pillar — the calendar and feed keep free.
+ */
+export function normalizeContentRhythm(v) {
+  const o = v && typeof v === 'object' ? v : {};
+  const slots = (Array.isArray(o.slots) ? o.slots : []).filter((x) => x && typeof x === 'object').slice(0, 21).map((x) => ({
+    id: typeof x.id === 'string' && ID.test(x.id) ? x.id : `s${nanoid(7)}`,
+    day: Math.round(num(x.day, 0, 6, 0)),
+    time: isTimeOfDay(x.time) ? x.time : '',
+    pillar: typeof x.pillar === 'string' && ID.test(x.pillar) ? x.pillar : null,
+  })).sort((a, b) => a.day - b.day || a.time.localeCompare(b.time));
+  return { goal: Math.round(num(o.goal, 0, 21, 0)), slots };
+}
+/** A saved hook, hashtag set or call to action, to use again. */
+export const CONTENT_SNIPPET_KINDS = ['hook', 'hashtags', 'cta'];
+export function normalizeContentSnippet(x) {
+  return {
+    id: typeof x?.id === 'string' && ID.test(x.id) ? x.id : nanoid(10),
+    kind: CONTENT_SNIPPET_KINDS.includes(x?.kind) ? x.kind : 'hook',
+    name: str(x?.name, 60).trim(),
+    text: str(x?.text, 2000),
+    uses: Math.round(num(x?.uses, 0, 1e9, 0)),
+    usedAt: num(x?.usedAt, 0, 1e14, 0),
+    createdAt: num(x?.createdAt, 0, 1e14, 0),
   };
 }
 /** How you appear in the post previews (Content): a name and a handle. */
@@ -1031,6 +1071,7 @@ export function normalizeContent(c) {
     beats: (Array.isArray(c?.beats) ? c.beats : []).filter((b) => b && typeof b === 'object').slice(0, 60).map(normalizeContentBeat),
     checks: normalizeContentChecks(c?.checks),      // production checklist: the steps done
     captions: normalizeContentCaptions(c?.captions),
+    pillar: typeof c?.pillar === 'string' && ID.test(c.pillar) ? c.pillar : null, // one of your content pillars (settings)
     link: str(c?.link, 2000),                       // where it's live
     planId: typeof c?.planId === 'string' && ID.test(c.planId) ? c.planId : null, // the project it shows
     color: TAG_KEYS.has(c?.color) ? c.color : null,

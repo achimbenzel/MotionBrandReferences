@@ -113,3 +113,44 @@ export const CHECKLISTS = {
   thread: [{ key: 'proofread', label: 'Proofread' }, { key: 'first', label: 'First post stands alone' }, { key: 'visual', label: 'Pictures on key posts' }, { key: 'last', label: 'Last post: call to action' }],
 };
 export const checklistFor = (format) => CHECKLISTS[format] || VIDEO_CHECKS;
+
+// ---- Pillars and rhythm ----------------------------------------------------------
+export const PILLAR_IDEAS = ['Breakdowns', 'Behind the scenes', 'Client work', 'Tips & tricks', 'Process', 'Showreel', 'Personal'];
+export const pillarOf = (pillars, id) => (id ? (pillars || []).find((p) => p.id === id) || null : null);
+export const WEEKDAY_LONG = Array.from({ length: 7 }, (_, i) => new Date(2024, 0, 1 + i).toLocaleDateString(undefined, { weekday: 'long' })); // Monday first
+export const weekdayOf = (iso) => { const [y, m, d] = iso.split('-').map(Number); return (new Date(y, m - 1, d).getDay() + 6) % 7; };
+export const addDays = (iso, n) => { const [y, m, d] = iso.split('-').map(Number); return dayKey(new Date(y, m - 1, d + n)); };
+export const mondayOf = (iso) => addDays(iso, -weekdayOf(iso));
+
+/**
+ * The rhythm's slots from `from` for `days` days that no post has taken yet —
+ * a day's posts fill its slots in time order; today's slots that are past
+ * don't count. → [{ date, time, pillar, id }]
+ */
+export function freeSlots(items, rhythm, from, days = 42) {
+  const slots = rhythm?.slots || [];
+  if (!slots.length) return [];
+  const perDay = {};
+  for (const c of items || []) if (c.date) perDay[c.date] = (perDay[c.date] || 0) + 1;
+  const now = new Date();
+  const nowHm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const out = [];
+  for (let i = 0; i < days; i += 1) {
+    const date = addDays(from, i);
+    const wd = weekdayOf(date);
+    const today = date === dayKey(now);
+    const mine = slots.filter((s) => s.day === wd);
+    mine.slice(perDay[date] || 0).forEach((s) => {
+      if (today && s.time && s.time < nowHm) return;
+      out.push({ date, time: s.time, pillar: s.pillar, id: `${date}-${s.id}` });
+    });
+  }
+  return out;
+}
+/** Posts (planned or out) on the days of the week starting `monday`. */
+export const postsInWeek = (items, monday) => {
+  const end = addDays(monday, 6);
+  return (items || []).filter((c) => c.date && c.date >= monday && c.date <= end);
+};
+/** The weekly goal: as set, else one post per slot. */
+export const goalOf = (rhythm) => rhythm?.goal || rhythm?.slots?.length || 0;

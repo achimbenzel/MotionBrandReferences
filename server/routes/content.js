@@ -8,8 +8,8 @@ import { readDB, mutateDB } from '../db.js';
 import { moveInto, safeRm, moveToTrash, moveRelPaths, sanitize, extOf, sniffImageExt } from '../files.js';
 import { upload } from '../upload.js';
 import {
-  normalizeContent, normalizeContentMedia, normalizeContentBeat, normalizeContentCaptions, normalizeContentChecks, str, isDay, isTimeOfDay, TAG_KEYS,
-  CONTENT_PLATFORMS, CONTENT_FORMATS, CONTENT_STATUSES, CONTENT_METRICS,
+  normalizeContent, normalizeContentMedia, normalizeContentBeat, normalizeContentCaptions, normalizeContentChecks, normalizeContentSnippet,
+  str, isDay, isTimeOfDay, TAG_KEYS, CONTENT_PLATFORMS, CONTENT_FORMATS, CONTENT_STATUSES, CONTENT_METRICS, CONTENT_SNIPPET_KINDS,
 } from '../schema.js';
 import { createRouter, HttpError } from '../http.js';
 import { resolveSource, IMAGE_EXT, VIDEO_EXT } from '../sources.js';
@@ -38,7 +38,7 @@ router.post('/api/content', async (req, res) => {
     const now = Date.now();
     const c = normalizeContent({
       id: nanoid(10), title: b.title, platforms: b.platforms, format: b.format, status: b.status, date: b.date, time: b.time,
-      hook: b.hook, caption: b.caption, hashtags: b.hashtags, script: b.script, notes: b.notes, planId: b.planId, createdAt: now, updatedAt: now,
+      hook: b.hook, caption: b.caption, hashtags: b.hashtags, script: b.script, notes: b.notes, planId: b.planId, pillar: b.pillar, createdAt: now, updatedAt: now,
     });
     if (c.status === 'posted') { c.postedAt = now; if (!c.date || c.date > today()) c.date = today(); }
     db.content.push(c);
@@ -64,6 +64,7 @@ router.patch('/api/content/:id', async (req, res) => {
     if ('beats' in b && Array.isArray(b.beats)) c.beats = b.beats.filter((x) => x && typeof x === 'object').slice(0, 60).map(normalizeContentBeat);
     if ('checks' in b) c.checks = normalizeContentChecks(b.checks);
     if ('captions' in b) c.captions = normalizeContentCaptions(b.captions); // the whole set (none = the caption everywhere)
+    if ('pillar' in b) c.pillar = typeof b.pillar === 'string' && /^[\w-]{1,40}$/.test(b.pillar) ? b.pillar : null;
     if ('coverId' in b) c.coverId = typeof b.coverId === 'string' && c.media.some((m) => m.id === b.coverId) ? b.coverId : null;
     if ('metrics' in b && b.metrics && typeof b.metrics === 'object') {
       c.metrics = normalizeContent({ metrics: { ...c.metrics, ...Object.fromEntries(Object.entries(b.metrics).filter(([k]) => CONTENT_METRICS.includes(k))) } }).metrics;
@@ -83,6 +84,151 @@ router.patch('/api/content/:id', async (req, res) => {
   });
   if (!item) return res.status(404).json({ error: 'not_found' });
   res.json({ item });
+});
+
+// ---- A post made from something in the app -------------------------------------------
+// A project (its latest review cut, its banner), a storyboard (its shots become the
+// beats, its frames the pictures), a mockup (its picture) or a reference (as the idea,
+// with its picture / video to look at). → the new post, its files copied in.
+const SECTION_BEAT = { hook: 'hook', cta: 'cta', outro: 'cta' };
+const ASPECT_FORMAT = { '9:16': 'reel', '16:9': 'video', '4:5': 'carousel', '1:1': 'carousel' };
+const MAX_FROM_FILES = 12;
+
+function postFrom(db, f) {
+  if (f?.kind === 'plan') {
+    const plan = db.plans.find((p) => p.id === f.planId);
+    if (!plan) return null;
+    const client = plan.client || (db.clients || []).find((c) => c.id === plan.clientId)?.name || '';
+    const sources = [];
+    for (const b of plan.blocks || []) {
+      if (b.type !== 'review') continue;
+      const v = [...(b.versions || [])].reverse().find((x) => x.file);
+      if (v) sources.push({ kind: 'plan', planId: plan.id, blockId: b.id, itemId: v.id });
+    }
+    if (plan.banner) sources.push({ kind: 'plan', planId: plan.id, itemId: '@banner' });
+    return {
+      fields: { title: plan.name, planId: plan.id, notes: [client && `Client: ${client}`, 'Made from the project — show the result, the process, the before / after.'].filter(Boolean).join('\n') },
+      sources,
+    };
+  }
+  if (f?.kind === 'storyboard') {
+    const plan = db.plans.find((p) => p.id === f.planId);
+    const b = plan?.blocks?.find((x) => x.id === f.blockId && x.type === 'storyboard');
+    if (!b) return null;
+    const shots = b.shots || [];
+    const beats = shots.slice(0, 60).map((sh) => ({
+      kind: SECTION_BEAT[sh.section] || (sh === shots[0] ? 'hook' : 'body'),
+      text: [sh.visual, sh.vo && `VO: ${sh.vo}`].filter(Boolean).join('\n'),
+      screen: sh.onscreen, sec: sh.duration,
+    }));
+    const vo = shots.map((sh, i) => (sh.vo ? `${i + 1}. ${sh.vo}` : '')).filter(Boolean).join('\n');
+    const sfx = [...new Set(shots.map((sh) => sh.sfx).filter(Boolean))].join(' · ');
+    return {
+      fields: {
+        title: b.title || plan.name, planId: plan.id, format: ASPECT_FORMAT[b.aspect] || 'reel', beats, status: 'script', // its script is written
+        script: [vo && `VO:\n${vo}`, sfx && `Sound: ${sfx}`].filter(Boolean).join('\n\n'),
+        notes: `From the storyboard “${b.title || 'Storyboard'}” (${plan.name}).`,
+      },
+      sources: shots.filter((sh) => sh.image).slice(0, MAX_FROM_FILES).map((sh) => ({ kind: 'plan', planId: plan.id, blockId: b.id, itemId: sh.id })),
+    };
+  }
+  if (f?.kind === 'mockup') {
+    const m = (db.mockups || []).find((x) => x.id === f.mockupId);
+    if (!m) return null;
+    return {
+      fields: { title: m.name, format: 'post', status: 'production', notes: `From the mockup “${m.name}”.` },
+      sources: m.thumb ? [{ kind: 'mockup', mockupId: m.id, file: m.thumb }] : [],
+    };
+  }
+  if (f?.kind === 'project') {
+    const p = db.projects.find((x) => x.id === f.projectId);
+    if (!p) return null;
+    const link = typeof p.url === 'string' ? p.url : '';
+    return {
+      fields: { title: p.title ? `Idea: ${p.title}` : 'Idea from a reference', notes: [`Inspired by “${p.title || 'a reference'}”${p.channel ? ` (${p.channel})` : ''}.`, link].filter(Boolean).join('\n') },
+      // the picture picked (one of its frames, assets …), else its main one
+      sources: [f.source?.kind === 'project' && f.source.projectId === p.id ? f.source : { kind: 'project', projectId: p.id }],
+    };
+  }
+  return null;
+}
+
+router.post('/api/content/from', async (req, res) => {
+  const b = req.body || {};
+  const db = await readDB();
+  const made = postFrom(db, b.from);
+  if (!made) throw new HttpError(404, 'not_found', 'That is no longer there.');
+  const id = nanoid(10);
+  const dir = path.join(contentDir(id), 'media');
+  const media = [];
+  for (const s of made.sources) {
+    const src = await resolveSource(db, s).catch(() => null);
+    if (!src) continue;
+    await fsp.mkdir(dir, { recursive: true });
+    const base = sanitize(String(src.name || src.kind).replace(/\.[^.]+$/, '')).slice(0, 60) || src.kind;
+    const name = `${nanoid(6)}-${base}${src.ext}`;
+    await fsp.copyFile(src.abs, path.join(dir, name));
+    media.push({ id: nanoid(8), file: `media/${name}`, name: str(`${src.name || src.kind}`, 200), kind: src.kind });
+  }
+  const item = await mutateDB((d) => {
+    const now = Date.now();
+    const c = normalizeContent({
+      platforms: Array.isArray(b.platforms) ? b.platforms : [], status: 'idea', pillar: b.pillar,
+      ...made.fields, ...(b.status ? { status: b.status } : {}), id, media, createdAt: now, updatedAt: now,
+    });
+    d.content.push(c);
+    return c;
+  });
+  res.status(201).json({ item, copied: media.length });
+});
+
+// ---- The library: hooks, hashtag sets and calls to action to use again -----------------
+router.get('/api/content-library', async (_req, res) => {
+  const db = await readDB();
+  res.json({ items: [...db.contentLibrary].sort((a, b) => b.uses - a.uses || b.createdAt - a.createdAt) });
+});
+
+// The same text of the same kind is kept once (→ that one).
+router.post('/api/content-library', async (req, res) => {
+  const b = req.body || {};
+  if (!CONTENT_SNIPPET_KINDS.includes(b.kind)) throw new HttpError(400, 'bad_kind', 'A hook, hashtags or a call to action.');
+  const text = str(b.text, 2000).trim();
+  if (!text) throw new HttpError(400, 'text_required', 'There is nothing to save.');
+  const out = await mutateDB((db) => {
+    const same = db.contentLibrary.find((x) => x.kind === b.kind && x.text.trim().toLowerCase() === text.toLowerCase());
+    if (same) return { item: same, existed: true };
+    const item = normalizeContentSnippet({ kind: b.kind, name: b.name, text, createdAt: Date.now() });
+    db.contentLibrary.push(item);
+    return { item, existed: false };
+  });
+  res.status(out.existed ? 200 : 201).json(out);
+});
+
+router.patch('/api/content-library/:id', async (req, res) => {
+  const b = req.body || {};
+  const item = await mutateDB((db) => {
+    const x = db.contentLibrary.find((s) => s.id === req.params.id);
+    if (!x) return null;
+    if ('text' in b && str(b.text, 2000).trim()) x.text = str(b.text, 2000);
+    if ('name' in b) x.name = str(b.name, 60).trim();
+    if (b.use === true) { x.uses += 1; x.usedAt = Date.now(); }
+    return x;
+  });
+  if (!item) return res.status(404).json({ error: 'not_found' });
+  res.json({ item });
+});
+
+router.delete('/api/content-library/:id', async (req, res) => {
+  const trashId = nanoid(10);
+  const ok = await mutateDB((db) => {
+    const i = db.contentLibrary.findIndex((s) => s.id === req.params.id);
+    if (i === -1) return false;
+    const [item] = db.contentLibrary.splice(i, 1);
+    db.trash.unshift({ trashId, kind: 'contentSnippet', deletedAt: Date.now(), data: item });
+    return true;
+  });
+  if (!ok) return res.status(404).json({ error: 'not_found' });
+  res.json({ ok: true, trashId });
 });
 
 // Pictures / videos: uploads (several at once) or one that's already in the app ({ source }).

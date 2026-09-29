@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, MoreHorizontal, Trash2, Copy, CopyPlus, ImagePlus, UploadCloud, Library, X, CalendarDays, Clock, Link2,
   ExternalLink, Hash, Sparkles, PencilRuler, BarChart3, Palette, Lightbulb, Clapperboard, ListChecks, Send, Star, ArrowRight, PenLine, Undo2,
+  Layers, Plus,
 } from 'lucide-react';
 import { api, contentFileUrl } from '../lib/api.js';
 import { useSaver, useRefreshOnReturn } from '../lib/autosave.js';
@@ -21,7 +22,10 @@ import MediaPicker from '../components/mockups/MediaPicker.jsx';
 import PlatformIcon from '../components/content/PlatformIcon.jsx';
 import PostPreview from '../components/content/PostPreview.jsx';
 import { Section, Beats, Checklist } from '../components/content/ContentParts.jsx';
-import useContentProfile from '../components/content/useContentProfile.js';
+import ContentPlanDialog from '../components/content/ContentPlanDialog.jsx';
+import SnippetPicker from '../components/content/SnippetPicker.jsx';
+import { placeholderIn } from '../lib/contentIdeas.js';
+import useContentSettings, { useContentProfile } from '../components/content/useContentSettings.js';
 
 const mediaFiles = (list) => [...(list || [])].filter((f) => /^(image|video)\//.test(f.type || '') || /\.(png|jpe?g|gif|webp|avif|svg|mp4|m4v|mov|webm)$/i.test(f.name || ''));
 
@@ -36,6 +40,15 @@ const STAGE_NEXT = {
 const TIMED = ['reel', 'story', 'video'];
 const isEmptyPost = (c) => !c.title.trim() && !c.hook.trim() && !c.caption.trim() && !c.hashtags.trim() && !c.script.trim() && !(c.notes || '').trim()
   && !(c.beats || []).some((b) => b.text.trim() || b.screen.trim()) && !Object.keys(c.captions || {}).length && !c.media.length;
+const lastParagraph = (s) => String(s || '').trim().split(/\n\s*\n/).pop() || '';
+// After a formula goes in: the field focused, its first [placeholder] selected to type over.
+const selectPlaceholder = (selector, text, offset) => setTimeout(() => {
+  const el = document.querySelector(selector);
+  if (!el) return;
+  el.focus();
+  const ph = placeholderIn(text.slice(offset));
+  if (ph) el.setSelectionRange(offset + ph[0], offset + ph[1]);
+}, 40);
 const firstLine = (s, max = 70) => { const t = String(s || '').trim().split('\n')[0]; return t.length > max ? `${t.slice(0, max)}…` : t; };
 
 /**
@@ -65,6 +78,9 @@ export default function ContentDetail() {
   const [capTab, setCapTab] = useState('all');
   const [pvPlatform, setPvPlatform] = useState('');
   const [profile, setProfile] = useContentProfile();
+  const [cs] = useContentSettings();
+  const pillars = cs.contentPillars;
+  const [planOpen, setPlanOpen] = useState(false);
   const pending = useRef({});
   const fileRef = useRef(null);
   const fresh = !!location.state?.fresh;
@@ -220,6 +236,25 @@ export default function ContentDetail() {
     const len = parts ? Math.max(0, ...parts.map(charCount)) : charCount(t);
     return { len, max, parts, cls: len > max ? 'over' : len > max * 0.9 ? 'near' : '' };
   };
+  // From the library: a hook replaces (Undo), hashtags join, a call to action ends the caption.
+  const pickHook = (text) => {
+    const before = item.hook;
+    patch({ hook: text }, true);
+    if (before.trim() && before !== text) toast('Hook replaced', 'ok', { label: 'Undo', onClick: () => patch({ hook: before }, true) });
+    selectPlaceholder('.ct-hook', text, 0);
+  };
+  const pickTags = (text) => {
+    const before = item.hashtags;
+    const merged = [...new Set([...hashtagsOf(before), ...hashtagsOf(text)])].join(' ');
+    patch({ hashtags: merged }, true);
+    if (before.trim()) toast('Hashtags added', 'ok', { label: 'Undo', onClick: () => patch({ hashtags: before }, true) });
+  };
+  const pickCta = (text) => {
+    const base = item.caption.trimEnd();
+    const next = base ? `${base}\n\n${text}` : text;
+    patch({ caption: next }, true);
+    selectPlaceholder('.ct-caption', next, next.length - text.length);
+  };
   // Results
   const mt = item.metrics;
   const engaged = ['likes', 'comments', 'shares', 'saves'].reduce((n, k) => n + (mt[k] || 0), 0);
@@ -272,6 +307,16 @@ export default function ContentDetail() {
                 ))}
               </div>
             </div>
+            <div className="ct-pillars" role="group" aria-label="Pillar">
+              <span className="ct-pillars-label"><Layers size={12} /> Pillar</span>
+              {pillars.map((p) => (
+                <button key={p.id} type="button" className={`ct-pillar ${item.pillar === p.id ? 'on' : ''}`} style={{ '--pc': tagColor(p.color).fg }}
+                  aria-pressed={item.pillar === p.id} onClick={() => patch({ pillar: item.pillar === p.id ? null : p.id }, true)}>
+                  <i />{p.name || 'Untitled pillar'}
+                </button>
+              ))}
+              <button type="button" className="ct-pillar ct-pillar-edit" onClick={() => setPlanOpen(true)}>{pillars.length ? 'Edit…' : <><Plus size={12} /> Your pillars</>}</button>
+            </div>
             <div className="ct-row ct-when">
               <label className="ct-field"><span>Format</span>
                 <select className="input" value={item.format} onChange={(e) => patch({ format: e.target.value }, true)}>
@@ -287,10 +332,13 @@ export default function ContentDetail() {
               {!item.date && <button type="button" className="btn btn-sm btn-ghost ct-today" onClick={() => patch({ date: dayKey() }, true)}>Today</button>}
             </div>
             <div className="hint ct-fmt-hint">{fmt.hint}</div>
-            <label className="ct-block">
-              <span className="ct-label"><Sparkles size={13} /> Hook <em>— the first second / the first line</em></span>
-              <AutoTextarea className="input ct-hook" value={item.hook} placeholder="Why should anyone stop scrolling?" onChange={(e) => patch({ hook: e.target.value })} />
-            </label>
+            <div className="ct-block">
+              <div className="ct-label-row">
+                <span className="ct-label"><Sparkles size={13} /> Hook <em>— the first second / the first line</em></span>
+                <SnippetPicker kind="hook" current={item.hook} onPick={pickHook} />
+              </div>
+              <AutoTextarea className="input ct-hook" value={item.hook} placeholder="Why should anyone stop scrolling?" aria-label="Hook" onChange={(e) => patch({ hook: e.target.value })} />
+            </div>
           </div>
 
           <Section icon={Lightbulb} title="Idea" now={now === 'idea'} open={isOpen('idea')} onToggle={() => toggle('idea')}
@@ -316,7 +364,8 @@ export default function ContentDetail() {
             {beatsOn && (
               <div className="ct-block">
                 <span className="ct-label">{timed ? 'Beats' : 'Slides'} <em>— {timed ? 'what happens, the text on screen, how long' : 'one idea per slide; the first one hooks'}</em></span>
-                <Beats beats={item.beats} timed={timed} onChange={setBeats} onRemoved={beatsRemoved} />
+                <Beats beats={item.beats} timed={timed} onChange={setBeats} onRemoved={beatsRemoved}
+                  ctaPicker={(b) => <SnippetPicker kind="cta" label="" current={b.screen} onPick={(t) => setBeats(item.beats.map((x) => (x.id === b.id ? { ...x, screen: t } : x)))} />} />
               </div>
             )}
             <label className="ct-block">
@@ -347,14 +396,20 @@ export default function ContentDetail() {
             )}
             {tab === 'all' ? (
               <>
-                <label className="ct-block">
-                  <span className="ct-label">Caption {owns.length > 0 && <em>— {owns.map((p) => PLATFORMS[p].label).join(', ')} {owns.length === 1 ? 'has its' : 'have their'} own</em>}</span>
-                  <AutoTextarea className="input ct-caption" value={item.caption} placeholder="The text that goes with it…" onChange={(e) => patch({ caption: e.target.value })} />
-                </label>
-                <label className="ct-block">
-                  <span className="ct-label"><Hash size={13} /> Hashtags <em>{tags.length ? `— ${tags.length}` : ''}</em></span>
-                  <input className="input" value={item.hashtags} placeholder="#motiondesign #branding …" onChange={(e) => patch({ hashtags: e.target.value })} />
-                </label>
+                <div className="ct-block">
+                  <div className="ct-label-row">
+                    <span className="ct-label">Caption {owns.length > 0 && <em>— {owns.map((p) => PLATFORMS[p].label).join(', ')} {owns.length === 1 ? 'has its' : 'have their'} own</em>}</span>
+                    <SnippetPicker kind="cta" label="Call to action" current={lastParagraph(item.caption)} onPick={pickCta} />
+                  </div>
+                  <AutoTextarea className="input ct-caption" value={item.caption} placeholder="The text that goes with it…" aria-label="Caption" onChange={(e) => patch({ caption: e.target.value })} />
+                </div>
+                <div className="ct-block">
+                  <div className="ct-label-row">
+                    <span className="ct-label"><Hash size={13} /> Hashtags <em>{tags.length ? `— ${tags.length}` : ''}</em></span>
+                    <SnippetPicker kind="hashtags" label="Sets" current={item.hashtags} onPick={pickTags} />
+                  </div>
+                  <input className="input ct-tags" value={item.hashtags} placeholder="#motiondesign #branding …" aria-label="Hashtags" onChange={(e) => patch({ hashtags: e.target.value })} />
+                </div>
                 <div className="ct-counts">
                   {capPlatforms.map((p) => {
                     const k = count(p);
@@ -476,6 +531,7 @@ export default function ContentDetail() {
       {lightbox >= 0 && <Lightbox items={images.map((m) => ({ src: contentFileUrl(item, m.file), caption: m.name }))} index={lightbox} onIndex={setLightbox} onClose={() => setLightbox(-1)} />}
       {appPick && <MediaPicker accept="any" title="Picture or video from the app" onPick={addFromApp} onClose={() => setAppPick(false)} />}
       {drag && <div className="note-drop" aria-hidden="true"><ImagePlus size={26} /> Drop pictures or videos to add them</div>}
+      {planOpen && <ContentPlanDialog onClose={() => setPlanOpen(false)} />}
       {dialog}
     </div>
   );

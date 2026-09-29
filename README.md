@@ -1059,13 +1059,50 @@ Notes are stored in `data/db.json` (`notes`), their pictures in
 **TikTok / Reels** and **X** (YouTube and LinkedIn too) — from the idea to the
 numbers.
 
+- **New post ▾** — a blank post, or one **made from** something in the app:
+  a **project** (the post shows it; its latest review cut and banner come
+  along), a **storyboard** (its shots become the beats — hook, body, CTA with
+  their seconds, text on screen and voice-over — and its frames the pictures;
+  9:16 makes a Reel), a **mockup** (it opens and goes into the post in full
+  size) or a **reference / any picture** (a reference becomes an idea with it
+  to look at). The same is in each of those places: **Make a post…** in a
+  project's and a storyboard's menu, in a mockup's ⋯ menu (and in the mockup
+  list), **Post idea from it…** in a reference's menu.
+- **Rhythm** — your **pillars** (the themes you post about, each with a
+  colour — give a post one with the chips under its platforms) and your
+  **posting rhythm**: posts a week and fixed **slots** (a weekday, a time,
+  maybe a pillar). Free slots show in the **calendar** (a dashed “+ 18:00 ·
+  Breakdowns” — a click plans a post for it) and as **Next slot** in the
+  feed; **This week 2 / 3** on top counts the week's posts against the goal.
+  Pillars show on the cards and as a coloured line under the feed's tiles;
+  filter by pillar next to the platforms. Removing a pillar keeps it on its
+  posts (Undo brings it back).
+- **Library** — your **hooks**, **hashtag sets** and **calls to action**.
+  Beside the hook, the caption (call to action), the hashtags (sets) and a
+  CTA beat's text on screen, **Library** lists yours (most used first) and
+  **ideas** to start from — hook and CTA formulas in **German or English**
+  (DE / EN), hashtag sets. A click puts one in (a hook replaces the old one
+  with Undo, hashtags join what's there, a call to action ends the caption);
+  the first **[placeholder]** is selected to type over. **Save this hook** (or
+  set, or call to action) keeps what's in the field. The **Library** button on
+  top edits and deletes them (Trash, Undo) and shows how often each was used
+  and how the posts with it did (⌀ views).
+- **Insights** — for 30 / 90 days, 12 months or all: posts, views, ⌀ views per
+  post, ⌀ engagement (likes, comments, shares and saves per view) and new
+  followers, each against the period before; the **rhythm** of the last 12
+  weeks against your goal (with the weeks in a row on goal); the **best
+  posts** by views, engagement, saves or follows; **what works** — ⌀ views or
+  engagement by pillar, format, weekday, time of day and length (Reels with
+  beats); **what stands out** (“Reels of 15–35 s get 2.0× your average
+  views”, the most saved post …) and the posted ones still **without
+  numbers**. The platform and pillar filters apply.
 - **Feed** (the default) — the profile grid as it'll look, in the app's 3:4
   tiles: what's **planned** on top (the latest first, with its day), what's
   **posted** below (with its views). A post without a picture gets a **cover
   made of type** — its title on a gradient in its colour. **Drag** a planned
   post onto another to **trade their days** (with Undo); drop one on **Next
-  post** to give it the day after the last planned one (a click there starts a
-  new post for that day). **Without a day** on the side holds the others — drag
+  post** to give it your rhythm's next free slot — or the day after the last
+  planned one (a click there starts a new post for that day). **Without a day** on the side holds the others — drag
   one into the grid, or a planned one back to take its day away. **Clean look**
   hides the labels. Stories, text posts and threads aren't in the grid; with
   **X** picked, the feed is the **timeline** — each post as it'll read on X.
@@ -1129,7 +1166,9 @@ numbers.
 Posts are stored in `data/db.json` (`content` — notes, beats, the checklist,
 own texts per platform and the cover are additions older posts simply read as
 empty), their pictures and videos in `data/content/<id>/media/`; your name and
-handle for the previews in the settings (`contentProfile`).
+handle for the previews, your pillars and rhythm in the settings
+(`contentProfile`, `contentPillars`, `contentRhythm`), a post's pillar in
+`pillar`; the library in `data/db.json` (`contentLibrary`).
 
 ### Achievements
 **Achievements** (sidebar, under Content) turns your milestones into

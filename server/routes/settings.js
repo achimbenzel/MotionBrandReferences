@@ -4,7 +4,7 @@ import { DATA_DIR } from '../config.js';
 import { readDB, mutateDB } from '../db.js';
 import { getUsedBytes, replaceImage, safeRm } from '../files.js';
 import { upload } from '../upload.js';
-import { str, normalizeDashboardFocus, normalizeDashboardLayout, normalizeWeeklyTodos, normalizeImageUploads, normalizeContentProfile, CURRENCIES } from '../schema.js';
+import { str, normalizeDashboardFocus, normalizeDashboardLayout, normalizeWeeklyTodos, normalizeImageUploads, normalizeContentProfile, normalizeContentPillars, normalizeContentRhythm, CURRENCIES } from '../schema.js';
 import { createRouter } from '../http.js';
 import { sourceAsUpload } from '../sources.js';
 import { activityDays, noteFocus, recentItems } from '../activity.js';
@@ -39,6 +39,8 @@ router.patch('/api/settings', async (req, res) => {
     if ('dashboardLayout' in req.body) db.settings.dashboardLayout = normalizeDashboardLayout(req.body.dashboardLayout);
     if ('weeklyTodos' in req.body) db.settings.weeklyTodos = normalizeWeeklyTodos(req.body.weeklyTodos);
     if (req.body.imageUploads && typeof req.body.imageUploads === 'object') db.settings.imageUploads = normalizeImageUploads({ ...db.settings.imageUploads, ...req.body.imageUploads });
+    if ('contentPillars' in req.body) db.settings.contentPillars = normalizeContentPillars(req.body.contentPillars);
+    if (req.body.contentRhythm && typeof req.body.contentRhythm === 'object') db.settings.contentRhythm = normalizeContentRhythm({ ...db.settings.contentRhythm, ...req.body.contentRhythm });
     if (req.body.contentProfile && typeof req.body.contentProfile === 'object') db.settings.contentProfile = normalizeContentProfile({ ...db.settings.contentProfile, ...req.body.contentProfile });
     if ('currency' in req.body && CURRENCIES.has(req.body.currency)) db.settings.currency = req.body.currency; // rates, invoices
     return db.settings;

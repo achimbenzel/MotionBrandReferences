@@ -539,6 +539,12 @@ export const api = {
   async updateContent(id, patch) { const { item } = await request(`/api/content/${id}`, { method: 'PATCH', json: patch }); return item; },
   async duplicateContent(id) { const { item } = await request(`/api/content/${id}/duplicate`, { method: 'POST' }); return item; },
   async removeContent(id) { return request(`/api/content/${id}`, { method: 'DELETE' }); }, // → { trashId }
+  /** A post made from a project / storyboard / mockup / reference: { kind: 'plan' | 'storyboard' | 'mockup' | 'project', … } */
+  async createContentFrom(from, extra = {}) { const { item } = await request('/api/content/from', { method: 'POST', json: { from, ...extra } }); return item; },
+  async listContentLibrary() { const { items } = await request('/api/content-library'); return items; },
+  async saveContentSnippet(body) { return request('/api/content-library', { method: 'POST', json: body }); }, // → { item, existed }
+  async updateContentSnippet(id, patch) { const { item } = await request(`/api/content-library/${id}`, { method: 'PATCH', json: patch }); return item; },
+  async removeContentSnippet(id) { return request(`/api/content-library/${id}`, { method: 'DELETE' }); }, // → { trashId }
   async removeContentIfEmpty(id) { return request(`/api/content/${id}?ifEmpty=1`, { method: 'DELETE' }); }, // no Trash; a post with anything in it stays
   // Pictures / videos: Files, or { source } for one that's already in the app. → { item, media }
   async addContentMedia(id, files) {

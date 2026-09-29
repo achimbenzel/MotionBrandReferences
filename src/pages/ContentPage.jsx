@@ -1,29 +1,44 @@
-import { useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus, Megaphone, Search, X, ChevronLeft, ChevronRight, CalendarDays, Columns3, List, Clock, Eye, Heart, Grid3x3, Play,
-  Clapperboard, Images, Tag,
+  Clapperboard, Images, Tag, CalendarClock, Layers, Check, ChevronDown, PencilRuler, Box, Library, BookMarked, BarChart3,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { tagColor } from '../lib/types.js';
 import { isTouch } from '../lib/useMedia.js';
-import { PLATFORMS, FORMATS, STATUSES, statusOf, dayKey, fmtDay, fmtNum, coverOf } from '../lib/content.js';
+import {
+  PLATFORMS, FORMATS, STATUSES, statusOf, dayKey, fmtDay, fmtNum, coverOf, pillarOf, freeSlots, postsInWeek, mondayOf, goalOf,
+} from '../lib/content.js';
+import Menu from '../components/Menu.jsx';
+import ContentPlanDialog from '../components/content/ContentPlanDialog.jsx';
+import MakePostDialog from '../components/content/MakePostDialog.jsx';
+import LibraryDialog from '../components/content/LibraryDialog.jsx';
+import Insights from '../components/content/Insights.jsx';
 import { useToast } from '../components/Toast.jsx';
 import PlatformIcon from '../components/content/PlatformIcon.jsx';
 import PostCover, { AutoCover } from '../components/content/PostCover.jsx';
 import { XPost } from '../components/content/PostPreview.jsx';
-import useContentProfile from '../components/content/useContentProfile.js';
+import useContentSettings, { useContentProfile } from '../components/content/useContentSettings.js';
 
 const VIEWS = [
   { key: 'feed', label: 'Feed', icon: Grid3x3 },
   { key: 'board', label: 'Board', icon: Columns3 },
   { key: 'calendar', label: 'Calendar', icon: CalendarDays },
   { key: 'list', label: 'List', icon: List },
+  { key: 'insights', label: 'Insights', icon: BarChart3 },
 ];
 const load = (k, fallback) => { try { return localStorage.getItem(k) || fallback; } catch { return fallback; } };
 const save = (k, v) => { try { localStorage.setItem(k, v); } catch { /* private window */ } };
 const WEEKDAYS = Array.from({ length: 7 }, (_, i) => new Date(2024, 0, 1 + i).toLocaleDateString(undefined, { weekday: 'short' })); // 1 Jan 2024 was a Monday
 const POSTED_SHOWN = 12;
+// Your pillars and rhythm, for every view on the page.
+const PlanCtx = createContext({ pillars: [], rhythm: { goal: 0, slots: [] } });
+const usePillar = (id) => pillarOf(useContext(PlanCtx).pillars, id);
+const PillarTag = ({ id }) => {
+  const p = usePillar(id);
+  return p ? <span className="ctp-pillar" style={{ '--pc': tagColor(p.color).fg }}>{p.name || 'Pillar'}</span> : null;
+};
 
 const matches = (c, needle) => !needle || [c.title, c.hook, c.caption, c.hashtags, c.script, c.notes, ...(c.beats || []).map((b) => `${b.text} ${b.screen}`), ...Object.values(c.captions || {})].join('\n').toLowerCase().includes(needle);
 // Planned ones by the day they go out (undated ones after), posted ones newest first.
@@ -37,8 +52,10 @@ const planOrder = (a, b) => {
 
 /**
  * Content: posts for Instagram, TikTok / Reels and X (YouTube, LinkedIn too),
- * from the idea to the numbers. A board by stage (drag a post along), a month
- * calendar (drag it to another day) and a list.
+ * from the idea to the numbers. The feed (the profile grid as it'll look), a
+ * board by stage, a month calendar with your rhythm's free slots, a list and
+ * insights — plus your pillars and rhythm, the library of hooks / hashtags /
+ * calls to action, and new posts made from projects, storyboards, mockups.
  */
 export default function ContentPage({ reloadKey }) {
   const navigate = useNavigate();
@@ -51,6 +68,13 @@ export default function ContentPage({ reloadKey }) {
   const [busy, setBusy] = useState(false);
   const [changed, setChanged] = useState(0);
   const [profile] = useContentProfile();
+  const [cs] = useContentSettings();
+  const [pillar, setPillarState] = useState(() => load('contentPillar', ''));
+  const [planOpen, setPlanOpen] = useState(false);
+  const [fromKind, setFromKind] = useState(null);
+  const [libOpen, setLibOpen] = useState(false);
+  const plan = useMemo(() => ({ pillars: cs.contentPillars, rhythm: cs.contentRhythm }), [cs.contentPillars, cs.contentRhythm]);
+  const setPillar = (p) => { setPillarState(p); save('contentPillar', p); };
   const setView = (v) => { setViewState(v); save('contentView', v); };
   const setPlatform = (p) => { setPlatformState(p); save('contentPlatform', p); };
 
@@ -92,7 +116,9 @@ export default function ContentPage({ reloadKey }) {
   };
 
   const needle = q.trim().toLowerCase();
-  const shown = useMemo(() => (items || []).filter((c) => (!platform || c.platforms.includes(platform)) && matches(c, needle)), [items, platform, needle]);
+  const pillarOn = pillar === 'none' || plan.pillars.some((p) => p.id === pillar) ? pillar : '';
+  const shown = useMemo(() => (items || []).filter((c) => (!platform || c.platforms.includes(platform))
+    && (!pillarOn || (pillarOn === 'none' ? !pillarOf(plan.pillars, c.pillar) : c.pillar === pillarOn)) && matches(c, needle)), [items, platform, pillarOn, plan.pillars, needle]);
   const today = dayKey();
   const stats = useMemo(() => {
     const all = items || [];
@@ -104,8 +130,12 @@ export default function ContentPage({ reloadKey }) {
       week: all.filter((c) => c.status !== 'posted' && c.date && c.date >= today && c.date <= week).length,
       posted: all.filter((c) => c.status === 'posted' && c.date.startsWith(month)).length,
       next: all.filter((c) => c.status !== 'posted' && c.date >= today).sort(planOrder)[0] || null,
+      thisWeek: postsInWeek(all, mondayOf(today)).length,
+      goal: goalOf(plan.rhythm),
+      slot: freeSlots(all, plan.rhythm, today, 14)[0] || null,
     };
-  }, [items, today]);
+  }, [items, today, plan.rhythm]);
+  const pillarLabel = pillarOn === 'none' ? 'No pillar' : pillarOf(plan.pillars, pillarOn)?.name || 'All pillars';
 
   return (
     <div className="ctp-page">
@@ -114,7 +144,22 @@ export default function ContentPage({ reloadKey }) {
           <h1>Content</h1>
           <p>Plan posts for Instagram, TikTok / Reels and X — from the idea to the numbers.</p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={() => create()} disabled={busy}><Plus size={16} /> New post</button>
+        <div className="ctp-head-tools">
+          <button type="button" className="btn" onClick={() => setLibOpen(true)} title="Your hooks, hashtag sets and calls to action"><BookMarked size={16} /> <span className="ctp-hide-s">Library</span></button>
+          <button type="button" className="btn" onClick={() => setPlanOpen(true)} title="Your pillars and posting rhythm"><CalendarClock size={16} /> <span className="ctp-hide-s">Rhythm</span></button>
+          <div className="ctp-new">
+            <button type="button" className="btn btn-primary" onClick={() => create()} disabled={busy}><Plus size={16} /> New post</button>
+            <Menu align="right" title="New post from"
+              trigger={<button type="button" className="btn btn-primary ctp-new-more" aria-label="New post from…"><ChevronDown size={16} /></button>}
+              items={[
+                { heading: 'New post from…' },
+                { label: 'A project', icon: <PencilRuler size={15} />, onClick: () => setFromKind('plan') },
+                { label: 'A storyboard', icon: <Clapperboard size={15} />, onClick: () => setFromKind('storyboard') },
+                { label: 'A mockup', icon: <Box size={15} />, onClick: () => setFromKind('mockup') },
+                { label: 'A reference or picture', icon: <Library size={15} />, onClick: () => setFromKind('media') },
+              ]} />
+          </div>
+        </div>
       </div>
       {error && <div className="center-msg">Couldn’t load: {error}</div>}
       {!items && !error && <div className="spinner" />}
@@ -125,6 +170,13 @@ export default function ContentPage({ reloadKey }) {
             <div><b>{stats.working}</b><span>In the works</span></div>
             <div><b>{stats.week}</b><span>Next 7 days</span></div>
             <div><b>{stats.posted}</b><span>Posted this month</span></div>
+            {stats.goal > 0 && (
+              <button type="button" className={`ctp-week ${stats.thisWeek >= stats.goal ? 'met' : ''}`} onClick={() => setPlanOpen(true)} title="Your rhythm">
+                <b>{stats.thisWeek} <small>/ {stats.goal}</small></b>
+                <span className="ctp-week-dots">{Array.from({ length: Math.min(stats.goal, 14) }, (_, i) => <i key={i} className={i < stats.thisWeek ? 'on' : ''} />)}</span>
+                <span>This week{stats.thisWeek >= stats.goal ? <> <Check size={11} /></> : ''}</span>
+              </button>
+            )}
             {stats.next && (
               <button type="button" className="ctp-next" onClick={() => navigate(`/content/${stats.next.id}`)}>
                 <span>Next up · {stats.next.date === today ? 'today' : fmtDay(stats.next.date)}{stats.next.time ? ` ${stats.next.time}` : ''}</span>
@@ -135,7 +187,7 @@ export default function ContentPage({ reloadKey }) {
 
           <div className="ctp-tools">
             <div className="segmented" role="group" aria-label="View">
-              {VIEWS.map((v) => <button key={v.key} type="button" className={view === v.key ? 'on' : ''} onClick={() => setView(v.key)}><v.icon size={14} /> {v.label}</button>)}
+              {VIEWS.map((v) => <button key={v.key} type="button" className={view === v.key ? 'on' : ''} onClick={() => setView(v.key)} aria-label={v.label} title={v.label}><v.icon size={14} /> <span className="ctp-view-label">{v.label}</span></button>)}
             </div>
             <div className="ctp-plats" role="group" aria-label="Platform">
               <button type="button" className={`chip ${!platform ? 'on' : ''}`} onClick={() => setPlatform('')}>All</button>
@@ -145,17 +197,30 @@ export default function ContentPage({ reloadKey }) {
                 </button>
               ))}
             </div>
+            {plan.pillars.length > 0 && (
+              <Menu title="Pillar" trigger={<button type="button" className={`chip ctp-pillar-pick ${pillarOn ? 'on' : ''}`}><Layers size={13} /> {pillarLabel}</button>}
+                items={[
+                  { label: 'All pillars', checked: !pillarOn, onClick: () => setPillar('') },
+                  ...plan.pillars.map((p) => ({ label: p.name || 'Untitled pillar', checked: pillarOn === p.id, icon: <span className="status-dot" style={{ background: tagColor(p.color).fg }} />, onClick: () => setPillar(p.id) })),
+                  { label: 'No pillar', checked: pillarOn === 'none', onClick: () => setPillar('none') },
+                  { separator: true },
+                  { label: 'Edit pillars…', icon: <Layers size={14} />, onClick: () => setPlanOpen(true) },
+                ]} />
+            )}
             <label className="clients-search ctp-search"><Search size={15} />
               <input value={q} placeholder="Find a post…" onChange={(e) => setQ(e.target.value)} aria-label="Find a post" />
               {q && <button type="button" className="icon-btn" onClick={() => setQ('')} aria-label="Clear"><X size={14} /></button>}
             </label>
           </div>
 
-          {view === 'feed' && <Feed items={shown} platform={platform} today={today} profile={profile} onOpen={(c) => navigate(`/content/${c.id}`)} onMove={update} onSwap={swap} onCreate={create} busy={busy} />}
+          <PlanCtx.Provider value={plan}>
+          {view === 'feed' && <Feed items={shown} all={items} platform={platform} today={today} profile={profile} onOpen={(c) => navigate(`/content/${c.id}`)} onMove={update} onSwap={swap} onCreate={create} busy={busy} />}
           {view === 'board' && <Board items={shown} today={today} onOpen={(c) => navigate(`/content/${c.id}`)} onMove={update} onCreate={create} busy={busy} />}
-          {view === 'calendar' && <Calendar items={shown} today={today} onOpen={(c) => navigate(`/content/${c.id}`)} onMove={update} onCreate={create} busy={busy} />}
+          {view === 'calendar' && <Calendar items={shown} all={items} today={today} onOpen={(c) => navigate(`/content/${c.id}`)} onMove={update} onCreate={create} busy={busy} />}
           {view === 'list' && <ListView items={shown} today={today} onOpen={(c) => navigate(`/content/${c.id}`)} onMove={update} />}
-          {(needle || platform) && !shown.length && <div className="hint">No post {needle ? `contains “${q.trim()}”` : ''}{needle && platform ? ' on ' : platform ? 'for ' : ''}{platform ? PLATFORMS[platform].label : ''}.</div>}
+          {view === 'insights' && <Insights items={shown} all={items} pillars={plan.pillars} rhythm={plan.rhythm} today={today} onOpen={(c) => navigate(`/content/${c.id}`)} />}
+          </PlanCtx.Provider>
+          {(needle || platform) && !shown.length && view !== 'insights' && <div className="hint">No post {needle ? `contains “${q.trim()}”` : ''}{needle && platform ? ' on ' : platform ? 'for ' : ''}{platform ? PLATFORMS[platform].label : ''}.</div>}
         </>
       ) : (
         <div className="empty">
@@ -165,6 +230,9 @@ export default function ContentPage({ reloadKey }) {
           <button className="btn btn-primary" onClick={() => create()} disabled={busy}><Plus size={16} /> New post</button>
         </div>
       ))}
+      {planOpen && <ContentPlanDialog items={items || []} onClose={() => setPlanOpen(false)} />}
+      {fromKind && <MakePostDialog initial={fromKind} onClose={() => setFromKind(null)} />}
+      {libOpen && <LibraryDialog items={items || []} onClose={() => setLibOpen(false)} />}
     </div>
   );
 }
@@ -198,6 +266,7 @@ function Card({ c, today, onOpen, dragging, setDragging }) {
         <b className={c.title ? '' : 'untitled'}>{c.title || 'Untitled post'}</b>
         {c.hook && !typed && <span className="ctp-card-hook">{c.hook}</span>}
         <span className="ctp-card-meta">
+          <PillarTag id={c.pillar} />
           <Plats c={c} />
           <span className="ctp-fmt">{FORMATS[c.format]?.label}</span>
           <When c={c} today={today} />
@@ -220,7 +289,8 @@ const nextDay = (iso) => { const [y, m, d] = iso.split('-').map(Number); return 
  * to trade their days; drop one on "Next" to give it the next free day.
  * With X picked: the timeline.
  */
-function Feed({ items, platform, today, profile, onOpen, onMove, onSwap, onCreate, busy }) {
+function Feed({ items, all, platform, today, profile, onOpen, onMove, onSwap, onCreate, busy }) {
+  const { pillars, rhythm } = useContext(PlanCtx);
   const [dragging, setDragging] = useState(null);
   const [over, setOver] = useState(null);
   const [clean, setCleanState] = useState(() => load('contentFeedClean', '') === '1');
@@ -232,7 +302,10 @@ function Feed({ items, platform, today, profile, onOpen, onMove, onSwap, onCreat
   const posted = inGrid.filter((c) => c.status === 'posted').sort(newest);
   const loose = items.filter((c) => c.status !== 'posted' && !c.date).sort(planOrder);
   const latest = planned[0]?.date;
-  const next = latest && latest >= today ? nextDay(latest) : today;
+  // The next free slot of your rhythm — else the day after the last planned one.
+  const slot = freeSlots(all, rhythm, today, 56)[0] || null;
+  const next = slot?.date || (latest && latest >= today ? nextDay(latest) : today);
+  const slotPillar = pillarOf(pillars, slot?.pillar);
   const dragged = items.find((x) => x.id === dragging);
   const end = () => { setDragging(null); setOver(null); };
   const dropOn = (target) => {
@@ -259,6 +332,7 @@ function Feed({ items, platform, today, profile, onOpen, onMove, onSwap, onCreat
         <PostCover c={c} badges={false} />
         {c.format === 'reel' || c.format === 'video' ? <Clapperboard size={15} className="ctp-tile-kind" /> : c.format === 'carousel' && c.media.length > 1 ? <Images size={15} className="ctp-tile-kind" /> : null}
         {done && c.metrics.views != null && <span className="ctp-tile-views"><Play size={11} fill="currentColor" /> {fmtNum(c.metrics.views)}</span>}
+        {!clean && pillarOf(pillars, c.pillar) && <i className="ctp-tile-pillar" style={{ background: tagColor(pillarOf(pillars, c.pillar).color).fg }} title={pillarOf(pillars, c.pillar).name} />}
         {!done && !clean && (
           <span className={`ctp-tile-when ${late ? 'late' : c.date === today ? 'today' : ''}`}>
             <i style={{ background: s.color }} />{c.date === today ? 'Today' : fmtDay(c.date, { weekday: 'short', day: 'numeric', month: 'short' })}
@@ -283,13 +357,18 @@ function Feed({ items, platform, today, profile, onOpen, onMove, onSwap, onCreat
         </div>
         <div className="ctp-grid">
           <button type="button" className={`ctp-tile ctp-tile-next ${over === 'next' ? 'over' : ''}`} disabled={busy}
-            onClick={() => onCreate({ date: next, format: 'reel', status: 'idea' })}
+            onClick={() => onCreate({ date: next, time: slot?.time || '', pillar: slot?.pillar || null, format: 'reel', status: 'idea' })}
             onDragOver={(e) => { if (dragged && dragged.status !== 'posted') { e.preventDefault(); setOver('next'); } }}
             onDragLeave={() => setOver((o) => (o === 'next' ? null : o))}
-            onDrop={(e) => { e.preventDefault(); const c = dragged; end(); if (c && c.date !== next) onMove(c.id, { date: next }); }}>
+            onDrop={(e) => {
+              e.preventDefault(); const c = dragged; end();
+              if (c && (c.date !== next || (slot?.time && c.time !== slot.time))) onMove(c.id, { date: next, ...(slot?.time ? { time: slot.time } : {}), ...(slotPillar && !c.pillar ? { pillar: slotPillar.id } : {}) });
+            }}
+            style={slotPillar ? { '--pc': tagColor(slotPillar.color).fg } : undefined}>
             <Plus size={20} />
-            <b>Next post</b>
-            <span>{next === today ? 'Today' : fmtDay(next)}</span>
+            <b>{slot ? 'Next slot' : 'Next post'}</b>
+            <span>{next === today ? 'Today' : fmtDay(next)}{slot?.time ? ` · ${slot.time}` : ''}</span>
+            {slotPillar && <span className="ctp-tile-next-pillar">{slotPillar.name}</span>}
           </button>
           {planned.map(tile)}
           {planned.length > 0 && posted.length > 0 && !clean && <div className="ctp-grid-line"><span>↑ planned · posted ↓</span></div>}
@@ -391,7 +470,8 @@ function Board({ items, today, onOpen, onMove, onCreate, busy }) {
   );
 }
 
-function Calendar({ items, today, onOpen, onMove, onCreate, busy }) {
+function Calendar({ items, all, today, onOpen, onMove, onCreate, busy }) {
+  const { pillars, rhythm } = useContext(PlanCtx);
   const [month, setMonth] = useState(() => today.slice(0, 7)); // 'YYYY-MM'
   const [picked, setPicked] = useState(today);
   const [dragging, setDragging] = useState(null);
@@ -407,6 +487,22 @@ function Calendar({ items, today, onOpen, onMove, onCreate, busy }) {
     for (const k of Object.keys(map)) map[k].sort((a, b) => (a.time || '99').localeCompare(b.time || '99'));
     return map;
   }, [items]);
+  // Your rhythm's free slots (on the days still to come).
+  const slotsByDay = useMemo(() => {
+    const map = {};
+    for (const x of freeSlots(all, rhythm, today, 120)) (map[x.date] ||= []).push(x);
+    return map;
+  }, [all, rhythm, today]);
+  const slotChip = (x, big = false) => {
+    const p = pillarOf(pillars, x.pillar);
+    return (
+      <button key={x.id} type="button" className={`ctp-slot ${big ? 'big' : ''}`} disabled={busy} style={p ? { '--pc': tagColor(p.color).fg } : undefined}
+        onClick={(e) => { e.stopPropagation(); onCreate({ date: x.date, time: x.time, pillar: x.pillar, status: 'idea' }); }}
+        title={`Free slot${x.time ? ` at ${x.time}` : ''}${p ? ` · ${p.name}` : ''} — plan a post for it`}>
+        <Plus size={11} />{x.time && <span className="ctp-chip-time">{x.time}</span>}<span className="ctp-chip-title">{p ? p.name : big ? 'Free slot — plan a post' : 'Free slot'}</span>
+      </button>
+    );
+  };
   const unscheduled = items.filter((c) => !c.date && c.status !== 'posted').sort(planOrder);
   const shift = (n) => { const d = new Date(y, m - 1 + n, 1); setMonth(dayKey(d).slice(0, 7)); };
   const drop = (day) => {
@@ -453,8 +549,13 @@ function Calendar({ items, today, onOpen, onMove, onCreate, busy }) {
                 onDrop={(e) => { e.preventDefault(); drop(day); }}>
                 <span className="ctp-day-n">{Number(day.slice(8))}</span>
                 <button type="button" className="ctp-day-add" onClick={(e) => { e.stopPropagation(); onCreate({ date: day }); }} disabled={busy} aria-label="New post on this day" title="New post on this day"><Plus size={13} /></button>
-                <div className="ctp-day-list">{list.map(chip)}</div>
-                {list.length > 0 && <span className="ctp-day-dots">{list.slice(0, 4).map((c) => <i key={c.id} style={{ background: statusOf(c.status).color }} />)}</span>}
+                <div className="ctp-day-list">{list.map(chip)}{(slotsByDay[day] || []).map((x) => slotChip(x))}</div>
+                {(list.length > 0 || slotsByDay[day]) && (
+                  <span className="ctp-day-dots">
+                    {list.slice(0, 4).map((c) => <i key={c.id} style={{ background: statusOf(c.status).color }} />)}
+                    {(slotsByDay[day] || []).slice(0, 2).map((x) => <i key={x.id} className="slot" />)}
+                  </span>
+                )}
               </div>
             );
           })}
@@ -464,7 +565,9 @@ function Calendar({ items, today, onOpen, onMove, onCreate, busy }) {
             <b>{picked === today ? 'Today' : fmtDay(picked, { weekday: 'long', day: 'numeric', month: 'long' })}</b>
             <button type="button" className="btn btn-sm" onClick={() => onCreate({ date: picked })} disabled={busy}><Plus size={14} /> Post on this day</button>
           </div>
-          {pickedList.length ? <div className="ctp-day-panel-list">{pickedList.map(chip)}</div> : <div className="hint">Nothing planned for this day.</div>}
+          {pickedList.length || slotsByDay[picked] ? (
+            <div className="ctp-day-panel-list">{pickedList.map(chip)}{(slotsByDay[picked] || []).map((x) => slotChip(x, true))}</div>
+          ) : <div className="hint">Nothing planned for this day.</div>}
         </div>
       </div>
       <aside className="ctp-unscheduled"
@@ -495,7 +598,7 @@ function ListView({ items, today, onOpen, onMove }) {
             <span className="ctp-row-thumb">{coverOf(c) ? <PostCover c={c} badges={false} /> : <AutoCover c={c} text="" />}</span>
             <span className="ctp-row-main">
               <b className={c.title ? '' : 'untitled'}>{c.title || 'Untitled post'}</b>
-              <span className="ctp-card-meta"><Plats c={c} /><span className="ctp-fmt">{FORMATS[c.format]?.label}</span><When c={c} today={today} /></span>
+              <span className="ctp-card-meta"><PillarTag id={c.pillar} /><Plats c={c} /><span className="ctp-fmt">{FORMATS[c.format]?.label}</span><When c={c} today={today} /></span>
             </span>
             {c.status === 'posted' && (c.metrics.views != null || c.metrics.likes != null) && (
               <span className="ctp-row-nums">

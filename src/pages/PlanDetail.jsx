@@ -8,7 +8,7 @@ import {
   Wand2, Copy, FileText, AlertTriangle,
   LayoutTemplate, Clapperboard, PackageCheck,
   Archive, Film, ChevronUp, ChevronsDownUp, ChevronsUpDown, Columns2, RectangleHorizontal, GripVertical, GripHorizontal,
-  Pin, PinOff,
+  Pin, PinOff, Megaphone,
 } from 'lucide-react';
 import { api, planFileUrl, fileUrl } from '../lib/api.js';
 import { useSaver, useRefreshOnReturn, whenSaved } from '../lib/autosave.js';
@@ -36,6 +36,7 @@ import PlanTabs from '../components/plan/PlanTabs.jsx';
 import PlanOverview from '../components/plan/PlanOverview.jsx';
 import BlockRow from '../components/plan/BlockRow.jsx';
 import PlanWhen from '../components/plan/PlanWhen.jsx';
+import useMakePost from '../components/content/useMakePost.js';
 import { PlanToc, PlanJump } from '../components/plan/PlanToc.jsx';
 import PlanTime from '../components/plan/PlanTime.jsx';
 import ClientPicker from '../components/ClientPicker.jsx';
@@ -96,6 +97,8 @@ export default function PlanDetail() {
   const [client, setClient] = useState('');
   const [clients, setClients] = useState([]);
   const saver = useSaver();
+  const [makePostRaw] = useMakePost();
+  const makePost = (from) => makePostRaw(from, { before: () => saver.flush() });
   const planRef = useRef(null);
   const bannerRef = useRef(null);
   const avatarRef = useRef(null);
@@ -1038,6 +1041,7 @@ export default function PlanDetail() {
             { label: 'Rename', icon: <Pencil size={15} />, onClick: () => setRenaming(true) },
             { label: 'Save as template…', icon: <LayoutTemplate size={15} />, onClick: () => setSavingTemplate(true) },
             { label: 'Archive as reference…', icon: <Archive size={15} />, onClick: () => setArchiving(true) },
+            { label: 'Make a post…', icon: <Megaphone size={15} />, hint: 'In Content: with its latest review cut and banner', onClick: () => makePost({ kind: 'plan', planId: plan.id }) },
             { separator: true },
             { label: 'Delete project', icon: <Trash2 size={15} />, danger: true, onClick: remove },
           ]}

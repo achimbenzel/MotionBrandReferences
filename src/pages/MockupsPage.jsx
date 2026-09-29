@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Box, MoreHorizontal, Copy, Trash2, UploadCloud, MonitorSmartphone, Sun } from 'lucide-react';
+import { Plus, Box, MoreHorizontal, Copy, Trash2, UploadCloud, MonitorSmartphone, Sun, Megaphone } from 'lucide-react';
 import { api, mockupFileUrl, mockupHdriUrl } from '../lib/api.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
@@ -160,6 +160,7 @@ export default function MockupsPage() {
                     <Menu align="right" title={m.name}
                       trigger={<button className="icon-btn" aria-label="Mockup options"><MoreHorizontal size={15} /></button>}
                       items={[
+                        { label: 'Make a post…', icon: <Megaphone size={15} />, onClick: () => navigate(`/mockups/${m.id}`, { state: { makePost: true } }) },
                         { label: 'Duplicate', icon: <Copy size={15} />, onClick: () => duplicate(m) },
                         { separator: true },
                         { label: 'Delete', icon: <Trash2 size={15} />, danger: true, onClick: () => remove(m) },

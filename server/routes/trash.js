@@ -63,6 +63,7 @@ function describe(t) {
     case 'content': return { title: t.data.title || 'Untitled post', subtitle: 'Content' };
     case 'contentMedia': return { title: t.data.media?.name || 'Media', subtitle: `${t.data.media?.kind === 'video' ? 'Video' : 'Picture'} · ${t.data.contentTitle || 'Content'}` };
     case 'achievement': return { title: t.data.title || 'Achievement', subtitle: `Achievement · ${t.data.group || ''}` };
+    case 'contentSnippet': return { title: t.data.name || String(t.data.text || '').slice(0, 80) || 'Snippet', subtitle: `Content library · ${{ hook: 'Hook', hashtags: 'Hashtags', cta: 'Call to action' }[t.data.kind] || 'Snippet'}` };
     case 'invoice': return { title: t.data.invoice?.number ? `Invoice ${t.data.invoice.number}` : (t.data.invoice?.name || 'Invoice'), subtitle: `Invoice · ${t.data.clientName || 'Client'}` };
     case 'gallery': return { title: t.data.name || 'Gallery', subtitle: `Gallery · ${TYPE_LABEL[t.data.type] || t.data.type}` };
     case 'software': return { title: t.data.name || 'Software', subtitle: 'Software' };
@@ -175,6 +176,9 @@ router.post('/api/trash/:trashId/restore', async (req, res) => {
       if (!Array.isArray(db.achievements)) db.achievements = [];
       if (!db.achievements.some((a) => a.id === data.id)) db.achievements.push(data);
       move = { from, to: achievementDir(data.id) };
+    } else if (entry.kind === 'contentSnippet') {
+      if (!Array.isArray(db.contentLibrary)) db.contentLibrary = [];
+      if (!db.contentLibrary.some((x) => x.id === data.id)) db.contentLibrary.push(data);
     } else if (entry.kind === 'invoice') {
       const c = (db.clients || []).find((x) => x.id === data.clientId);
       if (!c) { gone = true; return null; }
