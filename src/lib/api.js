@@ -1,6 +1,7 @@
 // Thin fetch wrapper around the local backend.
 // All uploaded files are referenced by URLs under /data (proxied to the API
 // in dev, same-origin in production).
+import { optimizeForm, rememberPrefs } from './imageOptimize.js';
 
 // Every request carries this header; the server rejects state-changing calls
 // without it, which stops other websites from posting to your library (CSRF).
@@ -59,9 +60,10 @@ async function transientInfo(res) {
 }
 
 // fetch() + CSRF header + JSON encoding + error handling in one place.
-async function request(url, { method = 'GET', json, body } = {}) {
+async function request(url, { method = 'GET', json, body, pictures } = {}) {
   const headers = { ...BASE_HEADERS };
-  let payload = body;
+  // Picture uploads: made smaller first, as you set it (ask / always / never).
+  let payload = pictures && body instanceof FormData ? await optimizeForm(body, pictures) : body;
   if (json !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(json); }
   const keepalive = keepaliveMode && (payload == null || (typeof payload === 'string' && payload.length < 60000));
   const repeatable = REPEATABLE.has(method) && !keepalive;
@@ -101,7 +103,7 @@ export const api = {
   },
 
   async create(formData) {
-    const { project } = await request('/api/projects', { method: 'POST', body: formData });
+    const { project } = await request('/api/projects', { method: 'POST', body: formData, pictures: true });
     return project;
   },
 
@@ -207,7 +209,7 @@ export const api = {
     if (url) fd.append('url', url);
     if (text) fd.append('text', text);
     if (title) fd.append('title', title);
-    const { items } = await request('/api/inbox', { method: 'POST', body: fd });
+    const { items } = await request('/api/inbox', { method: 'POST', body: fd, pictures: true });
     return items;
   },
   // `used`: it now lives in the library, so it's deleted for good (else → Trash).
@@ -233,7 +235,7 @@ export const api = {
   async setMockupContent(id, file, item) {
     const fd = new FormData();
     fd.append('file', file, file.name || 'screen.png');
-    const { mockup } = await request(`/api/mockups/${id}/content${item ? `?item=${encodeURIComponent(item)}` : ''}`, { method: 'POST', body: fd });
+    const { mockup } = await request(`/api/mockups/${id}/content${item ? `?item=${encodeURIComponent(item)}` : ''}`, { method: 'POST', body: fd, pictures: true });
     return mockup;
   },
   async importMockupContent(id, source, item) { const { mockup } = await request(`/api/mockups/${id}/content/import${item ? `?item=${encodeURIComponent(item)}` : ''}`, { method: 'POST', json: { source } }); return mockup; },
@@ -243,7 +245,7 @@ export const api = {
   async setMockupSlot(id, slot, file, item) {
     const fd = new FormData();
     fd.append('file', file, file.name || 'picture.png');
-    const { mockup } = await request(`/api/mockups/${id}/content?${slotQuery(slot, item)}`, { method: 'POST', body: fd });
+    const { mockup } = await request(`/api/mockups/${id}/content?${slotQuery(slot, item)}`, { method: 'POST', body: fd, pictures: true });
     return mockup;
   },
   async importMockupSlot(id, slot, source, item) { const { mockup } = await request(`/api/mockups/${id}/content/import?${slotQuery(slot, item)}`, { method: 'POST', json: { source } }); return mockup; },
@@ -304,7 +306,7 @@ export const api = {
     return request(`/api/plans/${id}`, { method: 'DELETE' });
   },
   async setPlanImage(id, kind, file) { // kind: 'banner' | 'avatar'; file: a File or { source }
-    const { plan } = await request(`/api/plans/${id}/${kind}`, { method: 'POST', ...picBody(kind, file, imageName(kind, file)) });
+    const { plan } = await request(`/api/plans/${id}/${kind}`, { method: 'POST', ...picBody(kind, file, imageName(kind, file)), pictures: true });
     return plan;
   },
   async removePlanImage(id, kind) {
@@ -319,10 +321,11 @@ export const api = {
   },
   // Store files in a storyboard's folder → [{ file, name, size }] (the block
   // itself is saved by the page, with the paths added to its shots / track).
-  async uploadBlockFiles(id, blockId, fileList) {
+  // `pictures`: storyboard frames (made smaller as you set it) — not a review's versions.
+  async uploadBlockFiles(id, blockId, fileList, { pictures = false } = {}) {
     const fd = new FormData();
     Array.from(fileList).forEach((f) => fd.append('files', f));
-    const { files } = await request(`/api/plans/${id}/blocks/${blockId}/uploads`, { method: 'POST', body: fd });
+    const { files } = await request(`/api/plans/${id}/blocks/${blockId}/uploads`, { method: 'POST', body: fd, pictures });
     return files;
   },
   async updateBlock(id, blockId, patch) {
@@ -344,10 +347,12 @@ export const api = {
   async removeBlock(id, blockId) {
     return request(`/api/plans/${id}/blocks/${blockId}`, { method: 'DELETE' });
   },
-  async addBlockFiles(id, blockId, fileList) { // files, or { source } — a picture already in the app
+  // files, or { source } — a picture already in the app. `pictures`: a moodboard's (made smaller as
+  // you set it) — not the files of a files block.
+  async addBlockFiles(id, blockId, fileList, { pictures = false } = {}) {
     let body;
     if (fileList?.source) body = { json: { source: fileList.source } };
-    else { const fd = new FormData(); Array.from(fileList).forEach((f) => fd.append('files', f)); body = { body: fd }; }
+    else { const fd = new FormData(); Array.from(fileList).forEach((f) => fd.append('files', f)); body = { body: fd, pictures }; }
     const { plan } = await request(`/api/plans/${id}/blocks/${blockId}/files`, { method: 'POST', ...body });
     return plan;
   },
@@ -357,7 +362,7 @@ export const api = {
     fd.append('file', file);
     if (example) fd.append('example', example);
     if (title) fd.append('title', title);
-    const { plan } = await request(`/api/plans/${id}/blocks/${blockId}/file`, { method: 'POST', body: fd });
+    const { plan } = await request(`/api/plans/${id}/blocks/${blockId}/file`, { method: 'POST', body: fd, pictures: ['example'] }); // the file itself stays as it is
     return plan;
   },
   async removeBlockFile(id, blockId, fileId) {
@@ -386,7 +391,7 @@ export const api = {
   },
   // Software banner / avatar images (like plans). kind: 'banner' | 'avatar'
   async setSoftwareImage(id, kind, file) {
-    const { software } = await request(`/api/software/${id}/${kind}`, { method: 'POST', ...picBody(kind, file, imageName(kind, file)) });
+    const { software } = await request(`/api/software/${id}/${kind}`, { method: 'POST', ...picBody(kind, file, imageName(kind, file)), pictures: true });
     return software;
   },
   async removeSoftwareImage(id, kind) {
@@ -405,7 +410,7 @@ export const api = {
   },
   // Plugin preview image (shown in the card view)
   async setPluginImage(id, pluginId, file) {
-    const { software } = await request(`/api/software/${id}/plugins/${pluginId}/image`, { method: 'POST', ...picBody('image', file) });
+    const { software } = await request(`/api/software/${id}/plugins/${pluginId}/image`, { method: 'POST', ...picBody('image', file), pictures: true });
     return software;
   },
   async removePluginImage(id, pluginId) {
@@ -414,7 +419,7 @@ export const api = {
   },
   // Expression-group preview image
   async setGroupImage(id, groupId, file) {
-    const { software } = await request(`/api/software/${id}/groups/${groupId}/image`, { method: 'POST', ...picBody('image', file) });
+    const { software } = await request(`/api/software/${id}/groups/${groupId}/image`, { method: 'POST', ...picBody('image', file), pictures: true });
     return software;
   },
   async removeGroupImage(id, groupId) {
@@ -472,10 +477,12 @@ export const api = {
   // --- App settings (dashboard banner, …) ---
   async getSettings() {
     const { settings } = await request('/api/settings');
+    if (settings?.imageUploads) rememberPrefs(settings.imageUploads);
     return settings;
   },
   async updateSettings(patch) {
     const { settings } = await request('/api/settings', { method: 'PATCH', json: patch });
+    if (settings?.imageUploads) rememberPrefs(settings.imageUploads);
     return settings;
   },
   // Saves and what was added per day (the dashboard's activity map) → [{ date, saves, refs, plans, mockups, inbox }].
@@ -490,7 +497,7 @@ export const api = {
   async updateClient(id, patch) { const { client } = await request(`/api/clients/${id}`, { method: 'PATCH', json: patch }); return client; },
   async removeClient(id) { return request(`/api/clients/${id}`, { method: 'DELETE' }); }, // → { trashId }
   async setClientLogo(id, file) {
-    const { client } = await request(`/api/clients/${id}/logo`, { method: 'POST', ...picBody('logo', file, imageName('logo', file)) });
+    const { client } = await request(`/api/clients/${id}/logo`, { method: 'POST', ...picBody('logo', file, imageName('logo', file)), pictures: true });
     return client;
   },
   async removeClientLogo(id) { const { client } = await request(`/api/clients/${id}/logo`, { method: 'DELETE' }); return client; },
@@ -516,7 +523,7 @@ export const api = {
     if (files && !Array.isArray(files) && files.source) return request(`/api/notes/${id}/images`, { method: 'POST', json: { source: files.source } });
     const fd = new FormData();
     for (const f of files) fd.append('images', f, f.name || 'pasted.png');
-    return request(`/api/notes/${id}/images`, { method: 'POST', body: fd });
+    return request(`/api/notes/${id}/images`, { method: 'POST', body: fd, pictures: true });
   },
   async removeNoteImage(id, imageId) { return request(`/api/notes/${id}/images/${imageId}`, { method: 'DELETE' }); }, // → { note, trashId }
 
@@ -533,7 +540,7 @@ export const api = {
     if (files && !Array.isArray(files) && files.source) return request(`/api/content/${id}/media`, { method: 'POST', json: { source: files.source } });
     const fd = new FormData();
     for (const f of files) fd.append('media', f, f.name || 'pasted.png');
-    return request(`/api/content/${id}/media`, { method: 'POST', body: fd });
+    return request(`/api/content/${id}/media`, { method: 'POST', body: fd, pictures: true });
   },
   async removeContentMedia(id, mediaId) { return request(`/api/content/${id}/media/${mediaId}`, { method: 'DELETE' }); }, // → { item, trashId }
 
@@ -544,7 +551,7 @@ export const api = {
   async removeAchievement(id) { return request(`/api/achievements/${id}`, { method: 'DELETE' }); }, // → { trashId }
   // The icon picture or the sticker ('icon' | 'sticker'): a File or { source }. → { achievement }
   async setAchievementImage(id, slot, pic) {
-    return request(`/api/achievements/${id}/image?slot=${slot}`, { method: 'POST', ...picBody('image', pic, imageName(slot, pic)) });
+    return request(`/api/achievements/${id}/image?slot=${slot}`, { method: 'POST', ...picBody('image', pic, imageName(slot, pic)), pictures: true });
   },
   async removeAchievementImage(id, slot) { return request(`/api/achievements/${id}/image?slot=${slot}`, { method: 'DELETE' }); },
   async updateAchievementStats(patch) { return request('/api/achievement-stats', { method: 'PATCH', json: patch }); }, // → like getAchievements
@@ -581,7 +588,7 @@ export const api = {
     return plan;
   },
   async setDashboardBanner(file) {
-    const { settings } = await request('/api/settings/dashboard-banner', { method: 'POST', ...picBody('banner', file, imageName('banner', file)) });
+    const { settings } = await request('/api/settings/dashboard-banner', { method: 'POST', ...picBody('banner', file, imageName('banner', file)), pictures: true });
     return settings;
   },
   async removeDashboardBanner() {

@@ -228,6 +228,12 @@ test('dashboard: what you changed last, focus minutes, today\'s focus, widget la
   assert.equal(weekly[0].id, 'w1');
   assert.ok(weekly[1].id !== 'w1' && weekly[2].id);
   assert.deepEqual(r.data.settings.dashboardLayout, [{ id: 'weekly', hidden: false, size: 'half' }]);
+  // Picture uploads: asked each time by default; what you change is merged, odd values fall back.
+  assert.deepEqual(r.data.settings.imageUploads, { mode: 'ask', format: 'webp', maxEdge: 2560, quality: 85 });
+  r = await srv.api('/api/settings', { method: 'PATCH', json: { imageUploads: { mode: 'auto', maxEdge: 1920 } } });
+  assert.deepEqual(r.data.settings.imageUploads, { mode: 'auto', format: 'webp', maxEdge: 1920, quality: 85 });
+  r = await srv.api('/api/settings', { method: 'PATCH', json: { imageUploads: { format: 'gif', maxEdge: 1000, quality: 20 } } });
+  assert.deepEqual(r.data.settings.imageUploads, { mode: 'auto', format: 'webp', maxEdge: 2560, quality: 50 });
 
   // Ticking one to-do of a plan leaves the others alone.
   const todos = (await srv.api('/api/plans/plan3/blocks', { method: 'POST', json: { type: 'todos' } })).data.plan.blocks.at(-1);

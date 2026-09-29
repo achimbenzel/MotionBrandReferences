@@ -38,6 +38,7 @@ const ContentDetail = lazy(() => import('./pages/ContentDetail.jsx'));
 const AchievementsPage = lazy(() => import('./pages/AchievementsPage.jsx'));
 import { TABS, isWorkPath, WORK_HOME } from './lib/types.js';
 import { useMediaQuery, DESKTOP } from './lib/useMedia.js';
+import ImageUploadPrompt from './components/ImageUploadPrompt.jsx';
 
 function Shell() {
   const [modalType, setModalType] = useState(null); // null = closed
@@ -160,6 +161,7 @@ function Shell() {
       )}
       {newPlan && <NewPlanModal clientId={newPlan.clientId} onClose={() => setNewPlan(false)} onCreated={planCreated} />}
       {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
+      <ImageUploadPrompt />
     </div>
     </StorageProvider>
   );

@@ -133,7 +133,7 @@ export default function StoryboardEditor() {
     if (!imgs.length) return;
     setBusy(true);
     try {
-      const up = await api.uploadBlockFiles(planId, blockId, shotId ? imgs.slice(0, 1) : imgs);
+      const up = await api.uploadBlockFiles(planId, blockId, shotId ? imgs.slice(0, 1) : imgs, { pictures: true });
       const cur = latest()?.shots || [];
       if (shotId) setShots(cur.map((s) => (s.id === shotId ? withFrame(s, up[0].file) : s)), true);
       else setShots([...cur, ...up.map((u) => newShot({ image: u.file }))], true);
@@ -162,7 +162,7 @@ export default function StoryboardEditor() {
     if (!file) return;
     setBusy(true);
     try {
-      const [u] = await api.uploadBlockFiles(planId, blockId, [file]);
+      const [u] = await api.uploadBlockFiles(planId, blockId, [file], { pictures: true });
       edit({ audio: { file: u.file, name: u.name, size: u.size } }, true);
     } catch (e) { toast(`Upload failed: ${e.message}`, 'error'); }
     finally { setBusy(false); }
@@ -174,7 +174,7 @@ export default function StoryboardEditor() {
   const takeAlt = (sid, altId) => setShots((latest()?.shots || []).map((s) => (s.id === sid ? pickVariant(s, altId) : s)), true);
   const saveDrawing = async (blob) => {
     const sid = drawing?.shotId;
-    const [u] = await api.uploadBlockFiles(planId, blockId, [new File([blob], 'drawing.png', { type: 'image/png' })]);
+    const [u] = await api.uploadBlockFiles(planId, blockId, [new File([blob], 'drawing.png', { type: 'image/png' })], { pictures: true });
     const cur = latest()?.shots || [];
     if (sid && cur.some((s) => s.id === sid)) setShots(cur.map((s) => (s.id === sid ? withFrame(s, u.file) : s)), true);
     else { const s = newShot({ image: u.file }); setShots([...cur, s], true); setSelId(s.id); }
@@ -183,7 +183,7 @@ export default function StoryboardEditor() {
   };
   const saveVoice = async (sid, file, seconds) => {
     try {
-      const [u] = await api.uploadBlockFiles(planId, blockId, [file]);
+      const [u] = await api.uploadBlockFiles(planId, blockId, [file], { pictures: true });
       patchShot(sid, { voice: { file: u.file, duration: seconds, volume: 1 } }, true);
     } catch (e) { toast(`Could not save the recording: ${e.message}`, 'error'); }
   };

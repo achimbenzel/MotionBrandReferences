@@ -15,6 +15,7 @@ import CropModal from './CropModal.jsx';
 import LogoRenditionsEditor from './LogoRenditionsEditor.jsx';
 import FromAppButton from './FromApp.jsx';
 import { parseVideoLink, PROVIDER_LABEL } from '../lib/videoLinks.js';
+import { optimizeFiles } from '../lib/imageOptimize.js';
 
 const ASPECT = 16 / 10;
 const isPdf = (f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
@@ -239,10 +240,11 @@ export default function UploadModal({ initialType, prefill = null, onClose, onCr
     try {
       // Image gallery: one project per image (no title/tags).
       if (type === 'imagegallery') {
-        for (const it of galleryItems) {
+        // made smaller in one go (one question for all of them), then one reference each
+        for (const file of await optimizeFiles(galleryItems.map((it) => it.file))) {
           const fd = new FormData();
           fd.append('type', 'imagegallery');
-          fd.append('image', it.file);
+          fd.append('image', file);
           await api.create(fd);
         }
         onCreated({ type: 'imagegallery' });

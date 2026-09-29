@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Keyboard, SlidersHorizontal, RotateCcw, Database, Sparkles, Download, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Settings, Keyboard, SlidersHorizontal, RotateCcw, Database, Sparkles, Download, CheckCircle2, ChevronDown, ChevronRight, ImageDown } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { rememberCurrency } from '../lib/clients.js';
 import { useToast } from '../components/Toast.jsx';
 import { useConfirm } from '../components/ConfirmDialog.jsx';
+import Range from '../components/Range.jsx';
+import { edgeLabel } from '../components/ImageUploadPrompt.jsx';
+import { FORMATS, EDGES, IMAGE_DEFAULTS } from '../lib/imageOptimize.js';
 
 const K = (s) => <kbd className="sc-key" key={s}>{s}</kbd>;
 
@@ -58,7 +61,23 @@ export default function SettingsPage() {
 
   // The currency hourly rates and invoice amounts are in (stored with the library).
   const [currency, setCurrency] = useState(null);
-  useEffect(() => { api.getSettings().then((s) => setCurrency(s.currency || 'EUR')).catch(() => setCurrency('EUR')); }, []);
+  const [pics, setPics] = useState(null); // picture uploads: { mode, format, maxEdge, quality }
+  useEffect(() => {
+    api.getSettings().then((s) => { setCurrency(s.currency || 'EUR'); setPics({ ...IMAGE_DEFAULTS, ...s.imageUploads }); })
+      .catch(() => { setCurrency('EUR'); setPics({ ...IMAGE_DEFAULTS }); });
+  }, []);
+  // A switch saves right away; the quality slider once you let it rest.
+  const picSave = useRef({ patch: {}, timer: null });
+  const setPic = (patch, sliding = false) => {
+    setPics((p) => ({ ...p, ...patch }));
+    const q = picSave.current;
+    Object.assign(q.patch, patch);
+    clearTimeout(q.timer);
+    q.timer = setTimeout(() => {
+      const body = q.patch; q.patch = {};
+      api.updateSettings({ imageUploads: body }).catch((e) => toast(`Could not save: ${e.message}`, 'error'));
+    }, sliding ? 400 : 0);
+  };
   const pickCurrency = async (c) => {
     setCurrency(c);
     try { await api.updateSettings({ currency: c }); rememberCurrency(c); toast(`Amounts in ${c}`); } catch (e) { toast(`Could not save: ${e.message}`, 'error'); }
@@ -127,6 +146,35 @@ export default function SettingsPage() {
             <select className="input pref-select" value={currency || 'EUR'} disabled={!currency} onChange={(e) => pickCurrency(e.target.value)} aria-label="Currency">
               {['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'CAD', 'AUD'].map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
+          </div>
+          <div className="pref-row pref-row-wide">
+            <div>
+              <div className="pref-title"><ImageDown size={15} style={{ verticalAlign: '-2px', marginRight: 6 }} />Picture uploads</div>
+              <div className="pref-sub">Pictures can be made smaller before they’re uploaded — everywhere you add one (references, covers, logos, notes, content, mockups …) — to save space. Files, deliverables and review versions always stay as they are; see-through pictures never become JPEG.</div>
+            </div>
+            {pics && (
+              <div className="pref-pics">
+                <div className="segmented segmented-sm" role="group" aria-label="When pictures are uploaded">
+                  {[['ask', 'Ask each time'], ['auto', 'Always smaller'], ['off', 'Keep originals']].map(([k, l]) => (
+                    <button key={k} type="button" className={pics.mode === k ? 'on' : ''} onClick={() => setPic({ mode: k })}>{l}</button>
+                  ))}
+                </div>
+                <div className="pref-pics-row"><span>Format</span>
+                  <div className="segmented segmented-sm" role="group" aria-label="Format">
+                    {FORMATS.map((f) => <button key={f.key} type="button" className={pics.format === f.key ? 'on' : ''} title={f.hint} onClick={() => setPic({ format: f.key })}>{f.label}</button>)}
+                  </div>
+                </div>
+                <div className="pref-pics-row"><span>Long edge</span>
+                  <select className="input pref-select" value={pics.maxEdge} onChange={(e) => setPic({ maxEdge: Number(e.target.value) })} aria-label="Long edge">
+                    {EDGES.map((e) => <option key={e} value={e}>{edgeLabel(e)}{e === 3840 ? ' (4K)' : e === 1920 ? ' (Full HD)' : ''}</option>)}
+                  </select>
+                </div>
+                <div className="pref-pics-row"><span>Quality</span>
+                  <Range min={50} max={100} step={1} value={pics.quality} onChange={(e) => setPic({ quality: Number(e.target.value) }, true)} aria-label="Quality" />
+                  <b>{pics.quality}</b>
+                </div>
+              </div>
+            )}
           </div>
           <div className="pref-row">
             <div>

@@ -164,7 +164,7 @@ export default function PlanDetail() {
       const inTab = boards.filter((b) => tabs[all.indexOf(b)] === tabRef.current);
       const target = boards.find((b) => b.id === lastMoodboard.current) || inTab[0] || boards[0];
       try {
-        const next = await api.addBlockFiles(id, target.id, files);
+        const next = await api.addBlockFiles(id, target.id, files, { pictures: true });
         setPlan((prev) => ({ ...prev, blocks: next.blocks.map((x) => (x.id === target.id ? x : prev.blocks.find((y) => y.id === x.id) || x)) }));
         lastMoodboard.current = target.id;
         toast(`Pasted into “${target.title}”`, 'ok', { label: 'Show', onClick: () => openBlockRef.current?.(target.id) });
@@ -445,7 +445,11 @@ export default function PlanDetail() {
   };
   const addFilesTo = (bid) => { pending.current = bid; filesRef.current?.click(); };
   const addPdfTo = (bid) => { pending.current = bid; pdfRef.current?.click(); };
-  const onFiles = async (files) => { if (!files?.length || !pending.current) return; try { setPlan(await api.addBlockFiles(id, pending.current, files)); } catch (e) { toast(`Upload failed: ${e.message}`, 'error'); } };
+  const onFiles = async (files) => {
+    if (!files?.length || !pending.current) return;
+    const board = planRef.current?.blocks?.find((x) => x.id === pending.current)?.type === 'moodboard'; // a moodboard's pictures get made smaller; a files block keeps them
+    try { setPlan(await api.addBlockFiles(id, pending.current, files, { pictures: board })); } catch (e) { toast(`Upload failed: ${e.message}`, 'error'); }
+  };
   // Add one file (with example image + title) to a files block via the modal.
   const submitFile = async ({ file, example, title }) => {
     if (!fileModalBlock) return;

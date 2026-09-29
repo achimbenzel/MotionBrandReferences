@@ -681,6 +681,7 @@ export function normalizeDB(db) {
   if (!CURRENCIES.has(db.settings.currency)) db.settings.currency = 'EUR';             // hourly rates, invoices
   db.settings.dashboardFocus = normalizeDashboardFocus(db.settings.dashboardFocus);
   db.settings.weeklyTodos = normalizeWeeklyTodos(db.settings.weeklyTodos);
+  db.settings.imageUploads = normalizeImageUploads(db.settings.imageUploads);
   db.settings.dashboardLayout = normalizeDashboardLayout(db.settings.dashboardLayout);
   return db;
 }
@@ -781,6 +782,19 @@ export function normalizeWeeklyTodos(v) {
       doneOn: typeof t.doneOn === 'string' && DASH_DAY.test(t.doneOn) ? t.doneOn : '',
     };
   });
+}
+/** Picture uploads: made smaller in the browser first — ask each time, always, or never; format, long edge, quality. */
+const IMAGE_MODES = ['ask', 'auto', 'off'];
+const IMAGE_FORMATS = ['webp', 'jpeg', 'keep'];
+const IMAGE_EDGES = [0, 1280, 1920, 2560, 3840];
+export function normalizeImageUploads(v) {
+  const o = v && typeof v === 'object' ? v : {};
+  return {
+    mode: IMAGE_MODES.includes(o.mode) ? o.mode : 'ask',
+    format: IMAGE_FORMATS.includes(o.format) ? o.format : 'webp',
+    maxEdge: IMAGE_EDGES.includes(Number(o.maxEdge)) ? Number(o.maxEdge) : 2560,
+    quality: Math.round(num(o.quality, 50, 100, 85)),
+  };
 }
 export const DASHBOARD_WIDGETS = ['focus', 'weekly', 'timer', 'next', 'continue', 'urgent', 'tools', 'pipeline', 'rhythm', 'inspiration', 'note', 'achievements'];
 /** The dashboard's widgets in your order: [{ id, hidden, size: 'full' | 'half' }] (unknown ones dropped; [] = the default). */

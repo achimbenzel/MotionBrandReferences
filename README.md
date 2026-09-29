@@ -321,6 +321,32 @@ volume** (and mute) is remembered across reloads in this browser, and can be
 reset from here. The **currency** (EUR, USD, GBP, CHF, JPY, CAD, AUD) is
 what hourly rates, amounts in the Excel export and invoice sums are shown in.
 
+### Smaller picture uploads
+
+Wherever you add a picture — new references (every section), covers, client
+and plan pictures, the dashboard banner, notes, content posts, moodboards,
+storyboard frames, mockup screens, software and plugin pictures, achievement
+badges and stickers, the Inbox — it can be **made smaller before it's
+uploaded**, right in the browser, so the library needs less space:
+
+- **Format**: **WebP** (smallest, keeps transparency), **JPEG** (works
+  everywhere) or **keep the format** (only resize).
+- **Size**: the long edge — original, 3840 (4K), 2560, 1920 (Full HD) or
+  1280 px (never made bigger).
+- **Quality**: 50–100 (85 by default).
+
+By default a small dialog **asks** each time, with what every picture comes to
+(“4.1 MB → 380 KB”, the new size and format) and the total saved; untick a
+picture to keep it as it is, or **Keep originals** for all (Esc does the same).
+Tick *Don't ask again* to always do it (or never), and change it any time under
+**Settings → Picture uploads**. Pictures with **transparency never become
+JPEG** (WebP, or they keep their format); SVGs and GIFs, and a result that
+wouldn't be smaller, stay as they are. Files meant to stay exact — a files
+block's files, deliverables, review versions, invoices, HDRIs, 3D models, a
+library import — are never touched, and neither are pictures shared to the
+Inbox straight from another app on your phone. Stored in the settings
+(`imageUploads`).
+
 ---
 
 ## Modes: Work & Reference

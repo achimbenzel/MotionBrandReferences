@@ -10,6 +10,7 @@ import GalleryNameModal from '../components/GalleryNameModal.jsx';
 import ImageMasonry from '../components/ImageMasonry.jsx';
 import MomentsGrid from '../components/MomentsGrid.jsx';
 import StructureView from '../components/StructureView.jsx';
+import { optimizeFiles } from '../lib/imageOptimize.js';
 
 const HEAD = {
   branding: { title: 'Branding', desc: 'Brand guidelines, presentations & identity work.', icon: FileText },
@@ -136,7 +137,8 @@ export default function GridPage({ type, reloadKey, onAdd }) {
     const images = Array.from(fileList || []).filter((f) => f.type && f.type.startsWith('image/'));
     if (!images.length) return;
     try {
-      for (const file of images) {
+      // made smaller in one go (one question for all of them), then one reference each
+      for (const file of await optimizeFiles(images)) {
         const fd = new FormData();
         fd.append('type', 'imagegallery');
         fd.append('image', file);
