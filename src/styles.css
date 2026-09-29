@@ -6018,6 +6018,7 @@ select.ctp-row-status {
 .stored-pics-done { display: flex; flex-direction: column; gap: 6px; }
 .stored-pics-done p { margin: 0; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 14px; }
 .stored-pics-done p svg { color: #34d399; }
+.stored-pics-done p.hint { display: block; font-size: 12.5px; }
 .ctx-plan { max-width: 620px; }
 .ctx-plan .modal-body { display: flex; flex-direction: column; gap: 22px; }
 .ctx-part { display: flex; flex-direction: column; gap: 10px; }
