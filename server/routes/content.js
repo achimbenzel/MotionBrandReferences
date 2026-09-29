@@ -8,7 +8,7 @@ import { readDB, mutateDB } from '../db.js';
 import { moveInto, safeRm, moveToTrash, moveRelPaths, sanitize, extOf, sniffImageExt } from '../files.js';
 import { upload } from '../upload.js';
 import {
-  normalizeContent, normalizeContentMedia, str, isDay, isTimeOfDay, TAG_KEYS,
+  normalizeContent, normalizeContentMedia, normalizeContentBeat, normalizeContentCaptions, normalizeContentChecks, str, isDay, isTimeOfDay, TAG_KEYS,
   CONTENT_PLATFORMS, CONTENT_FORMATS, CONTENT_STATUSES, CONTENT_METRICS,
 } from '../schema.js';
 import { createRouter, HttpError } from '../http.js';
@@ -38,7 +38,7 @@ router.post('/api/content', async (req, res) => {
     const now = Date.now();
     const c = normalizeContent({
       id: nanoid(10), title: b.title, platforms: b.platforms, format: b.format, status: b.status, date: b.date, time: b.time,
-      hook: b.hook, caption: b.caption, hashtags: b.hashtags, script: b.script, planId: b.planId, createdAt: now, updatedAt: now,
+      hook: b.hook, caption: b.caption, hashtags: b.hashtags, script: b.script, notes: b.notes, planId: b.planId, createdAt: now, updatedAt: now,
     });
     if (c.status === 'posted') { c.postedAt = now; if (!c.date || c.date > today()) c.date = today(); }
     db.content.push(c);
@@ -53,7 +53,7 @@ router.patch('/api/content/:id', async (req, res) => {
   const item = await mutateDB((db) => {
     const c = db.content.find((x) => x.id === req.params.id);
     if (!c) return null;
-    const text = { title: 300, hook: 1000, caption: 20000, hashtags: 4000, script: 100000, link: 2000 };
+    const text = { title: 300, hook: 1000, caption: 20000, hashtags: 4000, script: 100000, notes: 20000, link: 2000 };
     for (const [k, max] of Object.entries(text)) if (k in b) c[k] = str(b[k], max);
     if ('platforms' in b && Array.isArray(b.platforms)) c.platforms = [...new Set(b.platforms)].filter((p) => CONTENT_PLATFORMS.includes(p));
     if ('format' in b && CONTENT_FORMATS.includes(b.format)) c.format = b.format;
@@ -61,6 +61,10 @@ router.patch('/api/content/:id', async (req, res) => {
     if ('time' in b) c.time = isTimeOfDay(b.time) ? b.time : '';
     if ('color' in b) c.color = TAG_KEYS.has(b.color) ? b.color : null;
     if ('planId' in b) c.planId = typeof b.planId === 'string' && db.plans.some((p) => p.id === b.planId) ? b.planId : null;
+    if ('beats' in b && Array.isArray(b.beats)) c.beats = b.beats.filter((x) => x && typeof x === 'object').slice(0, 60).map(normalizeContentBeat);
+    if ('checks' in b) c.checks = normalizeContentChecks(b.checks);
+    if ('captions' in b) c.captions = normalizeContentCaptions(b.captions); // the whole set (none = the caption everywhere)
+    if ('coverId' in b) c.coverId = typeof b.coverId === 'string' && c.media.some((m) => m.id === b.coverId) ? b.coverId : null;
     if ('metrics' in b && b.metrics && typeof b.metrics === 'object') {
       c.metrics = normalizeContent({ metrics: { ...c.metrics, ...Object.fromEntries(Object.entries(b.metrics).filter(([k]) => CONTENT_METRICS.includes(k))) } }).metrics;
     }
@@ -136,8 +140,10 @@ router.delete('/api/content/:id/media/:mediaId', async (req, res) => {
     if (i === -1) return null;
     const [media] = c.media.splice(i, 1);
     rel = media.file;
+    const wasCover = c.coverId === media.id;
+    if (wasCover) c.coverId = null;
     c.updatedAt = Date.now();
-    db.trash.unshift({ trashId, kind: 'contentMedia', deletedAt: Date.now(), data: { contentId: c.id, contentTitle: c.title, media, index: i, rels: [rel] } });
+    db.trash.unshift({ trashId, kind: 'contentMedia', deletedAt: Date.now(), data: { contentId: c.id, contentTitle: c.title, media, index: i, wasCover, rels: [rel] } });
     return c;
   });
   if (!item) return res.status(404).json({ error: 'not_found' });
@@ -160,13 +166,16 @@ router.post('/api/content/:id/duplicate', async (req, res) => {
       date: '', time: '', link: '', metrics: {}, postedAt: 0, createdAt: now, updatedAt: now,
       media: src.media.map((m) => ({ ...m, id: nanoid(8) })),
     });
+    const at = src.media.findIndex((m) => m.id === src.coverId);
+    c.coverId = at >= 0 ? c.media[at].id : null;
     d.content.push(c);
     return c;
   });
   res.status(201).json({ item });
 });
 
-const isEmpty = (c) => !c.title.trim() && !c.hook.trim() && !c.caption.trim() && !c.hashtags.trim() && !c.script.trim() && !c.media.length;
+const isEmpty = (c) => !c.title.trim() && !c.hook.trim() && !c.caption.trim() && !c.hashtags.trim() && !c.script.trim() && !c.notes.trim()
+  && !c.beats.some((b) => b.text.trim() || b.screen.trim()) && !Object.keys(c.captions).length && !c.media.length;
 
 // A post → Trash (with its pictures and videos). ?ifEmpty=1: only an empty
 // one, and without the Trash (a "New post" left without writing anything).

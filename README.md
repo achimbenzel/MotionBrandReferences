@@ -1059,12 +1059,23 @@ Notes are stored in `data/db.json` (`notes`), their pictures in
 **TikTok / Reels** and **X** (YouTube and LinkedIn too) — from the idea to the
 numbers.
 
+- **Feed** (the default) — the profile grid as it'll look, in the app's 3:4
+  tiles: what's **planned** on top (the latest first, with its day), what's
+  **posted** below (with its views). A post without a picture gets a **cover
+  made of type** — its title on a gradient in its colour. **Drag** a planned
+  post onto another to **trade their days** (with Undo); drop one on **Next
+  post** to give it the day after the last planned one (a click there starts a
+  new post for that day). **Without a day** on the side holds the others — drag
+  one into the grid, or a planned one back to take its day away. **Clean look**
+  hides the labels. Stories, text posts and threads aren't in the grid; with
+  **X** picked, the feed is the **timeline** — each post as it'll read on X.
 - **Board** — a column per stage: **Ideas → Script → In production →
   Scheduled → Posted**. Drag a post to the next stage; type a **quick idea**
   into the Ideas column (Enter) to catch it without leaving the page; **+** in a
-  column starts a post in that stage. A card shows the cover, the hook, the
-  platforms, the format and the day (orange once the day has passed and it
-  isn't out yet; views and likes once it's posted).
+  column starts a post in that stage. A card shows the **cover** big (past the
+  idea and still without a picture: the hook, set in type), the platforms, the
+  format and the day (orange once the day has passed and it isn't out yet;
+  views and likes once it's posted).
 - **Calendar** — the month from Monday: drag a post to another day, **+** on a
   day plans one for it, a click on a day lists its posts underneath. **Not
   scheduled** on the side holds the ones without a day — drag them onto the
@@ -1074,23 +1085,51 @@ numbers.
   its stage to change right there.
 - On top: ideas, posts in the works, the next 7 days, posted this month and
   the **next post** to go out; filter by **platform** and search the text.
-- **A post** — the stage, a title, the **platforms** and the **format** (Reel /
+- **A post** — the stage, a title, the **platforms**, the **format** (Reel /
   Short, Post, Carousel, Story, Text, Thread, Video — with a hint for its
-  size), the day and time it goes out, the **hook** (the first second / line),
-  the **caption** and **hashtags** — counted against each platform's limit
-  (Instagram 2,200, X 280, …; a hint past 5 hashtags on Instagram) with a
-  **Copy** button for caption + hashtags — a **script** (shots, voice-over,
-  on-screen text, sound) and the **project** it shows. Once it's **posted**:
-  the link and its numbers (views, likes, comments, shares, saves, new
-  followers).
+  size), the day and time it goes out and the **hook** (the first second /
+  line). Below, a part for each stage — the one for the stage the post is in
+  is **open** (marked *Now*), the others fold away with a summary and open with
+  a click; at its end a button moves the post on to the next stage:
+  - **Idea** — notes (why, where you saw it) and the **project** it shows;
+    reference pictures go with the pictures and videos.
+  - **Script** — the **beats** of a Reel / Short: **Hook → Body → CTA**, each
+    with what happens, the **text on screen** and how many seconds it runs —
+    a bar shows the parts, the total adds up with a note on the length (15 s
+    loops well, up to ~35 s is the sweet spot for Reels …). Drag to reorder;
+    for a carousel they're **slides**. Below: voice-over and notes (for a text
+    post or thread: the draft).
+  - **Production** — a **checklist** for the format (Reel: footage, edit,
+    sound, subtitles, text inside the safe zone, cover, export 1080 × 1920;
+    carousel, post, story, text and thread have their own).
+  - **Caption & hashtags** — counted against each platform's limit (Instagram
+    2,200, X 280, …; a hint past 5 hashtags on Instagram). Every platform gets
+    caption + hashtags — or **its own text** (**Write its own for X**, starting
+    from the caption): its own counter, Copy, and **Use the caption** to go
+    back (with Undo). On X a thread's posts are separated by a line of `---`,
+    each counted to 280.
+  - **Link & numbers** (once it's posted) — the link and views, likes,
+    comments, shares, saves and new followers, with the **engagement** (likes,
+    comments, shares and saves per view), the share saved and views per follow.
+- **Preview** — beside the post, how it'll look: as a **Reel** (with the app's
+  buttons, your name, the first line of the caption and “Original audio”), on
+  **TikTok** (For You, the side buttons, the caption), on **X** (the post or
+  the thread, with its pictures) — or, for a post or carousel, in the
+  **Instagram feed**. Each shows the text that goes out on that platform; the
+  first video plays, the hook's text on screen sits on top. **Safe zone**
+  shades roughly what the app's buttons and text cover on a Reel and on
+  TikTok. Your **name and handle** for the previews: *Shown as …* underneath.
 - **Pictures and videos** — upload, paste, drop or take them **from the app**;
-  drag to reorder (the first is the cover, shown in a preview in the post's
-  format). **Duplicate** plans the same idea again (without its numbers);
-  **delete** goes to the Trash (with Undo). A “New post” you leave empty simply
-  goes away. ⌘K finds posts.
+  drag to reorder. The **★** one is the **cover** in the grid and on the board
+  (the first, unless you pick another). **Duplicate** plans the same idea again
+  (without its numbers); **delete** goes to the Trash (with Undo). A “New post”
+  you leave empty simply goes away. ⌘K finds posts (also by their notes, beats
+  and own texts).
 
-Posts are stored in `data/db.json` (`content`), their pictures and videos in
-`data/content/<id>/media/`.
+Posts are stored in `data/db.json` (`content` — notes, beats, the checklist,
+own texts per platform and the cover are additions older posts simply read as
+empty), their pictures and videos in `data/content/<id>/media/`; your name and
+handle for the previews in the settings (`contentProfile`).
 
 ### Achievements
 **Achievements** (sidebar, under Content) turns your milestones into

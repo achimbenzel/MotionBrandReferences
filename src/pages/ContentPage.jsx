@@ -1,16 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Plus, Megaphone, Search, X, ChevronLeft, ChevronRight, CalendarDays, Columns3, List, Clock, Eye, Heart, Film, Images,
+  Plus, Megaphone, Search, X, ChevronLeft, ChevronRight, CalendarDays, Columns3, List, Clock, Eye, Heart, Grid3x3, Play,
+  Clapperboard, Images, Tag,
 } from 'lucide-react';
-import { api, contentFileUrl } from '../lib/api.js';
+import { api } from '../lib/api.js';
 import { tagColor } from '../lib/types.js';
 import { isTouch } from '../lib/useMedia.js';
-import { PLATFORMS, FORMATS, STATUSES, statusOf, dayKey, fmtDay, fmtNum } from '../lib/content.js';
+import { PLATFORMS, FORMATS, STATUSES, statusOf, dayKey, fmtDay, fmtNum, coverOf } from '../lib/content.js';
 import { useToast } from '../components/Toast.jsx';
 import PlatformIcon from '../components/content/PlatformIcon.jsx';
+import PostCover, { AutoCover } from '../components/content/PostCover.jsx';
+import { XPost } from '../components/content/PostPreview.jsx';
+import useContentProfile from '../components/content/useContentProfile.js';
 
 const VIEWS = [
+  { key: 'feed', label: 'Feed', icon: Grid3x3 },
   { key: 'board', label: 'Board', icon: Columns3 },
   { key: 'calendar', label: 'Calendar', icon: CalendarDays },
   { key: 'list', label: 'List', icon: List },
@@ -20,7 +25,7 @@ const save = (k, v) => { try { localStorage.setItem(k, v); } catch { /* private 
 const WEEKDAYS = Array.from({ length: 7 }, (_, i) => new Date(2024, 0, 1 + i).toLocaleDateString(undefined, { weekday: 'short' })); // 1 Jan 2024 was a Monday
 const POSTED_SHOWN = 12;
 
-const matches = (c, needle) => !needle || `${c.title}\n${c.hook}\n${c.caption}\n${c.hashtags}\n${c.script}`.toLowerCase().includes(needle);
+const matches = (c, needle) => !needle || [c.title, c.hook, c.caption, c.hashtags, c.script, c.notes, ...(c.beats || []).map((b) => `${b.text} ${b.screen}`), ...Object.values(c.captions || {})].join('\n').toLowerCase().includes(needle);
 // Planned ones by the day they go out (undated ones after), posted ones newest first.
 const planOrder = (a, b) => {
   const pa = a.status === 'posted'; const pb = b.status === 'posted';
@@ -40,11 +45,12 @@ export default function ContentPage({ reloadKey }) {
   const toast = useToast();
   const [items, setItems] = useState(null);
   const [error, setError] = useState(null);
-  const [view, setViewState] = useState(() => (VIEWS.some((v) => v.key === load('contentView', '')) ? load('contentView', '') : 'board'));
+  const [view, setViewState] = useState(() => (VIEWS.some((v) => v.key === load('contentView', '')) ? load('contentView', '') : 'feed'));
   const [platform, setPlatformState] = useState(() => (PLATFORMS[load('contentPlatform', '')] ? load('contentPlatform', '') : ''));
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
   const [changed, setChanged] = useState(0);
+  const [profile] = useContentProfile();
   const setView = (v) => { setViewState(v); save('contentView', v); };
   const setPlatform = (p) => { setPlatformState(p); save('contentPlatform', p); };
 
@@ -75,6 +81,14 @@ export default function ContentPage({ reloadKey }) {
     setItems((l) => l.map((c) => (c.id === id ? { ...c, ...fields } : c)));
     try { const saved = await api.updateContent(id, fields); setItems((l) => l.map((c) => (c.id === id ? saved : c))); }
     catch (e) { setItems(before); toast(`Could not move it: ${e.message}`, 'error'); }
+  };
+  // Two posts trade their days (the feed's order) — with Undo.
+  const swap = async (a, b) => {
+    const ta = { date: a.date, time: a.time }; const tb = { date: b.date, time: b.time };
+    await Promise.all([update(a.id, tb), update(b.id, ta)]);
+    toast(b.date && !a.date ? `“${b.title || 'Untitled post'}” is not scheduled now` : 'Swapped their days', 'ok', {
+      label: 'Undo', onClick: () => Promise.all([update(a.id, ta), update(b.id, tb)]),
+    });
   };
 
   const needle = q.trim().toLowerCase();
@@ -137,6 +151,7 @@ export default function ContentPage({ reloadKey }) {
             </label>
           </div>
 
+          {view === 'feed' && <Feed items={shown} platform={platform} today={today} profile={profile} onOpen={(c) => navigate(`/content/${c.id}`)} onMove={update} onSwap={swap} onCreate={create} busy={busy} />}
           {view === 'board' && <Board items={shown} today={today} onOpen={(c) => navigate(`/content/${c.id}`)} onMove={update} onCreate={create} busy={busy} />}
           {view === 'calendar' && <Calendar items={shown} today={today} onOpen={(c) => navigate(`/content/${c.id}`)} onMove={update} onCreate={create} busy={busy} />}
           {view === 'list' && <ListView items={shown} today={today} onOpen={(c) => navigate(`/content/${c.id}`)} onMove={update} />}
@@ -151,20 +166,6 @@ export default function ContentPage({ reloadKey }) {
         </div>
       ))}
     </div>
-  );
-}
-
-/** A small cover: the first picture, or a frame of the first video. */
-function Cover({ c }) {
-  const m = c.media[0];
-  if (!m) return null;
-  const url = contentFileUrl(c, m.file);
-  return (
-    <span className="ctp-cover">
-      {m.kind === 'video' ? <video src={`${url}#t=0.1`} muted preload="metadata" /> : <img src={url} alt="" loading="lazy" draggable={false} />}
-      {c.media.length > 1 && <i>{c.format === 'carousel' ? <Images size={11} /> : null}{c.media.length}</i>}
-      {m.kind === 'video' && c.media.length === 1 && <i><Film size={11} /></i>}
-    </span>
   );
 }
 
@@ -184,15 +185,18 @@ const When = ({ c, today }) => {
 
 function Card({ c, today, onOpen, dragging, setDragging }) {
   const col = c.color ? tagColor(c.color) : null;
+  // Past the idea and still no picture: the hook, big, as its cover.
+  const typed = !coverOf(c) && c.status !== 'idea' && !!c.hook.trim();
   return (
     <button type="button" className={`ctp-card ${dragging === c.id ? 'moving' : ''}`} draggable={!isTouch()}
       onDragStart={(e) => { setDragging(c.id); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', c.id); }}
       onDragEnd={() => setDragging(null)}
       onClick={() => onOpen(c)} style={col ? { '--line': col.fg } : undefined}>
-      <Cover c={c} />
+      {coverOf(c) ? <PostCover c={c} className="ctp-card-cover" />
+        : typed ? <span className="ct-cover ctp-card-cover typed"><AutoCover c={c} text={c.hook} /></span> : null}
       <span className="ctp-card-body">
         <b className={c.title ? '' : 'untitled'}>{c.title || 'Untitled post'}</b>
-        {c.hook && <span className="ctp-card-hook">{c.hook}</span>}
+        {c.hook && !typed && <span className="ctp-card-hook">{c.hook}</span>}
         <span className="ctp-card-meta">
           <Plats c={c} />
           <span className="ctp-fmt">{FORMATS[c.format]?.label}</span>
@@ -202,6 +206,138 @@ function Card({ c, today, onOpen, dragging, setDragging }) {
         </span>
       </span>
     </button>
+  );
+}
+
+// ---- Feed: how the profile grid will look ---------------------------------------
+const NOT_IN_GRID = ['story', 'text', 'thread'];
+const newest = (a, b) => `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`) || (b.postedAt || b.updatedAt) - (a.postedAt || a.updatedAt);
+const nextDay = (iso) => { const [y, m, d] = iso.split('-').map(Number); return dayKey(new Date(y, m - 1, d + 1)); };
+
+/**
+ * The profile grid as it'll look: what's planned on top (the latest first,
+ * like the app shows it), what's out below. Drag a planned post onto another
+ * to trade their days; drop one on "Next" to give it the next free day.
+ * With X picked: the timeline.
+ */
+function Feed({ items, platform, today, profile, onOpen, onMove, onSwap, onCreate, busy }) {
+  const [dragging, setDragging] = useState(null);
+  const [over, setOver] = useState(null);
+  const [clean, setCleanState] = useState(() => load('contentFeedClean', '') === '1');
+  const setClean = (v) => { setCleanState(v); save('contentFeedClean', v ? '1' : ''); };
+  if (platform === 'x') return <XTimeline items={items} today={today} profile={profile} onOpen={onOpen} />;
+
+  const inGrid = items.filter((c) => !NOT_IN_GRID.includes(c.format));
+  const planned = inGrid.filter((c) => c.status !== 'posted' && c.date).sort(newest);
+  const posted = inGrid.filter((c) => c.status === 'posted').sort(newest);
+  const loose = items.filter((c) => c.status !== 'posted' && !c.date).sort(planOrder);
+  const latest = planned[0]?.date;
+  const next = latest && latest >= today ? nextDay(latest) : today;
+  const dragged = items.find((x) => x.id === dragging);
+  const end = () => { setDragging(null); setOver(null); };
+  const dropOn = (target) => {
+    const c = dragged; end();
+    if (!c || c.id === target.id) return;
+    onSwap(c, target);
+  };
+  const dragProps = (c) => (isTouch() || c.status === 'posted' ? {} : {
+    draggable: true,
+    onDragStart: (e) => { setDragging(c.id); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', c.id); },
+    onDragEnd: end,
+  });
+  const tile = (c) => {
+    const s = statusOf(c.status);
+    const done = c.status === 'posted';
+    const late = !done && c.date < today;
+    return (
+      <button key={c.id} type="button" className={`ctp-tile ${done ? 'posted' : 'planned'} ${dragging === c.id ? 'moving' : ''} ${over === c.id ? 'over' : ''}`}
+        onClick={() => onOpen(c)} {...dragProps(c)}
+        onDragOver={(e) => { if (dragged && !done && dragged.id !== c.id) { e.preventDefault(); setOver(c.id); } }}
+        onDragLeave={() => setOver((o) => (o === c.id ? null : o))}
+        onDrop={(e) => { e.preventDefault(); dropOn(c); }}
+        title={`${c.title || 'Untitled post'} · ${s.one}${c.date ? ` · ${fmtDay(c.date)}` : ''}`}>
+        <PostCover c={c} badges={false} />
+        {c.format === 'reel' || c.format === 'video' ? <Clapperboard size={15} className="ctp-tile-kind" /> : c.format === 'carousel' && c.media.length > 1 ? <Images size={15} className="ctp-tile-kind" /> : null}
+        {done && c.metrics.views != null && <span className="ctp-tile-views"><Play size={11} fill="currentColor" /> {fmtNum(c.metrics.views)}</span>}
+        {!done && !clean && (
+          <span className={`ctp-tile-when ${late ? 'late' : c.date === today ? 'today' : ''}`}>
+            <i style={{ background: s.color }} />{c.date === today ? 'Today' : fmtDay(c.date, { weekday: 'short', day: 'numeric', month: 'short' })}
+          </span>
+        )}
+      </button>
+    );
+  };
+
+  return (
+    <div className="ctp-feed-wrap">
+      <div className="ctp-feed">
+        <div className="ctp-feed-head">
+          <span className="ctp-feed-av">{(profile.name || profile.handle || 'Y').trim()[0]?.toUpperCase()}</span>
+          <span className="ctp-feed-who">
+            <b>{profile.handle ? `@${profile.handle}` : 'Your profile'}{platform ? <> · <PlatformIcon platform={platform} size={13} /> {PLATFORMS[platform].label}</> : null}</b>
+            <span><b>{posted.length}</b> posted · <b>{planned.length}</b> planned{loose.length ? <> · <b>{loose.length}</b> without a day</> : null}</span>
+          </span>
+          <label className="ctp-feed-clean" title="Hide the labels to see the grid as others will">
+            <input type="checkbox" checked={clean} onChange={(e) => setClean(e.target.checked)} /> Clean look
+          </label>
+        </div>
+        <div className="ctp-grid">
+          <button type="button" className={`ctp-tile ctp-tile-next ${over === 'next' ? 'over' : ''}`} disabled={busy}
+            onClick={() => onCreate({ date: next, format: 'reel', status: 'idea' })}
+            onDragOver={(e) => { if (dragged && dragged.status !== 'posted') { e.preventDefault(); setOver('next'); } }}
+            onDragLeave={() => setOver((o) => (o === 'next' ? null : o))}
+            onDrop={(e) => { e.preventDefault(); const c = dragged; end(); if (c && c.date !== next) onMove(c.id, { date: next }); }}>
+            <Plus size={20} />
+            <b>Next post</b>
+            <span>{next === today ? 'Today' : fmtDay(next)}</span>
+          </button>
+          {planned.map(tile)}
+          {planned.length > 0 && posted.length > 0 && !clean && <div className="ctp-grid-line"><span>↑ planned · posted ↓</span></div>}
+          {posted.map(tile)}
+        </div>
+        {!inGrid.length && <div className="hint ctp-feed-empty">Give a post a day to see it in the grid — stories, text posts and threads aren’t shown here.</div>}
+      </div>
+      <aside className={`ctp-unscheduled ${over === 'none' ? 'over' : ''}`}
+        onDragOver={(e) => { if (dragged && dragged.date && dragged.status !== 'posted') { e.preventDefault(); setOver('none'); } }}
+        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setOver(null); }}
+        onDrop={(e) => { e.preventDefault(); const c = dragged; end(); if (c && c.date && c.status !== 'posted') onMove(c.id, { date: '', time: '' }); }}>
+        <div className={`ctp-unscheduled-head ${over === 'none' ? 'over' : ''}`}><Clock size={13} /> Without a day <span className="count">{loose.length}</span></div>
+        <p className="hint">{isTouch() ? 'Open a post to give it a day.' : 'Drag one onto “Next post” or onto a planned one to take its day.'}</p>
+        <div className="ctp-loose">
+          {loose.map((c) => (
+            <button key={c.id} type="button" className={`ctp-loose-item ${dragging === c.id ? 'moving' : ''}`} onClick={() => onOpen(c)} {...dragProps(c)}>
+              <PostCover c={c} badges={false} />
+              <span><b className={c.title ? '' : 'untitled'}>{c.title || 'Untitled post'}</b><small><i style={{ background: statusOf(c.status).color }} />{statusOf(c.status).one} · {FORMATS[c.format]?.label}</small></span>
+            </button>
+          ))}
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+/** X: the posts as they'll read on the timeline — planned ones first. */
+function XTimeline({ items, today, profile, onOpen }) {
+  const planned = items.filter((c) => c.status !== 'posted').sort(planOrder);
+  const posted = items.filter((c) => c.status === 'posted').sort(newest);
+  const row = (c) => (
+    <div key={c.id} className="ctp-xrow" role="button" tabIndex={0} onClick={() => onOpen(c)} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(c); }}>
+      <span className="ctp-xrow-meta">
+        <i style={{ background: statusOf(c.status).color }} />{statusOf(c.status).one}
+        {c.date && <> · {c.date === today ? 'Today' : fmtDay(c.date)}{c.time ? ` ${c.time}` : ''}</>}
+        {c.title && <b> · {c.title}</b>}
+      </span>
+      <XPost c={c} profile={profile} />
+    </div>
+  );
+  return (
+    <div className="ctp-xline">
+      {!items.length && <div className="hint">No post for X yet.</div>}
+      {planned.length > 0 && <div className="ctp-xline-head"><Tag size={13} /> Coming up</div>}
+      {planned.map(row)}
+      {posted.length > 0 && <div className="ctp-xline-head">Posted</div>}
+      {posted.map(row)}
+    </div>
   );
 }
 
@@ -222,7 +358,7 @@ function Board({ items, today, onOpen, onMove, onCreate, busy }) {
         const list = items.filter((c) => c.status === s.key).sort(planOrder);
         const cut = s.key === 'posted' && !allPosted && list.length > POSTED_SHOWN;
         return (
-          <section key={s.key} className={`ctp-col ${over === s.key ? 'over' : ''}`}
+          <section key={s.key} className={`ctp-col ctp-col-${s.key} ${over === s.key ? 'over' : ''}`}
             onDragOver={(e) => { if (dragging) { e.preventDefault(); setOver(s.key); } }}
             onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setOver(null); }}
             onDrop={(e) => {
@@ -356,7 +492,7 @@ function ListView({ items, today, onOpen, onMove }) {
         const s = statusOf(c.status);
         return (
           <div key={c.id} className="ctp-row" role="button" tabIndex={0} onClick={() => onOpen(c)} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(c); }}>
-            <span className="ctp-row-thumb">{c.media[0] ? <Cover c={c} /> : <Megaphone size={15} />}</span>
+            <span className="ctp-row-thumb">{coverOf(c) ? <PostCover c={c} badges={false} /> : <AutoCover c={c} text="" />}</span>
             <span className="ctp-row-main">
               <b className={c.title ? '' : 'untitled'}>{c.title || 'Untitled post'}</b>
               <span className="ctp-card-meta"><Plats c={c} /><span className="ctp-fmt">{FORMATS[c.format]?.label}</span><When c={c} today={today} /></span>

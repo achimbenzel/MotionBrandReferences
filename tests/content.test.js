@@ -71,3 +71,53 @@ test('content: plan a post, add media, post it, Trash and back', async () => {
   const unused = (await srv.api('/api/maintenance/unused')).data.files.map((f) => f.rel);
   assert.ok(!unused.some((rel) => rel.startsWith('content/')), unused.join(', '));
 });
+
+test('content: idea notes, reel beats, checklist, own text per platform, cover — additive', async () => {
+  // An older post (none of the new fields) reads with empty ones.
+  let r = await srv.api('/api/content', { method: 'POST', json: { title: 'Kinetic type', platforms: ['instagram', 'x'], notes: 'Seen at Buck' } });
+  const c = r.data.item;
+  assert.deepEqual([c.notes, c.beats, c.checks, c.captions, c.coverId], ['Seen at Buck', [], [], {}, null]);
+
+  r = await srv.api(`/api/content/${c.id}`, {
+    method: 'PATCH',
+    json: {
+      beats: [{ kind: 'hook', text: 'Logo slams in', screen: 'Wait for it', sec: 1.25 }, { kind: 'nope', text: 'Breakdown', sec: 9999 }, 'junk', { kind: 'cta', text: 'Follow', sec: -3 }],
+      checks: ['subtitles', 'sound', 'subtitles', 'Bad Key!', 7],
+      captions: { x: 'Short one for X', tiktok: '   ', myspace: 'no', instagram: 42 },
+    },
+  });
+  const it = r.data.item;
+  assert.deepEqual(it.beats.map((b) => [b.kind, b.text, b.screen, b.sec]), [['hook', 'Logo slams in', 'Wait for it', 1.3], ['body', 'Breakdown', '', 600], ['cta', 'Follow', '', 0]]);
+  assert.ok(it.beats.every((b) => typeof b.id === 'string' && b.id));
+  assert.deepEqual(it.checks, ['subtitles', 'sound']);
+  assert.deepEqual(it.captions, { x: 'Short one for X' });
+
+  // The cover: one of its pictures (an unknown one is refused); gone with the picture, back with Undo.
+  const fd = new FormData();
+  fd.append('media', new Blob([PNG], { type: 'image/png' }), 'a.png');
+  fd.append('media', new Blob([PNG], { type: 'image/png' }), 'b.png');
+  const [, second] = (await srv.api(`/api/content/${c.id}/media`, { method: 'POST', body: fd })).data.item.media;
+  assert.equal((await srv.api(`/api/content/${c.id}`, { method: 'PATCH', json: { coverId: 'nope' } })).data.item.coverId, null);
+  assert.equal((await srv.api(`/api/content/${c.id}`, { method: 'PATCH', json: { coverId: second.id } })).data.item.coverId, second.id);
+  r = await srv.api(`/api/content/${c.id}/media/${second.id}`, { method: 'DELETE' });
+  assert.equal(r.data.item.coverId, null);
+  await srv.api(`/api/trash/${r.data.trashId}/restore`, { method: 'POST' });
+  assert.equal((await srv.api(`/api/content/${c.id}`)).data.item.coverId, second.id);
+
+  // Back to the caption for X: the whole set is sent; a copy keeps it all (and its own cover).
+  r = await srv.api(`/api/content/${c.id}`, { method: 'PATCH', json: { captions: {} } });
+  assert.deepEqual(r.data.item.captions, {});
+  const copy = (await srv.api(`/api/content/${c.id}/duplicate`, { method: 'POST' })).data.item;
+  assert.deepEqual([copy.notes, copy.beats.length, copy.checks], ['Seen at Buck', 3, ['subtitles', 'sound']]);
+  assert.equal(copy.media.findIndex((m) => m.id === copy.coverId), 1);
+
+  // Found by what's only in a beat; a post with just a beat isn't "empty".
+  assert.ok((await srv.api('/api/search?q=slams')).data.results.some((x) => x.id === c.id));
+  const beatOnly = (await srv.api('/api/content', { method: 'POST', json: {} })).data.item;
+  await srv.api(`/api/content/${beatOnly.id}`, { method: 'PATCH', json: { beats: [{ kind: 'hook', text: 'Just a hook' }] } });
+  assert.equal((await srv.api(`/api/content/${beatOnly.id}?ifEmpty=1`, { method: 'DELETE' })).data.removed, false);
+
+  // How you appear in the previews: a name and a clean handle.
+  r = await srv.api('/api/settings', { method: 'PATCH', json: { contentProfile: { name: 'Achim', handle: '@@achim.motion!' } } });
+  assert.deepEqual(r.data.settings.contentProfile, { name: 'Achim', handle: 'achim.motion' });
+});

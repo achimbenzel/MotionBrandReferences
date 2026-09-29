@@ -169,6 +169,7 @@ router.post('/api/trash/:trashId/restore', async (req, res) => {
       const c = (db.content || []).find((x) => x.id === data.contentId);
       if (!c) { gone = true; return null; }
       if (!c.media.some((m) => m.id === data.media.id)) c.media.splice(Math.min(data.index ?? c.media.length, c.media.length), 0, data.media);
+      if (data.wasCover && !c.coverId) c.coverId = data.media.id;
       rels = { base: contentDir(c.id), list: data.rels };
     } else if (entry.kind === 'achievement') {
       if (!Array.isArray(db.achievements)) db.achievements = [];

@@ -703,6 +703,7 @@ export function normalizeDB(db) {
   db.settings.dashboardFocus = normalizeDashboardFocus(db.settings.dashboardFocus);
   db.settings.weeklyTodos = normalizeWeeklyTodos(db.settings.weeklyTodos);
   db.settings.imageUploads = normalizeImageUploads(db.settings.imageUploads);
+  db.settings.contentProfile = normalizeContentProfile(db.settings.contentProfile);
   db.settings.dashboardLayout = normalizeDashboardLayout(db.settings.dashboardLayout);
   return db;
 }
@@ -816,6 +817,11 @@ export function normalizeImageUploads(v) {
     maxEdge: IMAGE_EDGES.includes(Number(o.maxEdge)) ? Number(o.maxEdge) : 2560,
     quality: Math.round(num(o.quality, 50, 100, 85)),
   };
+}
+/** How you appear in the post previews (Content): a name and a handle. */
+export function normalizeContentProfile(v) {
+  const o = v && typeof v === 'object' ? v : {};
+  return { name: str(o.name, 60).trim(), handle: str(o.handle, 40).replace(/^@+/, '').replace(/[^\w.]/g, '').slice(0, 30) };
 }
 export const DASHBOARD_WIDGETS = ['focus', 'weekly', 'timer', 'next', 'continue', 'urgent', 'tools', 'pipeline', 'rhythm', 'inspiration', 'note', 'achievements'];
 /** The dashboard's widgets in your order: [{ id, hidden, size: 'full' | 'half' }] (unknown ones dropped; [] = the default). */
@@ -987,8 +993,28 @@ export function normalizeContentMedia(m) {
     file: contentFile(m?.file), name: str(m?.name, 200), kind: m?.kind === 'video' ? 'video' : 'image',
   };
 }
+export const CONTENT_BEAT_KINDS = ['hook', 'body', 'cta'];
+/** One beat of a Reel / Short: what happens, the text on screen, how long (s). */
+export function normalizeContentBeat(b) {
+  return {
+    id: typeof b?.id === 'string' && ID.test(b.id) ? b.id : nanoid(8),
+    kind: CONTENT_BEAT_KINDS.includes(b?.kind) ? b.kind : 'body',
+    text: str(b?.text, 2000),
+    screen: str(b?.screen, 500),
+    sec: Math.round(num(b?.sec, 0, 600, 0) * 10) / 10,
+  };
+}
+/** Its own text for a platform ({ x: '…' }); none = the caption + hashtags. */
+export function normalizeContentCaptions(v) {
+  const o = v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  return Object.fromEntries(CONTENT_PLATFORMS.filter((p) => typeof o[p] === 'string' && o[p].trim()).map((p) => [p, str(o[p], 20000)]));
+}
+const CHECK_KEY = /^[a-z0-9-]{1,40}$/;
+export const normalizeContentChecks = (v) => [...new Set(Array.isArray(v) ? v : [])].filter((k) => typeof k === 'string' && CHECK_KEY.test(k)).slice(0, 40);
+
 export function normalizeContent(c) {
   const metrics = c?.metrics && typeof c.metrics === 'object' ? c.metrics : {};
+  const media = (Array.isArray(c?.media) ? c.media : []).slice(0, 200).map(normalizeContentMedia).filter((m) => m.file);
   return {
     id: typeof c?.id === 'string' && ID.test(c.id) ? c.id : nanoid(10),
     title: str(c?.title, 300),
@@ -1001,10 +1027,15 @@ export function normalizeContent(c) {
     caption: str(c?.caption, 20000),
     hashtags: str(c?.hashtags, 4000),
     script: str(c?.script, 100000),                 // shots, voice-over, notes
+    notes: str(c?.notes, 20000),                    // the idea: why, references, thoughts
+    beats: (Array.isArray(c?.beats) ? c.beats : []).filter((b) => b && typeof b === 'object').slice(0, 60).map(normalizeContentBeat),
+    checks: normalizeContentChecks(c?.checks),      // production checklist: the steps done
+    captions: normalizeContentCaptions(c?.captions),
     link: str(c?.link, 2000),                       // where it's live
     planId: typeof c?.planId === 'string' && ID.test(c.planId) ? c.planId : null, // the project it shows
     color: TAG_KEYS.has(c?.color) ? c.color : null,
-    media: (Array.isArray(c?.media) ? c.media : []).slice(0, 200).map(normalizeContentMedia).filter((m) => m.file),
+    media,
+    coverId: typeof c?.coverId === 'string' && media.some((m) => m.id === c.coverId) ? c.coverId : null, // none = the first
     metrics: Object.fromEntries(CONTENT_METRICS.map((k) => [k, metrics[k] === '' || metrics[k] == null ? null : num(metrics[k], 0, 1e12, null)])),
     postedAt: num(c?.postedAt, 0, 1e14, 0),
     createdAt: num(c?.createdAt, 0, 1e14, 0),
