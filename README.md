@@ -427,10 +427,11 @@ it and show it again; your layout is saved. The widgets:
   Concept → Design → Production → Review → Delivered); a stage opens the project
   list filtered to it.
 - **Money this month** — what this month has to bring in (see
-  [Expenses](#expenses)) against what you've invoiced so far, with a bar, what's
-  still missing and the days left; the costs of the month, what still goes out
-  and the average a month; and the next payments and cancel-by days (a click
-  opens that expense). Without expenses it invites you to add some.
+  [Expenses](#expenses); in the Business / Private / Both view chosen there)
+  against what you've invoiced so far, with a bar, what's still missing and the
+  days left; the costs of the month, what still goes out, the average a month
+  and the recurring income; and the next payments, income and cancel-by days
+  (a click opens it). Without expenses it invites you to add some.
 - **Your rhythm** — a GitHub-style map of the last 26 weeks (15 on a phone):
   a square per day, dark → bright with how much you did — every save, and the
   references, projects, mockups and Inbox shares you added. Hover a day for its
@@ -1069,19 +1070,24 @@ library export / import.
 **Expenses** (sidebar, under Time Tracker) is what your business costs —
 subscriptions, insurance, health insurance and pension, hardware, your phone,
 the tax advisor … — and, if you like, what you pay privately (rent, car,
-streaming …), and what has to come in each month to cover it and pay you.
+streaming …), and what has to come in each month to cover it and pay you —
+less the money that comes in regularly anyway (retainers).
 
 - **Business · Private · Both** (top of the page, remembered): which costs the
   page shows — the business part of each expense, the private part, or all of
-  it. The year and ⌀ tiles, **Month by month**, **By category**, *Coming up*
-  and the list follow (an all-private expense isn't listed under Business, an
-  all-business one not under Private). Under **Both** the month bars stack
-  business (coral) and private (violet), and each category's bar shows its
-  private part striped. Under **Private** the chart measures your private costs
-  against **your pay** (the dashed line), and the fourth tile shows this
-  month's private costs against your pay and what's left. *To earn a month*
-  always counts the business costs only — private costs come out of your pay
-  (the calculator says how much of it they take and what's left).
+  it. The tiles, **to earn a month**, **Month by month**, **By category**,
+  *Coming up* and the list follow (an all-private expense isn't listed under
+  Business, an all-business one not under Private). Under **Both** the month
+  bars stack business (coral) and private (violet), and each category's bar
+  shows its private part striped. **To earn a month** per view:
+  - **Business** — the business costs (⌀ a month) + the reserve: what the
+    business needs to break even;
+  - **Private** — what you take home: **your pay**, or your **private costs**
+    if they're more (or no pay is set) — before tax (÷ (1 − tax on profit)) —
+    + the reserve;
+  - **Both** — the two together (without private costs, this is costs + pay +
+    tax + reserve, as before).
+  The dashboard widget follows the same switch.
 
 - **An expense**: name (typing offers common ones — Adobe Creative Cloud,
   Maxon One, Betriebshaftpflicht, Künstlersozialkasse, Steuerberater … and
@@ -1101,32 +1107,44 @@ streaming …), and what has to come in each month to cover it and pay you.
 - **Price changes…** — a new amount from a day on: the old one ends the day
   before, a copy starts with the new price, so the past stays right.
   **Duplicate**, and **Delete** (to the Trash, with Undo).
-- **Year** (← 2026 →): the year's total (business part; with private parts
-  too, if there are any), **⌀ a month** and what's running per month now,
-  **to earn a month**, and this month so far — invoiced against the target,
-  paid, and what still goes out.
-- **Month by month** — bars for what goes out (business part) and what you
-  invoiced, with a dashed line for what has to come in; hover a month for its
-  payments. **By category** — the year per category with its share.
-- **What has to come in** — your **pay a month** (net), the **tax on profit**
-  (30 % by default), a **reserve** on top (10 %), your **hourly rate** and
-  **weeks off** a year: costs ⌀ a month + pay + the tax on it + reserve = **to
-  earn a month**, and with a rate the **billable hours** a month and a week
-  that takes. Saved as you type.
-- **Coming up** — the payments of the next 45 days and **cancel-by** days (the
-  next payment minus the notice) of the next 60, in yellow; a click opens it.
+- **Year** (← 2026 →): the year's total in the view, **⌀ a month** and what's
+  running per month now, **to earn a month** (with what recurring income
+  covers and what's still to find), and this month so far — invoiced against
+  the target, paid, and what still goes out.
+- **Month by month** — bars for what goes out and what you invoiced, recurring
+  income as a green band behind them, and a dashed line for what has to come
+  in; hover a month for its payments. **By category** — the year per category
+  with its share.
+- **What has to come in** — your **pay a month** (net; leave it empty to use
+  your private costs), the **tax on profit** (30 % by default), a **reserve**
+  on top (10 %), your **hourly rate** and **weeks off** a year; it adds up the
+  view's target step by step, takes off the **recurring income** (what's
+  running now; for another year its average) — **= still to find** (or what's
+  left over) — and with a rate shows the **billable hours** a month and a week
+  it takes, and for what's still to find. Saved as you type.
+- **Recurring income** — retainers and other money that comes in regularly:
+  name, **client** (optional — picking one names it “Retainer …”), amount
+  (before tax), **monthly, quarterly, every 6 months or yearly**, first
+  payment, an optional end, notes. It's taken off what you still have to earn,
+  shows in the chart and in *Coming up* (green, +), and in its own sheet of
+  the Excel export. Delete goes to the Trash (with Undo); ⌘K finds it.
+- **Coming up** — the payments of the next 45 days, recurring income coming in
+  (green) and **cancel-by** days (the next payment minus the notice) of the
+  next 60, in yellow; a click opens it.
   In the list, a cancel-by within 30 days is yellow too.
 - **The list** — **Running / Ended / All** and a search, grouped by category
   with each group's year; every row shows its rhythm, since when, the business
   part, the next payment, the cancel-by day, the amount and the year.
 - **Export** — the year as **Excel** (German or English): every payment with
   date, name, category, rhythm, amount, business %, business and private
-  amount (as formulas, with totals that follow a filter), and a summary sheet
-  by category and by month (all, business, private).
+  amount (as formulas, with totals that follow a filter), a summary sheet by
+  category and by month (all, business, private), and the recurring income's
+  payments (date, name, client, rhythm, amount).
 - Invoices (for "invoiced") come from your [clients](#clients). Expenses are
   in the ⌘K search, and the dashboard has a **Money this month** widget.
 
-Stored in `data/db.json` (`expenses`; the calculator in `settings.finance`),
+Stored in `data/db.json` (`expenses`, recurring income in `income`; the
+calculator in `settings.finance`),
 so they're part of the library export / import.
 
 ### Notes

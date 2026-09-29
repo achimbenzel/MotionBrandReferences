@@ -7,7 +7,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { startServer, tempDir } from './helpers.js';
 import { readCentralDirectory, readEntryBuffer } from '../server/zip.js';
-import { paymentsIn, yearOf, monthlyOf, nextPayment, cancelBy, monthsOf, targetOf, isActive, partOf, inView, EXPENSE_CATEGORIES } from '../src/lib/expenses.js';
+import { paymentsIn, yearOf, monthlyOf, nextPayment, cancelBy, monthsOf, targetOf, targetFor, incomeMonthsOf, incomeNow, isActive, partOf, inView, EXPENSE_CATEGORIES } from '../src/lib/expenses.js';
 import { EXPENSE_CATEGORY_KEYS } from '../server/schema.js';
 
 let srv;
@@ -44,6 +44,21 @@ test('sums: payment days (month ends kept), a year, per month, next payment, can
   assert.equal(Math.round(t.hours), Math.round(t.total / 80));
   assert.equal(Math.round(t.weekHours * 10) / 10, Math.round(((t.total / 80) * 12 / 46) * 10) / 10);
   assert.equal(targetOf(500, {}).total, 500);
+  // Per view: business costs alone; your pay (or private costs, if more) before tax; both — and what retainers leave to find.
+  const f = { salary: 3000, taxRate: 30, reserve: 10, rate: 100, weeksOff: 6 };
+  const monthly = { business: 1000, private: 3500 };
+  assert.equal(Math.round(targetFor('business', monthly, f).total), 1100);
+  const priv = targetFor('private', monthly, f);
+  assert.deepEqual([Math.round(priv.total), priv.needIsPrivate], [5500, true]); // 3,500 private > 3,000 pay → 3,500 / 0.7 × 1.1
+  const both = targetFor('both', monthly, f, 2000);
+  assert.deepEqual([Math.round(both.total), Math.round(both.rest), Math.round(both.restHours)], [6600, 4600, 46]);
+  assert.equal(targetFor('business', monthly, f, 5000).rest, 0);
+  assert.equal(Math.round(targetOf(1000, f).total), Math.round(targetFor('both', { business: 1000 }, f).total));
+  const retainer = { amount: 2000, interval: 'month', start: '2026-03-01', end: '2026-08-31' };
+  const quarterly = { amount: 900, interval: 'quarter', start: '2026-01-15', end: '' };
+  const inc = incomeMonthsOf([retainer, quarterly], 2026);
+  assert.deepEqual(inc.map((m) => m.sum), [900, 0, 2000, 2900, 2000, 2000, 2900, 2000, 0, 900, 0, 0]);
+  assert.deepEqual([incomeNow([retainer, quarterly], '2026-05-10'), incomeNow([retainer, quarterly], '2026-09-01'), incomeNow([retainer], '2026-02-01')], [2300, 300, 0]);
 });
 
 test('expenses: saved and cleaned up, edited, Trash and back, found, the year as Excel; finance settings', async () => {
@@ -85,4 +100,28 @@ test('expenses: saved and cleaned up, edited, Trash and back, found, the year as
   assert.equal((sheet.match(/Haftpflicht/g) || []).length, 1); // once a year
   assert.match(sheet, /SUBTOTAL\(109,G2:G14\)/);
   assert.match(sheet, /SUBTOTAL\(109,H2:H14\)/); // the private part too
+
+  // Recurring income: saved (cleaned up), edited, Trash and back, found, in the export.
+  assert.equal((await srv.api('/api/income', { method: 'POST', json: { name: ' ' } })).status, 400);
+  let x = (await srv.api('/api/income', { method: 'POST', json: { name: 'Retainer Acme', amount: '2000', interval: 'once', start: '2026-02-01', clientId: 'x y', bogus: 1 } })).data.income;
+  assert.deepEqual([x.amount, x.interval, x.clientId, 'bogus' in x], [2000, 'month', '', false]);
+  x = (await srv.api(`/api/income/${x.id}`, { method: 'PATCH', json: { end: '2026-06-30', name: '' } })).data.income;
+  assert.deepEqual([x.name, x.end], ['Retainer Acme', '2026-06-30']);
+  r = await srv.api('/api/expenses');
+  assert.deepEqual([r.data.income.length, Array.isArray(r.data.clients)], [1, true]);
+  assert.ok((await srv.api('/api/search?q=retainer')).data.results.some((s) => s.kind === 'income'));
+  const del = await srv.api(`/api/income/${x.id}`, { method: 'DELETE' });
+  assert.equal((await srv.api('/api/expenses')).data.income.length, 0);
+  await srv.api(`/api/trash/${del.data.trashId}/restore`, { method: 'POST' });
+  assert.equal((await srv.api('/api/expenses')).data.income.length, 1);
+  const res2 = await fetch(`${srv.base}/api/expenses/export.xlsx?year=2026&lang=en`);
+  const buf2 = Buffer.from(await res2.arrayBuffer());
+  const file2 = path.join(srv.dataDir, 'expenses-en.xlsx');
+  await fsp.writeFile(file2, buf2);
+  const fh2 = await fsp.open(file2, 'r');
+  try {
+    const entries = await readCentralDirectory(fh2, buf2.length);
+    const s3 = (await readEntryBuffer(fh2, entries.find((e) => e.name === 'xl/worksheets/sheet3.xml'))).toString('utf8');
+    assert.equal((s3.match(/Retainer Acme/g) || []).length, 5); // Feb … Jun
+  } finally { await fh2.close(); }
 });

@@ -1,9 +1,10 @@
 // Expenses (Work mode): what the business costs — subscriptions, insurance,
-// hardware … — with the invoices from your clients to hold them against, and
-// a year as an Excel workbook for your tax advisor.
+// hardware … (and what you pay privately) — with the invoices from your
+// clients and the money that comes in regularly (retainers) to hold them
+// against, and a year as an Excel workbook for your tax advisor.
 import { nanoid } from 'nanoid';
 import { readDB, mutateDB } from '../db.js';
-import { normalizeExpense } from '../schema.js';
+import { normalizeExpense, normalizeIncome } from '../schema.js';
 import { createRouter, HttpError } from '../http.js';
 import { buildXlsx, excelDate } from '../xlsx.js';
 import { styles, LOOK } from './time.js';
@@ -20,7 +21,10 @@ const invoicesOf = (db) => (db.clients || []).flatMap((c) => (c.invoices || []).
 
 router.get('/api/expenses', async (_req, res) => {
   const db = await readDB();
-  res.json({ expenses: sorted(db.expenses), finance: db.settings.finance, invoices: invoicesOf(db), currency: db.settings.currency || 'EUR' });
+  res.json({
+    expenses: sorted(db.expenses), income: [...db.income].sort((a, b) => b.amount - a.amount), finance: db.settings.finance,
+    invoices: invoicesOf(db), clients: (db.clients || []).map((c) => ({ id: c.id, name: c.name })), currency: db.settings.currency || 'EUR',
+  });
 });
 
 router.post('/api/expenses', async (req, res) => {
@@ -63,15 +67,57 @@ router.delete('/api/expenses/:id', async (req, res) => {
   res.json({ trashId });
 });
 
+// ---- Recurring income (retainers …)
+const INCOME_EDITABLE = ['name', 'clientId', 'amount', 'interval', 'start', 'end', 'notes'];
+router.post('/api/income', async (req, res) => {
+  const b = req.body || {};
+  if (!String(b.name || '').trim()) throw new HttpError(400, 'name_required', 'Give it a name.');
+  const income = await mutateDB((db) => {
+    const now = Date.now();
+    const x = normalizeIncome({ ...Object.fromEntries(INCOME_EDITABLE.filter((k) => k in b).map((k) => [k, b[k]])), id: nanoid(10), createdAt: now, updatedAt: now });
+    db.income.push(x);
+    return x;
+  });
+  res.status(201).json({ income });
+});
+router.patch('/api/income/:id', async (req, res) => {
+  const b = req.body || {};
+  const income = await mutateDB((db) => {
+    const i = db.income.findIndex((x) => x.id === req.params.id);
+    if (i === -1) return null;
+    const next = { ...db.income[i] };
+    for (const k of INCOME_EDITABLE) if (k in b) next[k] = b[k];
+    if ('name' in b && !String(b.name || '').trim()) next.name = db.income[i].name;
+    db.income[i] = normalizeIncome({ ...next, updatedAt: Date.now() });
+    return db.income[i];
+  });
+  if (!income) return res.status(404).json({ error: 'not_found' });
+  res.json({ income });
+});
+router.delete('/api/income/:id', async (req, res) => {
+  const trashId = nanoid(10);
+  const ok = await mutateDB((db) => {
+    const i = db.income.findIndex((x) => x.id === req.params.id);
+    if (i === -1) return false;
+    const [x] = db.income.splice(i, 1);
+    db.trash.unshift({ trashId, kind: 'income', deletedAt: Date.now(), data: x });
+    return true;
+  });
+  if (!ok) return res.status(404).json({ error: 'not_found' });
+  res.json({ trashId });
+});
+
 // ---- A year as Excel: every payment (date, what, category, amount, business and private part) and a summary.
 const WORDS = {
   de: {
     sheet: 'Ausgaben', summary: 'Übersicht', head: ['Datum', 'Ausgabe', 'Kategorie', 'Intervall', 'Betrag', 'Geschäftlich %', 'Geschäftlich', 'Privat'],
+    income: 'Einnahmen', incomeHead: ['Datum', 'Einnahme', 'Kunde', 'Intervall', 'Betrag'],
     total: 'Summe', byCategory: 'Nach Kategorie', byMonth: 'Nach Monat', file: 'Ausgaben', category: 'Kategorie', month: 'Monat', amount: 'Betrag', business: 'Geschäftlich', private: 'Privat',
     intervals: { month: 'monatlich', quarter: 'vierteljährlich', half: 'halbjährlich', year: 'jährlich', once: 'einmalig' },
   },
   en: {
     sheet: 'Expenses', summary: 'Summary', head: ['Date', 'Expense', 'Category', 'Interval', 'Amount', 'Business %', 'Business', 'Private'],
+    income: 'Income', incomeHead: ['Date', 'Income', 'Client', 'Interval', 'Amount'],
     total: 'Total', byCategory: 'By category', byMonth: 'By month', file: 'Expenses', category: 'Category', month: 'Month', amount: 'Amount', business: 'Business', private: 'Private',
     intervals: { month: 'monthly', quarter: 'quarterly', half: 'every 6 months', year: 'yearly', once: 'one-time' },
   },
@@ -114,11 +160,22 @@ export function expensesWorkbook(db, q = {}) {
     [{ v: w.byMonth, s: 1 }, { v: w.amount, s: 1 }, { v: w.business, s: 1 }, { v: w.private, s: 1 }],
     ...months.map(([m, all, bus]) => [m, { v: all, s: 11 }, { v: bus, s: 11 }, { v: all - bus, s: 11 }]),
   ];
+  // Recurring income: every payment of the year.
+  const clientName = new Map((db.clients || []).map((c) => [c.id, c.name]));
+  const ins = (db.income || []).flatMap((x) => paymentsIn(x, `${year}-01-01`, `${year}-12-31`).map((date) => ({ date, x })))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.x.name.localeCompare(b.x.name));
+  const inRows = ins.map(({ date, x }) => [
+    { v: excelDate(date), s: 2 }, x.name, clientName.get(x.clientId) || '', w.intervals[x.interval] || intervalOf(x.interval).label, { v: x.amount, s: 11 },
+  ]);
+  const inLast = inRows.length + 1;
+  const inTotals = [{ v: w.total, s: 6 }, { v: '', s: 6 }, { v: '', s: 6 }, { v: '', s: 6 },
+    { f: `SUBTOTAL(109,E2:E${inLast})`, v: ins.reduce((n, p) => n + p.x.amount, 0), s: 12 }];
   const buffer = buildXlsx({
     stylesXml: styles(LOOK.app, currency),
     sheets: [
       { name: `${w.sheet} ${year}`, rows: [head, ...rows, totals], cols: [12, 32, 24, 16, 13, 13, 14, 14], freeze: true, autoFilter: `A1:H${last}`, tab: LOOK.app.tab, headerHeight: 24 },
       { name: w.summary, rows: summary, cols: [30, 14, 14, 14] },
+      ...(ins.length ? [{ name: `${w.income} ${year}`, rows: [w.incomeHead.map((v) => ({ v, s: 1 })), ...inRows, inTotals], cols: [12, 32, 24, 16, 13], freeze: true, autoFilter: `A1:E${inLast}`, tab: LOOK.app.tab, headerHeight: 24 }] : []),
     ],
   });
   return { buffer, filename: `${w.file}_${year}.xlsx` };

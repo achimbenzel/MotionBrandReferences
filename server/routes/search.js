@@ -93,6 +93,10 @@ router.get('/api/search', async (req, res) => {
     const score = scoreMatch(terms, e.name || '', [e.name, e.notes, e.category, e.link].filter(Boolean).join(' ').toLowerCase());
     if (score > 0) results.push({ kind: 'expense', id: e.id, title: e.name || 'Expense', subtitle: `Expense · ${e.amount} ${db.settings?.currency || 'EUR'} ${e.interval === 'once' ? 'once' : `/ ${e.interval}`}`, score });
   }
+  for (const x of db.income || []) {
+    const score = scoreMatch(terms, x.name || '', [x.name, x.notes].filter(Boolean).join(' ').toLowerCase());
+    if (score > 0) results.push({ kind: 'income', id: x.id, title: x.name || 'Income', subtitle: `Recurring income · ${x.amount} ${db.settings?.currency || 'EUR'} / ${x.interval}`, score });
+  }
   for (const a of db.achievements || []) {
     const score = scoreMatch(terms, a.title || '', [a.title, a.description, a.group].filter(Boolean).join(' ').toLowerCase());
     if (score > 0) results.push({ kind: 'achievement', id: a.id, title: a.title || 'Achievement', subtitle: `Achievement · ${a.group}${a.achievedAt ? ' · unlocked' : ''}`, score });

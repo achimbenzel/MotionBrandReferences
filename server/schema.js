@@ -685,6 +685,8 @@ export function normalizeDB(db) {
   db.content = db.content.filter((c) => c && typeof c === 'object').map(normalizeContent);
   if (!Array.isArray(db.expenses)) db.expenses = [];                  // what the business costs
   db.expenses = db.expenses.filter((e) => e && typeof e === 'object').map(normalizeExpense);
+  if (!Array.isArray(db.income)) db.income = [];                      // money that comes in regularly (retainers …)
+  db.income = db.income.filter((x) => x && typeof x === 'object').map(normalizeIncome);
   if (!Array.isArray(db.contentLibrary)) db.contentLibrary = [];      // saved hooks, hashtag sets, calls to action
   db.contentLibrary = db.contentLibrary.filter((x) => x && typeof x === 'object').map(normalizeContentSnippet).filter((x) => x.text.trim());
   if (!Array.isArray(db.achievements)) db.achievements = [];          // milestones (gamified)
@@ -845,6 +847,23 @@ export function normalizeExpense(e) {
     notes: str(e?.notes, 2000),
     createdAt: num(e?.createdAt, 0, 1e14, 0) || Date.now(),
     updatedAt: num(e?.updatedAt, 0, 1e14, 0) || Date.now(),
+  };
+}
+/** Money that comes in regularly — a retainer, a fixed monthly fee … (the rhythm fields work as for an expense). */
+export const INCOME_INTERVALS = ['month', 'quarter', 'half', 'year'];
+export function normalizeIncome(x) {
+  const amount = Number(x?.amount);
+  return {
+    id: typeof x?.id === 'string' && ID.test(x.id) ? x.id : nanoid(10),
+    name: str(x?.name, 120),
+    clientId: typeof x?.clientId === 'string' && ID.test(x.clientId) ? x.clientId : '', // the client it comes from (optional)
+    amount: Number.isFinite(amount) && amount > 0 ? Math.round(Math.min(amount, 1e9) * 100) / 100 : 0,
+    interval: INCOME_INTERVALS.includes(x?.interval) ? x.interval : 'month',
+    start: isDay(x?.start) ? x.start : new Date().toISOString().slice(0, 10),
+    end: isDay(x?.end) ? x.end : '',
+    notes: str(x?.notes, 2000),
+    createdAt: num(x?.createdAt, 0, 1e14, 0) || Date.now(),
+    updatedAt: num(x?.updatedAt, 0, 1e14, 0) || Date.now(),
   };
 }
 /** What you want to earn with it: your pay (net, a month), tax on profit, a reserve, your hourly rate, weeks off a year. */

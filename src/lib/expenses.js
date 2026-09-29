@@ -126,18 +126,54 @@ export function monthsOf(list, year) {
 }
 
 /**
- * What has to come in each month: the costs (business part, ⌀ over the
- * year), plus your pay before tax — pay ÷ (1 − tax on profit) — plus a
- * reserve on top. → { costs, pay, gross, tax, reserve, total, hours, weekHours }
+ * What has to come in each month, for a view:
+ * - business — the business costs (⌀ over the year);
+ * - private — what you take home: your pay, or your private costs if they're
+ *   more (or no pay is set) — before tax: ÷ (1 − tax on profit);
+ * - both — the two together.
+ * A reserve goes on top. Recurring income (retainers) already covers part of
+ * it: `rest` is what's still to find. → { view, costs, need, needIsPrivate,
+ * gross, tax, reserve, total, income, rest, hours, weekHours, restHours }
  */
-export function targetOf(monthlyCosts, f = {}) {
-  const tax = Math.min(0.8, Math.max(0, (f.taxRate || 0) / 100));
+export function targetFor(view, monthly = {}, f = {}, income = 0) {
+  const taxRate = Math.min(0.8, Math.max(0, (f.taxRate || 0) / 100));
+  const costs = view === 'private' ? 0 : Math.max(0, monthly.business || 0);
   const pay = Math.max(0, f.salary || 0);
-  const gross = pay / (1 - tax);
-  const base = monthlyCosts + gross;
+  const priv = Math.max(0, monthly.private || 0);
+  const need = view === 'business' ? 0 : Math.max(pay, priv);
+  const gross = need / (1 - taxRate);
+  const base = costs + gross;
   const reserve = base * Math.max(0, f.reserve || 0) / 100;
   const total = base + reserve;
-  const hours = f.rate > 0 ? total / f.rate : null;
+  const rest = Math.max(0, total - Math.max(0, income));
+  const perHour = (v) => (f.rate > 0 ? v / f.rate : null);
+  const hours = perHour(total);
   const weeks = 52 - Math.min(20, Math.max(0, f.weeksOff ?? 6));
-  return { costs: monthlyCosts, pay, gross, tax: gross - pay, reserve, total, hours, weekHours: hours == null ? null : (hours * 12) / weeks };
+  return {
+    view, costs, need, needIsPrivate: need > 0 && priv > pay, gross, tax: gross - need, reserve, total,
+    income: Math.max(0, income), rest, hours, weekHours: hours == null ? null : (hours * 12) / weeks, restHours: perHour(rest),
+  };
 }
+/** The same for business costs and your pay alone (no private costs, no income) → { costs, pay, gross, tax, reserve, total, hours, weekHours }. */
+export function targetOf(monthlyCosts, f = {}) {
+  const t = targetFor('both', { business: monthlyCosts, private: 0 }, f);
+  return { costs: t.costs, pay: t.need, gross: t.gross, tax: t.tax, reserve: t.reserve, total: t.total, hours: t.hours, weekHours: t.weekHours };
+}
+
+// ---- Recurring income: retainers and other money that comes in regularly (same rhythm fields as an expense).
+export const INCOME_INTERVALS = INTERVALS.filter((i) => i.key !== 'once');
+/** What comes in each month of a year → [12 sums], and the items per month. */
+export function incomeMonthsOf(list, year) {
+  const months = Array.from({ length: 12 }, () => ({ sum: 0, items: [] }));
+  for (const x of list || []) {
+    for (const date of paymentsIn(x, `${year}-01-01`, `${year}-12-31`)) {
+      const m = months[Number(date.slice(5, 7)) - 1];
+      m.sum += x.amount; m.items.push({ x, date });
+    }
+  }
+  return months;
+}
+/** What comes in a month from what's running on that day (a quarterly 900 → 300). */
+export const incomeNow = (list, day = todayIso()) => (list || [])
+  .filter((x) => x.start <= day && (!x.end || x.end >= day))
+  .reduce((n, x) => n + (x.amount || 0) / (intervalOf(x.interval).months || 1), 0);

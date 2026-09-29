@@ -557,10 +557,13 @@ export const api = {
   async removeContentMedia(id, mediaId) { return request(`/api/content/${id}/media/${mediaId}`, { method: 'DELETE' }); }, // → { item, trashId }
 
   // --- Expenses (what the business costs) ---
-  async listExpenses() { return request('/api/expenses'); }, // → { expenses, finance, invoices, currency }
+  async listExpenses() { return request('/api/expenses'); }, // → { expenses, income, finance, invoices, clients, currency }
   async createExpense(body) { const { expense } = await request('/api/expenses', { method: 'POST', json: body }); return expense; },
   async updateExpense(id, patch) { const { expense } = await request(`/api/expenses/${id}`, { method: 'PATCH', json: patch }); return expense; },
   async removeExpense(id) { return request(`/api/expenses/${id}`, { method: 'DELETE' }); }, // → { trashId }
+  async createIncome(body) { const { income } = await request('/api/income', { method: 'POST', json: body }); return income; },
+  async updateIncome(id, patch) { const { income } = await request(`/api/income/${id}`, { method: 'PATCH', json: patch }); return income; },
+  async removeIncome(id) { return request(`/api/income/${id}`, { method: 'DELETE' }); }, // → { trashId }
   expensesExportUrl: (year, lang = 'de') => `/api/expenses/export.xlsx?year=${year}&lang=${lang}`,
   // --- Achievements ---
   async getAchievements() { return request('/api/achievements'); }, // → { achievements, stats, metrics, unlocked, ideas }

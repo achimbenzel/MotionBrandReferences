@@ -7107,7 +7107,7 @@ button.ach-card.holo:hover .ach-holo i { opacity: .8; }
 }
 
 /* ---------------------------------------------------------------- Expenses */
-.ex-page { --ex-out: #f58b7c; --ex-priv: #a58bff; }
+.ex-page { --ex-out: #f58b7c; --ex-priv: #a58bff; --ex-in: #4ade80; }
 .ex-head-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ex-view button { padding: 7px 12px; }
 .ex-year { display: inline-flex; align-items: center; gap: 2px; height: 38px; padding: 0 3px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
@@ -7126,7 +7126,6 @@ button.ach-card.holo:hover .ach-holo i { opacity: .8; }
 .ex-tile.accent b { color: var(--accent); }
 .ex-progress { display: block; height: 6px; margin: 2px 0; border-radius: 999px; background: rgba(255, 255, 255, .07); overflow: hidden; }
 .ex-progress i { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width .4s ease; }
-.ex-progress.priv i { background: var(--ex-priv); }
 
 .ex-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; align-items: start; margin-bottom: 28px; }
 .ex-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
@@ -7142,7 +7141,9 @@ button.ach-card.holo:hover .ach-holo i { opacity: .8; }
 .ex-month small { height: 20px; line-height: 20px; text-align: center; font-size: 11px; color: var(--text-faint); white-space: nowrap; overflow: hidden; }
 .ex-month.now small { color: var(--accent); font-weight: 700; }
 .ex-month.now .ex-bars { background: rgba(255, 255, 255, .035); }
-.ex-bars { flex: 1; min-height: 0; display: flex; align-items: flex-end; justify-content: center; gap: 2px; border-radius: 6px 6px 0 0; }
+.ex-bars { position: relative; flex: 1; min-height: 0; display: flex; align-items: flex-end; justify-content: center; gap: 2px; border-radius: 6px 6px 0 0; }
+.ex-ret { position: absolute; left: 1px; right: 1px; bottom: 0; border-top: 2px solid rgba(74, 222, 128, .6); border-radius: 3px 3px 0 0; background: linear-gradient(180deg, rgba(74, 222, 128, .12), rgba(74, 222, 128, .03)); pointer-events: none; }
+.ex-bars > i, .ex-bars > .ex-stack { position: relative; }
 .ex-bars > i, .ex-stack { flex: 1; max-width: 14px; border-radius: 4px 4px 0 0; transform-origin: bottom; animation: ex-grow .7s cubic-bezier(.2, .7, .2, 1) both; transition: filter .15s; }
 .ex-bars > i.in { background: var(--accent); }
 .ex-stack { display: flex; flex-direction: column; overflow: hidden; }
@@ -7158,6 +7159,7 @@ button.ach-card.holo:hover .ach-holo i { opacity: .8; }
 .ex-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }
 .ex-legend i.out { background: var(--ex-out); }
 .ex-legend i.priv { background: var(--ex-priv); }
+.ex-legend i.ret { background: rgba(74, 222, 128, .18); box-shadow: inset 0 2px 0 rgba(74, 222, 128, .7); }
 .ex-legend i.solid { background: var(--text-muted); }
 .ex-legend i.striped { background: var(--text-muted); opacity: .5; background-image: repeating-linear-gradient(135deg, rgba(0, 0, 0, .45) 0 2px, transparent 2px 4px); }
 .ex-legend i.in { background: var(--accent); }
@@ -7186,6 +7188,10 @@ button.ach-card.holo:hover .ach-holo i { opacity: .8; }
 .ex-calc-sum > div b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
 .ex-calc-sum > div.total { margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--border); color: var(--text); font-weight: 600; align-items: baseline; }
 .ex-calc-sum > div.total b { color: var(--accent); font-size: 19px; font-weight: 800; }
+.ex-calc-sum > div.total em { font-style: normal; font-weight: 400; color: var(--text-faint); }
+.ex-calc-sum > div.rest { color: var(--text); font-weight: 600; }
+.ex-calc-sum > div em { font-style: normal; font-weight: 400; color: var(--text-faint); }
+.ex-calc-sum > div.rest b { color: var(--ex-in); font-weight: 800; }
 .ex-calc-sum .hint b { color: var(--text-muted); }
 .ex-calc-private.over b { color: var(--danger); }
 
@@ -7197,6 +7203,24 @@ button.ach-card.holo:hover .ach-holo i { opacity: .8; }
 .ex-up.cancel { background: rgba(250, 204, 21, .06); }
 .ex-up.cancel:hover { background: rgba(250, 204, 21, .11); }
 .ex-up.cancel .ex-up-what b { color: #facc15; }
+.ex-up.in .ex-up-v { color: var(--ex-in); }
+
+.ex-card > header .ex-card-add { margin-left: auto; }
+.ex-inc { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 10px; border: 0; border-radius: 10px; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.ex-inc:hover { background: var(--surface-3); }
+.ex-inc.ended { opacity: .55; }
+.ex-inc-main { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.ex-inc-main b { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ex-inc-main small { font-size: 12px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ex-inc-v { display: flex; flex-direction: column; align-items: flex-end; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ex-inc-v b { font-size: 14px; color: var(--ex-in); }
+.ex-inc-v small { font-size: 11.5px; color: var(--text-faint); }
+.ex-card .ex-inc-editor { margin: 4px 0 8px; border: 1px solid var(--border-strong); border-radius: 12px; }
+.ex-inc-editor .ex-f { flex: 1 1 150px; }
+.ex-income-sum { display: flex; justify-content: space-between; margin-top: 8px; padding: 8px 10px 0; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-muted); }
+.ex-income-sum { flex-wrap: wrap; column-gap: 12px; }
+.ex-income-sum b { margin-left: auto; color: var(--ex-in); font-variant-numeric: tabular-nums; }
+.ex-income-sum small { flex-basis: 100%; text-align: right; font-size: 11.5px; color: var(--text-faint); }
 
 .ex-list-head { display: flex; align-items: center; gap: 10px 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .ex-list-head h2 { margin: 0; font-size: 18px; }
@@ -7303,6 +7327,8 @@ button.ach-card.holo:hover .ach-holo i { opacity: .8; }
 .dash-money-row svg { color: var(--text-faint); }
 .dash-money-row.cancel { color: #facc15; }
 .dash-money-row.cancel svg { color: #facc15; }
+.dash-money-row.in svg, .dash-money-row.in .dash-money-row-v { color: #4ade80; }
+.dash-money-nums .in b { color: #4ade80; }
 .dash-money-row-date { color: var(--text-muted); white-space: nowrap; }
 .dash-money-row-what { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dash-money-row-v { color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }

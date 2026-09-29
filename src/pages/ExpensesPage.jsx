@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Plus, Wallet, ChevronLeft, ChevronRight, FileSpreadsheet, ExternalLink, Trash2, Check, X, Search, BellRing, CalendarClock, Target, TrendingUp, Tag,
-  Copy, Calculator,
+  Copy, Calculator, Repeat,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { fmtMoney } from '../lib/clients.js';
@@ -11,7 +11,7 @@ import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
 import {
   EXPENSE_CATEGORIES, EXPENSE_IDEAS, INTERVALS, categoryOf, intervalOf, paymentsIn, yearOf, monthlyOf, nextPayment, cancelBy, monthsOf,
-  targetOf, isActive, todayIso, VIEWS, partOf, inView,
+  targetFor, isActive, todayIso, VIEWS, partOf, inView, incomeMonthsOf, incomeNow, INCOME_INTERVALS,
 } from '../lib/expenses.js';
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => new Date(2024, i, 1).toLocaleDateString(undefined, { month: 'short' }));
@@ -21,6 +21,7 @@ const load = (k, f) => { try { return localStorage.getItem(k) || f; } catch { re
 const save = (k, v) => { try { localStorage.setItem(k, v); } catch { /* private window */ } };
 const AHEAD = 45; // days of "coming up"
 const VIEW_WORD = { business: 'business', private: 'private', both: 'business + private' };
+const TARGET_WORD = { business: 'business', private: 'private', both: 'all' };
 
 /**
  * Expenses: what the business costs — subscriptions, insurance, hardware …
@@ -28,7 +29,8 @@ const VIEW_WORD = { business: 'business', private: 'private', both: 'business + 
  * part (the rest is private) and notice period. Per year and month, by
  * category — the business part, the private part or both; what's coming up
  * (and what to cancel in time) — and what has to come in each month to cover
- * it all and pay you, against what you've invoiced.
+ * it (in the same view) and pay you, against what you've invoiced; money that
+ * comes in regularly (retainers) is taken off what's still to find.
  */
 export default function ExpensesPage({ reloadKey }) {
   const toast = useToast();
@@ -39,6 +41,7 @@ export default function ExpensesPage({ reloadKey }) {
   const [error, setError] = useState(null);
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [editing, setEditing] = useState(null); // id | 'new'
+  const [editingIncome, setEditingIncome] = useState(null); // id | 'new'
   const [show, setShowState] = useState(() => load('exShow', 'active')); // active | ended | all
   const [q, setQ] = useState('');
   const setShow = (v) => { setShowState(v); save('exShow', v); };
@@ -53,7 +56,13 @@ export default function ExpensesPage({ reloadKey }) {
   // From the search: open that one.
   useEffect(() => {
     const id = params.get('e');
-    if (id && data) { setEditing(id); setShow('all'); setParams({}, { replace: true }); }
+    const inc = params.get('i');
+    if (id && data) {
+      const e = data.expenses.find((x) => x.id === id);
+      if (e && !inView(e, view)) setView('both'); // a private one opened from the search under Business …
+      setEditing(id); setShow('all'); setParams({}, { replace: true });
+    }
+    if (inc && data) { setEditingIncome(inc); setParams({}, { replace: true }); }
   }, [params, data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const today = todayIso();
@@ -85,7 +94,12 @@ export default function ExpensesPage({ reloadKey }) {
     const sum = view === 'business' ? business : view === 'private' ? priv : all;
     return { all, business, private: priv, sum, count, recurring, months, invoiced, paid, byCat };
   }, [list, year, data, today, view]);
-  const target = targetOf(sums.business / 12, finance);
+  const income = useMemo(() => data?.income || [], [data]);
+  const incMonths = useMemo(() => incomeMonthsOf(income, year), [income, year]);
+  const incYear = incMonths.reduce((n, m) => n + m.sum, 0);
+  // Recurring income a month: what's running today (this year), or the year's average (another year).
+  const incPerMonth = year === Number(today.slice(0, 4)) ? incomeNow(income, today) : incYear / 12;
+  const target = targetFor(view, { business: sums.business / 12, private: sums.private / 12 }, finance, incPerMonth);
   const thisMonth = Number(today.slice(5, 7)) - 1;
   const isNow = year === Number(today.slice(0, 4));
   const earned = isNow ? sums.invoiced[thisMonth] : 0;
@@ -99,8 +113,9 @@ export default function ExpensesPage({ reloadKey }) {
     const mine = list.filter((e) => inView(e, view));
     const pays = mine.flatMap((e) => paymentsIn(e, today, until).map((date) => ({ kind: 'pay', date, e })));
     const cancels = mine.map((e) => ({ e, date: cancelBy(e, today) })).filter((x) => x.date && x.date >= today && x.date <= addDays(today, 60)).map((x) => ({ kind: 'cancel', ...x }));
-    return [...cancels, ...pays].sort((a, b) => a.date.localeCompare(b.date) || (a.kind === 'cancel' ? -1 : 1)).slice(0, 8);
-  }, [list, today, view]);
+    const ins = income.flatMap((x) => paymentsIn(x, today, until).map((date) => ({ kind: 'in', date, e: x })));
+    return [...cancels, ...ins, ...pays].sort((a, b) => a.date.localeCompare(b.date) || (a.kind === 'cancel' ? -1 : 1)).slice(0, 8);
+  }, [list, income, today, view]);
 
   const needle = q.trim().toLowerCase();
   const shown = list.filter((e) => inView(e, view) && (show === 'all' || (show === 'active' ? isActive(e, today) : !isActive(e, today)))
@@ -139,6 +154,22 @@ export default function ExpensesPage({ reloadKey }) {
       toast(`New price from ${fmtDay(from, { day: 'numeric', month: 'long', year: 'numeric' })}`);
     } catch (err) { toast(`Could not change it: ${err.message}`, 'error'); }
   };
+  const saveIncome = async (x) => {
+    const body = { name: x.name, clientId: x.clientId || '', amount: Number(String(x.amount).replace(',', '.')) || 0, interval: x.interval, start: x.start, end: x.end || '', notes: x.notes || '' };
+    try {
+      if (x.id) { const y = await api.updateIncome(x.id, body); setData((d) => ({ ...d, income: d.income.map((z) => (z.id === y.id ? y : z)) })); }
+      else { const y = await api.createIncome(body); setData((d) => ({ ...d, income: [...d.income, y] })); }
+      setEditingIncome(null);
+    } catch (err) { toast(`Could not save: ${err.message}`, 'error'); }
+  };
+  const removeIncome = async (x) => {
+    try {
+      const { trashId } = await api.removeIncome(x.id);
+      setData((d) => ({ ...d, income: d.income.filter((z) => z.id !== x.id) }));
+      setEditingIncome(null);
+      toast(`“${x.name}” removed`, 'ok', { label: 'Undo', onClick: async () => { await api.restoreTrash(trashId); setData(await api.listExpenses()); } });
+    } catch (err) { toast(err.message, 'error'); }
+  };
   const duplicate = async (e) => {
     try {
       const x = await api.createExpense({ ...e, id: undefined, name: `${e.name} (copy)` });
@@ -150,12 +181,12 @@ export default function ExpensesPage({ reloadKey }) {
   if (error) return <div className="center-msg">Couldn’t load: {error}</div>;
   if (!data) return <div className="spinner" />;
 
-  // The chart: what goes out in this view; invoiced and the target beside it — under Private, your pay instead.
-  const showIn = view !== 'private';
-  const line = view === 'private' ? salary : target.total;
-  const maxBar = Math.max(line, ...sums.months.map(outOf), ...(showIn ? sums.invoiced : []), 1);
-  const privThisMonth = isNow ? sums.months[thisMonth].private : 0;
+  // The chart: what goes out in this view, what was invoiced, recurring income behind them, and this view's target.
+  const line = target.total;
+  const maxBar = Math.max(line, ...sums.months.map(outOf), ...sums.invoiced, ...incMonths.map((m) => m.sum), 1);
   const privLeft = salary - sums.private / 12;
+  const clientName = new Map((data.clients || []).map((c) => [c.id, c.name]));
+  const blankIncome = { name: '', clientId: '', amount: '', interval: 'month', start: today, end: '', notes: '' };
   const blank = { name: '', category: view === 'private' ? 'home' : 'software', amount: '', interval: 'month', start: today, end: '', share: view === 'private' ? 0 : 100, notice: 0, link: '', notes: '' };
 
   return (
@@ -176,7 +207,7 @@ export default function ExpensesPage({ reloadKey }) {
           </div>
           <Menu align="right" title="Export" trigger={<button type="button" className="btn" disabled={!list.length}><FileSpreadsheet size={16} /> <span className="ex-hide-s">Export</span></button>}
             items={[
-              { heading: `${year} as Excel — every payment, by category and month` },
+              { heading: `${year} as Excel — every payment, by category and month, and the recurring income` },
               { label: 'Deutsch', icon: <FileSpreadsheet size={15} />, onClick: () => { window.location.href = api.expensesExportUrl(year, 'de'); } },
               { label: 'English', icon: <FileSpreadsheet size={15} />, onClick: () => { window.location.href = api.expensesExportUrl(year, 'en'); } },
             ]} />
@@ -199,19 +230,15 @@ export default function ExpensesPage({ reloadKey }) {
           <small>running now: {money(sums.recurring)} / month</small>
         </div>
         <div className="ex-tile accent">
-          <span><Target size={12} /> To earn a month</span>
+          <span><Target size={12} /> To earn a month · {TARGET_WORD[view]}</span>
           <b>{money(target.total)}</b>
-          <small>{target.hours != null ? `${Math.ceil(target.hours)} h at ${money(finance.rate)}/h · ${Math.round(target.weekHours)} h a week` : 'Set your pay and rate below'}</small>
+          <small>
+            {target.income > 0 ? (target.rest > 0 ? `${money(target.income)} recurring · ${money(target.rest)} to find` : `Covered by recurring income · ${money(target.income - target.total)} over`)
+              : target.hours != null ? `${Math.ceil(target.hours)} h at ${money(finance.rate)}/h · ${Math.round(target.weekHours)} h a week`
+                : view === 'business' ? 'Set your hourly rate below' : 'Set your pay and rate below'}
+          </small>
         </div>
-        {isNow && view === 'private' && (
-          <div className="ex-tile">
-            <span><Wallet size={12} /> {MONTHS[thisMonth]} · private</span>
-            <b>{money(privThisMonth)} {salary > 0 && <em>/ {money(salary)} pay</em>}</b>
-            {salary > 0 && <span className="ex-progress priv"><i style={{ width: `${Math.min(100, (privThisMonth / salary) * 100)}%` }} /></span>}
-            <small>{salary > 0 ? `${money(salary - privThisMonth)} of your pay left` : 'Set your pay below to see what’s left'}</small>
-          </div>
-        )}
-        {isNow && view !== 'private' && (
+        {isNow && (
           <div className="ex-tile">
             <span><TrendingUp size={12} /> {MONTHS[thisMonth]} so far</span>
             <b>{money(earned)} <em>/ {money(target.total)}</em></b>
@@ -224,20 +251,20 @@ export default function ExpensesPage({ reloadKey }) {
       <div className="ex-grid">
         <div className="ex-col">
           <section className="ex-card">
-            <header><CalendarClock size={14} /> <b>Month by month</b> <em>— {view === 'business' ? 'paid out (business part) and invoiced, against what has to come in'
-              : view === 'private' ? 'your private costs, against your pay' : 'business and private costs and invoiced, against what has to come in'}</em></header>
+            <header><CalendarClock size={14} /> <b>Month by month</b> <em>— {view === 'business' ? 'paid out (business part)' : view === 'private' ? 'your private costs' : 'business and private costs'} and invoiced, against what has to come in</em></header>
             <div className="ex-chart" style={{ '--t': line / maxBar }}>
               {sums.months.map((m, i) => {
                 const items = m.items.filter((x) => inView(x.e, view));
                 return (
                   <div key={i} className={`ex-month ${isNow && i === thisMonth ? 'now' : ''}`}
-                    title={`${MONTHS[i]}: ${view === 'both' ? `business ${money(m.business)} + private ${money(m.private)}` : `${view} ${money(outOf(m))}`}${items.length ? ` (${items.map((x) => x.e.name).slice(0, 6).join(', ')}${items.length > 6 ? ' …' : ''})` : ''}${showIn ? ` · invoiced ${money(sums.invoiced[i])}` : ''}`}>
+                    title={`${MONTHS[i]}: ${view === 'both' ? `business ${money(m.business)} + private ${money(m.private)}` : `${view} ${money(outOf(m))}`}${items.length ? ` (${items.map((x) => x.e.name).slice(0, 6).join(', ')}${items.length > 6 ? ' …' : ''})` : ''} · invoiced ${money(sums.invoiced[i])}${incMonths[i].sum ? ` · recurring income ${money(incMonths[i].sum)}` : ''}`}>
                     <div className="ex-bars">
+                      {incMonths[i].sum > 0 && <span className="ex-ret" style={{ height: `${(incMonths[i].sum / maxBar) * 100}%` }} />}
                       <span className="ex-stack" style={{ height: `${(outOf(m) / maxBar) * 100}%` }}>
                         {view !== 'business' && m.private > 0 && <i className="priv" style={{ flexGrow: m.private }} />}
                         {view !== 'private' && m.business > 0 && <i className="out" style={{ flexGrow: m.business }} />}
                       </span>
-                      {showIn && <i className="in" style={{ height: `${(sums.invoiced[i] / maxBar) * 100}%` }} />}
+                      <i className="in" style={{ height: `${(sums.invoiced[i] / maxBar) * 100}%` }} />
                     </div>
                     <small>{MONTHS[i]}</small>
                   </div>
@@ -248,8 +275,9 @@ export default function ExpensesPage({ reloadKey }) {
             <div className="ex-legend">
               {view !== 'private' && <span><i className="out" /> {view === 'both' ? 'business' : 'paid out'}</span>}
               {view !== 'business' && <span><i className="priv" /> {view === 'both' ? 'private' : 'paid out (private)'}</span>}
-              {showIn && <span><i className="in" /> invoiced</span>}
-              {line > 0 && <span><i className="line" /> {view === 'private' ? 'your pay' : 'to earn a month'}</span>}
+              <span><i className="in" /> invoiced</span>
+              {incYear > 0 && <span><i className="ret" /> recurring income</span>}
+              {line > 0 && <span><i className="line" /> to earn a month</span>}
             </div>
           </section>
 
@@ -275,22 +303,30 @@ export default function ExpensesPage({ reloadKey }) {
           <section className="ex-card ex-calc">
             <header><Calculator size={14} /> <b>What has to come in</b></header>
             <div className="ex-calc-fields">
-              <label><span>Your pay a month <em>net</em></span><span className="ex-in"><input className="input" inputMode="decimal" value={finance.salary || ''} placeholder="0" onChange={(e) => setFinance({ salary: Number(e.target.value.replace(',', '.')) || 0 })} /><i>{cur}</i></span></label>
+              <label><span>Your pay a month <em>net</em></span><span className="ex-in"><input className="input" inputMode="decimal" value={finance.salary || ''} placeholder={sums.private > 0 ? 'your private costs' : '0'} onChange={(e) => setFinance({ salary: Number(e.target.value.replace(',', '.')) || 0 })} /><i>{cur}</i></span></label>
               <label><span>Tax on profit</span><span className="ex-in"><input className="input" inputMode="decimal" value={finance.taxRate ?? ''} onChange={(e) => setFinance({ taxRate: Number(e.target.value) || 0 })} /><i>%</i></span></label>
               <label><span>Reserve on top</span><span className="ex-in"><input className="input" inputMode="decimal" value={finance.reserve ?? ''} onChange={(e) => setFinance({ reserve: Number(e.target.value) || 0 })} /><i>%</i></span></label>
               <label><span>Your hourly rate</span><span className="ex-in"><input className="input" inputMode="decimal" value={finance.rate || ''} placeholder="—" onChange={(e) => setFinance({ rate: Number(e.target.value.replace(',', '.')) || 0 })} /><i>{cur}/h</i></span></label>
               <label><span>Weeks off a year</span><span className="ex-in"><input className="input" inputMode="numeric" value={finance.weeksOff ?? ''} onChange={(e) => setFinance({ weeksOff: Number(e.target.value) || 0 })} /><i>weeks</i></span></label>
             </div>
             <div className="ex-calc-sum">
-              <div><span>Costs, ⌀ a month</span><b>{money(target.costs)}</b></div>
-              {target.pay > 0 && <div><span>Your pay</span><b>{money(target.pay)}</b></div>}
+              {view !== 'private' && <div><span>Business costs, ⌀ a month</span><b>{money(target.costs)}</b></div>}
+              {view !== 'business' && <div><span>{target.needIsPrivate || !salary ? 'Your private costs, ⌀' : 'Your pay'} <em>net</em></span><b>{money(target.need)}</b></div>}
               {target.tax > 0 && <div><span>+ tax on it ({finance.taxRate} %)</span><b>{money(target.tax)}</b></div>}
               {target.reserve > 0 && <div><span>+ reserve ({finance.reserve} %)</span><b>{money(target.reserve)}</b></div>}
-              <div className="total"><span>= to earn a month</span><b>{money(target.total)}</b></div>
-              {target.hours != null && (
-                <p className="hint">At {money(finance.rate)}/h that’s <b>{Math.ceil(target.hours)} billable hours</b> a month — about <b>{Math.round(target.weekHours)} h a week</b> over {52 - (finance.weeksOff ?? 6)} working weeks.</p>
+              <div className="total"><span>= to earn a month <em>· {TARGET_WORD[view]}</em></span><b>{money(target.total)}</b></div>
+              {target.income > 0 && (
+                <>
+                  <div><span>− recurring income{isNow ? ', running now' : `, ⌀ in ${year}`}</span><b>{money(target.income)}</b></div>
+                  <div className="rest"><span>{target.rest > 0 ? '= still to find' : '= covered, left over'}</span><b>{money(target.rest > 0 ? target.rest : target.income - target.total)}</b></div>
+                </>
               )}
-              {sums.private > 0 && (
+              {target.hours != null && (
+                <p className="hint">At {money(finance.rate)}/h that’s <b>{Math.ceil(target.hours)} billable hours</b> a month — about <b>{Math.round(target.weekHours)} h a week</b> over {52 - (finance.weeksOff ?? 6)} working weeks{target.income > 0 ? (target.rest > 0 ? <>; what’s still to find is <b>{Math.ceil(target.restHours)} h</b></> : '; recurring income covers it') : ''}.</p>
+              )}
+              {view === 'business' && salary > 0 && <p className="hint">Your pay isn’t in here — <b>Private</b> or <b>Both</b> add it.</p>}
+              {view !== 'business' && target.needIsPrivate && salary > 0 && <p className="hint">Your private costs are more than your pay, so they count instead.</p>}
+              {sums.private > 0 && view !== 'business' && !target.needIsPrivate && salary > 0 && (
                 <p className={`hint ex-calc-private ${salary > 0 && privLeft < 0 ? 'over' : ''}`}>
                   Private costs, ⌀ <b>{money(sums.private / 12)}</b> a month, come out of your pay{salary > 0
                     ? (privLeft >= 0 ? <> — <b>{money(privLeft)}</b> of it left.</> : <> — that’s <b>{money(-privLeft)}</b> more than it.</>) : '.'}
@@ -300,13 +336,33 @@ export default function ExpensesPage({ reloadKey }) {
             </div>
           </section>
 
+          <section className="ex-card ex-income">
+            <header>
+              <Repeat size={14} /> <b>Recurring income</b> <em>— retainers & fixed money</em>
+              {editingIncome !== 'new' && <button type="button" className="btn btn-sm btn-ghost ex-card-add" onClick={() => setEditingIncome('new')}><Plus size={14} /> Add</button>}
+            </header>
+            {editingIncome === 'new' && <IncomeEditor initial={blankIncome} clients={data.clients || []} currency={cur} onSave={saveIncome} onCancel={() => setEditingIncome(null)} />}
+            {income.map((x) => (editingIncome === x.id ? (
+              <IncomeEditor key={x.id} initial={x} clients={data.clients || []} currency={cur} onSave={saveIncome} onCancel={() => setEditingIncome(null)} onDelete={() => removeIncome(x)} />
+            ) : (
+              <IncomeRow key={x.id} x={x} client={clientName.get(x.clientId)} today={today} money={money} onOpen={() => setEditingIncome(x.id)} />
+            )))}
+            {!income.length && editingIncome !== 'new' && <p className="hint">A retainer or other money that comes in regularly — it’s taken off what you still have to earn each month.</p>}
+            {(incYear > 0 || incPerMonth > 0) && (
+              <div className="ex-income-sum">
+                <span>{isNow ? 'A month, running now' : `⌀ a month in ${year}`}</span><b>{money(incPerMonth)}</b>
+                <small>{money(incYear)} in {year}</small>
+              </div>
+            )}
+          </section>
+
           <section className="ex-card">
             <header><BellRing size={14} /> <b>Coming up</b> <em>— next {AHEAD} days</em></header>
             {upcoming.length ? upcoming.map((x) => (
-              <button key={`${x.kind}-${x.e.id}-${x.date}`} type="button" className={`ex-up ${x.kind}`} onClick={() => { setShow('all'); setEditing(x.e.id); }}>
+              <button key={`${x.kind}-${x.e.id}-${x.date}`} type="button" className={`ex-up ${x.kind}`} onClick={() => { if (x.kind === 'in') { setEditingIncome(x.e.id); return; } setShow('all'); setEditing(x.e.id); }}>
                 <span className="ex-up-date">{x.date === today ? 'Today' : fmtDay(x.date, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
                 <span className="ex-up-what">{x.kind === 'cancel' ? <><b>Cancel by</b> — {x.e.name} renews {fmtDay(nextPayment(x.e, today))}</> : x.e.name}</span>
-                <span className="ex-up-v">{x.kind === 'cancel' ? `${money(x.e.amount)} / ${intervalOf(x.e.interval).per}` : money(x.e.amount)}</span>
+                <span className="ex-up-v">{x.kind === 'cancel' ? `${money(x.e.amount)} / ${intervalOf(x.e.interval).per}` : x.kind === 'in' ? `+${money(x.e.amount)}` : money(x.e.amount)}</span>
               </button>
             )) : <p className="hint">Nothing due in the next {AHEAD} days.</p>}
           </section>
@@ -456,6 +512,74 @@ function ExpenseEditor({ initial, currency, onSave, onCancel, onDelete, onPrice,
         {onDelete && <button type="button" className="btn btn-sm btn-ghost ex-del" onClick={onDelete}><Trash2 size={14} /> Delete</button>}
         {onPrice && e.interval !== 'once' && !price && <button type="button" className="btn btn-sm btn-ghost" onClick={() => setPrice({ amount: String(initial.amount), from: nextPayment(initial) || todayIso() })}><TrendingUp size={14} /> Price changes…</button>}
         {onDuplicate && <button type="button" className="btn btn-sm btn-ghost" onClick={onDuplicate}><Copy size={14} /> Duplicate</button>}
+        <span className="ex-gap" />
+        <button type="button" className="btn btn-sm" onClick={onCancel}>Cancel</button>
+        <button type="button" className="btn btn-sm btn-primary" onClick={save} disabled={!ok}><Check size={14} /> Save</button>
+      </div>
+    </div>
+  );
+}
+
+function IncomeRow({ x, client, today, money, onOpen }) {
+  const iv = intervalOf(x.interval);
+  const ended = !isActive(x, today);
+  const next = ended ? '' : nextPayment(x, today);
+  return (
+    <button type="button" className={`ex-inc ${ended ? 'ended' : ''}`} onClick={onOpen}>
+      <span className="ex-inc-main">
+        <b>{x.name || 'Untitled'}</b>
+        <small>
+          {[client, `${iv.label.toLowerCase()} since ${fmtDay(x.start, { month: 'short', year: 'numeric' })}`,
+            x.end ? `${ended ? 'ended' : 'until'} ${fmtDay(x.end, { day: 'numeric', month: 'short', year: 'numeric' })}` : '',
+            next ? `next ${fmtDay(next)}` : ''].filter(Boolean).join(' · ')}
+        </small>
+      </span>
+      <span className="ex-inc-v"><b>+{money(x.amount)}</b><small>/ {iv.per}</small></span>
+    </button>
+  );
+}
+
+/** Money that comes in regularly, being added or changed. */
+function IncomeEditor({ initial, clients, currency, onSave, onCancel, onDelete }) {
+  const [x, setX] = useState({ ...initial, amount: initial.amount === '' ? '' : String(initial.amount) });
+  const set = (p) => setX((v) => ({ ...v, ...p }));
+  const ok = x.name.trim() && Number(String(x.amount).replace(',', '.')) > 0 && x.start;
+  const save = () => { if (ok) onSave(x); };
+  // Picking a client names an unnamed one after it.
+  const pickClient = (id) => {
+    const c = clients.find((y) => y.id === id);
+    set({ clientId: id, ...(c && !x.name.trim() ? { name: `Retainer ${c.name}` } : {}) });
+  };
+  const perMonth = (Number(String(x.amount).replace(',', '.')) || 0) / (intervalOf(x.interval).months || 1);
+  return (
+    <div className="ex-editor ex-inc-editor" onKeyDown={(ev) => { if (ev.key === 'Escape') onCancel(); if (ev.key === 'Enter' && ev.target.tagName === 'INPUT') { ev.preventDefault(); save(); } }}>
+      <div className="ex-editor-row">
+        <label className="ex-f grow"><span>Name</span><input className="input" value={x.name} autoFocus placeholder="e.g. Retainer Acme" maxLength={120} onChange={(ev) => set({ name: ev.target.value })} /></label>
+        {clients.length > 0 && (
+          <label className="ex-f"><span>Client <em>optional</em></span>
+            <select className="input" value={x.clientId} onChange={(ev) => pickClient(ev.target.value)}>
+              <option value="">—</option>
+              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </label>
+        )}
+      </div>
+      <div className="ex-editor-row">
+        <label className="ex-f"><span>Amount <em>before tax</em></span><span className="ex-in"><input className="input" inputMode="decimal" value={x.amount} placeholder="0.00" onChange={(ev) => set({ amount: ev.target.value })} /><i>{currency}</i></span></label>
+        <label className="ex-f"><span>Comes in</span>
+          <select className="input" value={x.interval} onChange={(ev) => set({ interval: ev.target.value })}>
+            {INCOME_INTERVALS.map((i) => <option key={i.key} value={i.key}>{i.label}</option>)}
+          </select>
+        </label>
+      </div>
+      <div className="ex-editor-row">
+        <label className="ex-f"><span>First payment</span><input className="input" type="date" value={x.start} onChange={(ev) => set({ start: ev.target.value })} /></label>
+        <label className="ex-f"><span>Until <em>optional</em></span><input className="input" type="date" value={x.end} min={x.start} onChange={(ev) => set({ end: ev.target.value })} /></label>
+      </div>
+      <label className="ex-f grow"><span>Notes</span><input className="input" value={x.notes} placeholder="What it covers, hours included…" onChange={(ev) => set({ notes: ev.target.value })} /></label>
+      {x.interval !== 'month' && perMonth > 0 && <div className="hint">{fmtMoney(Math.round(perMonth * 100) / 100, currency)} a month</div>}
+      <div className="ex-editor-foot">
+        {onDelete && <button type="button" className="btn btn-sm btn-ghost ex-del" onClick={onDelete}><Trash2 size={14} /> Delete</button>}
         <span className="ex-gap" />
         <button type="button" className="btn btn-sm" onClick={onCancel}>Cancel</button>
         <button type="button" className="btn btn-sm btn-primary" onClick={save} disabled={!ok}><Check size={14} /> Save</button>
