@@ -5,7 +5,8 @@ import path from 'node:path';
 import { nanoid } from 'nanoid';
 import { DATA_DIR, TRASH_DIR } from '../config.js';
 import { readDB, mutateDB } from '../db.js';
-import { moveInto, replaceImage, safeRm, moveToTrash, moveRelPaths, sanitize } from '../files.js';
+import { moveInto, replaceImage, safeRm, sanitize, relPairs } from '../files.js';
+import { trashFiles } from '../trashMoves.js';
 import { upload } from '../upload.js';
 import { normalizeClient, normalizeInvoice, str } from '../schema.js';
 import { createRouter, HttpError } from '../http.js';
@@ -178,7 +179,7 @@ router.delete('/api/clients/:id/invoices/:invoiceId', async (req, res) => {
     return { client: c };
   });
   if (!out) return res.status(404).json({ error: 'not_found' });
-  if (rel) await moveRelPaths(clientDir(req.params.id), path.join(TRASH_DIR, trashId), [rel]).catch(() => {});
+  if (rel) await trashFiles(trashId, relPairs(clientDir(req.params.id), path.join(TRASH_DIR, trashId), [rel]));
   res.json({ ...out, trashId });
 });
 
@@ -205,6 +206,6 @@ router.delete('/api/clients/:id', async (req, res) => {
     return true;
   });
   if (!ok) return res.status(404).json({ error: 'not_found' });
-  await moveToTrash(clientDir(req.params.id), path.join(TRASH_DIR, trashId));
+  await trashFiles(trashId, [{ from: clientDir(req.params.id), to: path.join(TRASH_DIR, trashId) }]);
   res.json({ ok: true, trashId });
 });

@@ -7,7 +7,8 @@ import path from 'node:path';
 import { nanoid } from 'nanoid';
 import { DATA_DIR, TRASH_DIR } from '../config.js';
 import { readDB, mutateDB } from '../db.js';
-import { moveInto, replaceImage, safeRm, moveToTrash, extOf } from '../files.js';
+import { moveInto, replaceImage, safeRm, extOf } from '../files.js';
+import { trashFiles } from '../trashMoves.js';
 import { resolveSource, mediaKind as kindOf } from '../sources.js';
 import { upload } from '../upload.js';
 import { str, normalizeMockup, normalizeMockupModel, normalizeMockupHdri } from '../schema.js';
@@ -125,7 +126,7 @@ router.delete('/api/mockups/:id', async (req, res) => {
     return gone;
   });
   if (!m) return res.status(404).json({ error: 'not_found' });
-  await moveToTrash(mockupDir(m.id), path.join(TRASH_DIR, trashId));
+  await trashFiles(trashId, [{ from: mockupDir(m.id), to: path.join(TRASH_DIR, trashId) }]);
   res.json({ ok: true, trashId });
 });
 
@@ -312,7 +313,7 @@ router.delete('/api/mockup-hdris/:id', async (req, res) => {
     return gone;
   });
   if (!h) return res.status(404).json({ error: 'not_found' });
-  await moveToTrash(hdriDir(h.id), path.join(TRASH_DIR, trashId));
+  await trashFiles(trashId, [{ from: hdriDir(h.id), to: path.join(TRASH_DIR, trashId) }]);
   res.json({ ok: true, trashId });
 });
 
@@ -326,6 +327,6 @@ router.delete('/api/mockup-models/:id', async (req, res) => {
     return gone;
   });
   if (!m) return res.status(404).json({ error: 'not_found' });
-  await moveToTrash(modelDir(m.id), path.join(TRASH_DIR, trashId));
+  await trashFiles(trashId, [{ from: modelDir(m.id), to: path.join(TRASH_DIR, trashId) }]);
   res.json({ ok: true, trashId });
 });

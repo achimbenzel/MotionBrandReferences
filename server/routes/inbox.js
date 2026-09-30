@@ -5,7 +5,8 @@ import path from 'node:path';
 import { nanoid } from 'nanoid';
 import { DATA_DIR, TRASH_DIR } from '../config.js';
 import { readDB, mutateDB } from '../db.js';
-import { moveInto, moveFile, safeRm, moveToTrash, extOf } from '../files.js';
+import { moveInto, moveFile, safeRm, extOf } from '../files.js';
+import { trashFiles } from '../trashMoves.js';
 import { upload } from '../upload.js';
 import { str, BLOCK_TITLES } from '../schema.js';
 import { createRouter } from '../http.js';
@@ -94,7 +95,7 @@ router.delete('/api/inbox/:id', async (req, res) => {
   });
   if (!item) return res.status(404).json({ error: 'not_found' });
   if (used) await safeRm(inboxDir(item.id), { recursive: true, force: true }).catch(() => {});
-  else await moveToTrash(inboxDir(item.id), path.join(TRASH_DIR, trashId));
+  else await trashFiles(trashId, [{ from: inboxDir(item.id), to: path.join(TRASH_DIR, trashId) }]);
   res.json({ ok: true, trashId: used ? null : trashId });
 });
 

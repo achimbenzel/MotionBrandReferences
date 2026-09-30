@@ -70,9 +70,14 @@ export async function scanUnused() {
   for (const a of db.achievements || []) if (a?.id) owners.set(`achievement/${a.id}`, refSet(a)); // icon, sticker
   owners.set('dashboard', refSet(db.settings));
 
+  // Files of a trashed item that are still waiting to be moved into the Trash (a locked file) aren't unused.
+  const waiting = (db.trash || []).flatMap((t) => (t.pending || []).map((p) => p.from));
+  const isWaiting = (full) => waiting.some((w) => full === w || full.startsWith(`${w}/`));
+
   const found = [];
   const check = (key, dir) => walkFiles(dir, (_abs, rel, st) => {
     if (now - st.mtimeMs < MIN_AGE_MS) return;
+    if (isWaiting(`${key}/${rel}`)) return;
     const refs = owners.get(key);
     if (refs && (refs.has(rel) || refs.has(path.posix.basename(rel)))) return;
     if (linked.has(`${key}/${rel}`)) return;

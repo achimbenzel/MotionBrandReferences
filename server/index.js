@@ -16,11 +16,13 @@ import { emptyDB } from './schema.js';
 import { drainWrites } from './db.js';
 import { createApp } from './app.js';
 import { purgeExpiredTrash } from './routes/trash.js';
+import { resumePending } from './trashMoves.js';
 
 ensureDirs(emptyDB());
 const app = createApp();
 
 purgeExpiredTrash().catch(() => {}); // clear items older than the TTL on boot
+resumePending(); // files that couldn't be moved into the Trash yet (a locked file) — try again
 
 const server = app.listen(PORT, HOST, () => {
   const shown = HOST === '0.0.0.0' || HOST === '::' ? 'localhost' : HOST.includes(':') ? `[${HOST}]` : HOST;

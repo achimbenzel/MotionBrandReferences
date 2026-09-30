@@ -5,7 +5,8 @@ import path from 'node:path';
 import { nanoid } from 'nanoid';
 import { DATA_DIR, DB_PATH, BACKUP_DIR, TRASH_DIR } from '../config.js';
 import { loadRawDB, readDB, mutateDB, withWriteLock, writeDBAtomic } from '../db.js';
-import { moveRelPaths, pruneEmptyDirs, sniffImageExt, extOf } from '../files.js';
+import { relPairs, pruneEmptyDirs, sniffImageExt, extOf } from '../files.js';
+import { trashFiles } from '../trashMoves.js';
 import { upload } from '../upload.js';
 import { scanPictures, ownerOf, names, renameRefs, smallerName, RASTER, PICTURE_AREAS } from '../pictures.js';
 import { SCHEMA_VERSION, migrationReport, migrateDB, emptyDB } from '../schema.js';
@@ -73,7 +74,7 @@ router.post('/api/maintenance/unused', async (req, res) => {
   const rels = files.map((f) => f.rel);
   const { count, bytes } = summarize(files);
   await mutateDB((db) => { db.trash.unshift({ trashId, kind: 'orphans', deletedAt: Date.now(), data: { rels, count, bytes } }); });
-  await moveRelPaths(DATA_DIR, path.join(TRASH_DIR, trashId), rels);
+  await trashFiles(trashId, relPairs(DATA_DIR, path.join(TRASH_DIR, trashId), rels));
   for (const rel of rels) {
     const root = rel.split('/')[0];
     await pruneEmptyDirs(path.dirname(path.join(DATA_DIR, rel)), path.join(DATA_DIR, root));

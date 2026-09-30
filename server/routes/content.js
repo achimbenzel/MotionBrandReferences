@@ -5,7 +5,8 @@ import path from 'node:path';
 import { nanoid } from 'nanoid';
 import { DATA_DIR, TMP_DIR, TRASH_DIR } from '../config.js';
 import { readDB, mutateDB } from '../db.js';
-import { moveInto, safeRm, moveToTrash, moveRelPaths, sanitize, extOf, sniffImageExt } from '../files.js';
+import { moveInto, safeRm, sanitize, extOf, sniffImageExt, relPairs } from '../files.js';
+import { trashFiles } from '../trashMoves.js';
 import { upload } from '../upload.js';
 import {
   normalizeContent, normalizeContentMedia, normalizeContentBeat, normalizeContentCaptions, normalizeContentChecks, normalizeContentSnippet,
@@ -293,7 +294,7 @@ router.delete('/api/content/:id/media/:mediaId', async (req, res) => {
     return c;
   });
   if (!item) return res.status(404).json({ error: 'not_found' });
-  await moveRelPaths(contentDir(req.params.id), path.join(TRASH_DIR, trashId), [rel]).catch(() => {});
+  await trashFiles(trashId, relPairs(contentDir(req.params.id), path.join(TRASH_DIR, trashId), [rel]));
   res.json({ item, trashId });
 });
 
@@ -342,6 +343,6 @@ router.delete('/api/content/:id', async (req, res) => {
     await safeRm(contentDir(req.params.id), { recursive: true, force: true }).catch(() => {});
     return res.json({ ok: true, removed: true });
   }
-  await moveToTrash(contentDir(req.params.id), path.join(TRASH_DIR, trashId));
+  await trashFiles(trashId, [{ from: contentDir(req.params.id), to: path.join(TRASH_DIR, trashId) }]);
   res.json({ ok: true, trashId });
 });

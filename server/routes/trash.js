@@ -3,6 +3,7 @@ import path from 'node:path';
 import { DATA_DIR, TRASH_DIR, TRASH_TTL_DAYS, TYPE_LABEL } from '../config.js';
 import { readDB, mutateDB } from '../db.js';
 import { safeRm, restoreFromTrash, moveRelPaths } from '../files.js';
+import { removePending, trashedFileUrl } from '../trashMoves.js';
 import { BLOCK_TITLES } from '../schema.js';
 import { restorePictures } from '../pictures.js';
 import { createRouter } from '../http.js';
@@ -33,7 +34,10 @@ export async function purgeExpiredTrash() {
     d.trash = d.trash.filter((t) => !isExpired(t));
     return gone;
   });
-  for (const t of expired) await safeRm(path.join(TRASH_DIR, t.trashId), { recursive: true, force: true }).catch(() => {});
+  for (const t of expired) {
+    await safeRm(path.join(TRASH_DIR, t.trashId), { recursive: true, force: true }).catch(() => {});
+    await removePending(t);
+  }
 }
 
 const trashThumb = (t) => {
@@ -53,7 +57,7 @@ const trashThumb = (t) => {
                           : t.kind === 'contentMedia' ? (t.data.media?.kind === 'image' ? t.data.media.file : null)
                             : t.kind === 'achievement' ? (t.data.iconImage || t.data.sticker)
                               : t.kind === 'pictures' ? t.data.items?.[0]?.rel : null;
-  return rel ? `/data/trash/${t.trashId}/${rel}` : null;
+  return rel ? trashedFileUrl(t, rel) : null;
 };
 
 function describe(t) {
@@ -209,26 +213,29 @@ router.post('/api/trash/:trashId/restore', async (req, res) => {
   if (!restored) return res.status(404).json({ error: 'not_found' });
   if (move) await restoreFromTrash(move.from, move.to);
   if (rels) {
-    await moveRelPaths(from, rels.base, rels.list || []);
+    await moveRelPaths(from, rels.base, rels.list || [], { copyIfLocked: true });
     await safeRm(from, { recursive: true, force: true }).catch(() => {});
   }
   res.json({ ok: true, kind: restored.kind, id: restored.data?.id || restored.data?.planId, type: restored.data?.type });
 });
 
 router.delete('/api/trash/:trashId', async (req, res) => {
-  const ok = await mutateDB((db) => {
+  const entry = await mutateDB((db) => {
     const idx = db.trash.findIndex((t) => t.trashId === req.params.trashId);
-    if (idx === -1) return false;
-    db.trash.splice(idx, 1);
-    return true;
+    if (idx === -1) return null;
+    return db.trash.splice(idx, 1)[0];
   });
-  if (!ok) return res.status(404).json({ error: 'not_found' });
+  if (!entry) return res.status(404).json({ error: 'not_found' });
   await safeRm(path.join(TRASH_DIR, req.params.trashId), { recursive: true, force: true }).catch(() => {});
+  await removePending(entry); // files that never made it into the Trash go too
   res.json({ ok: true });
 });
 
 router.delete('/api/trash', async (_req, res) => {
-  const ids = await mutateDB((db) => { const list = db.trash.map((t) => t.trashId); db.trash = []; return list; });
-  for (const tid of ids) await safeRm(path.join(TRASH_DIR, tid), { recursive: true, force: true }).catch(() => {});
-  res.json({ ok: true, removed: ids.length });
+  const gone = await mutateDB((db) => { const list = db.trash; db.trash = []; return list; });
+  for (const t of gone) {
+    await safeRm(path.join(TRASH_DIR, t.trashId), { recursive: true, force: true }).catch(() => {});
+    await removePending(t);
+  }
+  res.json({ ok: true, removed: gone.length });
 });

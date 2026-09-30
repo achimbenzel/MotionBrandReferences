@@ -5,7 +5,8 @@ import path from 'node:path';
 import { nanoid } from 'nanoid';
 import { DATA_DIR, TRASH_DIR, TYPE_LABEL } from '../config.js';
 import { readDB, mutateDB } from '../db.js';
-import { moveInto, replaceImage, safeRm, moveToTrash, moveRelPaths, extOf } from '../files.js';
+import { moveInto, replaceImage, safeRm, extOf, relPairs } from '../files.js';
+import { trashFiles } from '../trashMoves.js';
 import { upload } from '../upload.js';
 import {
   BLOCK_TYPES, BLOCK_TITLES, BLOCK_TABS, BLOCK_WIDTHS, PLAN_STATUSES, STORYBOARD_ASPECTS, normalizeField, normalizeShot, normalizeAudio,
@@ -614,7 +615,7 @@ router.delete('/api/plans/:id/blocks/:blockId', async (req, res) => {
     return p;
   });
   if (!updated) return res.status(404).json({ error: 'not_found' });
-  await moveRelPaths(planDir(req.params.id), path.join(TRASH_DIR, trashId), entry.data.rels);
+  await trashFiles(trashId, relPairs(planDir(req.params.id), path.join(TRASH_DIR, trashId), entry.data.rels));
   res.json({ plan: updated, trashId });
 });
 
@@ -695,23 +696,25 @@ router.post('/api/plans/:id/blocks/:blockId/file', upload.fields([{ name: 'file'
 
 router.delete('/api/plans/:id/blocks/:blockId/files/:fileId', async (req, res) => {
   const planId = req.params.id;
-  let removed = null; let blockType = null;
+  const trashId = nanoid(10);
+  let removed = null; let rels = null;
   const updated = await mutateDB((db) => {
     const p = db.plans.find((x) => x.id === planId); if (!p) return null;
     const b = findBlock(p, req.params.blockId); if (!b) return null;
     const arr = b.type === 'moodboard' ? b.images : b.files; if (!Array.isArray(arr)) return null;
     const idx = arr.findIndex((f) => f.id === req.params.fileId); if (idx === -1) return null;
-    removed = arr[idx]; blockType = b.type;
+    removed = arr[idx];
     arr.splice(idx, 1);
+    if (b.type === 'files' || b.type === 'pdf') {
+      // Soft delete → Trash (file + its example image), restorable later — saved together with the removal.
+      rels = [removed.file, removed.example].filter(Boolean);
+      db.trash.unshift({ trashId, kind: 'file', deletedAt: Date.now(), data: { planId, blockId: req.params.blockId, item: removed, rels } });
+    }
     return p;
   });
   if (!updated) return res.status(404).json({ error: 'not_found' });
-  if (removed && (blockType === 'files' || blockType === 'pdf')) {
-    // Soft delete → Trash (file + its example image), restorable later.
-    const trashId = nanoid(10);
-    const rels = [removed.file, removed.example].filter(Boolean);
-    await moveRelPaths(planDir(planId), path.join(TRASH_DIR, trashId), rels);
-    await mutateDB((db) => { db.trash.unshift({ trashId, kind: 'file', deletedAt: Date.now(), data: { planId, blockId: req.params.blockId, item: removed, rels } }); });
+  if (rels) {
+    await trashFiles(trashId, relPairs(planDir(planId), path.join(TRASH_DIR, trashId), rels));
     return res.json({ plan: updated, trashId });
   }
   if (removed?.file) await safeRm(path.join(planDir(planId), removed.file), { force: true }).catch(() => {});
@@ -731,6 +734,6 @@ router.delete('/api/plans/:id', async (req, res) => {
     return true;
   });
   if (!ok) return res.status(404).json({ error: 'not_found' });
-  if (move) await moveToTrash(move.from, move.to);
+  if (move) await trashFiles(trashId, [move]);
   res.json({ ok: true, trashId });
 });

@@ -98,22 +98,57 @@ export function safeRm(target, opts) {
   return fsp.rm(target, opts);
 }
 
+// ---- Locked files (Windows) -----------------------------------------------------
+// Windows won't rename a folder while a file in it is open — a video the
+// browser is still streaming, a virus scanner or the search indexer reading a
+// new file — and says EPERM / EACCES / EBUSY. Such a lock is usually gone in a
+// moment, so a rename is tried a few more times before it counts as failed.
+export const LOCKED = new Set(['EPERM', 'EACCES', 'EBUSY']);
+const wait = (ms) => new Promise((r) => { setTimeout(r, ms); });
+// Tests stand in for such a lock: renames of paths containing FS_LOCKED fail
+// until a file data/.unlock exists (only with NODE_ENV=test).
+const TEST_LOCK = process.env.NODE_ENV === 'test' ? process.env.FS_LOCKED || '' : '';
+function rename(from, to) {
+  if (TEST_LOCK && from.includes(TEST_LOCK) && !fs.existsSync(path.join(DATA_DIR, '.unlock'))) {
+    return Promise.reject(Object.assign(new Error(`EPERM: operation not permitted, rename '${from}'`), { code: 'EPERM' }));
+  }
+  return fsp.rename(from, to);
+}
+async function renameRetry(from, to) {
+  for (let i = 0; ; i += 1) {
+    try { return await rename(from, to); } catch (err) {
+      if (!LOCKED.has(err.code) || i >= 5) throw err;
+      await wait(40 * 2 ** i); // 40 … 640 ms — about 1.2 s in all
+    }
+  }
+}
+
 // Move a file or folder, falling back to copy + delete when a plain rename
-// crosses devices (EXDEV). Missing sources are ignored when `ignoreMissing`.
-export async function moveFile(from, to, { ignoreMissing = false } = {}) {
+// crosses devices (EXDEV) — or, with `copyIfLocked`, when something still holds
+// a file in it (the copy is what counts; the leftovers are removed later).
+// Missing sources are ignored when `ignoreMissing`.
+export async function moveFile(from, to, { ignoreMissing = false, copyIfLocked = false } = {}) {
   assertInside(from); assertInside(to);
   await fsp.mkdir(path.dirname(to), { recursive: true });
   try {
-    await fsp.rename(from, to);
+    await renameRetry(from, to);
   } catch (err) {
-    if (err.code === 'EXDEV') {
-      await fsp.cp(from, to, { recursive: true });
-      await fsp.rm(from, { recursive: true, force: true });
+    if (err.code === 'EXDEV' || (copyIfLocked && LOCKED.has(err.code))) {
+      await fsp.cp(from, to, { recursive: true, force: true });
+      await fsp.rm(from, { recursive: true, force: true }).catch((e) => removeLater(from, e));
     } else if (!(ignoreMissing && err.code === 'ENOENT')) {
       throw err;
     }
   }
   invalidateStorage();
+}
+// What couldn't be deleted (still locked) is tried again a few times in the background.
+function removeLater(target, err, attempt = 0) {
+  if (attempt === 0) console.warn(`  Could not remove ${path.relative(DATA_DIR, target)} yet (${err?.code || err?.message}) — trying again shortly.`);
+  if (attempt >= 5) return;
+  setTimeout(() => {
+    safeRm(target, { recursive: true, force: true }).catch((e) => removeLater(target, e, attempt + 1));
+  }, 5000 * 3 ** attempt).unref?.();
 }
 
 // Move an uploaded tmp file into its final folder under `finalName`.
@@ -137,27 +172,24 @@ export async function replaceImage(dir, tmpPath, stem, originalName, oldStored, 
 }
 
 // ---- Trash moves -------------------------------------------------------------
-// Move a whole folder aside (a deleted project / plan / software).
-export async function moveToTrash(from, to) {
-  if (!fs.existsSync(from)) return; // nothing on disk (e.g. a fileless item)
-  await moveFile(from, to, { ignoreMissing: true });
-}
-// Put a trashed folder back, replacing anything at the destination.
+// (Moving a deleted item's files in: see ../trashMoves.js — it may have to wait.)
+// Put a trashed folder back, replacing anything at the destination. Restoring
+// must bring the files back, so a folder that stays locked is copied instead.
 export async function restoreFromTrash(from, to) {
-  if (!fs.existsSync(from)) return;
+  if (!fs.existsSync(from)) return; // nothing on disk, or its files never left their place
   await safeRm(to, { recursive: true, force: true }).catch(() => {});
-  await moveFile(from, to);
+  await moveFile(from, to, { copyIfLocked: true });
 }
+/** Pairs { from, to } for specific files/folders (paths relative to `fromBase`) at the same relative paths under `toBase`. */
+export const relPairs = (fromBase, toBase, rels) => (rels || []).filter(Boolean)
+  .map((rel) => ({ from: path.join(fromBase, rel), to: path.join(toBase, rel) }));
 // Move specific files/folders (paths relative to `fromBase`) to the same
 // relative paths under `toBase`, so restoring is a plain move back.
-export async function moveRelPaths(fromBase, toBase, rels, { ignoreMissing = true } = {}) {
-  for (const rel of rels) {
-    if (!rel) continue;
-    const from = path.join(fromBase, rel);
-    const to = path.join(toBase, rel);
+export async function moveRelPaths(fromBase, toBase, rels, { ignoreMissing = true, copyIfLocked = false } = {}) {
+  for (const { from, to } of relPairs(fromBase, toBase, rels)) {
     assertInside(from); assertInside(to);
     if (!fs.existsSync(from)) continue;
-    await moveFile(from, to, { ignoreMissing });
+    await moveFile(from, to, { ignoreMissing, copyIfLocked });
   }
 }
 // Remove now-empty folders from `dir` up to (not including) `stopAt`.

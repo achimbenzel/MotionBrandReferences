@@ -4,7 +4,8 @@ import path from 'node:path';
 import { nanoid } from 'nanoid';
 import { DATA_DIR, TRASH_DIR } from '../config.js';
 import { readDB, mutateDB } from '../db.js';
-import { replaceImage, safeRm, moveToTrash } from '../files.js';
+import { replaceImage, safeRm } from '../files.js';
+import { trashFiles } from '../trashMoves.js';
 import { upload } from '../upload.js';
 import { str, normalizeSoftware, normalizePlugin, normalizeExprGroup, normalizeTut } from '../schema.js';
 import { createRouter, HttpError } from '../http.js';
@@ -81,7 +82,7 @@ router.delete('/api/software/:id', async (req, res) => {
     return true;
   });
   if (!ok) return res.status(404).json({ error: 'not_found' });
-  if (move) await moveToTrash(move.from, move.to);
+  if (move) await trashFiles(trashId, [move]);
   res.json({ ok: true, trashId });
 });
 

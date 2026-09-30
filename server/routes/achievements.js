@@ -4,7 +4,8 @@ import path from 'node:path';
 import { nanoid } from 'nanoid';
 import { DATA_DIR, TRASH_DIR } from '../config.js';
 import { readDB, mutateDB } from '../db.js';
-import { replaceImage, safeRm, moveToTrash } from '../files.js';
+import { replaceImage, safeRm } from '../files.js';
+import { trashFiles } from '../trashMoves.js';
 import { upload } from '../upload.js';
 import { normalizeAchievement, normalizeAchievementStats, str, isDay, RARITIES, ACHIEVEMENT_METRICS } from '../schema.js';
 import { createRouter, HttpError } from '../http.js';
@@ -123,7 +124,7 @@ router.delete('/api/achievements/:id', async (req, res) => {
     return true;
   });
   if (!found) return res.status(404).json({ error: 'not_found' });
-  await moveToTrash(achievementDir(req.params.id), path.join(TRASH_DIR, trashId));
+  await trashFiles(trashId, [{ from: achievementDir(req.params.id), to: path.join(TRASH_DIR, trashId) }]);
   res.json({ ok: true, trashId });
 });
 
