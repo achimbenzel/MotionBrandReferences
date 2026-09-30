@@ -1710,7 +1710,7 @@ lookup off with `LINK_LOOKUP=off`).
 | `npm run serve` | build, then serve app + API from a single port (4300) |
 | `npm start` | serve a pre-built `dist/` + API from 4300 |
 | `npm test` | API / migration / security tests and the helpers' unit tests (Node's built-in test runner) |
-| `npm run test:e2e` | every page in a real browser, desktop + phones (after `npm run build`; once: `npx playwright install chromium`) |
+| `npm run test:e2e` | every page in a real browser, desktop + phones, and two devices on one library (after `npm run build`; once: `npx playwright install chromium` — or use your installed Chrome with `PW_CHANNEL=chrome`) |
 | `npm run lint` | ESLint (incl. React hook rules) |
 | `npm run check` | lint + tests + build (CI also runs `test:e2e` on every push) |
 

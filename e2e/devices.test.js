@@ -28,7 +28,8 @@ before(async () => {
   plan = (await srv.api('/api/plans', { method: 'POST', json: { name: 'Shared project' } })).data.plan;
   block = (await srv.api(`/api/plans/${plan.id}/blocks`, { method: 'POST', json: { type: 'text', tab: 'brief' } })).data.block;
   await srv.api(`/api/plans/${plan.id}/blocks/${block.id}`, { method: 'PATCH', json: { content: 'Start' } });
-  browser = await chromium.launch();
+  // PW_CHANNEL=chrome: an installed Google Chrome (CI) instead of Playwright's own Chromium.
+  browser = await chromium.launch(process.env.PW_CHANNEL ? { channel: process.env.PW_CHANNEL } : {});
   desk = await browser.newContext({ viewport: { width: 1280, height: 860 } });
   phone = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 });

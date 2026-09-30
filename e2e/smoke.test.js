@@ -41,7 +41,8 @@ before(async () => {
     '/time', '/expenses', '/clients', `/clients/${client.id}`, '/notes', `/notes/${note.id}`,
     '/content', `/content/${post.id}`, '/achievements', '/inbox', '/trash', '/settings',
   ];
-  browser = await chromium.launch();
+  // PW_CHANNEL=chrome: an installed Google Chrome (CI) instead of Playwright's own Chromium.
+  browser = await chromium.launch(process.env.PW_CHANNEL ? { channel: process.env.PW_CHANNEL } : {});
 });
 after(async () => { await browser?.close(); await srv?.stop(); });
 
