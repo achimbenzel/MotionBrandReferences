@@ -7,18 +7,22 @@ import path from 'node:path';
 import express from 'express';
 import multer from 'multer';
 import { ALLOWED_HOSTS, ENTITY_ROOTS, MAX_UPLOAD_BYTES } from './config.js';
+import { inContext } from './live.js';
 
 // ---- Async routes ---------------------------------------------------------------
 // Express 4 doesn't catch a rejected promise from an async handler: the request
 // hangs and Node treats it as an unhandled rejection, which kills the process.
-// Forward those errors to the error handler instead.
+// Forward those errors to the error handler instead. Each handler also runs in
+// its request's live context (see live.js) — an upload's stream loses it.
 export function asyncRoute(fn) {
   if (typeof fn !== 'function' || fn.length >= 4) return fn; // error middleware as-is
   return function wrapped(req, res, next) {
-    try {
-      const out = fn(req, res, next);
-      if (out && typeof out.catch === 'function') out.catch(next);
-    } catch (err) { next(err); }
+    inContext(req, () => {
+      try {
+        const out = fn(req, res, next);
+        if (out && typeof out.catch === 'function') out.catch(next);
+      } catch (err) { next(err); }
+    });
   };
 }
 

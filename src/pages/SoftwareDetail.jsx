@@ -79,7 +79,7 @@ export default function SoftwareDetail() {
   }, [id, saver]);
 
   // Back on this tab after a while: pick up changes made on another device.
-  useRefreshOnReturn(() => api.getSoftware(id), setSoft, saver);
+  useRefreshOnReturn(() => api.getSoftware(id), setSoft, saver, { live: `software/${id}` });
 
   // Send any pending text edit now; resolves when it has landed (file ops
   // await this first so a debounced save can't arrive after the upload

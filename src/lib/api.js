@@ -7,6 +7,34 @@ import { optimizeForm, rememberPrefs } from './imageOptimize.js';
 // without it, which stops other websites from posting to your library (CSRF).
 const BASE_HEADERS = { 'X-Requested-With': 'confinium' };
 
+// ---- Several devices (see server/live.js) ------------------------------------
+// This tab's name, sent with every request. For what the page loaded, the
+// library revision it was loaded at (`X-Rev`), sent back with edits: the
+// server refuses an edit of something another device has changed since.
+export const CLIENT_ID = `tab-${Math.random().toString(36).slice(2, 12)}`;
+const loadedAt = new Map(); // 'plans/abc' → revision
+const keyOfUrl = (url) => new URL(url, 'http://app').pathname.replace(/^\/api\//, '');
+function baseFor(url) {
+  for (let k = keyOfUrl(url); k; k = k.includes('/') ? k.slice(0, k.lastIndexOf('/')) : '') {
+    if (loadedAt.has(k)) return loadedAt.get(k);
+  }
+  return null;
+}
+/** The revision a page's copy of `key` stands on — kept when a background reload isn't shown. */
+export const loadedRev = {
+  get: (key) => loadedAt.get(key),
+  set: (key, rev) => { if (rev == null) loadedAt.delete(key); else loadedAt.set(key, rev); },
+};
+// Asked what to do when an edit clashes: → 'mine' (save it anyway) or 'theirs'.
+let conflictHandler = null;
+export function setConflictHandler(fn) {
+  conflictHandler = fn;
+  return () => { if (conflictHandler === fn) conflictHandler = null; };
+}
+export class ConflictError extends Error {
+  constructor() { super('it was changed on another device — showing that version now'); this.code = 'conflict'; }
+}
+
 // While true, requests are sent with `keepalive` so they survive the page
 // being closed (used to flush pending autosaves on pagehide). Browsers cap
 // keepalive bodies at 64 KB, so bigger ones go out as normal requests.
@@ -61,7 +89,9 @@ async function transientInfo(res) {
 
 // fetch() + CSRF header + JSON encoding + error handling in one place.
 async function request(url, { method = 'GET', json, body, pictures } = {}) {
-  const headers = { ...BASE_HEADERS };
+  const headers = { ...BASE_HEADERS, 'X-Client-Id': CLIENT_ID };
+  const base = method === 'PATCH' || method === 'PUT' ? baseFor(url) : null;
+  if (base) headers['X-Base-Rev'] = String(base);
   // Picture uploads: made smaller first, as you set it (ask / always / never).
   let payload = pictures && body instanceof FormData ? await optimizeForm(body, pictures) : body;
   if (json !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(json); }
@@ -85,6 +115,23 @@ async function request(url, { method = 'GET', json, body, pictures } = {}) {
     if (!res.ok && (res.status === 502 || res.status === 504 || (res.status === 500 && !/json/.test(res.headers.get('content-type') || '')))) {
       const b = await res.clone().json().catch(() => null);
       if (!b || b.error === 'backend_unreachable') throw new Error(UNREACHABLE);
+    }
+    if (res.status === 409 && !keepalive && (await res.clone().json().catch(() => null))?.error === 'conflict') {
+      // Changed on another device since this page loaded it: yours, or theirs?
+      if ((await conflictHandler?.({ url, key: keyOfUrl(url) })) !== 'mine') throw new ConflictError();
+      headers['X-Force'] = '1';
+      attempt -= 1; // not one of the retries
+      continue;
+    }
+    const rev = Number(res.headers.get('X-Rev'));
+    if (res.ok && rev) {
+      if (method === 'GET') {
+        const key = keyOfUrl(url);
+        loadedAt.set(key, rev);
+        for (const k of loadedAt.keys()) if (k.startsWith(`${key}/`)) loadedAt.delete(k); // loaded as a whole again
+      }
+      // Kept mine: this page now stands on what it just saved, not on the other device's older change.
+      else if (headers['X-Force']) loadedAt.set(keyOfUrl(url), rev);
     }
     return handle(res);
   }

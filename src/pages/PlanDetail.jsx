@@ -127,7 +127,7 @@ export default function PlanDetail() {
   };
 
   // Back on this tab after a while: pick up changes made on another device.
-  useRefreshOnReturn(() => api.getPlan(id), (p) => { setPlan(p); setMilestones(p.milestones || []); setClient(p.client || ''); }, saver);
+  useRefreshOnReturn(() => api.getPlan(id), (p) => { setPlan(p); setMilestones(p.milestones || []); setClient(p.client || ''); }, saver, { live: `plans/${id}` });
 
   // Paste images into the last-used (or first) moodboard block.
   useEffect(() => {

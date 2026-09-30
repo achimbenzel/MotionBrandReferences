@@ -8,6 +8,7 @@ import { nanoid } from 'nanoid';
 import { DATA_DIR, DB_PATH, DB_BAK, BACKUP_DIR, MAX_SNAPSHOTS, SNAPSHOT_INTERVAL_MS } from './config.js';
 import { invalidateStorage, safeRm } from './files.js';
 import { normalizeDB, emptyDB } from './schema.js';
+import { checkConflict, recordChange } from './live.js';
 
 export class DBUnavailableError extends Error {
   constructor(cause) {
@@ -152,11 +153,15 @@ export function withWriteLock(fn) {
 }
 
 // Read → mutate → write, serialized. The mutator's return value is passed on.
+// An edit based on something another device has changed since is refused
+// (409) before anything happens; every saved change is announced (live.js).
 export function mutateDB(mutator) {
   return withWriteLock(async () => {
+    checkConflict();
     const db = await readDB();
     const result = await mutator(db);
     await writeDBAtomic(db);
+    recordChange();
     return result;
   });
 }

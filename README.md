@@ -281,6 +281,22 @@ briefing answers. It also lets you **jump to any section** (or
 Projects, Brand Tester, Trash) by name. Arrow keys to move, Enter to open, Esc to
 close.
 
+### Several devices at once
+
+Phone and desktop (or two tabs) on the same library stay in step:
+
+- **Live:** a change saved on one device shows on the others by itself —
+  an open project, storyboard, note, software page, post or the To-Do board
+  reloads what changed (never while you're typing: it waits until your own
+  edits are saved), and what you share to the Inbox from your phone appears
+  on the desktop at once. One connection per browser, however many tabs are
+  open; it comes back by itself after the server restarts.
+- **No silent overwrites:** if you edit something that was changed on
+  another device since you opened it — the same text, the same list, the same
+  card — the app asks: **Keep mine** (yours replaces theirs) or **Load
+  theirs** (their version shows, your last change is dropped). Edits of
+  different things (another block, another field) never ask.
+
 ### Trash (recoverable deletes)
 
 Deleting a **reference, project, gallery, software, project block** — or a **file from
@@ -1667,6 +1683,7 @@ lookup off with `LINK_LOOKUP=off`).
   ├── templates.js    # built-in project templates, save-as-template
   ├── files.js        # fs helpers (path containment, moves, trash, storage size)
   ├── trashMoves.js   # a deleted item's files into the Trash — later, if a file is locked
+  ├── live.js         # several devices: revisions, 409 on a clashing edit, the live event stream
   ├── http.js         # async-safe routers, JSON errors, host/CSRF/data guards
   ├── upload.js       # multer (per-request tmp folder, always cleaned up)
   ├── unused.js       # unused-file scan
@@ -1681,7 +1698,8 @@ lookup off with `LINK_LOOKUP=off`).
   `tests/libs.test.js` covers the pure helpers (days, colours, timing, ranks,
   plan tabs, storyboards). `npm run test:e2e` opens every page of the built app
   in Chromium — on a desktop and on 320 / 390 px phones — and fails on any
-  error, a page that doesn't render or a page that scrolls sideways.
+  error, a page that doesn't render or a page that scrolls sideways; it also
+  plays two devices on one library (live updates, keep mine / load theirs).
 
 ### Scripts
 

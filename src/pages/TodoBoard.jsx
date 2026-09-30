@@ -49,7 +49,7 @@ export default function TodoBoard() {
   }, []);
 
   // Back on this tab after a while: pick up changes made on another device.
-  useRefreshOnReturn(() => api.getBoard(), (b) => setColumns(b.columns), saver);
+  useRefreshOnReturn(() => api.getBoard(), (b) => setColumns(b.columns), saver, { live: 'board' });
 
   // Persist the whole board; text edits debounced, structural changes immediate.
   const commit = (next, immediate = false) => {

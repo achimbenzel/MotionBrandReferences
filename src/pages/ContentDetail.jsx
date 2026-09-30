@@ -93,7 +93,7 @@ export default function ContentDetail() {
     api.listPlans().then((p) => { if (alive) setPlans(p); }).catch(() => {});
     return () => { alive = false; };
   }, [id]);
-  useRefreshOnReturn(() => api.getContent(id), setItem, saver);
+  useRefreshOnReturn(() => api.getContent(id), setItem, saver, { live: `content/${id}` });
   // Left without writing anything: the empty post goes (no Trash needed).
   const itemRef = useRef(null);
   itemRef.current = item;

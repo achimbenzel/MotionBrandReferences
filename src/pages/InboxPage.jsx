@@ -5,7 +5,8 @@ import {
   PencilRuler, MoreHorizontal, Check, X, Smartphone, Plus, File as FileIcon, Square, Ban, Palette, Type, Images, StickyNote,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
-import { inboxFileUrl, inboxKind, inboxFile, notifyInbox } from '../lib/inbox.js';
+import { inboxFileUrl, inboxKind, inboxFile, notifyInbox, inboxChanged } from '../lib/inbox.js';
+import { onRemoteChange } from '../lib/live.js';
 import { parseVideoLink, PROVIDER_LABEL } from '../lib/videoLinks.js';
 import { hostOf, normalizeUrl } from '../lib/types.js';
 import { useToast } from '../components/Toast.jsx';
@@ -76,7 +77,8 @@ export default function InboxPage() {
   useEffect(() => {
     const onVisible = () => { if (document.visibilityState === 'visible') load(); };
     document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
+    const off = onRemoteChange((ev) => { if (inboxChanged(ev)) load(); }); // shared from the phone → here at once
+    return () => { off(); document.removeEventListener('visibilitychange', onVisible); };
   }, [load]);
   const changed = () => { load(); notifyInbox(); };
 

@@ -44,7 +44,7 @@ export default function NoteDetail() {
     api.getNote(id).then((n) => { if (alive) setNote(n); }).catch((e) => { if (alive) setError(e.message); });
     return () => { alive = false; };
   }, [id]);
-  useRefreshOnReturn(() => api.getNote(id), setNote, saver);
+  useRefreshOnReturn(() => api.getNote(id), setNote, saver, { live: `notes/${id}` });
   // Left without writing anything: the empty note goes (no Trash needed).
   const noteRef = useRef(null);
   noteRef.current = note;

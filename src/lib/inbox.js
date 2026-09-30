@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
+import { onRemoteChange } from './live.js';
 
 // Inbox helpers: what a shared item is, its file as a File (to hand it to
 // the upload dialog), and the item count for the sidebar.
@@ -30,7 +31,10 @@ export async function inboxFile(item) {
 const EVENT = 'inbox:changed';
 export const notifyInbox = () => window.dispatchEvent(new Event(EVENT));
 
-/** Items waiting in the Inbox (re-read on navigation, on return, on change). */
+/** Something arrived in (or left) the Inbox on another device or tab. */
+export const inboxChanged = (ev) => !ev.path || ev.path.startsWith('/api/inbox') || ev.path.startsWith('/api/trash');
+
+/** Items waiting in the Inbox (re-read on navigation, on return, on change — here or on another device). */
 export function useInboxCount(pathname) {
   const [count, setCount] = useState(0);
   useEffect(() => {
@@ -40,7 +44,8 @@ export function useInboxCount(pathname) {
     load();
     window.addEventListener(EVENT, load);
     document.addEventListener('visibilitychange', onVisible);
-    return () => { on = false; window.removeEventListener(EVENT, load); document.removeEventListener('visibilitychange', onVisible); };
+    const off = onRemoteChange((ev) => { if (inboxChanged(ev)) load(); });
+    return () => { on = false; off(); window.removeEventListener(EVENT, load); document.removeEventListener('visibilitychange', onVisible); };
   }, [pathname]);
   return count;
 }

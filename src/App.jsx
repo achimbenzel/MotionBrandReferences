@@ -42,6 +42,7 @@ const CommandPalette = lazy(() => import('./components/CommandPalette.jsx'));
 import { TABS, isWorkPath, WORK_HOME } from './lib/types.js';
 import { useMediaQuery, DESKTOP } from './lib/useMedia.js';
 import ImageUploadPrompt from './components/ImageUploadPrompt.jsx';
+import ConflictPrompt from './components/ConflictPrompt.jsx';
 import { getBoolPref, setBoolPref } from './lib/prefs.js';
 
 function Shell() {
@@ -167,6 +168,7 @@ function Shell() {
         {paletteOpen && <Suspense fallback={null}><CommandPalette onClose={() => setPaletteOpen(false)} /></Suspense>}
       </ErrorBoundary>
       <ImageUploadPrompt />
+      <ConflictPrompt />
     </div>
     </StorageProvider>
   );

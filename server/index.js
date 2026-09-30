@@ -14,6 +14,7 @@ import { DATA_DIR, HOST, PORT, IS_PROD } from './config.js';
 import { ensureDirs } from './files.js';
 import { emptyDB } from './schema.js';
 import { drainWrites } from './db.js';
+import { closeStreams } from './live.js';
 import { createApp } from './app.js';
 import { purgeExpiredTrash } from './routes/trash.js';
 import { resumePending } from './trashMoves.js';
@@ -47,6 +48,7 @@ async function shutdown(signal) {
   const hardExit = setTimeout(() => process.exit(0), 5000);
   hardExit.unref();
   const closed = new Promise((resolve) => server.close(resolve)); // waits for in-flight requests
+  closeStreams(); // …not for the pages' live streams (they reconnect by themselves)
   server.closeIdleConnections?.(); // …but not for idle keep-alive sockets
   await closed;
   await drainWrites();

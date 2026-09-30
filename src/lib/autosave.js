@@ -5,7 +5,8 @@
 // silently lost. A saver instead *runs* pending saves early: when the page
 // unmounts, when the tab is hidden, and on page unload (as keepalive requests).
 import { useEffect, useRef } from 'react';
-import { withKeepalive } from './api.js';
+import { withKeepalive, loadedRev } from './api.js';
+import { onRemoteChange, concerns } from './live.js';
 
 const mounted = new Set();
 // Every save on the wire, from any page — so a page that opens next can wait
@@ -76,13 +77,28 @@ export function useSaver(defaultDelay = 500) {
   return ref.current;
 }
 
+// Load again and show it — unless an edit started meanwhile; then the page's
+// copy stays what it was, and so does the revision its next save is based on.
+async function reload(fns, saver, live, force) {
+  const before = live ? loadedRev.get(live) : undefined;
+  try {
+    const data = await fns.current.load();
+    if (force || !saver || saver.idle()) { fns.current.apply(data); return true; }
+  } catch { return true; /* offline or gone — keep what's on screen */ }
+  if (live) loadedRev.set(live, before);
+  return false;
+}
+
 /**
- * Reload a page's data when the tab comes back after being hidden for a
- * while, so a tab left open on another device doesn't overwrite newer changes
- * with a stale copy. Skipped while this page has unsaved or in-flight edits,
- * and the result is only applied if no edit started meanwhile.
+ * Keep a page's data current while it's open on several devices:
+ * - reload it when the tab comes back after being hidden for a while;
+ * - with `live` (what the page shows, e.g. 'plans/abc'): reload it as soon as
+ *   another device or tab saves a change to it, and after "Load theirs" when
+ *   an edit clashed with one.
+ * Never while this page has unsaved or in-flight edits — it waits until they're
+ * saved — and a result is only shown if no edit started meanwhile.
  */
-export function useRefreshOnReturn(load, apply, saver, { afterMs = 3000 } = {}) {
+export function useRefreshOnReturn(load, apply, saver, { afterMs = 3000, live = null } = {}) {
   const fns = useRef({ load, apply });
   fns.current = { load, apply };
   useEffect(() => {
@@ -92,12 +108,40 @@ export function useRefreshOnReturn(load, apply, saver, { afterMs = 3000 } = {}) 
       if (!hiddenAt || Date.now() - hiddenAt < afterMs) return;
       hiddenAt = 0;
       if (saver && !saver.idle()) return;
-      try {
-        const data = await fns.current.load();
-        if (!saver || saver.idle()) fns.current.apply(data);
-      } catch { /* offline or gone — keep what's on screen */ }
+      await reload(fns, saver, live, false);
     };
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
-  }, [saver, afterMs]);
+  }, [saver, afterMs, live]);
+
+  useEffect(() => {
+    if (!live) return undefined;
+    let timer = 0;
+    let tries = 0;
+    const run = async () => {
+      timer = 0;
+      if (saver && !saver.idle()) { // this page's own edits first
+        tries += 1;
+        if (tries < 60) timer = setTimeout(run, 1000);
+        return;
+      }
+      if (!(await reload(fns, saver, live, false)) && tries < 60) { tries += 1; timer = setTimeout(run, 1000); }
+    };
+    const off = onRemoteChange((ev) => {
+      if (!concerns(ev, live)) return;
+      clearTimeout(timer);
+      tries = 0;
+      timer = setTimeout(run, 300); // a burst of saves (typing) → one reload
+    });
+    const onTheirs = async (e) => {
+      const key = e.detail?.key || '';
+      if (key !== live && !key.startsWith(`${live}/`) && !live.startsWith(`${key}/`)) return;
+      e.detail.handled = true;
+      clearTimeout(timer);
+      await saver?.flush();
+      await reload(fns, saver, live, true);
+    };
+    window.addEventListener('confinium:theirs', onTheirs);
+    return () => { off(); clearTimeout(timer); window.removeEventListener('confinium:theirs', onTheirs); };
+  }, [saver, live]);
 }

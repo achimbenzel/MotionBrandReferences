@@ -88,7 +88,7 @@ export default function StoryboardEditor() {
     whenSaved().then(() => api.getPlan(planId)).then((p) => { if (alive) setPlan(p); }).catch((e) => { if (alive) setError(e.message); });
     return () => { alive = false; };
   }, [planId, blockId, saver]);
-  useRefreshOnReturn(() => api.getPlan(planId), setPlan, saver);
+  useRefreshOnReturn(() => api.getPlan(planId), setPlan, saver, { live: `plans/${planId}` });
   useEffect(() => { setPref('sbView', view); }, [view]);
 
   const block = plan?.blocks?.find((b) => b.id === blockId && b.type === 'storyboard') || null;

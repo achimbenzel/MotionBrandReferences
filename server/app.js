@@ -9,6 +9,7 @@ import { DATA_DIR, DIST_DIR, IS_PROD } from './config.js';
 import { cleanupTmpOnClose } from './upload.js';
 import { countActivity } from './activity.js';
 import { hostGuard, csrfGuard, dataGuard, dataHeaders, errorHandler } from './http.js';
+import { liveContext, eventStream } from './live.js';
 import projects from './routes/projects.js';
 import plans from './routes/plans.js';
 import software from './routes/software.js';
@@ -34,6 +35,8 @@ export function createApp() {
   app.use('/api', csrfGuard);
   app.use(express.json({ limit: '10mb' }));
   app.use(cleanupTmpOnClose);
+  app.use('/api', liveContext); // which tab asks, what it changes, the revision it's based on
+  app.get('/api/events', eventStream); // saved changes, live, for the open pages
   app.use('/api', countActivity); // the dashboard's activity map
 
   // The content library. express.static supports HTTP range requests, which
