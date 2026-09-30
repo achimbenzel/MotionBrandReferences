@@ -28,7 +28,7 @@
   padding: 2px 8px; border-radius: 999px; letter-spacing: .02em;
 }
 .pref-badge.ok { color: var(--accent); background: var(--accent-dim); }
-.pref-badge.warn { color: #ffcf6e; background: rgba(255, 207, 110, 0.12); }
+.pref-badge.warn { color: var(--warn); background: rgba(var(--warn-rgb), 0.12); }
 .pref-result { display: flex; align-items: center; gap: 6px; margin-top: 8px; color: var(--accent); }
 .maint-changes { margin: 8px 0 0; padding-left: 18px; font-size: 13px; color: var(--text-muted); line-height: 1.6; }
 .maint-changes b { color: var(--text); }
@@ -45,7 +45,7 @@
 .maint-files li span:first-child { min-width: 0; overflow-wrap: anywhere; }
 .maint-files li span:last-child { flex-shrink: 0; color: var(--text-faint); }
 .maint-files li.more { color: var(--text-faint); }
-@media (max-width: 560px) {
+@media (max-width: 640px) {
   .pref-row { flex-direction: column; align-items: stretch; }
   .pref-actions { justify-content: flex-start; }
 }
@@ -72,13 +72,13 @@
 .stored-pics .modal-body { display: flex; flex-direction: column; gap: 12px; }
 .stored-pics .hint { margin: 0; }
 .stored-pics-areas { display: flex; flex-direction: column; gap: 6px; }
-.stored-pics-none { display: flex; align-items: center; gap: 8px; padding: 14px; border-radius: 12px; background: var(--surface-2); color: #34d399; font-size: 13.5px; }
+.stored-pics-none { display: flex; align-items: center; gap: 8px; padding: 14px; border-radius: 12px; background: var(--surface-2); color: var(--ok); font-size: 13.5px; }
 .stored-pics-run { display: flex; flex-direction: column; gap: 12px; padding: 6px 0; }
 .stored-pics-bar { height: 8px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
 .stored-pics-bar i { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width .3s; }
 .stored-pics-done { display: flex; flex-direction: column; gap: 6px; }
 .stored-pics-done p { margin: 0; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 14px; }
-.stored-pics-done p svg { color: #34d399; }
+.stored-pics-done p svg { color: var(--ok); }
 .stored-pics-done p.hint { display: block; font-size: 12.5px; }
 .pref-row-wide { flex-wrap: wrap; align-items: flex-start; }
 .pref-row-wide > div:first-child { flex: 1 1 320px; }
@@ -88,5 +88,5 @@
 .pref-pics-row .range { flex: 1; }
 .pref-pics-row > b { width: 28px; text-align: right; font-variant-numeric: tabular-nums; }
 @media (max-width: 640px) {
-  .pref-pics .segmented { flex-wrap: wrap; }
+  .pref-pics .segmented { flex-wrap: wrap; flex-shrink: 1; min-width: 0; }
 }

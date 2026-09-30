@@ -35,7 +35,7 @@ export default function BlockPeek({ plan, block: b, compact = false }) {
     );
     case 'todos': {
       const it = b.items || [];
-      if (compact) return bar(it.filter((t) => t.done).length, it.length, '#7fe0b0');
+      if (compact) return bar(it.filter((t) => t.done).length, it.length, 'var(--ok)');
       return (
         <span className="peek-lines">
           {it.filter((t) => !t.done).slice(0, 3).map((t) => <span key={t.id} className="peek-todo"><Circle size={11} /> {t.text || 'To-do'}</span>)}
@@ -45,7 +45,7 @@ export default function BlockPeek({ plan, block: b, compact = false }) {
     }
     case 'deliverables': {
       const it = b.items || [];
-      return bar(it.filter((d) => d.status === 'delivered').length, it.length, '#7fe0b0');
+      return bar(it.filter((d) => d.status === 'delivered').length, it.length, 'var(--ok)');
     }
     case 'briefing': {
       const f = b.fields || [];

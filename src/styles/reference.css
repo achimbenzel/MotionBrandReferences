@@ -175,7 +175,7 @@
 .picker-title { display: block; font-size: 13px; margin-top: 6px; color: var(--text); }
 /* --------------------------------------------------- Business-card detail */
 .bc-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-@media (max-width: 620px) {
+@media (max-width: 640px) {
   .bc-detail { grid-template-columns: 1fr; }
 }
 .bc-detail-side { position: relative; margin: 0; cursor: zoom-in; }

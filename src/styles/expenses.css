@@ -1,7 +1,7 @@
 /* Expenses: loaded with its pages, after base.css (see README.md in this folder). */
 
 /* ---------------------------------------------------------------- Expenses */
-.ex-page { --ex-out: #f58b7c; --ex-priv: #a58bff; --ex-in: #4ade80; }
+.ex-page { --ex-out: #f58b7c; --ex-priv: #a58bff; --ex-in: var(--ok); }
 .ex-head-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ex-view button { padding: 7px 12px; }
 .ex-year { display: inline-flex; align-items: center; gap: 2px; height: 38px; padding: 0 3px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
@@ -33,7 +33,7 @@
 .ex-month.now small { color: var(--accent); font-weight: 700; }
 .ex-month.now .ex-bars { background: rgba(255, 255, 255, .035); }
 .ex-bars { position: relative; flex: 1; min-height: 0; display: flex; align-items: flex-end; justify-content: center; gap: 2px; border-radius: 6px 6px 0 0; }
-.ex-ret { position: absolute; left: 1px; right: 1px; bottom: 0; border-top: 2px solid rgba(74, 222, 128, .6); border-radius: 3px 3px 0 0; background: linear-gradient(180deg, rgba(74, 222, 128, .12), rgba(74, 222, 128, .03)); pointer-events: none; }
+.ex-ret { position: absolute; left: 1px; right: 1px; bottom: 0; border-top: 2px solid rgba(var(--ok-rgb), .6); border-radius: 3px 3px 0 0; background: linear-gradient(180deg, rgba(var(--ok-rgb), .12), rgba(var(--ok-rgb), .03)); pointer-events: none; }
 .ex-bars > i, .ex-bars > .ex-stack { position: relative; }
 .ex-bars > i, .ex-stack { flex: 1; max-width: 14px; border-radius: 4px 4px 0 0; transform-origin: bottom; animation: ex-grow .7s cubic-bezier(.2, .7, .2, 1) both; transition: filter .15s; }
 .ex-bars > i.in { background: var(--accent); }
@@ -49,7 +49,7 @@
 .ex-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }
 .ex-legend i.out { background: var(--ex-out); }
 .ex-legend i.priv { background: var(--ex-priv); }
-.ex-legend i.ret { background: rgba(74, 222, 128, .18); box-shadow: inset 0 2px 0 rgba(74, 222, 128, .7); }
+.ex-legend i.ret { background: rgba(var(--ok-rgb), .18); box-shadow: inset 0 2px 0 rgba(var(--ok-rgb), .7); }
 .ex-legend i.solid { background: var(--text-muted); }
 .ex-legend i.striped { background: var(--text-muted); opacity: .5; background-image: repeating-linear-gradient(135deg, rgba(0, 0, 0, .45) 0 2px, transparent 2px 4px); }
 .ex-legend i.in { background: var(--accent); }
@@ -87,9 +87,9 @@
 .ex-up-date { font-size: 12.5px; color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .ex-up-what { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ex-up-v { color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.ex-up.cancel { background: rgba(250, 204, 21, .06); }
-.ex-up.cancel:hover { background: rgba(250, 204, 21, .11); }
-.ex-up.cancel .ex-up-what b { color: #facc15; }
+.ex-up.cancel { background: rgba(var(--warn-rgb), .06); }
+.ex-up.cancel:hover { background: rgba(var(--warn-rgb), .11); }
+.ex-up.cancel .ex-up-what b { color: var(--warn); }
 .ex-up.in .ex-up-v { color: var(--ex-in); }
 .ex-card > header .ex-card-add { margin-left: auto; }
 .ex-inc { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 10px; border: 0; border-radius: 10px; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
@@ -128,7 +128,7 @@
 .ex-row-link { flex: none; width: 22px; height: 22px; color: var(--text-faint); }
 .ex-row-next { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 .ex-row-cancel { color: var(--text-faint); }
-.ex-row-cancel.soon { color: #facc15; }
+.ex-row-cancel.soon { color: var(--warn); }
 .ex-row-amount, .ex-row-year { display: flex; flex-direction: column; align-items: flex-end; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .ex-row-amount b { font-size: 14px; font-weight: 500; }
 .ex-row-year b { font-size: 14px; font-weight: 700; }
@@ -152,7 +152,7 @@
 .ex-gap { flex: 1; }
 .ex-del { color: var(--danger); }
 .ex-foot { margin-top: 18px; }
-@media (max-width: 900px) {
+@media (max-width: 899px) {
   .ex-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ex-grid { grid-template-columns: minmax(0, 1fr); }
 }

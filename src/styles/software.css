@@ -64,14 +64,14 @@
 .pe-img-choices { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; justify-content: center; }
 .plugin-editor-fields { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .plugin-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-@media (max-width: 480px) {
+@media (max-width: 640px) {
   .plugin-row2 { grid-template-columns: 1fr; }
 }
 .plugin-field { display: flex; flex-direction: column; gap: 5px; }
 .plugin-field > span { font-size: 12px; color: var(--text-muted); font-weight: 600; }
 .plugin-field .textarea { min-height: 60px; }
 .plugin-row3 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }
-@media (max-width: 620px) {
+@media (max-width: 640px) {
   .plugin-row3 { grid-template-columns: 1fr 1fr; }
 }
 .plugin-file { display: flex; align-items: center; gap: 8px; color: var(--text-muted); }

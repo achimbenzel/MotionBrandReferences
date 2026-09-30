@@ -46,7 +46,7 @@
 }
 .note-add span { color: var(--text-faint); }
 .note-add:hover { border-color: var(--accent); color: var(--text); }
-@media (max-width: 620px) {
+@media (max-width: 640px) {
   .notes-grid { columns: 2 150px; column-gap: 10px; }
   .note-card { margin-bottom: 10px; }
   .note-sheet { padding: 18px 16px; border-radius: 14px; }

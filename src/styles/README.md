@@ -27,3 +27,15 @@ Rules of thumb:
   same weight. A base rule that must beat an area rule (e.g. "on touch
   screens, show what's otherwise shown on hover") goes in the area's file,
   after the rule it overrides.
+- Colours: use the tokens in `:root` (`--accent`, `--ok`, `--warn`, `--info`,
+  `--danger`, and `rgba(var(--ok-rgb), .2)` for a tint) rather than hex values.
+- Breakpoints — only these:
+  - `@media (max-width: 640px)` — phones (menus become bottom sheets; `PHONE` in `src/lib/useMedia.js`)
+  - `@media (max-width: 899px)` — tablets and phones: the sidebar is a drawer (`DESKTOP` = `min-width: 900px`)
+  - `@media (max-width: 1099px)` — small laptops
+  - plus `(min-width: 1440px)` for extras on wide screens, and the device
+    queries `(hover: none)`, `(pointer: coarse)`, `(prefers-reduced-motion)`.
+  - When a layout depends on how wide a *part* is rather than the window (a
+    widget that can be half or full width), use a container query — like the
+    focus timer: `.dash-timer { container-type: inline-size }` +
+    `@container (max-width: 375px)`.

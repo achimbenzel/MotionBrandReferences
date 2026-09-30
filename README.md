@@ -291,6 +291,13 @@ membership come back intact — or delete them permanently. Trash auto-empties
 items older than **30 days**. (Trashed items live under `data/trash/` and are
 excluded from exports.)
 
+A delete never fails because a file is in use: on Windows a folder can't be
+moved while something holds a file in it (the video the page still plays, a
+virus scan). The item is in the Trash right away; its files follow a moment
+later — tried again after 3 s, 15 s, 1 min, 5 min, then every 30 min, and at
+start-up. Until then they stay where they were: restoring leaves them there,
+deleting for good removes them.
+
 ### Pictures from the app (everywhere)
 Wherever a picture goes in — a banner or profile picture, a moodboard, a
 note, a client's logo, a plugin's or expression group's preview, a mockup
@@ -1637,7 +1644,10 @@ lookup off with `LINK_LOOKUP=off`).
 - **Frontend:** React 18 + Vite + React Router; three.js for the 3D mockups
   (loaded only by the mockup editor), Mediabunny to write MP4 / WebM (loaded
   only when a video is exported) and modern-screenshot to turn the 2D mockups
-  into images.
+  into images. Styles live in `src/styles/`: `base.css` (what every page
+  needs, loaded with the app) and one file per area, loaded with its pages;
+  colour tokens (`--ok`, `--warn`, `--info`, `--danger`) and three breakpoints
+  (640 / 899 / 1099 px) — see `src/styles/README.md`.
 - **Backend:** a small Express server that stores files on disk and metadata in
   `data/db.json` (writes are serialized so nothing clobbers). Layout:
 
@@ -1650,6 +1660,7 @@ lookup off with `LINK_LOOKUP=off`).
   ├── schema.js       # record shapes, read-time normalizing, the v1→v2 migration
   ├── templates.js    # built-in project templates, save-as-template
   ├── files.js        # fs helpers (path containment, moves, trash, storage size)
+  ├── trashMoves.js   # a deleted item's files into the Trash — later, if a file is locked
   ├── http.js         # async-safe routers, JSON errors, host/CSRF/data guards
   ├── upload.js       # multer (per-request tmp folder, always cleaned up)
   ├── unused.js       # unused-file scan
