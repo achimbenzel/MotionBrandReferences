@@ -8,6 +8,7 @@ import Menu from '../components/Menu.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import ClientAvatar from '../components/ClientAvatar.jsx';
 import { minutesOf, budgetMinutes, budgetState, budgetText } from '../lib/clients.js';
+import '../styles/plan.css';
 
 const fmtRange = (s, e) => {
   if (s && e) return `${s} – ${e}`;

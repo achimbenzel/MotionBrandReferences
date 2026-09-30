@@ -4,6 +4,7 @@ import { Plus, NotebookPen, Search, Pin, Images } from 'lucide-react';
 import { api, noteFileUrl } from '../lib/api.js';
 import { tagColor } from '../lib/types.js';
 import { useToast } from '../components/Toast.jsx';
+import '../styles/notes.css';
 
 const ago = (t) => {
   if (!t) return '';

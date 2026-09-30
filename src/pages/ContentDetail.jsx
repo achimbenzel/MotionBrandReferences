@@ -26,6 +26,7 @@ import ContentPlanDialog from '../components/content/ContentPlanDialog.jsx';
 import SnippetPicker from '../components/content/SnippetPicker.jsx';
 import { placeholderIn } from '../lib/contentIdeas.js';
 import useContentSettings, { useContentProfile } from '../components/content/useContentSettings.js';
+import '../styles/content.css';
 
 const mediaFiles = (list) => [...(list || [])].filter((f) => /^(image|video)\//.test(f.type || '') || /\.(png|jpe?g|gif|webp|avif|svg|mp4|m4v|mov|webm)$/i.test(f.name || ''));
 

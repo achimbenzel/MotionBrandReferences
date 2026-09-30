@@ -2,6 +2,7 @@ import { lazy, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { api } from '../lib/api.js';
+import '../styles/mockups.css';
 
 // Each editor is its own chunk: the 3D one brings three.js, the 2D one doesn't.
 const Mockup3D = lazy(() => import('./MockupEditor.jsx'));

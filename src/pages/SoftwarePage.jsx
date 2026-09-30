@@ -4,6 +4,7 @@ import { Plus, AppWindow, Puzzle } from 'lucide-react';
 import { api, softwareFileUrl } from '../lib/api.js';
 import { currencySymbol, gradientCss } from '../lib/types.js';
 import GalleryNameModal from '../components/GalleryNameModal.jsx';
+import '../styles/software.css';
 
 // Sum plugin prices per currency → e.g. "€ 129.99 · $ 40".
 function spendLabel(plugins) {

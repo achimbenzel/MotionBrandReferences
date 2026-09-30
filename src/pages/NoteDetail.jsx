@@ -11,6 +11,7 @@ import Menu from '../components/Menu.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import Lightbox from '../components/Lightbox.jsx';
 import MediaPicker from '../components/mockups/MediaPicker.jsx';
+import '../styles/notes.css';
 
 const imageFiles = (list) => [...(list || [])].filter((f) => f.type?.startsWith('image/') || /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(f.name || ''));
 

@@ -9,6 +9,7 @@ import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
 import { useTimeTracker, tracker, fmtElapsed, fmtPause, segmentsOf, dayKey, hhmm } from '../lib/timeTracker.js';
 import { whoOf, entryLabel } from '../lib/clients.js';
+import '../styles/time.css';
 
 const OTHER = '__other__';
 const minutesOf = (e) => { const t = (x) => { const [h, m] = x.split(':').map(Number); return h * 60 + m; }; return (t(e.end) - t(e.start) + 1440) % 1440; };

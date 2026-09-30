@@ -20,6 +20,7 @@ import PlatformIcon from '../components/content/PlatformIcon.jsx';
 import PostCover, { AutoCover } from '../components/content/PostCover.jsx';
 import { XPost } from '../components/content/PostPreview.jsx';
 import useContentSettings, { useContentProfile } from '../components/content/useContentSettings.js';
+import '../styles/content.css';
 
 const VIEWS = [
   { key: 'feed', label: 'Feed', icon: Grid3x3 },

@@ -43,6 +43,7 @@ import ClientPicker from '../components/ClientPicker.jsx';
 import { PLAN_TABS, BLOCK_TABS, STRUCTURAL, blockTabs, statusTab, isEmptyBlock, tabColor, planTab } from '../lib/planTabs.js';
 import { voEstimate } from '../lib/timing.js';
 import { useSortable, moveItem } from '../lib/useSortable.js';
+import '../styles/plan.css';
 
 const rid = () => Math.random().toString(36).slice(2, 8);
 

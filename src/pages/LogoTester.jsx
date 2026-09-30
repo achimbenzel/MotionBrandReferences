@@ -11,6 +11,7 @@ import SaveToPlanModal from '../components/SaveToPlanModal.jsx';
 import ExportDialog from '../components/ExportDialog.jsx';
 import Range from '../components/Range.jsx';
 import FromAppButton from '../components/FromApp.jsx';
+import '../styles/logotester.css';
 
 const BRAND_BOARD = /brand|logo|test/i;
 

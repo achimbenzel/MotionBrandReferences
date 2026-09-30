@@ -28,6 +28,7 @@ import DrawPad from '../components/storyboard/DrawPad.jsx';
 import ExportDialog from '../components/ExportDialog.jsx';
 import GalleryNameModal from '../components/GalleryNameModal.jsx';
 import useMakePost from '../components/content/useMakePost.js';
+import '../styles/plan.css';
 
 const VIEWS = [
   { key: 'grid', label: 'Grid', icon: LayoutGrid },

@@ -10,6 +10,7 @@ import AchievementEditor from '../components/achievements/AchievementEditor.jsx'
 import AchievementSeries from '../components/achievements/AchievementSeries.jsx';
 import AchievementStats from '../components/achievements/AchievementStats.jsx';
 import AchievementInspect from '../components/achievements/AchievementInspect.jsx';
+import '../styles/achievements.css';
 
 const FILTERS = [{ key: 'all', label: 'All' }, { key: 'got', label: 'Unlocked' }, { key: 'locked', label: 'To go' }];
 const load = (k, fallback) => { try { return localStorage.getItem(k) || fallback; } catch { return fallback; } };

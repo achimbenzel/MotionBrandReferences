@@ -1,0 +1,92 @@
+/* Settings: loaded with its pages, after base.css (see README.md in this folder). */
+
+.sc-group { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 12px 14px; }
+.sc-group-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-faint); margin-bottom: 8px; }
+.sc-row { display: flex; align-items: center; gap: 12px; padding: 6px 0; }
+.sc-row + .sc-row { border-top: 1px solid var(--border); }
+.sc-keys { flex: 0 0 130px; display: flex; align-items: center; flex-wrap: wrap; gap: 3px; }
+.sc-key {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px;
+  padding: 0 6px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--surface-2);
+  color: var(--text); font: inherit; font-size: 12px; font-weight: 600; line-height: 1;
+}
+.sc-plus, .sc-or { color: var(--text-faint); font-size: 11px; padding: 0 2px; }
+.sc-desc { flex: 1; min-width: 0; color: var(--text-muted); font-size: 14px; }
+.pref-list { display: flex; flex-direction: column; gap: 8px; }
+.pref-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
+}
+.pref-title { font-weight: 600; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pref-sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; line-height: 1.45; }
+.pref-sub code { font-size: 12px; background: var(--surface-3); padding: 1px 5px; border-radius: 5px; }
+.pref-row-top { align-items: flex-start; }
+.pref-main { min-width: 0; flex: 1; }
+.pref-actions { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+.pref-badge {
+  display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700;
+  padding: 2px 8px; border-radius: 999px; letter-spacing: .02em;
+}
+.pref-badge.ok { color: var(--accent); background: var(--accent-dim); }
+.pref-badge.warn { color: #ffcf6e; background: rgba(255, 207, 110, 0.12); }
+.pref-result { display: flex; align-items: center; gap: 6px; margin-top: 8px; color: var(--accent); }
+.maint-changes { margin: 8px 0 0; padding-left: 18px; font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+.maint-changes b { color: var(--text); }
+.maint-toggle {
+  display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; padding: 0;
+  background: none; border: 0; color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.maint-files {
+  list-style: none; margin: 8px 0 0; padding: 8px 10px; max-height: 220px; overflow: auto;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--text-muted);
+}
+.maint-files li { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; }
+.maint-files li span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.maint-files li span:last-child { flex-shrink: 0; color: var(--text-faint); }
+.maint-files li.more { color: var(--text-faint); }
+@media (max-width: 560px) {
+  .pref-row { flex-direction: column; align-items: stretch; }
+  .pref-actions { justify-content: flex-start; }
+}
+/* ------------------------------------------------------------- Trash */
+.trash-list { display: flex; flex-direction: column; gap: 8px; }
+.trash-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
+}
+.trash-thumb {
+  width: 52px; height: 40px; flex-shrink: 0; border-radius: 8px; overflow: hidden;
+  background: var(--surface-2); border: 1px solid var(--border);
+  display: grid; place-items: center; color: var(--text-muted);
+}
+.trash-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.trash-meta { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.trash-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trash-sub { font-size: 12px; color: var(--text-muted); }
+.trash-purge { color: var(--text-muted); }
+.trash-purge:hover { color: var(--danger); }
+.pref-select { width: auto; min-width: 110px; height: 34px; padding: 0 10px; font-size: 13.5px; }
+/* Rhythm & pillars dialog */
+/* Stored pictures made smaller */
+.stored-pics .modal-body { display: flex; flex-direction: column; gap: 12px; }
+.stored-pics .hint { margin: 0; }
+.stored-pics-areas { display: flex; flex-direction: column; gap: 6px; }
+.stored-pics-none { display: flex; align-items: center; gap: 8px; padding: 14px; border-radius: 12px; background: var(--surface-2); color: #34d399; font-size: 13.5px; }
+.stored-pics-run { display: flex; flex-direction: column; gap: 12px; padding: 6px 0; }
+.stored-pics-bar { height: 8px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
+.stored-pics-bar i { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width .3s; }
+.stored-pics-done { display: flex; flex-direction: column; gap: 6px; }
+.stored-pics-done p { margin: 0; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 14px; }
+.stored-pics-done p svg { color: #34d399; }
+.stored-pics-done p.hint { display: block; font-size: 12.5px; }
+.pref-row-wide { flex-wrap: wrap; align-items: flex-start; }
+.pref-row-wide > div:first-child { flex: 1 1 320px; }
+.pref-pics { display: flex; flex-direction: column; gap: 10px; flex: 0 1 380px; min-width: 0; }
+.pref-pics-row { display: flex; align-items: center; gap: 10px; }
+.pref-pics-row > span { width: 78px; flex: none; font-size: 13px; color: var(--text-muted); }
+.pref-pics-row .range { flex: 1; }
+.pref-pics-row > b { width: 28px; text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+  .pref-pics .segmented { flex-wrap: wrap; }
+}

@@ -5,6 +5,7 @@ import { api, planFileUrl } from '../lib/api.js';
 import { fmtClock } from '../lib/timing.js';
 import { allStoryboards, timing, progress, sectionRuns, segmentColor, storyboardPath } from '../lib/storyboard.js';
 import NewStoryboardModal from '../components/storyboard/NewStoryboardModal.jsx';
+import '../styles/plan.css';
 
 /**
  * Every storyboard of every plan in one place — open one to edit it, or make

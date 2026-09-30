@@ -9,6 +9,7 @@ import Range from '../components/Range.jsx';
 import { edgeLabel } from '../components/ImageUploadPrompt.jsx';
 import StoredPicturesDialog from '../components/StoredPicturesDialog.jsx';
 import { FORMATS, EDGES, IMAGE_DEFAULTS } from '../lib/imageOptimize.js';
+import '../styles/settings.css';
 
 const K = (s) => <kbd className="sc-key" key={s}>{s}</kbd>;
 

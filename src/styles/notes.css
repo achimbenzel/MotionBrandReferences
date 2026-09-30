@@ -1,0 +1,56 @@
+/* Notes: loaded with its pages, after base.css (see README.md in this folder). */
+
+/* ---------------------------------------------------------------------------
+   Notes
+   --------------------------------------------------------------------------- */
+.notes-group + .notes-group { margin-top: 26px; }
+.notes-group-head { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); }
+.notes-grid { columns: 4 240px; column-gap: 14px; }
+.note-card {
+  display: inline-flex; flex-direction: column; width: 100%; margin: 0 0 14px; break-inside: avoid; overflow: hidden;
+  border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: pointer;
+  transition: border-color .15s, transform .15s;
+}
+.note-card:hover { border-color: var(--border-strong); transform: translateY(-2px); }
+.note-card-cover { position: relative; display: block; max-height: 220px; overflow: hidden; background: var(--surface-3); }
+.note-card-cover img { display: block; width: 100%; height: auto; max-height: 220px; object-fit: cover; }
+.note-card-cover i { position: absolute; right: 8px; bottom: 8px; display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 999px; background: rgba(0, 0, 0, .6); color: #fff; font-style: normal; font-size: 11px; }
+.note-card-body { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px 12px; }
+.note-card-body b { font-size: 15px; line-height: 1.3; }
+.note-card-body b.untitled { color: var(--text-faint); font-weight: 600; }
+.note-card-text { font-size: 13px; line-height: 1.5; color: var(--text-muted); white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
+.note-card-meta { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--text-faint); }
+.note-card.tinted .note-card-text, .note-card.tinted .note-card-meta { color: rgba(255, 255, 255, .72); }
+.note-page { position: relative; max-width: 860px; margin: 0 auto; }
+.note-sheet {
+  display: flex; flex-direction: column; gap: 8px; padding: 26px 30px 22px; border: 1px solid var(--border); border-radius: 18px;
+  background: var(--note-tint, var(--surface)); box-shadow: inset 4px 0 0 var(--note-line, transparent);
+}
+.note-title { border: 0; outline: none; background: none; color: var(--text); font: inherit; font-size: 28px; font-weight: 800; letter-spacing: -0.02em; padding: 0; }
+.note-title::placeholder { color: var(--text-faint); }
+.note-body {
+  min-height: 180px; border: 0; outline: none; resize: none; background: none; color: var(--text); font: inherit; font-size: 15.5px; line-height: 1.65; padding: 0;
+}
+.note-body::placeholder { color: var(--text-faint); }
+.note-images { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin-top: 10px; }
+.note-img { position: relative; margin: 0; aspect-ratio: 4 / 3; border-radius: 12px; overflow: hidden; background: var(--surface-3); cursor: grab; }
+.note-img.moving { opacity: .4; }
+.note-img-open { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.note-img-open img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.note-img:hover .note-img-x { opacity: 1; }
+.note-img-busy { display: grid; place-items: center; cursor: default; }
+.note-img-busy .spinner { margin: 0; }
+.note-add {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 7px; margin-top: 10px; padding: 8px 12px; border: 1px dashed var(--border-strong);
+  border-radius: 10px; background: none; color: var(--text-muted); font: inherit; font-size: 13px; cursor: pointer;
+}
+.note-add span { color: var(--text-faint); }
+.note-add:hover { border-color: var(--accent); color: var(--text); }
+@media (max-width: 620px) {
+  .notes-grid { columns: 2 150px; column-gap: 10px; }
+  .note-card { margin-bottom: 10px; }
+  .note-sheet { padding: 18px 16px; border-radius: 14px; }
+  .note-title { font-size: 22px; }
+  .note-add span { display: none; }
+  .note-images { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

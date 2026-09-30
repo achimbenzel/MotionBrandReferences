@@ -12,6 +12,7 @@ import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
 import PlanPicker from '../components/PlanPicker.jsx';
 import UploadModal from '../components/UploadModal.jsx';
+import '../styles/inbox.css';
 
 // What each kind of item can become in the library (first = suggested).
 const NEW_FOR = {

@@ -13,6 +13,7 @@ import {
   EXPENSE_CATEGORIES, EXPENSE_IDEAS, INTERVALS, categoryOf, intervalOf, paymentsIn, yearOf, monthlyOf, nextPayment, cancelBy, monthsOf,
   targetFor, isActive, todayIso, VIEWS, partOf, inView, incomeMonthsOf, incomeNow, INCOME_INTERVALS,
 } from '../lib/expenses.js';
+import '../styles/expenses.css';
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => new Date(2024, i, 1).toLocaleDateString(undefined, { month: 'short' }));
 const fmtDay = (iso, opts = { day: 'numeric', month: 'short' }) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString(undefined, opts); };

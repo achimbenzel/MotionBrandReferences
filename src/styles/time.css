@@ -1,0 +1,152 @@
+/* Time: loaded with its pages, after base.css (see README.md in this folder). */
+
+/* ================================================================ Time Tracker */
+.tt-page { display: flex; flex-direction: column; gap: 16px; }
+.tt-page > .page-head-row { margin-bottom: 0; }
+.tt-live {
+  position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 14px; padding: 18px 20px;
+  border: 1px solid var(--border); border-radius: var(--radius-lg); background: linear-gradient(180deg, var(--surface-2), var(--surface));
+}
+.tt-live::before { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .5s; background: radial-gradient(90% 120% at 0% 0%, rgba(242, 85, 90, .14), transparent 60%); }
+.tt-live.running { border-color: rgba(242, 85, 90, .35); }
+.tt-live.running::before { opacity: 1; }
+.tt-live-main { position: relative; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.tt-clock { display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto; column-gap: 10px; align-items: center; min-width: 170px; }
+.tt-clock b { font-family: var(--font-mono); font-size: 32px; font-weight: 700; letter-spacing: -0.04em; line-height: 1.05; }
+.tt-clock-dot { grid-row: span 2; width: 12px; height: 12px; border-radius: 50%; background: var(--surface-3); box-shadow: inset 0 0 0 1px var(--border-strong); }
+.tt-live.running .tt-clock-dot { background: var(--danger); box-shadow: 0 0 0 4px rgba(242, 85, 90, .18); animation: tt-pulse 1.6s ease-in-out infinite; }
+.tt-since { font-size: 12px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px; }
+.tt-since input { height: 24px; padding: 0 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font: inherit; font-size: 12px; }
+.tt-live-fields { flex: 1 1 360px; min-width: 0; display: flex; gap: 8px; flex-wrap: wrap; }
+.tt-live-fields .tt-project { flex: 1 1 220px; }
+.tt-live-details { flex: 2 1 240px; min-width: 0; }
+.tt-live-actions { display: flex; align-items: center; gap: 6px; }
+.tt-start { min-width: 112px; justify-content: center; height: 40px; font-size: 14.5px; }
+.tt-pause, .tt-resume { min-width: 104px; justify-content: center; height: 40px; font-size: 14.5px; }
+.tt-pause { border-color: rgba(251, 191, 36, .45); color: #fbbf24; background: rgba(251, 191, 36, .08); }
+.tt-pause:hover { background: rgba(251, 191, 36, .16); }
+.tt-resume { background: #fbbf24; border-color: transparent; color: #2a1d00; }
+.tt-resume:hover { background: #fcd34d; }
+/* Paused: the clock stands still in amber, the pause counts up beside it */
+.tt-live.paused { border-color: rgba(251, 191, 36, .45); }
+.tt-live.paused::before { background: radial-gradient(90% 120% at 0% 0%, rgba(251, 191, 36, .14), transparent 60%); }
+.tt-live.paused .tt-clock b { color: #fbbf24; }
+.tt-live.paused .tt-clock-dot { display: grid; place-items: center; background: #fbbf24; color: #2a1d00; box-shadow: 0 0 0 4px rgba(251, 191, 36, .18); animation: none; }
+.tt-clock-sub { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.tt-pause-since { color: #fbbf24; }
+.tt-pause-since b { font-family: var(--font-mono); font-size: 12.5px; }
+.tt-pause-since input { border-color: rgba(251, 191, 36, .4); }
+.tt-pause-sum { color: #fbbf24; }
+/* The session as a line: work and pauses */
+.tt-line { position: relative; display: flex; flex-direction: column; gap: 7px; margin-top: 14px; }
+.tt-line-bar { display: flex; gap: 2px; height: 22px; border-radius: 7px; overflow: hidden; }
+.tt-seg { position: relative; display: flex; align-items: center; justify-content: center; min-width: 3px; overflow: hidden; }
+.tt-seg.work { background: color-mix(in srgb, var(--danger) 55%, var(--surface-3)); }
+.tt-seg.pause { background: repeating-linear-gradient(135deg, rgba(251, 191, 36, .5) 0 5px, rgba(251, 191, 36, .28) 5px 10px); }
+.tt-seg.pause.open { animation: tt-pause-glow 1.6s ease-in-out infinite; }
+.tt-seg em { display: inline-flex; align-items: center; gap: 3px; padding: 0 6px; border-radius: 999px; background: rgba(20, 16, 4, .7); color: #fcd34d; font-style: normal; font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+.tt-line-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11.5px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.tt-line-pauses { flex: 1; display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; }
+.tt-pchip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; background: rgba(251, 191, 36, .12); color: #fbbf24; }
+.tt-pchip b { color: #fcd34d; }
+.tt-pchip.open { box-shadow: inset 0 0 0 1px rgba(251, 191, 36, .5); }
+.tt-dur-pause b { display: inline-flex; align-items: center; gap: 5px; color: #fbbf24; }
+@media (prefers-reduced-motion: reduce) {
+  .tt-seg.pause.open { animation: none; }
+}
+.tt-project { display: flex; gap: 6px; min-width: 0; }
+.tt-project select { flex: 1 1 auto; min-width: 0; }
+.tt-project input { flex: 1 1 140px; min-width: 0; }
+.tt-project.free { flex-wrap: wrap; }
+/* typing another project: the name gets the room (its own line on a phone) */
+.tt-project.free select { flex: 1 1 190px; }
+.tt-project.free input { flex: 3 1 180px; }
+.tt-acts { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.tt-acts-ico { color: var(--text-faint); margin-right: 2px; }
+.tt-act {
+  height: 28px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--border); background: none; color: var(--text-muted);
+  font: inherit; font-size: 12.5px; cursor: pointer; transition: color .15s, border-color .15s, background .15s;
+}
+.tt-act:hover { color: var(--text); border-color: var(--border-strong); }
+.tt-act.on { color: var(--text); border-color: var(--accent); background: var(--accent-dim); }
+.tt-act-add { width: 28px; padding: 0; display: inline-grid; place-items: center; border-style: dashed; }
+.tt-act-input { height: 28px; width: 140px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--accent); background: var(--surface); color: var(--text); font: inherit; font-size: 12.5px; outline: none; }
+.tt-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.tt-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.tt-periods { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.tt-periods::-webkit-scrollbar { display: none; }
+.tt-periods button { flex: none; }
+.tt-range { display: inline-flex; align-items: center; gap: 6px; color: var(--text-faint); }
+.tt-range .input { width: auto; height: 32px; padding-top: 0; padding-bottom: 0; font-size: 13px; }
+.tt-filters select.tt-filter { width: auto; max-width: 220px; height: 32px; font-size: 13px; padding: 0 28px 0 10px; }
+.tt-break { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 12px; }
+.tt-break-card { padding: 14px 16px 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: linear-gradient(180deg, var(--surface-2), var(--surface)); }
+.tt-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.tt-chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); font: inherit; font-size: 12.5px; cursor: pointer; }
+.tt-chip b { color: var(--text); font-variant-numeric: tabular-nums; }
+.tt-chip span { color: var(--text-faint); font-size: 11.5px; }
+.tt-chip:hover, .tt-chip.on { border-color: var(--accent); }
+.tt-chip.on { background: var(--accent-dim); }
+.tt-list-head { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+.tt-list-head h2 { margin: 0; font-size: 16px; display: inline-flex; align-items: center; gap: 8px; }
+.tt-day { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); overflow: visible; }
+.tt-day-head { display: flex; align-items: center; justify-content: space-between; padding: 9px 14px; border-bottom: 1px solid var(--border); font-size: 12.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+.tt-day-head b { color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: 0; text-transform: none; }
+.tt-row { display: flex; align-items: center; gap: 4px; padding: 0 6px 0 0; border-bottom: 1px solid var(--border); }
+.tt-row:last-child { border-bottom: 0; }
+.tt-row-main {
+  flex: 1; min-width: 0; display: grid; grid-template-columns: 104px 56px minmax(0, 1fr) auto; align-items: center; gap: 12px;
+  padding: 10px 8px 10px 14px; border: 0; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; border-radius: 10px;
+}
+.tt-row-main:hover { background: rgba(255, 255, 255, .025); }
+.tt-row-time { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; font-size: 13px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.tt-row-pause {
+  display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 999px; white-space: nowrap;
+  background: rgba(251, 191, 36, .13); color: #fbbf24; font-size: 11px; font-weight: 600;
+}
+.tt-row-dur { font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tt-row-what { display: flex; flex-direction: column; min-width: 0; }
+.tt-row-project { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tt-row-details { font-size: 12.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tt-row-act { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--surface-3); color: var(--text-muted); white-space: nowrap; }
+.tt-row-menu { opacity: .5; }
+.tt-row:hover .tt-row-menu { opacity: 1; }
+.tt-empty { margin-top: 0; }
+.tt-editor { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--accent); border-radius: 14px; background: var(--surface-2); box-shadow: 0 0 0 4px var(--accent-dim); }
+.tt-day .tt-editor { margin: 6px; }
+.tt-editor-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.tt-f { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--text-muted); min-width: 0; }
+.tt-f.grow { flex: 1 1 260px; }
+.tt-editor > .tt-f.grow { flex: none; }
+/* in the column the 260px would be its height */
+.tt-f .input { height: 36px; padding-top: 0; padding-bottom: 0; }
+.tt-dur b { height: 36px; display: flex; align-items: center; font-size: 16px; color: var(--text); font-variant-numeric: tabular-nums; }
+.tt-editor-foot { display: flex; justify-content: flex-end; gap: 8px; }
+.tt-export { max-width: 520px; }
+.tt-export h2 { display: inline-flex; align-items: center; gap: 8px; }
+.tt-export-what { margin: 0 0 14px; color: var(--text-muted); font-size: 13.5px; }
+.tt-export-opt { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; font-size: 13px; color: var(--text-muted); }
+.tt-export-preview { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); margin: 6px 0 12px; border-radius: 8px; overflow: hidden; font-size: 10.5px; font-weight: 700; color: #fff; }
+.tt-export-preview span { padding: 7px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tt-export-preview.app { background: #1b1b1e; box-shadow: inset 0 -2px 0 #2ec5d3; border: 1px solid var(--border); }
+.tt-export-preview.classic { background: #2f5597; box-shadow: inset 0 -2px 0 #1f3864; }
+.tt-export-list { margin: 0; padding-left: 18px; color: var(--text-muted); font-size: 12.5px; line-height: 1.7; }
+.tt-export .modal-foot a.btn { text-decoration: none; }
+@media (max-width: 900px) {
+  .tt-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tt-break { grid-template-columns: 1fr; }
+}
+@media (max-width: 620px) {
+  .tt-live { padding: 14px; }
+  .tt-live-actions { width: 100%; }
+  .tt-start { flex: 1; }
+  .tt-row-main { grid-template-columns: 1fr auto; grid-template-areas: 'what dur' 'time act'; row-gap: 3px; }
+  .tt-row-what { grid-area: what; }
+  .tt-row-dur { grid-area: dur; text-align: right; }
+  .tt-row-time { grid-area: time; }
+  .tt-row-act { grid-area: act; justify-self: end; }
+  .tt-filters select.tt-filter { max-width: none; flex: 1 1 140px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tt-live.running .tt-clock-dot { animation: none; }
+}

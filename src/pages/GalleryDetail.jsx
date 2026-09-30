@@ -9,6 +9,7 @@ import GalleryPicker from '../components/GalleryPicker.jsx';
 import GalleryNameModal from '../components/GalleryNameModal.jsx';
 import { TABS, setLastTab } from '../lib/types.js';
 import { useAddToPlan } from '../components/AddToPlan.jsx';
+import '../styles/reference.css';
 
 export default function GalleryDetail() {
   const { id } = useParams();

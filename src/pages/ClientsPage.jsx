@@ -7,6 +7,7 @@ import ClientAvatar from '../components/ClientAvatar.jsx';
 import { isTouch } from '../lib/useMedia.js';
 import { dayKey } from '../lib/timeTracker.js';
 import { whoOf, minutesOf, fmtHours, fmtMoney, upcomingBirthdays, useCurrency } from '../lib/clients.js';
+import '../styles/clients.css';
 
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const inDays = (iso) => {

@@ -9,6 +9,7 @@ import LogoOptionsModal from '../components/LogoOptionsModal.jsx';
 import { coverAspect, setLastTab } from '../lib/types.js';
 import { useAddToPlan } from '../components/AddToPlan.jsx';
 import useMakePost from '../components/content/useMakePost.js';
+import '../styles/reference.css';
 
 // Per-type bodies + the (heavy, imaging-backed) thumbnail studio are split into
 // their own chunks — opening a colour project doesn't pull the branding/logo

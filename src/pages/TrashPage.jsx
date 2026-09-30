@@ -3,6 +3,7 @@ import { Trash2, RotateCcw, X, FileText, PencilRuler, FolderOpen, LayoutList, Pu
 import { api } from '../lib/api.js';
 import { useToast } from '../components/Toast.jsx';
 import { useConfirm } from '../components/ConfirmDialog.jsx';
+import '../styles/settings.css';
 
 const timeAgo = (ts) => {
   const s = Math.max(1, Math.floor((Date.now() - ts) / 1000));

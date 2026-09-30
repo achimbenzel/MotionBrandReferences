@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-// Breakpoints shared with styles.css.
+// Breakpoints shared with the stylesheets (see src/styles/README.md).
 export const DESKTOP = '(min-width: 900px)';   // sidebar is docked (below: drawer + top bar)
 export const PHONE = '(max-width: 640px)';     // menus become bottom sheets
 export const TOUCH = '(hover: none), (pointer: coarse)';

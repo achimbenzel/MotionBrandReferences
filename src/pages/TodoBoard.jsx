@@ -8,6 +8,7 @@ import Menu from '../components/Menu.jsx';
 import { useConfirm } from '../components/ConfirmDialog.jsx';
 import { useSaver, useRefreshOnReturn } from '../lib/autosave.js';
 import PlanPicker from '../components/PlanPicker.jsx';
+import '../styles/board.css';
 
 const rid = () => Math.random().toString(36).slice(2, 10);
 

@@ -14,6 +14,7 @@ import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
 import MediaPicker from '../components/mockups/MediaPicker.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
+import '../styles/software.css';
 
 const rid = () => Math.random().toString(36).slice(2, 10);
 const firstEmoji = (str) => {

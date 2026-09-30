@@ -20,6 +20,7 @@ import { useTimeTracker, tracker, dayKey } from '../lib/timeTracker.js';
 import {
   minutesOf, fmtHours, fmtMoney, amountOf, budgetMinutes, budgetState, budgetText, nextBirthday, turnsOn, useCurrency,
 } from '../lib/clients.js';
+import '../styles/clients.css';
 
 const rid = () => Math.random().toString(36).slice(2, 10);
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
