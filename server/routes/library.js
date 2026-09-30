@@ -8,6 +8,7 @@ import { folderSize, invalidateStorage, safeRm } from '../files.js';
 import { uploadArchive } from '../upload.js';
 import { createZipToStream, validateLibraryZip, extractZip } from '../zip.js';
 import { createRouter, HttpError } from '../http.js';
+import { localDay } from '../schema.js';
 
 const router = createRouter();
 export default router;
@@ -21,7 +22,7 @@ const EXPORT_SKIP = (rel) =>
   || /^\.db-.*\.tmp$/.test(rel);
 
 router.get('/api/export', async (_req, res) => {
-  const stamp = new Date().toISOString().slice(0, 10);
+  const stamp = localDay();
   res.setHeader('Content-Type', 'application/zip');
   res.setHeader('Content-Disposition', `attachment; filename="design-reference-${stamp}.zip"`);
   await createZipToStream(DATA_DIR, res, { skip: EXPORT_SKIP });

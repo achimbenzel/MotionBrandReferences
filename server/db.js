@@ -61,9 +61,45 @@ export async function loadRawDB() {
   return null;
 }
 
+// ---- The database in memory -----------------------------------------------------
+// Reading db.json, parsing and normalizing it on every request costs tens of
+// milliseconds once the library grows — and the dashboard asks for ~10 things
+// at once. So the normalized database is kept in memory as a (compact) JSON
+// string, and every reader gets its own parsed copy: nobody can change what
+// another request sees, just like reading the file. A write replaces it (it's
+// normalized again on the next read, as a read from the file would be); a
+// db.json changed from outside — an import, a restored backup, an edit by
+// hand — is noticed by its file stats and read again.
+let cache = null;   // { key, json } — normalized
+let written = null; // { key, json } — what we last wrote, not normalized yet
+let loading = null; // the read in flight, shared by everyone asking meanwhile
+
+async function fileKey() {
+  try { const st = await fsp.stat(DB_PATH); return `${st.ino}:${st.size}:${st.mtimeMs}`; } catch { return null; }
+}
+
 // The database with every record brought to the shape the code expects.
 export async function readDB() {
-  return normalizeDB((await loadRawDB()) || emptyDB());
+  const key = await fileKey();
+  if (key && cache?.key === key) return JSON.parse(cache.json);
+  if (key && written?.key === key) {
+    const db = normalizeDB(JSON.parse(written.json));
+    cache = { key, json: JSON.stringify(db) };
+    written = null;
+    return db;
+  }
+  if (!loading) {
+    loading = (async () => {
+      const before = await fileKey();
+      const raw = await loadRawDB();
+      const db = normalizeDB(raw || emptyDB());
+      const json = JSON.stringify(db);
+      const after = await fileKey();
+      if (raw && before && before === after) cache = { key: after, json }; // the file didn't change while it was read
+      return json;
+    })().finally(() => { loading = null; });
+  }
+  return JSON.parse(await loading);
 }
 
 // Write db.json atomically: temp file → fsync → rename over the target (atomic
@@ -81,6 +117,7 @@ export async function writeDBAtomic(db) {
     await fsp.rm(tmp, { force: true }).catch(() => {});
     throw err;
   }
+  cache = null; written = { key: await fileKey(), json }; // what the next read starts from
   await fsp.writeFile(DB_BAK, json).catch(() => {}); // mirror the last good version
   await snapshotDB(json).catch(() => {});
   invalidateStorage();

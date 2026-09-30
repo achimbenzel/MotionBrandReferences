@@ -160,6 +160,25 @@ test('a corrupt db.json self-heals from the .bak mirror', async () => {
   } finally { await s.stop(); }
 });
 
+test('db.json changed by hand while the app runs is read again (the in-memory copy follows the file)', async () => {
+  const dir = await tempDir();
+  await seedLegacyLibrary(dir);
+  const s = await startServer({ dataDir: dir });
+  try {
+    await s.api('/api/galleries', { method: 'POST', json: { type: 'logo', name: 'Before' } });
+    assert.ok((await s.api('/api/galleries?type=logo')).data.galleries.some((g) => g.name === 'Before'));
+    // Same length on purpose: only the contents (and the file time) change.
+    const file = path.join(dir, 'db.json');
+    await fsp.writeFile(file, (await fsp.readFile(file, 'utf8')).replace('"Before"', '"Edited"'));
+    const names = (await s.api('/api/galleries?type=logo')).data.galleries.map((g) => g.name);
+    assert.ok(names.includes('Edited') && !names.includes('Before'), names.join(', '));
+    // …and a write after that builds on the edited file.
+    await s.api('/api/galleries', { method: 'POST', json: { type: 'logo', name: 'After' } });
+    const saved = (await readJSON(file)).galleries.map((g) => g.name);
+    assert.ok(saved.includes('Edited') && saved.includes('After'), saved.join(', '));
+  } finally { await s.stop(); }
+});
+
 test('upload errors answer clearly and leave no tmp files behind', async () => {
   const dir = await tempDir();
   const s = await startServer({ dataDir: dir, env: { MAX_UPLOAD_MB: '1' } });

@@ -839,7 +839,7 @@ export function normalizeExpense(e) {
     category: EXPENSE_CATEGORY_KEYS.includes(e?.category) ? e.category : 'other',
     amount: Number.isFinite(amount) && amount > 0 ? Math.round(Math.min(amount, 1e9) * 100) / 100 : 0,
     interval: EXPENSE_INTERVALS.includes(e?.interval) ? e.interval : 'month',
-    start: isDay(e?.start) ? e.start : new Date().toISOString().slice(0, 10), // the first payment (its day of the month is the payment day)
+    start: isDay(e?.start) ? e.start : localDay(), // the first payment (its day of the month is the payment day)
     end: isDay(e?.end) ? e.end : '',                                         // the last payment on or before this day ('' = runs on)
     share: Math.round(num(e?.share, 0, 100, 100)),                           // the business part, in % (the rest is private; 0 = all private)
     notice: Math.round(num(e?.notice, 0, 730, 0)),                           // days' notice to cancel before it renews
@@ -859,7 +859,7 @@ export function normalizeIncome(x) {
     clientId: typeof x?.clientId === 'string' && ID.test(x.clientId) ? x.clientId : '', // the client it comes from (optional)
     amount: Number.isFinite(amount) && amount > 0 ? Math.round(Math.min(amount, 1e9) * 100) / 100 : 0,
     interval: INCOME_INTERVALS.includes(x?.interval) ? x.interval : 'month',
-    start: isDay(x?.start) ? x.start : new Date().toISOString().slice(0, 10),
+    start: isDay(x?.start) ? x.start : localDay(),
     end: isDay(x?.end) ? x.end : '',
     notes: str(x?.notes, 2000),
     createdAt: num(x?.createdAt, 0, 1e14, 0) || Date.now(),
@@ -944,6 +944,8 @@ const YMD = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 export const DEFAULT_ACTIVITIES = ['Design', 'Animation', 'Storyboard', 'After Effects', 'Website', 'Meeting', 'Research', 'Admin'];
 export const isTimeOfDay = (v) => typeof v === 'string' && HHMM.test(v);
 export const isDay = (v) => typeof v === 'string' && YMD.test(v);
+/** Today as yyyy-mm-dd on this computer's clock — not UTC (which is still "yesterday" here until 1 or 2 am). */
+export const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 /** Minutes from start to end (an end before the start is on the next day). */
 export const entryMinutes = (e) => {
   const [a, b] = [e.start, e.end].map((t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; });
@@ -953,7 +955,7 @@ const ID = /^[\w-]{1,40}$/;
 export function normalizeTimeEntry(e) {
   return {
     id: typeof e?.id === 'string' && ID.test(e.id) ? e.id : nanoid(10),
-    date: isDay(e?.date) ? e.date : new Date().toISOString().slice(0, 10),
+    date: isDay(e?.date) ? e.date : localDay(),
     start: isTimeOfDay(e?.start) ? e.start : '09:00',
     end: isTimeOfDay(e?.end) ? e.end : (isTimeOfDay(e?.start) ? e.start : '09:00'),
     planId: typeof e?.planId === 'string' && ID.test(e.planId) ? e.planId : null,
