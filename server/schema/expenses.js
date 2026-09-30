@@ -7,6 +7,20 @@ import { ID, isDay, localDay, num, str } from './base.js';
 // The same keys as EXPENSE_CATEGORIES in src/lib/expenses.js (a test keeps them in step).
 export const EXPENSE_CATEGORY_KEYS = ['software', 'insurance', 'health', 'office', 'phone', 'hardware', 'taxes', 'accounting', 'marketing', 'learning', 'travel', 'home', 'mobility', 'leisure', 'other'];
 export const EXPENSE_INTERVALS = ['month', 'quarter', 'half', 'year', 'once'];
+/** A receipt (invoice, bill) kept with an expense: its file under data/expense/<id>/, and the day it's for. */
+export const RECEIPT_KINDS = ['pdf', 'image', 'xml', 'other'];
+export function normalizeReceipt(r) {
+  const file = typeof r?.file === 'string' && /^receipts\/[\w.\- ()]{1,160}$/.test(r.file) ? r.file : null;
+  if (!file) return null;
+  return {
+    id: typeof r.id === 'string' && ID.test(r.id) ? r.id : nanoid(8),
+    file,
+    name: str(r.name, 200) || file.slice(9),
+    size: Math.round(num(r.size, 0, 1e12, 0)),
+    date: isDay(r.date) ? r.date : localDay(),
+    kind: RECEIPT_KINDS.includes(r.kind) ? r.kind : 'other',
+  };
+}
 export function normalizeExpense(e) {
   const amount = Number(e?.amount);
   return {
@@ -21,6 +35,7 @@ export function normalizeExpense(e) {
     notice: Math.round(num(e?.notice, 0, 730, 0)),                           // days' notice to cancel before it renews
     link: str(e?.link, 500).trim(),
     notes: str(e?.notes, 2000),
+    receipts: (Array.isArray(e?.receipts) ? e.receipts : []).map(normalizeReceipt).filter(Boolean),
     createdAt: num(e?.createdAt, 0, 1e14, 0) || Date.now(),
     updatedAt: num(e?.updatedAt, 0, 1e14, 0) || Date.now(),
   };

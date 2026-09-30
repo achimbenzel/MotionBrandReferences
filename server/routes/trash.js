@@ -14,6 +14,7 @@ import { clientDir } from './clients.js';
 import { noteDir } from './notes.js';
 import { contentDir } from './content.js';
 import { achievementDir } from './achievements.js';
+import { expenseDir } from './expenses.js';
 
 const router = createRouter();
 export default router;
@@ -56,6 +57,7 @@ const trashThumb = (t) => {
                         : t.kind === 'content' ? t.data.media?.find((m) => m.kind === 'image')?.file
                           : t.kind === 'contentMedia' ? (t.data.media?.kind === 'image' ? t.data.media.file : null)
                             : t.kind === 'achievement' ? (t.data.iconImage || t.data.sticker)
+                              : t.kind === 'receipt' ? (t.data.receipt?.kind === 'image' && IMAGE_EXT.test(t.data.receipt.file) ? t.data.receipt.file : null)
                               : t.kind === 'pictures' ? t.data.items?.[0]?.rel : null;
   return rel ? trashedFileUrl(t, rel) : null;
 };
@@ -69,7 +71,8 @@ function describe(t) {
     case 'content': return { title: t.data.title || 'Untitled post', subtitle: 'Content' };
     case 'contentMedia': return { title: t.data.media?.name || 'Media', subtitle: `${t.data.media?.kind === 'video' ? 'Video' : 'Picture'} · ${t.data.contentTitle || 'Content'}` };
     case 'achievement': return { title: t.data.title || 'Achievement', subtitle: `Achievement · ${t.data.group || ''}` };
-    case 'expense': return { title: t.data.name || 'Expense', subtitle: 'Expense' };
+    case 'expense': return { title: t.data.name || 'Expense', subtitle: `Expense${t.data.receipts?.length ? ` · ${t.data.receipts.length} receipt${t.data.receipts.length === 1 ? '' : 's'}` : ''}` };
+    case 'receipt': return { title: t.data.receipt?.name || 'Receipt', subtitle: `Receipt · ${t.data.expenseName || 'Expense'}` };
     case 'income': return { title: t.data.name || 'Income', subtitle: 'Recurring income' };
     case 'contentSnippet': return { title: t.data.name || String(t.data.text || '').slice(0, 80) || 'Snippet', subtitle: `Content library · ${{ hook: 'Hook', hashtags: 'Hashtags', cta: 'Call to action' }[t.data.kind] || 'Snippet'}` };
     case 'invoice': return { title: t.data.invoice?.number ? `Invoice ${t.data.invoice.number}` : (t.data.invoice?.name || 'Invoice'), subtitle: `Invoice · ${t.data.clientName || 'Client'}` };
@@ -191,6 +194,12 @@ router.post('/api/trash/:trashId/restore', async (req, res) => {
     } else if (entry.kind === 'expense') {
       if (!Array.isArray(db.expenses)) db.expenses = [];
       if (!db.expenses.some((x) => x.id === data.id)) db.expenses.push(data);
+      move = { from, to: expenseDir(data.id) }; // its receipts (nothing on disk for one without)
+    } else if (entry.kind === 'receipt') {
+      const e = (db.expenses || []).find((x) => x.id === data.expenseId);
+      if (!e) { gone = true; return null; }
+      if (!e.receipts.some((r) => r.id === data.receipt.id)) e.receipts = [...e.receipts, data.receipt].sort((a, b) => a.date.localeCompare(b.date));
+      rels = { base: expenseDir(e.id), list: data.rels };
     } else if (entry.kind === 'income') {
       if (!Array.isArray(db.income)) db.income = [];
       if (!db.income.some((x) => x.id === data.id)) db.income.push(data);
@@ -209,7 +218,7 @@ router.post('/api/trash/:trashId/restore', async (req, res) => {
     return entry;
   });
   if (gone === 'name') return res.status(409).json({ error: 'name_taken', message: 'You have another client with that name now — rename it first.' });
-  if (gone) return res.status(409).json({ error: 'target_gone', message: 'The project, block, client or note this item belonged to no longer exists.' });
+  if (gone) return res.status(409).json({ error: 'target_gone', message: 'The project, block, client, note or expense this item belonged to no longer exists.' });
   if (!restored) return res.status(404).json({ error: 'not_found' });
   if (move) await restoreFromTrash(move.from, move.to);
   if (rels) {

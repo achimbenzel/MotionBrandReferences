@@ -86,6 +86,45 @@ export function paymentsIn(e, from, to) {
   }
   return out;
 }
+// ---- Receipts ---------------------------------------------------------------------
+// What the business pays needs a receipt (an invoice, a bill) for each payment;
+// a receipt counts for the payment in its month. Private costs need none.
+export const needsReceipts = (e) => Number(e?.share ?? 100) > 0;
+/** Each payment of `e` from `from` to `to`, and whether a receipt from its month is there → [{ date, covered }]. */
+export function receiptCheck(e, from, to) {
+  if (!needsReceipts(e)) return [];
+  const months = new Set((e.receipts || []).map((r) => String(r.date).slice(0, 7)));
+  return paymentsIn(e, from, to).map((date) => ({ date, covered: months.has(date.slice(0, 7)) }));
+}
+/** The payments of `e` in `year`, up to `today`, that have no receipt yet → dates. */
+export const missingReceipts = (e, year, today) => {
+  const end = `${year}-12-31` < today ? `${year}-12-31` : today;
+  return receiptCheck(e, `${year}-01-01`, end).filter((p) => !p.covered).map((p) => p.date);
+};
+/** The day a new receipt most likely belongs to: the latest payment up to today without one, else today. */
+export function receiptDateFor(e, today) {
+  const open = receiptCheck(e, addDays(today, -730), today).filter((p) => !p.covered);
+  return open.length ? open[open.length - 1].date : today;
+}
+/**
+ * A date in a receipt's file name ("Invoice_2026-03-15.pdf", "Rechnung 15.03.2026",
+ * "adobe-202603.pdf") → 'YYYY-MM-DD' (a month alone → its first day), else null.
+ */
+export function dateFromName(name) {
+  const s = String(name || '');
+  const real = (y, m, d) => {
+    const iso = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const t = new Date(`${iso}T12:00:00`);
+    return y >= 2000 && y <= 2099 && t.getMonth() + 1 === Number(m) && t.getDate() === Number(d) ? iso : null;
+  };
+  let m = /(?<!\d)(20\d\d)[-_. ]?(0[1-9]|1[0-2])[-_. ]?(0[1-9]|[12]\d|3[01])(?!\d)/.exec(s);
+  if (m) return real(m[1], m[2], m[3]);
+  m = /(?<!\d)(0?[1-9]|[12]\d|3[01])[._-](0?[1-9]|1[0-2])[._-](20\d\d)(?!\d)/.exec(s);
+  if (m) return real(m[3], m[2], m[1]);
+  m = /(?<!\d)(20\d\d)[-_. ]?(0[1-9]|1[0-2])(?!\d)/.exec(s);
+  if (m) return real(m[1], m[2], 1);
+  return null;
+}
 /** What it costs in a year — all of it, the business part (its share) and the private rest. */
 export function yearOf(e, year) {
   const n = paymentsIn(e, `${year}-01-01`, `${year}-12-31`).length;

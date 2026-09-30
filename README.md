@@ -185,6 +185,7 @@ data/
     └── blocks/<blockId>/*          # one folder per content block
                                     # (moodboard images, files + example images)
 ├── client/<id>/                    # a client's logo + invoices/*.pdf
+├── expense/<id>/receipts/*         # an expense's receipts (PDFs, photos, e-invoices)
 ├── software/<id>/*                 # plugin installers + your own script files
 ├── mockup/<id>/                    # a mockup's screen pictures / videos, 2D pictures + thumb.webp
 ├── mockup-model/<id>/model.<ext>   # an imported 3D model (.glb / .gltf / .usdz)
@@ -1157,18 +1158,37 @@ less the money that comes in regularly anyway (retainers).
   In the list, a cancel-by within 30 days is yellow too.
 - **The list** — **Running / Ended / All** and a search, grouped by category
   with each group's year; every row shows its rhythm, since when, the business
-  part, the next payment, the cancel-by day, the amount and the year.
+  part, the next payment, the cancel-by day, the amount and the year — and its
+  receipts: a 📎 with how many the year has, or **“2 missing”** in yellow.
+  **Missing** (next to All, with a count) lists what still needs a receipt.
+- **Receipts** — each expense keeps the invoices and bills for its payments
+  (in its editor, saved right away — apart from Save): **Add** or drop PDFs,
+  photos or scans (on a phone the camera too) and e-invoices (XML), several at
+  once. Each is for a day, and a receipt counts for the payment in its month.
+  The day is found by itself: a date in the file name (“Rechnung
+  15.03.2026.pdf”, “invoice-2026-03.pdf”), else the latest payment still
+  without one — so twelve monthly invoices dropped together fill the twelve
+  open months. **Missing in 2026** lists the payments up to today that have
+  none; a click on one adds the receipt for exactly that payment. The day can
+  be changed; a click on the name opens the file; delete goes to the Trash
+  (with Undo). Private costs need none (you can still keep them). Files are
+  kept as they are — never made smaller.
 - **Export** — the year as **Excel** (German or English): every payment with
   date, name, category, rhythm, amount, business %, business and private
-  amount (as formulas, with totals that follow a filter), a summary sheet by
-  category and by month (all, business, private), and the recurring income's
-  payments (date, name, client, rhythm, amount).
+  amount (as formulas, with totals that follow a filter) and its **receipt**
+  (the file name in the ZIP, or “fehlt” / “missing” for a payment up to
+  today without one), a summary sheet by category and by month (all,
+  business, private), and the recurring income's payments (date, name,
+  client, rhythm, amount). **Receipts 2026 as ZIP** is for the tax advisor:
+  that workbook plus every receipt of the year, named by its day and expense
+  (“2026-03-15 Adobe CC.pdf”; private ones in a folder of their own).
 - Invoices (for "invoiced") come from your [clients](#clients). Expenses are
   in the ⌘K search, and the dashboard has a **Money this month** widget.
 
-Stored in `data/db.json` (`expenses`, recurring income in `income`; the
-calculator in `settings.finance`),
-so they're part of the library export / import.
+Stored in `data/db.json` (`expenses` — each with its `receipts` —, recurring
+income in `income`; the calculator in `settings.finance`), the receipt files
+in `data/expense/<id>/receipts/`, so they're part of the library export /
+import (and the scan for unused files leaves them alone).
 
 ### Notes
 **Notes** (sidebar, under Expenses) is for everything that isn't a
@@ -1699,7 +1719,8 @@ lookup off with `LINK_LOOKUP=off`).
   plan tabs, storyboards). `npm run test:e2e` opens every page of the built app
   in Chromium — on a desktop and on 320 / 390 px phones — and fails on any
   error, a page that doesn't render or a page that scrolls sideways; it also
-  plays two devices on one library (live updates, keep mine / load theirs).
+  plays two devices on one library (live updates, keep mine / load theirs)
+  and adds receipts to an expense (a missing payment, delete and undo).
 
 ### Scripts
 
@@ -1710,7 +1731,7 @@ lookup off with `LINK_LOOKUP=off`).
 | `npm run serve` | build, then serve app + API from a single port (4300) |
 | `npm start` | serve a pre-built `dist/` + API from 4300 |
 | `npm test` | API / migration / security tests and the helpers' unit tests (Node's built-in test runner) |
-| `npm run test:e2e` | every page in a real browser, desktop + phones, and two devices on one library (after `npm run build`; once: `npx playwright install chromium` — or use your installed Chrome with `PW_CHANNEL=chrome`) |
+| `npm run test:e2e` | every page in a real browser, desktop + phones, two devices on one library, receipts (after `npm run build`; once: `npx playwright install chromium` — or use your installed Chrome with `PW_CHANNEL=chrome`) |
 | `npm run lint` | ESLint (incl. React hook rules) |
 | `npm run check` | lint + tests + build (CI also runs `test:e2e` on every push) |
 

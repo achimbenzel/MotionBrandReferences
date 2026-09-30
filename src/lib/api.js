@@ -608,6 +608,17 @@ export const api = {
   async createExpense(body) { const { expense } = await request('/api/expenses', { method: 'POST', json: body }); return expense; },
   async updateExpense(id, patch) { const { expense } = await request(`/api/expenses/${id}`, { method: 'PATCH', json: patch }); return expense; },
   async removeExpense(id) { return request(`/api/expenses/${id}`, { method: 'DELETE' }); }, // → { trashId }
+  // Receipts (kept as they are — not made smaller). Without `date` each finds its payment. → { expense, receipts }
+  async addReceipts(id, files, date = null) {
+    const fd = new FormData();
+    for (const f of files) fd.append('files', f);
+    if (date) fd.append('date', date);
+    return request(`/api/expenses/${id}/receipts`, { method: 'POST', body: fd });
+  },
+  async updateReceipt(id, receiptId, patch) { return request(`/api/expenses/${id}/receipts/${receiptId}`, { method: 'PATCH', json: patch }); }, // → { expense }
+  async removeReceipt(id, receiptId) { return request(`/api/expenses/${id}/receipts/${receiptId}`, { method: 'DELETE' }); }, // → { expense, trashId }
+  expenseFileUrl: (e, rel) => `/data/expense/${e.id}/${rel}`,
+  expenseReceiptsUrl: (year, lang = 'de') => `/api/expenses/receipts.zip?year=${year}&lang=${lang}`,
   async createIncome(body) { const { income } = await request('/api/income', { method: 'POST', json: body }); return income; },
   async updateIncome(id, patch) { const { income } = await request(`/api/income/${id}`, { method: 'PATCH', json: patch }); return income; },
   async removeIncome(id) { return request(`/api/income/${id}`, { method: 'DELETE' }); }, // → { trashId }

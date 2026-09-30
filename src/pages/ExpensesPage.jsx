@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Plus, Wallet, ChevronLeft, ChevronRight, FileSpreadsheet, ExternalLink, Trash2, Check, X, Search, BellRing, CalendarClock, Target, TrendingUp, Tag,
-  Copy, Calculator, Repeat,
+  Copy, Calculator, Repeat, FileArchive, Paperclip,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { fmtMoney } from '../lib/clients.js';
@@ -10,9 +10,10 @@ import { addDays, fmtDay as fmtDate } from '../lib/dates.js';
 import { useSaver } from '../lib/autosave.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
+import Receipts from '../components/expenses/Receipts.jsx';
 import {
   EXPENSE_CATEGORIES, EXPENSE_IDEAS, INTERVALS, categoryOf, intervalOf, paymentsIn, yearOf, monthlyOf, nextPayment, cancelBy, monthsOf,
-  targetFor, isActive, todayIso, VIEWS, partOf, inView, incomeMonthsOf, incomeNow, INCOME_INTERVALS,
+  targetFor, isActive, todayIso, VIEWS, partOf, inView, incomeMonthsOf, incomeNow, INCOME_INTERVALS, missingReceipts,
 } from '../lib/expenses.js';
 import { usePref } from '../lib/prefs.js';
 import '../styles/expenses.css';
@@ -30,7 +31,9 @@ const TARGET_WORD = { business: 'business', private: 'private', both: 'all' };
  * category — the business part, the private part or both; what's coming up
  * (and what to cancel in time) — and what has to come in each month to cover
  * it (in the same view) and pay you, against what you've invoiced; money that
- * comes in regularly (retainers) is taken off what's still to find.
+ * comes in regularly (retainers) is taken off what's still to find. Each
+ * expense keeps its receipts; which payments still lack one is shown, and a
+ * year's receipts go to the tax advisor as one ZIP.
  */
 export default function ExpensesPage({ reloadKey }) {
   const toast = useToast();
@@ -42,7 +45,7 @@ export default function ExpensesPage({ reloadKey }) {
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [editing, setEditing] = useState(null); // id | 'new'
   const [editingIncome, setEditingIncome] = useState(null); // id | 'new'
-  const [show, setShow] = usePref('exShow', 'active'); // active | ended | all
+  const [show, setShow] = usePref('exShow', 'active'); // active | ended | all | receipts (payments without one)
   const [q, setQ] = useState('');
   const [view, setView] = usePref('exView', 'business', (v) => VIEWS.some((x) => x.key === v));
 
@@ -115,9 +118,13 @@ export default function ExpensesPage({ reloadKey }) {
     return [...cancels, ...ins, ...pays].sort((a, b) => a.date.localeCompare(b.date) || (a.kind === 'cancel' ? -1 : 1)).slice(0, 8);
   }, [list, income, today, view]);
 
+  // Payments of the year (up to today) without a receipt, per expense.
+  const missing = useMemo(() => new Map(list.map((e) => [e.id, missingReceipts(e, year, today).length])), [list, year, today]);
+  const missingCount = list.filter((e) => inView(e, view)).reduce((n, e) => n + missing.get(e.id), 0);
   const needle = q.trim().toLowerCase();
-  const shown = list.filter((e) => inView(e, view) && (show === 'all' || (show === 'active' ? isActive(e, today) : !isActive(e, today)))
-    && (!needle || `${e.name} ${e.notes} ${categoryOf(e.category).label}`.toLowerCase().includes(needle)));
+  const showing = (e) => (show === 'all' ? true : show === 'receipts' ? missing.get(e.id) > 0 : show === 'active' ? isActive(e, today) : !isActive(e, today));
+  const shown = list.filter((e) => e.id === editing || (inView(e, view) && showing(e) // the one open stays, even once it has all its receipts
+    && (!needle || `${e.name} ${e.notes} ${categoryOf(e.category).label}`.toLowerCase().includes(needle))));
   const groups = EXPENSE_CATEGORIES.map((c) => ({ ...c, items: shown.filter((e) => e.category === c.key) })).filter((g) => g.items.length);
 
   // ---- saving
@@ -168,6 +175,8 @@ export default function ExpensesPage({ reloadKey }) {
       toast(`“${x.name}” removed`, 'ok', { label: 'Undo', onClick: async () => { await api.restoreTrash(trashId); setData(await api.listExpenses()); } });
     } catch (err) { toast(err.message, 'error'); }
   };
+  const receiptsChanged = (x) => setData((d) => ({ ...d, expenses: d.expenses.map((y) => (y.id === x.id ? x : y)) }));
+  const reload = async () => { try { setData(await api.listExpenses()); } catch (err) { toast(err.message, 'error'); } };
   const duplicate = async (e) => {
     try {
       const x = await api.createExpense({ ...e, id: undefined, name: `${e.name} (copy)` });
@@ -208,6 +217,10 @@ export default function ExpensesPage({ reloadKey }) {
               { heading: `${year} as Excel — every payment, by category and month, and the recurring income` },
               { label: 'Deutsch', icon: <FileSpreadsheet size={15} />, onClick: () => { window.location.href = api.expensesExportUrl(year, 'de'); } },
               { label: 'English', icon: <FileSpreadsheet size={15} />, onClick: () => { window.location.href = api.expensesExportUrl(year, 'en'); } },
+              { separator: true },
+              { heading: `Receipts ${year} as ZIP — each named by its day and expense, with the Excel list` },
+              { label: 'Deutsch', icon: <FileArchive size={15} />, onClick: () => { window.location.href = api.expenseReceiptsUrl(year, 'de'); } },
+              { label: 'English', icon: <FileArchive size={15} />, onClick: () => { window.location.href = api.expenseReceiptsUrl(year, 'en'); } },
             ]} />
           <button type="button" className="btn btn-primary" onClick={() => { setEditing('new'); setShow('all'); }}><Plus size={16} /> New expense</button>
         </div>
@@ -371,6 +384,11 @@ export default function ExpensesPage({ reloadKey }) {
         <h2>All expenses <span className="count">{shown.length}</span></h2>
         <div className="segmented segmented-sm" role="group" aria-label="Show">
           {[['active', 'Running'], ['ended', 'Ended'], ['all', 'All']].map(([k, l]) => <button key={k} type="button" className={show === k ? 'on' : ''} onClick={() => setShow(k)}>{l}</button>)}
+          {(missingCount > 0 || show === 'receipts') && (
+            <button type="button" className={`ex-show-rc ${show === 'receipts' ? 'on' : ''}`} onClick={() => setShow('receipts')} title={`Payments in ${year} so far without a receipt`}>
+              <Paperclip size={12} /> Missing <span className="count">{missingCount}</span>
+            </button>
+          )}
         </div>
         <label className="clients-search ex-search"><Search size={15} /><input value={q} placeholder="Find…" onChange={(e) => setQ(e.target.value)} aria-label="Find an expense" /></label>
       </div>
@@ -386,9 +404,10 @@ export default function ExpensesPage({ reloadKey }) {
         <section key={g.key} className="ex-group">
           <div className="ex-group-head"><i style={{ background: g.color }} /><span>{g.label}</span><b>{money(g.items.reduce((n, e) => n + yearOf(e, year).all * partOf(e, view), 0))} <em>in {year}</em></b></div>
           {g.items.map((e) => (editing === e.id ? (
-            <ExpenseEditor key={e.id} initial={e} currency={cur} onSave={saveExpense} onCancel={() => setEditing(null)} onDelete={() => remove(e)} onPrice={(a, from) => changePrice(e, a, from)} onDuplicate={() => duplicate(e)} />
+            <ExpenseEditor key={e.id} initial={e} currency={cur} onSave={saveExpense} onCancel={() => setEditing(null)} onDelete={() => remove(e)} onPrice={(a, from) => changePrice(e, a, from)} onDuplicate={() => duplicate(e)}
+              receipts={<Receipts expense={e} year={year} today={today} onChange={receiptsChanged} onReload={reload} toast={toast} />} />
           ) : (
-            <ExpenseRow key={e.id} e={e} year={year} today={today} money={money} view={view} onOpen={() => setEditing(e.id)} onLink={() => window.open(e.link, '_blank', 'noopener')} />
+            <ExpenseRow key={e.id} e={e} year={year} today={today} money={money} view={view} missing={missing.get(e.id)} onOpen={() => setEditing(e.id)} onLink={() => window.open(e.link, '_blank', 'noopener')} />
           )))}
         </section>
       ))}
@@ -397,19 +416,20 @@ export default function ExpensesPage({ reloadKey }) {
           : !list.some((e) => inView(e, view)) ? (view === 'private'
             ? 'No private expenses yet — add one with New expense, or set one to Private or Split in its editor.'
             : 'No business expenses yet — they’re all private.')
-            : show === 'ended' ? 'Nothing has ended.' : 'Nothing is running.'}</p>
+            : show === 'receipts' ? `Every payment in ${year} so far has its receipt.` : show === 'ended' ? 'Nothing has ended.' : 'Nothing is running.'}</p>
       )}
       <div className="ex-foot hint">Invoices come from your <button type="button" className="ex-link" onClick={() => navigate('/clients')}>clients</button> (their dates and amounts).</div>
     </div>
   );
 }
 
-function ExpenseRow({ e, year, today, money, view, onOpen, onLink }) {
+function ExpenseRow({ e, year, today, money, view, missing, onOpen, onLink }) {
   const iv = intervalOf(e.interval);
   const inYear = yearOf(e, year).all * partOf(e, view);
   const next = nextPayment(e, today);
   const cancel = cancelBy(e, today);
   const ended = !isActive(e, today);
+  const kept = (e.receipts || []).filter((r) => r.date.startsWith(`${year}-`)).length;
   return (
     <div className={`ex-row ${ended ? 'ended' : ''}`} role="button" tabIndex={0} onClick={onOpen} onKeyDown={(ev) => { if (ev.key === 'Enter') onOpen(); }}>
       <span className="ex-row-main">
@@ -424,6 +444,8 @@ function ExpenseRow({ e, year, today, money, view, onOpen, onLink }) {
       <span className="ex-row-next">
         {!ended && next && <span>next {fmtDay(next)}</span>}
         {!ended && cancel && <span className={`ex-row-cancel ${cancel <= addDays(today, 30) ? 'soon' : ''}`}>cancel by {fmtDay(cancel)}</span>}
+        {missing > 0 ? <span className="ex-row-rc miss" title={`${missing} payment${missing === 1 ? '' : 's'} in ${year} without a receipt`}><Paperclip size={11} /> {missing} missing</span>
+          : kept > 0 && <span className="ex-row-rc" title={`${kept} receipt${kept === 1 ? '' : 's'} in ${year}`}><Paperclip size={11} /> {kept}</span>}
       </span>
       <span className="ex-row-amount"><b>{money(e.amount)}</b><small>{iv.per ? `/ ${iv.per}` : 'once'}</small></span>
       <span className="ex-row-year"><b>{money(inYear)}</b><small>{view === 'both' || e.share === 100 || (view === 'private' && e.share === 0) ? `in ${year}` : `${view} in ${year}`}</small></span>
@@ -432,7 +454,7 @@ function ExpenseRow({ e, year, today, money, view, onOpen, onLink }) {
 }
 
 /** An expense being added or changed. */
-function ExpenseEditor({ initial, currency, onSave, onCancel, onDelete, onPrice, onDuplicate }) {
+function ExpenseEditor({ initial, currency, onSave, onCancel, onDelete, onPrice, onDuplicate, receipts }) {
   const [e, setE] = useState({ ...initial, amount: initial.amount === '' ? '' : String(initial.amount) });
   const [price, setPrice] = useState(null); // { amount, from } — a new price from a day on
   const [split, setSplit] = useState(() => Number(initial.share) > 0 && Number(initial.share) < 100); // part business, part private
@@ -506,6 +528,7 @@ function ExpenseEditor({ initial, currency, onSave, onCancel, onDelete, onPrice,
         </div>
       )}
       <datalist id="ex-ideas">{EXPENSE_IDEAS.map(([n]) => <option key={n} value={n} />)}</datalist>
+      {receipts || <p className="hint ex-rc-later"><Paperclip size={13} /> Receipts can be added once it’s saved.</p>}
       <div className="ex-editor-foot">
         {onDelete && <button type="button" className="btn btn-sm btn-ghost ex-del" onClick={onDelete}><Trash2 size={14} /> Delete</button>}
         {onPrice && e.interval !== 'once' && !price && <button type="button" className="btn btn-sm btn-ghost" onClick={() => setPrice({ amount: String(initial.amount), from: nextPayment(initial) || todayIso() })}><TrendingUp size={14} /> Price changes…</button>}

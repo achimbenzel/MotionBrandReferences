@@ -84,16 +84,28 @@ async function pumpFile(full, stream) {
  * `skip(relPath)` returns true to exclude an entry. Does not end the stream.
  */
 export async function createZipToStream(srcDir, stream, { skip = () => false } = {}) {
+  async function* files() {
+    for await (const { full, rel } of walk(srcDir)) if (!skip(rel)) yield { name: rel, full };
+  }
+  await writeZip(files(), stream);
+}
+
+/**
+ * Write a STORE/ZIP64 archive of `entries` — { name, full } (a file on disk,
+ * stored under `name`) or { name, data } (a Buffer) — to `stream`. Does not
+ * end the stream.
+ */
+export async function writeZip(entries, stream) {
   let offset = 0;
   const central = [];
   let anyZip64 = false;
 
-  for await (const { full, rel } of walk(srcDir)) {
-    if (skip(rel)) continue;
-    const st = await fsp.stat(full);
-    const size = st.size;
-    const crc = await crc32File(full);
-    const { time, date } = dosDateTime(st.mtime);
+  for await (const entry of entries) {
+    const rel = entry.name;
+    const st = entry.full ? await fsp.stat(entry.full) : null;
+    const size = st ? st.size : entry.data.length;
+    const crc = st ? await crc32File(entry.full) : crc32(entry.data);
+    const { time, date } = dosDateTime(st ? st.mtime : new Date());
     const nameBuf = Buffer.from(rel, 'utf8');
     const utf8 = Buffer.byteLength(rel, 'utf8') !== rel.length; // any non-ASCII character
     const flags = utf8 ? 0x0800 : 0;
@@ -127,7 +139,8 @@ export async function createZipToStream(srcDir, stream, { skip = () => false } =
     if (localExtra.length) await writeChunk(stream, localExtra);
     offset += 30 + nameBuf.length + localExtra.length;
 
-    await pumpFile(full, stream);     // raw file data (STORE)
+    if (st) await pumpFile(entry.full, stream); // raw file data (STORE)
+    else await writeChunk(stream, entry.data);
     offset += size;
 
     central.push(centralHeader({ nameBuf, crc, size, localOffset, flags, time, date, sizeBig, offBig }));

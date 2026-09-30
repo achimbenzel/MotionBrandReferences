@@ -68,6 +68,7 @@ export async function scanUnused() {
   for (const n of db.notes || []) if (n?.id) owners.set(`note/${n.id}`, refSet(n));       // a note's pictures
   for (const c of db.content || []) if (c?.id) owners.set(`content/${c.id}`, refSet(c));   // a post's pictures / videos
   for (const a of db.achievements || []) if (a?.id) owners.set(`achievement/${a.id}`, refSet(a)); // icon, sticker
+  for (const e of db.expenses || []) if (e?.id) owners.set(`expense/${e.id}`, refSet(e));         // receipts
   owners.set('dashboard', refSet(db.settings));
 
   // Files of a trashed item that are still waiting to be moved into the Trash (a locked file) aren't unused.
@@ -84,7 +85,7 @@ export async function scanUnused() {
     found.push({ rel: `${key}/${rel}`, size: st.size });
   });
 
-  for (const root of [...TYPES, 'plan', 'software', 'inbox', 'mockup', 'mockup-model', 'mockup-hdri', 'client', 'note', 'content', 'achievement']) {
+  for (const root of [...TYPES, 'plan', 'software', 'inbox', 'mockup', 'mockup-model', 'mockup-hdri', 'client', 'note', 'content', 'achievement', 'expense']) {
     const rootDir = path.join(DATA_DIR, root);
     const entries = await fsp.readdir(rootDir, { withFileTypes: true }).catch(() => []);
     for (const e of entries) {

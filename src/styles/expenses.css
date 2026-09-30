@@ -152,6 +152,36 @@
 .ex-gap { flex: 1; }
 .ex-del { color: var(--danger); }
 .ex-foot { margin-top: 18px; }
+/* Receipts: on a row, in the list head, in the editor */
+.ex-row-rc { display: inline-flex; align-items: center; gap: 4px; color: var(--text-faint); }
+.ex-row-rc.miss { color: var(--warn); }
+.segmented .ex-show-rc { display: inline-flex; align-items: center; gap: 5px; }
+.ex-show-rc .count { font-size: 11px; font-weight: 700; color: var(--warn); }
+.ex-rc-box { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); transition: border-color .12s, box-shadow .12s; }
+.ex-rc-box.drag { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+.ex-rc-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
+.ex-rc-head b { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.ex-rc-head .count { font-size: 12px; font-weight: 400; color: var(--text-faint); }
+.ex-rc-head em { font-style: normal; font-size: 11.5px; color: var(--text-faint); }
+.ex-rc-head .btn { margin-left: auto; }
+.ex-rc-missing { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 12px; color: var(--warn); }
+.ex-rc-miss { display: inline-flex; align-items: center; gap: 3px; height: 26px; padding: 0 9px; border: 1px dashed currentColor; border-radius: 999px; background: none; color: var(--warn); font: inherit; font-size: 12px; cursor: pointer; }
+.ex-rc-miss:hover { background: var(--surface-3); }
+.ex-rc-missing small { color: var(--text-faint); font-size: 11.5px; }
+.ex-rc-done { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; color: var(--ok); }
+.ex-rc { display: grid; grid-template-columns: 30px minmax(0, 1fr) 150px 32px; align-items: center; gap: 8px; }
+.ex-rc-file { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: rgba(var(--danger-rgb), .12); color: #ff9ba6; }
+.ex-rc-file.image { background: rgba(var(--ok-rgb), .12); color: var(--ok); }
+.ex-rc-file.xml { background: var(--accent-dim); color: var(--accent); }
+.ex-rc-name { display: flex; flex-direction: column; min-width: 0; color: var(--text); font-size: 13px; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ex-rc-name:hover { text-decoration: underline; }
+.ex-rc-name small { font-size: 11px; color: var(--text-faint); }
+.ex-rc-date.input { height: 32px; padding: 0 8px; font-size: 12.5px; }
+.ex-rc-more { align-self: flex-start; border: 0; background: none; padding: 2px 0; color: var(--text-muted); font: inherit; font-size: 12px; cursor: pointer; text-decoration: underline; }
+.ex-rc-drop { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1.5px dashed var(--border-strong); border-radius: 10px; background: none; color: var(--text-muted); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; }
+.ex-rc-drop:hover { border-color: var(--accent); color: var(--text); }
+.ex-rc-drop svg { flex: none; }
+.ex-rc-later { display: flex; align-items: center; gap: 6px; }
 @media (max-width: 899px) {
   .ex-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ex-grid { grid-template-columns: minmax(0, 1fr); }
@@ -179,4 +209,7 @@
   .ex-row-year b { font-size: 12.5px; }
   .ex-f { flex: 1 1 140px; }
   .ex-price .ex-in { flex: 1 1 120px; width: auto; }
+  .ex-rc { grid-template-columns: 30px minmax(0, 1fr) 32px; row-gap: 4px; }
+  .ex-rc-date.input { grid-column: 2; grid-row: 2; height: 36px; }
+  .ex-rc > .icon-btn { grid-column: 3; grid-row: 1; }
 }
