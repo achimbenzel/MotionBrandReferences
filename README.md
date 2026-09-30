@@ -1656,8 +1656,9 @@ lookup off with `LINK_LOOKUP=off`).
   ├── index.js        # entry: start, listen, graceful shutdown
   ├── app.js          # middleware + routes
   ├── config.js       # paths, ports, env vars
-  ├── db.js           # atomic writes, self-healing reads, snapshots, write queue
-  ├── schema.js       # record shapes, read-time normalizing, the v1→v2 migration
+  ├── db.js           # atomic writes, self-healing reads, snapshots, write queue, the in-memory copy
+  ├── schema.js       # the database as a whole: normalizing on read, the v1→v2 migration (re-exports schema/)
+  ├── schema/         # record shapes per area: plans, references, mockups, content, clients, time, expenses …
   ├── templates.js    # built-in project templates, save-as-template
   ├── files.js        # fs helpers (path containment, moves, trash, storage size)
   ├── trashMoves.js   # a deleted item's files into the Trash — later, if a file is locked
