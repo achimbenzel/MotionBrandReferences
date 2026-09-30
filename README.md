@@ -1647,7 +1647,12 @@ lookup off with `LINK_LOOKUP=off`).
   into images. Styles live in `src/styles/`: `base.css` (what every page
   needs, loaded with the app) and one file per area, loaded with its pages;
   colour tokens (`--ok`, `--warn`, `--info`, `--danger`) and three breakpoints
-  (640 / 899 / 1099 px) — see `src/styles/README.md`.
+  (640 / 899 / 1099 px) — see `src/styles/README.md`. Shared helpers sit in
+  `src/lib/` — e.g. `dates.js` (days on the local calendar, never UTC) and
+  `prefs.js` (the per-browser settings in localStorage). Rarely used dialogs
+  (upload, new project, ⌘K) load when first opened; the big pages are split
+  into their parts (the plan page's blocks in `src/components/plan/`, the 3D
+  editor's panels in `src/components/mockups/`).
 - **Backend:** a small Express server that stores files on disk and metadata in
   `data/db.json` (writes are serialized so nothing clobbers). Layout:
 
@@ -1672,7 +1677,11 @@ lookup off with `LINK_LOOKUP=off`).
   ```
 - **Tests:** `npm test` starts the real server against throwaway data folders —
   including a library with every data shape older versions wrote — and checks
-  the API, the security guards, crash handling, export/import and the migration.
+  the API, the security guards, crash handling, export/import and the migration;
+  `tests/libs.test.js` covers the pure helpers (days, colours, timing, ranks,
+  plan tabs, storyboards). `npm run test:e2e` opens every page of the built app
+  in Chromium — on a desktop and on 320 / 390 px phones — and fails on any
+  error, a page that doesn't render or a page that scrolls sideways.
 
 ### Scripts
 
@@ -1682,9 +1691,10 @@ lookup off with `LINK_LOOKUP=off`).
 | `npm run build` | build the frontend into `dist/` |
 | `npm run serve` | build, then serve app + API from a single port (4300) |
 | `npm start` | serve a pre-built `dist/` + API from 4300 |
-| `npm test` | API / migration / security tests (Node's built-in test runner) |
+| `npm test` | API / migration / security tests and the helpers' unit tests (Node's built-in test runner) |
+| `npm run test:e2e` | every page in a real browser, desktop + phones (after `npm run build`; once: `npx playwright install chromium`) |
 | `npm run lint` | ESLint (incl. React hook rules) |
-| `npm run check` | lint + tests + build — the same as CI on every push |
+| `npm run check` | lint + tests + build (CI also runs `test:e2e` on every push) |
 
 ### A note on `npm audit`
 

@@ -34,4 +34,10 @@ export default [
       'no-empty': ['error', { allowEmptyCatch: true }],
     },
   },
+  {
+    // Browser tests: Node, plus the page code they hand to the browser.
+    files: ['e2e/**/*.js'],
+    languageOptions: { ecmaVersion: 2023, sourceType: 'module', globals: { ...globals.node, ...globals.browser } },
+    rules: { 'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'none' }] },
+  },
 ];

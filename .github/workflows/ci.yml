@@ -17,3 +17,6 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+      # Every page in a real browser (desktop and phones): renders, no errors, no sideways scroll.
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
