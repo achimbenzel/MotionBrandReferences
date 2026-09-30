@@ -11,6 +11,7 @@ import { gradientCss, PLAN_GRADIENTS, PLAN_STATUSES, TABS, tagColor } from '../l
 import Menu from '../components/Menu.jsx';
 import { upcomingBirthdays } from '../lib/clients.js';
 import { dayKey, dateOf, fmtDay, daysFromToday } from '../lib/dates.js';
+import { WIDGET, layoutOf, lonelyHalves } from '../lib/dashboardLayout.js';
 import { useToast } from '../components/Toast.jsx';
 import MediaPicker from '../components/mockups/MediaPicker.jsx';
 import ActivityMap from '../components/dashboard/ActivityMap.jsx';
@@ -25,34 +26,6 @@ import MoneyWidget from '../components/dashboard/MoneyWidget.jsx';
 import { useSortable, moveItem } from '../lib/useSortable.js';
 
 const DEFAULT_BANNER = 'linear-gradient(120deg,#6a11cb,#2575fc)';
-// The widgets below the hero, in their first order and size (yours is saved in settings).
-const WIDGETS = [
-  { id: 'focus', label: 'Today’s focus', size: 'half' },
-  { id: 'weekly', label: 'Weekly to-dos', size: 'half' },
-  { id: 'timer', label: 'Focus timer', size: 'half' },
-  { id: 'next', label: 'Next up & two weeks', size: 'full' },
-  { id: 'continue', label: 'Continue where you left off', size: 'full' },
-  { id: 'urgent', label: 'Urgent', size: 'full' },
-  { id: 'tools', label: 'Your tools', size: 'full' },
-  { id: 'pipeline', label: 'Pipeline', size: 'full' },
-  { id: 'money', label: 'Money this month', size: 'full' },
-  { id: 'rhythm', label: 'Your rhythm', size: 'full' },
-  { id: 'inspiration', label: 'Inspiration', size: 'half' },
-  { id: 'note', label: 'Quick note', size: 'half' },
-  { id: 'achievements', label: 'Achievements', size: 'full' },
-];
-const WIDGET = Object.fromEntries(WIDGETS.map((w) => [w.id, w]));
-// Your saved order; a widget added since then joins right after the one it
-// follows by default (Weekly to-dos next to Today's focus), or first.
-function layoutOf(saved) {
-  const list = (Array.isArray(saved) ? saved : []).filter((w) => WIDGET[w.id]);
-  WIDGETS.forEach((w, i) => {
-    if (list.some((x) => x.id === w.id)) return;
-    const before = WIDGETS.slice(0, i).reverse().find((p) => list.some((x) => x.id === p.id));
-    list.splice(before ? list.findIndex((x) => x.id === before.id) + 1 : 0, 0, { id: w.id, hidden: false, size: w.size });
-  });
-  return list;
-}
 const today0 = () => { const t = new Date(); t.setHours(0, 0, 0, 0); return t; };
 const whenLabel = (n) => (n === 0 ? 'Today' : n === 1 ? 'Tomorrow' : n === -1 ? 'Yesterday' : n > 1 ? `In ${n} days` : `${-n} days ago`);
 const DUE_AHEAD = 14; // days ahead shown under "Coming up"
@@ -269,7 +242,8 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
     ids: shownW.map((w) => w.id), container: gridRef, mode: 'center',
     onMove: (from, to) => {
       const order = moveItem(shownW, from, to);
-      saveLayout([...order, ...hiddenW]);
+      let k = 0;
+      saveLayout(layout.map((w) => (w.hidden ? w : order[k++]))); // hidden ones keep their place
     },
   });
   const EMPTY_HINT = {
@@ -516,12 +490,14 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
         ) : <button type="button" className="btn btn-sm btn-ghost dash-w-edit" onClick={() => setEditing(true)}><Settings2 size={14} /> Customize</button>}
       </div>
       <div className={`dash-widgets ${editing ? 'editing' : ''}`} ref={gridRef}>
-        {shownW.map((w, i) => {
-          const content = renderWidget(w);
-          if (!content && !editing) return null;
+        {(() => {
+          const cards = shownW.map((w) => ({ w, content: renderWidget(w) })).filter((c) => c.content || editing);
+          // While arranging, a half-width widget shows as half even when it has no partner (so you see it).
+          const lone = editing ? new Set() : lonelyHalves(cards.map((c) => c.w.id), (id) => cards.find((c) => c.w.id === id).w.size);
+          return cards.map(({ w, content }, i) => {
           const st = sort.itemState(w.id);
           return (
-            <div key={w.id} data-sort-id={w.id} className={`dash-w ${w.size} dash-rise ${st.className}`} style={{ '--i': i }}>
+            <div key={w.id} data-sort-id={w.id} className={`dash-w ${lone.has(w.id) ? 'full' : w.size} dash-rise ${st.className}`} style={{ '--i': i }}>
               {editing && (
                 <div className="dash-w-tools">
                   <button type="button" className="icon-btn dash-w-grip" {...sort.grab(w.id)} aria-label={`Move ${WIDGET[w.id].label}`} title="Drag to move"><GripVertical size={15} /></button>
@@ -543,7 +519,8 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
               <div className={`dash-w-body ${w.id === 'weekly' ? 'live' : ''}`}>{content || <div className="dash-w-empty">{EMPTY_HINT[w.id] || 'Nothing to show right now.'}</div>}</div>
             </div>
           );
-        })}
+          });
+        })()}
       </div>
       {sort.drag && <div className="block-ghost" style={{ left: sort.drag.x + 14, top: sort.drag.y + 12 }}><Layers size={14} /> {WIDGET[sort.drag.id]?.label}</div>}
     </div>

@@ -1601,7 +1601,7 @@ img { max-width: 100%; display: block; }
 .dash-w-edit:hover { color: var(--text); }
 .dash-w-hint { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-muted); flex: 1 1 280px; }
 .dash-w-hidden { display: flex; flex-wrap: wrap; gap: 6px; }
-.dash-widgets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: dense; gap: 18px 16px; align-items: stretch; }
+.dash-widgets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 16px; align-items: stretch; } /* in your order — see lonelyHalves() */
 .dash-w { position: relative; min-width: 0; display: flex; flex-direction: column; }
 .dash-w.full { grid-column: 1 / -1; }
 .dash-w-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }

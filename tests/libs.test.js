@@ -12,6 +12,7 @@ import { segmentName } from '../src/lib/segments.js';
 import { hashtagsOf, threadParts, charCount, weekdayOf, mondayOf, fmtSec } from '../src/lib/content.js';
 import { parseVideoLink, firstUrl } from '../src/lib/videoLinks.js';
 import { normalizeUrl, hostOf, youtubeId } from '../src/lib/types.js';
+import { WIDGETS, layoutOf, lonelyHalves } from '../src/lib/dashboardLayout.js';
 
 // Germany: a day starts an hour or two before UTC's does.
 process.env.TZ = 'Europe/Berlin';
@@ -183,4 +184,24 @@ test('video links and web addresses', () => {
   assert.equal(normalizeUrl('http://x.io'), 'http://x.io');
   assert.equal(hostOf('www.example.com/path'), 'example.com');
   assert.equal(youtubeId('https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=1'), 'dQw4w9WgXcQ');
+});
+
+test('dashboard: new widgets join next to their neighbour, never behind a hidden one', () => {
+  const all = WIDGETS.map((w) => w.id);
+  // A layout saved before "money" existed, with "pipeline" (its neighbour) hidden
+  // and moved to the end, as arranging used to do.
+  const saved = all.filter((id) => id !== 'money' && id !== 'pipeline').map((id) => ({ id, hidden: false, size: 'full' }));
+  saved.push({ id: 'pipeline', hidden: true, size: 'full' });
+  const ids = layoutOf(saved).map((w) => w.id);
+  assert.equal(ids.indexOf('money'), ids.indexOf('tools') + 1); // after the last shown one before it
+  assert.equal(ids.at(-1), 'pipeline');
+  assert.deepEqual(layoutOf([]).map((w) => w.id), all); // nothing saved: the first order
+  assert.equal(layoutOf([{ id: 'gone', hidden: false }]).some((w) => w.id === 'gone'), false);
+});
+
+test('dashboard: half-width widgets pair up in your order; a lone one takes the row', () => {
+  const size = { a: 'half', b: 'full', c: 'half', d: 'half', e: 'half' };
+  assert.deepEqual([...lonelyHalves(['a', 'b', 'c', 'd', 'e'], (id) => size[id])], ['a', 'e']);
+  assert.deepEqual([...lonelyHalves(['c', 'd'], (id) => size[id])], []);
+  assert.deepEqual([...lonelyHalves([], (id) => size[id])], []);
 });
