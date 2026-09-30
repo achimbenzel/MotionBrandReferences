@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, UploadCloud, Library, X, Download, FolderInput, MoreHorizontal, Copy, Trash2, Play, Box, RotateCw,
-  FlipHorizontal, Camera, Plus, Move, Crop, LayoutGrid, Volume2, VolumeX, Sun, DoorOpen, ImagePlus, Megaphone,
+  FlipHorizontal, Plus, Move, Crop, LayoutGrid, Volume2, VolumeX, DoorOpen, ImagePlus, Megaphone,
 } from 'lucide-react';
 import { api, mockupFileUrl, mockupModelUrl, mockupHdriUrl } from '../lib/api.js';
 import { useSaver } from '../lib/autosave.js';
@@ -15,17 +15,17 @@ import MediaPicker from '../components/mockups/MediaPicker.jsx';
 import ScreenFitter from '../components/mockups/ScreenFitter.jsx';
 import Timeline from '../components/mockups/Timeline.jsx';
 import {
-  MockupStage, FRAMES, VIEW_LABELS, MOTIONS_LABELS, CAMERA_MOVES, LOOPING, TONES, loadModel, guessScreen, buildModel, modelJoints, guessHinge, valueAt,
+  MockupStage, FRAMES, VIEW_LABELS, MOTIONS_LABELS, CAMERA_MOVES, LOOPING, loadModel, guessScreen, buildModel, modelJoints, guessHinge, valueAt,
 } from '../lib/mockup3d/stage.js';
 import { GLASS } from '../lib/mockup3d/screen.js';
-import { LIGHT_SETUPS, loadHdriTexture, analyseHdri, hdriPreview } from '../lib/mockup3d/lighting.js';
+import { loadHdriTexture, analyseHdri, hdriPreview } from '../lib/mockup3d/lighting.js';
 import { buildDevice } from '../lib/mockup3d/devices.js';
 import { recordVideo, videoFormats } from '../lib/mockup3d/video.js';
-import {
-  DEVICES, exportSize, itemIcon, OBJECTS, OBJECT_ICON, CARD_SIZES, POSTER_SIZES, FINISHES, POSTER_FRAMES, BOX_MATERIALS, OBJECT_COLORS, defaultObject,
-} from '../lib/mockup3d/catalog.js';
+import { DEVICES, exportSize, itemIcon, OBJECTS, OBJECT_ICON, defaultObject } from '../lib/mockup3d/catalog.js';
 import { buildObject } from '../lib/mockup3d/objects.js';
 import Range from '../components/Range.jsx';
+import ObjectSettings, { Seg } from '../components/mockups/ObjectSettings.jsx';
+import { LightSection, BackgroundSection } from '../components/mockups/ScenePanels.jsx';
 
 const MOCKUP_BOARD = /mockup/i;
 const IMAGE_SIZES = [
@@ -34,17 +34,6 @@ const IMAGE_SIZES = [
 const VIDEO_SIZES = [{ label: '720p', long: 1280 }, { label: '1080p', long: 1920 }, { label: '1440p', long: 2560 }, { label: '4K', long: 3840 }];
 const BACKGROUNDS = { white: { mode: 'color', color: '#FFFFFF' }, black: { mode: 'color', color: '#000000' }, transparent: { mode: 'transparent' } };
 const LEGACY_MOVES = { orbit: 'orbit', push: 'push', reveal: 'reveal' };
-const SHADOW_MODES = [['contact', 'Soft'], ['sun', 'Sun'], ['both', 'Both'], ['none', 'None']];
-// A hint of each light setup for its button.
-const LIGHT_SWATCH = {
-  studio: 'radial-gradient(circle at 30% 25%, #f2f2f2 0 18%, #3a3a40 45%, #151518)',
-  product: 'linear-gradient(90deg, #fff 0 5%, #050507 12% 88%, #fff 95%)',
-  daylight: 'linear-gradient(90deg, #cfe2ff 0 22%, #b8a58c 30% 100%)',
-  golden: 'linear-gradient(180deg, #3c5a9a 0%, #ff9b50 55%, #3b2616 60%)',
-  overcast: 'linear-gradient(180deg, #f4f6fa 0%, #d9dde3 55%, #555 60%)',
-  office: 'repeating-linear-gradient(90deg, #eee 0 10%, #3d3f44 10% 25%)',
-  neon: 'linear-gradient(90deg, #ff2aa0 0 8%, #0c0b1c 20% 80%, #1ecbff 92%)',
-};
 
 const safeName = (s) => String(s || 'mockup').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'mockup';
 const newId = () => `d${Math.random().toString(36).slice(2, 8)}`;
@@ -541,7 +530,6 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
   const logoParts = parts.filter((p) => p.logo);
 
   // ---- Your own HDRIs ------------------------------------------------------------------
-  const hdriInput = useRef(null);
   const importHdri = async (file) => {
     if (!file) return;
     const format = { hdr: 'hdr', exr: 'exr', jpg: 'jpg', jpeg: 'jpg', png: 'png', webp: 'webp', avif: 'avif' }[(file.name.split('.').pop() || '').toLowerCase()];
@@ -903,58 +891,9 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
             </section>
           )}
 
-          <section>
-            <h3><Sun size={12} style={{ verticalAlign: '-1px' }} /> Light</h3>
-            <div className="mke-lights">
-              {Object.entries(LIGHT_SETUPS).map(([k, s]) => (
-                <button key={k} type="button" className={light.setup === k ? 'on' : ''} onClick={() => setLight({ setup: k })} title={s.note}>
-                  <i style={{ background: LIGHT_SWATCH[k] }} /><span>{s.label}</span>
-                </button>
-              ))}
-              {hdris.map((h) => (
-                <button key={h.id} type="button" className={light.setup === 'hdri' && light.hdri === h.id ? 'on' : ''} onClick={() => setLight({ setup: 'hdri', hdri: h.id })} title={`${h.name} — your HDRI`}>
-                  <i style={h.thumb ? { backgroundImage: `url(${mockupHdriUrl(h, h.thumb)})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { background: '#444' }} /><span>{h.name}</span>
-                </button>
-              ))}
-              <button type="button" className="mke-light-add" onClick={() => hdriInput.current?.click()} title="Your own .hdr / .exr, or a 2:1 panorama picture">
-                <i><ImagePlus size={14} /></i><span>Import HDRI…</span>
-              </button>
-            </div>
-            <input ref={hdriInput} type="file" accept=".hdr,.exr,.jpg,.jpeg,.png,.webp,.avif" className="visually-hidden-input" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; importHdri(f); }} />
-            <label className="mke-range">Turn light <Range min="-180" max="180" value={light.rotation} onChange={(e) => setLight({ rotation: Number(e.target.value) })} /> <span>{light.rotation}°</span></label>
-            <label className="mke-range">Brightness <Range min="0.3" max="2.5" step="0.05" value={light.exposure} onChange={(e) => setLight({ exposure: Number(e.target.value) })} /> <span>{Math.round(light.exposure * 100)}%</span></label>
-            <Seg label="Look" value={light.tone || 'neutral'} options={Object.entries(TONES).map(([k, [l]]) => [k, l])} onChange={(v) => setLight({ tone: v })} />
-            <div className="mke-subhead">Shadow</div>
-            <div className="segmented mke-seg" role="group" aria-label="Shadow">
-              {SHADOW_MODES.map(([k, label]) => <button key={k} type="button" className={light.shadow === k ? 'on' : ''} onClick={() => setLight({ shadow: k })}>{label}</button>)}
-            </div>
-            {light.shadow !== 'none' && (
-              <label className="mke-range">Strength <Range min="0" max="1" step="0.05" value={light.strength} onChange={(e) => setLight({ strength: Number(e.target.value) })} /> <span>{Math.round(light.strength * 100)}%</span></label>
-            )}
-          </section>
+          <LightSection light={light} setLight={setLight} hdris={hdris} onImportHdri={importHdri} />
 
-          <section>
-            <h3>Background &amp; format</h3>
-            <div className="segmented mke-seg" role="group" aria-label="Background">
-              {[['transparent', 'None'], ['color', 'Colour'], ['gradient', 'Gradient'], ['environment', 'Room']].map(([k, label]) => (
-                <button key={k} type="button" className={bg.mode === k ? 'on' : ''} onClick={() => setBg({ mode: k })} title={k === 'environment' ? 'The light setup’s room / sky (or your HDRI) behind the scene' : undefined}>{label}</button>
-              ))}
-            </div>
-            {bg.mode === 'environment' && (
-              <label className="mke-range">Room blur <Range min="0" max="1" step="0.05" value={light.blur ?? 0.35} onChange={(e) => setLight({ blur: Number(e.target.value) })} /> <span>{Math.round((light.blur ?? 0.35) * 100)}%</span></label>
-            )}
-            {(bg.mode === 'color' || bg.mode === 'gradient') && (
-              <div className="mke-colors">
-                <label title="Colour"><input type="color" value={bg.color.toLowerCase()} onChange={(e) => setBg({ color: e.target.value.toUpperCase() })} /></label>
-                {bg.mode === 'gradient' && <label title="Top colour"><input type="color" value={bg.color2.toLowerCase()} onChange={(e) => setBg({ color2: e.target.value.toUpperCase() })} /></label>}
-                {brand.map((hex) => <button key={hex} type="button" className="mke-swatch" style={{ background: hex }} title={hex} onClick={() => setBg({ color: hex.toUpperCase() })} />)}
-              </div>
-            )}
-            <div className="segmented mke-seg mke-frames" role="group" aria-label="Format">
-              {Object.keys(FRAMES).map((f) => <button key={f} type="button" className={m.frame === f ? 'on' : ''} onClick={() => patch({ frame: f })}>{f}</button>)}
-            </div>
-            <div className="hint mke-tip"><Camera size={12} /> Drag to turn, scroll / pinch to zoom, right-drag to move.</div>
-          </section>
+          <BackgroundSection bg={bg} setBg={setBg} light={light} setLight={setLight} brand={brand} frame={m.frame} onFrame={(f) => patch({ frame: f })} />
         </aside>
       </div>
 
@@ -992,84 +931,6 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
           onClose={() => { setPlanFile(null); setQuickPlan(false); }}
           onSaved={(plan) => { setPlanFile(null); setQuickPlan(false); toast(`Mockup saved to “${plan.name}”`, 'ok', { label: 'Open project', onClick: () => navigate(`/plan/${plan.id}`) }); }} />
       )}
-    </div>
-  );
-}
-
-const SWATCHES = (set, key, current, brand) => (
-  <div className="mke-colors">
-    <label title="Colour"><input type="color" value={(current || '#ffffff').toLowerCase()} onChange={(e) => set({ [key]: e.target.value.toUpperCase() })} /></label>
-    {[...OBJECT_COLORS, ...brand.filter((h) => !OBJECT_COLORS.includes(h.toUpperCase()))].slice(0, 14).map((hex) => (
-      <button key={hex} type="button" className={`mke-swatch ${current?.toUpperCase() === hex.toUpperCase() ? 'on' : ''}`} style={{ background: hex }} title={hex} onClick={() => set({ [key]: hex.toUpperCase() })} />
-    ))}
-  </div>
-);
-const Seg = ({ label, value, options, onChange }) => (
-  <div className="mke-optrow">
-    {label && <span className="mke-optlabel">{label}</span>}
-    <div className="segmented segmented-sm mke-seg" role="group" aria-label={label}>
-      {options.map(([k, l]) => <button key={k} type="button" className={value === k ? 'on' : ''} onClick={() => onChange(k)}>{l}</button>)}
-    </div>
-  </div>
-);
-
-/** The settings of a branding object: size, paper, finish, frame, box size, mug colours. */
-function ObjectSettings({ o, set, brand }) {
-  if (!o) return null;
-  const finish = <Seg label="Finish" value={o.finish} options={Object.entries(FINISHES).map(([k, f]) => [k, f.label])} onChange={(v) => set({ finish: v })} />;
-  if (o.type === 'card') {
-    return (
-      <div className="mke-obj">
-        <Seg label="Size" value={o.size} options={Object.entries(CARD_SIZES).map(([k, c]) => [k, c.label])} onChange={(v) => set({ size: v })} />
-        <Seg label="Shows" value={o.layout} options={[['single', 'One card'], ['pair', 'Front + back'], ['stack', 'Stack']]} onChange={(v) => set({ layout: v })} />
-        <Seg label="Format" value={o.landscape ? 'l' : 'p'} options={[['l', 'Landscape'], ['p', 'Portrait']]} onChange={(v) => set({ landscape: v === 'l' })} />
-        <Seg label="Corners" value={o.radius > 0 ? 'r' : 's'} options={[['s', 'Square'], ['r', 'Rounded']]} onChange={(v) => set({ radius: v === 'r' ? 3 : 0 })} />
-        {finish}
-        <div className="mke-subhead">Card colour</div>
-        {SWATCHES(set, 'color', o.color, brand)}
-      </div>
-    );
-  }
-  if (o.type === 'poster') {
-    return (
-      <div className="mke-obj">
-        <label className="mke-field">Size
-          <select className="input" value={o.size} onChange={(e) => set({ size: e.target.value })}>
-            {Object.entries(POSTER_SIZES).map(([k, x]) => <option key={k} value={k}>{x.label} · {x.w} × {x.h} cm</option>)}
-          </select>
-        </label>
-        <Seg label="Format" value={o.landscape ? 'l' : 'p'} options={[['p', 'Portrait'], ['l', 'Landscape']]} onChange={(v) => set({ landscape: v === 'l' })} />
-        <Seg label="Frame" value={o.frame} options={Object.entries(POSTER_FRAMES).map(([k, f]) => [k, k === 'none' ? 'None' : f.label])} onChange={(v) => set({ frame: v })} />
-        {o.frame !== 'none' && <label className="mke-check"><input type="checkbox" checked={o.mat} onChange={(e) => set({ mat: e.target.checked })} /> Passe-partout</label>}
-        <Seg label="Hangs" value={o.placement} options={[['wall', 'On the wall'], ['lean', 'Leaning'], ['free', 'Standing']]} onChange={(v) => set({ placement: v })} />
-        {o.placement !== 'free' && (<><div className="mke-subhead">Wall</div>{SWATCHES(set, 'color2', o.color2, brand)}</>)}
-        <div className="mke-subhead">Paper</div>
-        {SWATCHES(set, 'color', o.color, brand)}
-      </div>
-    );
-  }
-  if (o.type === 'box') {
-    const dim = (k, label) => (
-      <label className="mke-field m2e-num">{label}
-        <input className="input" type="number" min="1" max="200" step="0.5" value={o[k]} onChange={(e) => set({ [k]: Math.max(0.5, Math.min(200, Number(e.target.value) || 1)) })} />
-      </label>
-    );
-    return (
-      <div className="mke-obj">
-        <div className="mke-dims">{dim('w', 'Width cm')}{dim('h', 'Height cm')}{dim('d', 'Depth cm')}</div>
-        <Seg label="Board" value={o.material} options={Object.entries(BOX_MATERIALS).map(([k, x]) => [k, x.label])} onChange={(v) => set({ material: v })} />
-        {finish}
-      </div>
-    );
-  }
-  return ( // mug
-    <div className="mke-obj">
-      <Seg label="Print" value={o.wrap} options={[['front', 'Front'], ['full', 'All round']]} onChange={(v) => set({ wrap: v })} />
-      {finish}
-      <div className="mke-subhead">Mug</div>
-      {SWATCHES(set, 'color', o.color, brand)}
-      <div className="mke-subhead">Inside</div>
-      {SWATCHES(set, 'color2', o.color2, brand)}
     </div>
   );
 }

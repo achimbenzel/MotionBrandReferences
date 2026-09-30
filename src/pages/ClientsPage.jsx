@@ -7,13 +7,12 @@ import ClientAvatar from '../components/ClientAvatar.jsx';
 import { isTouch } from '../lib/useMedia.js';
 import { dayKey } from '../lib/timeTracker.js';
 import { whoOf, minutesOf, fmtHours, fmtMoney, upcomingBirthdays, useCurrency } from '../lib/clients.js';
+import { daysFromToday } from '../lib/dates.js';
 import '../styles/clients.css';
 
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const inDays = (iso) => {
-  const t = new Date(); t.setHours(0, 0, 0, 0);
-  const [y, m, d] = iso.split('-').map(Number);
-  const n = Math.round((new Date(y, m - 1, d) - t) / 86400000);
+  const n = daysFromToday(iso);
   return n === 0 ? 'today' : n === 1 ? 'tomorrow' : `in ${n} days`;
 };
 

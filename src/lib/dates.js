@@ -14,5 +14,7 @@ export const dateOf = (iso) => {
 };
 /** 'yyyy-mm-dd' plus n days (n may be negative) → 'yyyy-mm-dd'. */
 export const addDays = (iso, n) => { const t = dateOf(iso); t.setDate(t.getDate() + n); return dayKey(t); };
+/** Whole days from today to 'yyyy-mm-dd' (negative = past; NaN when it isn't a day). */
+export const daysFromToday = (iso) => { const t = dateOf(iso); return t ? Math.round((t - dateOf(dayKey())) / 86400000) : NaN; };
 /** 'yyyy-mm-dd' in the browser's language — e.g. "Tue, 30 Sep". */
 export const fmtDay = (iso, opts = { weekday: 'short', day: 'numeric', month: 'short' }) => dateOf(iso)?.toLocaleDateString(undefined, opts) ?? '';

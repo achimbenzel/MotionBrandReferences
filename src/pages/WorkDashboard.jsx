@@ -10,7 +10,7 @@ import { api, planFileUrl, dashboardFileUrl } from '../lib/api.js';
 import { gradientCss, PLAN_GRADIENTS, PLAN_STATUSES, TABS, tagColor } from '../lib/types.js';
 import Menu from '../components/Menu.jsx';
 import { upcomingBirthdays } from '../lib/clients.js';
-import { dayKey, dateOf, fmtDay } from '../lib/dates.js';
+import { dayKey, dateOf, fmtDay, daysFromToday } from '../lib/dates.js';
 import { useToast } from '../components/Toast.jsx';
 import MediaPicker from '../components/mockups/MediaPicker.jsx';
 import ActivityMap from '../components/dashboard/ActivityMap.jsx';
@@ -53,14 +53,7 @@ function layoutOf(saved) {
   });
   return list;
 }
-const DAY = 86400000;
-
 const today0 = () => { const t = new Date(); t.setHours(0, 0, 0, 0); return t; };
-// Days from today to a yyyy-mm-dd date (negative = past), in local time.
-function daysFromToday(iso) {
-  const dt = dateOf(iso);
-  return dt ? Math.round((dt - today0()) / DAY) : NaN;
-}
 const whenLabel = (n) => (n === 0 ? 'Today' : n === 1 ? 'Tomorrow' : n === -1 ? 'Yesterday' : n > 1 ? `In ${n} days` : `${-n} days ago`);
 const DUE_AHEAD = 14; // days ahead shown under "Coming up"
 const DUE_BEHIND = 30; // overdue items stay this long

@@ -21,15 +21,14 @@ import {
   minutesOf, fmtHours, fmtMoney, amountOf, budgetMinutes, budgetState, budgetText, nextBirthday, turnsOn, useCurrency,
 } from '../lib/clients.js';
 import { getPref } from '../lib/prefs.js';
+import { daysFromToday, fmtDay } from '../lib/dates.js';
 import '../styles/clients.css';
 
 const rid = () => Math.random().toString(36).slice(2, 10);
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const today0 = () => { const t = new Date(); t.setHours(0, 0, 0, 0); return t; };
-const dateOf = (iso) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d); };
-const daysTo = (iso) => Math.round((dateOf(iso) - today0()) / 86400000);
-const when = (iso) => { const n = daysTo(iso); return n === 0 ? 'today' : n === 1 ? 'tomorrow' : n === -1 ? 'yesterday' : n < 0 ? `${-n} days ago` : `in ${n} days`; };
-const fmtDate = (iso, opts = { day: 'numeric', month: 'short', year: 'numeric' }) => (iso ? dateOf(iso).toLocaleDateString(undefined, opts) : '');
+const when = (iso) => { const n = daysFromToday(iso); return n === 0 ? 'today' : n === 1 ? 'tomorrow' : n === -1 ? 'yesterday' : n < 0 ? `${-n} days ago` : `in ${n} days`; };
+const fmtDate = (iso, opts = { day: 'numeric', month: 'short', year: 'numeric' }) => fmtDay(iso, opts);
 const isOpen = (p) => p.status !== 'delivered' && p.status !== 'archived';
 const statusOfDl = (k) => DELIVERABLE_STATUS.find((s) => s.key === k) || DELIVERABLE_STATUS[0];
 const spec = (d) => [d.aspect, d.resolution, d.fps && `${d.fps} fps`, d.codec, d.length].filter((x) => x && String(x).trim()).join(' · ');
@@ -136,7 +135,7 @@ export default function ClientDetail({ onNewPlan }) {
     ...mine.filter(isOpen).flatMap((p) => [
       ...(p.milestones || []).filter((m) => m.date && !m.done).map((m) => ({ key: `${p.id}:${m.id}`, date: m.date, label: m.title || 'Milestone', sub: p.name, icon: CalendarClock, to: `/plan/${p.id}` })),
       ...(p.end ? [{ key: `${p.id}:end`, date: p.end, label: 'Deadline', sub: p.name, icon: Flag, to: `/plan/${p.id}`, end: true }] : []),
-    ]).filter((x) => daysTo(x.date) >= -7),
+    ]).filter((x) => daysFromToday(x.date) >= -7),
     ...client.contacts.map((c) => {
       const next = nextBirthday(c.birthday);
       if (!next || (next - today0()) / 86400000 > 60) return null;
@@ -209,7 +208,7 @@ export default function ClientDetail({ onNewPlan }) {
             {upcoming.length ? (
               <ul className="client-upcoming">
                 {upcoming.map((u) => (
-                  <li key={u.key} className={`${u.bday ? 'bday' : ''} ${u.end ? 'end' : ''} ${daysTo(u.date) < 0 ? 'late' : ''}`}>
+                  <li key={u.key} className={`${u.bday ? 'bday' : ''} ${u.end ? 'end' : ''} ${daysFromToday(u.date) < 0 ? 'late' : ''}`}>
                     <button type="button" onClick={() => u.to && navigate(u.to)} disabled={!u.to}>
                       <span className="client-up-ico"><u.icon size={14} /></span>
                       <span className="client-up-what"><b>{u.label}</b><span>{u.sub}</span></span>

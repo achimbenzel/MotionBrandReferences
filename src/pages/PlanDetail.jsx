@@ -1,30 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft, Trash2, Pencil, MoreHorizontal, Images,
-  UploadCloud, X, Plus, Check, ChevronDown, ChevronRight,
-  Image as ImageIcon, Camera, ArrowUp, ArrowDown, File as FileIcon, ExternalLink,
-  Link2, Library, FolderOpen, Palette as PaletteIcon,
-  Wand2, Copy, FileText, AlertTriangle,
-  LayoutTemplate, Clapperboard, PackageCheck,
-  Archive, Film, ChevronUp, ChevronsDownUp, ChevronsUpDown, Columns2, RectangleHorizontal, GripVertical, GripHorizontal,
-  Pin, PinOff, Megaphone,
+  ArrowLeft, Trash2, Pencil, MoreHorizontal, Images, Plus, ChevronDown, ArrowUp, ArrowDown, Library, Palette as PaletteIcon,
+  LayoutTemplate, Clapperboard, PackageCheck, Archive, Film, ChevronUp, ChevronsDownUp, ChevronsUpDown, Columns2, RectangleHorizontal,
+  GripVertical, GripHorizontal, Pin, PinOff, Megaphone,
 } from 'lucide-react';
-import { api, planFileUrl, fileUrl } from '../lib/api.js';
+import { api, planFileUrl } from '../lib/api.js';
 import { useSaver, useRefreshOnReturn, whenSaved } from '../lib/autosave.js';
-import { PLAN_GRADIENTS, PLAN_STATUSES, gradientCss, normalizeUrl, hostOf, planStatus, tagColor } from '../lib/types.js';
-import { rgbToHex, hexToRgb } from '../lib/color.js';
+import { PLAN_STATUSES, planStatus, tagColor } from '../lib/types.js';
+import { rgbToHex } from '../lib/color.js';
 import { extractPalette } from '../lib/imaging.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
-import PdfViewer from '../components/PdfViewer.jsx';
 import Lightbox from '../components/Lightbox.jsx';
 import GalleryNameModal from '../components/GalleryNameModal.jsx';
 import RefPicker from '../components/RefPicker.jsx';
 import FileAddModal from '../components/FileAddModal.jsx';
 import MediaPicker from '../components/mockups/MediaPicker.jsx';
-import ProjectCard from '../components/ProjectCard.jsx';
-import AutoTextarea from '../components/AutoTextarea.jsx';
 import ScriptBlock from '../components/plan/ScriptBlock.jsx';
 import StoryboardBlock from '../components/plan/StoryboardBlock.jsx';
 import ReviewBlock from '../components/plan/ReviewBlock.jsx';
@@ -35,10 +27,14 @@ import { BLOCK_META } from '../components/plan/blockMeta.js';
 import PlanTabs from '../components/plan/PlanTabs.jsx';
 import PlanOverview from '../components/plan/PlanOverview.jsx';
 import BlockRow from '../components/plan/BlockRow.jsx';
-import PlanWhen from '../components/plan/PlanWhen.jsx';
+import PlanWhen, { PlanWhenPanel } from '../components/plan/PlanWhen.jsx';
+import PlanIdentity from '../components/plan/PlanIdentity.jsx';
 import useMakePost from '../components/content/useMakePost.js';
 import { PlanToc, PlanJump } from '../components/plan/PlanToc.jsx';
 import PlanTime from '../components/plan/PlanTime.jsx';
+import { BriefingBlock, TextBlock, TodosBlock, LinksBlock, HeadingBlock, DividerBlock, TableBlock } from '../components/plan/BasicBlocks.jsx';
+import { RefsBlock, PaletteBlock } from '../components/plan/LibraryBlocks.jsx';
+import { MoodboardBlock, PdfBlock, FilesBlock } from '../components/plan/FileBlocks.jsx';
 import ClientPicker from '../components/ClientPicker.jsx';
 import { PLAN_TABS, BLOCK_TABS, STRUCTURAL, blockTabs, statusTab, isEmptyBlock, tabColor, planTab } from '../lib/planTabs.js';
 import { voEstimate } from '../lib/timing.js';
@@ -48,25 +44,7 @@ import '../styles/plan.css';
 
 const rid = () => Math.random().toString(36).slice(2, 8);
 
-const PLAN_EMOJIS = ['🎨', '✏️', '🖌️', '🧠', '💡', '🚀', '🔥', '⭐', '🌈', '🎯',
-  '📦', '🏷️', '🖼️', '📐', '🧩', '🎬', '📸', '🎵', '🏗️', '🛠️',
-  '💎', '🌱', '☕', '📊', '🗂️', '🔮', '🦄', '🍎', '🌍', '🏀'];
-function firstEmoji(str) {
-  const t = String(str || '').trim();
-  if (!t) return '';
-  try { const seg = new Intl.Segmenter(undefined, { granularity: 'grapheme' }); return [...seg.segment(t)][0].segment; }
-  catch { return [...t][0]; }
-}
-
 // BLOCK_META (name + icon per block type) lives in components/plan/blockMeta.js.
-const fmtSum = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
-const toNum = (v) => Number(String(v ?? '').trim().replace(',', '.'));
-const fmtBytes = (n) => {
-  if (n == null) return '';
-  const u = ['B', 'KB', 'MB', 'GB']; let v = n; let i = 0;
-  while (v >= 1024 && i < u.length - 1) { v /= 1024; i += 1; }
-  return `${v.toFixed(v < 10 && i > 0 ? 1 : 0)} ${u[i]}`;
-};
 
 // Small blocks sit side by side, two in a row, unless set to full width (and any block can be set to half).
 const HALF_BY_DEFAULT = new Set(['palette', 'links', 'files']);
@@ -85,9 +63,6 @@ export default function PlanDetail() {
   const [refPickerBlock, setRefPickerBlock] = useState(null); // block id currently picking references
   const [fileModalBlock, setFileModalBlock] = useState(null); // block id for the add-file modal
   const [refCache, setRefCache] = useState({}); // `${refKind}:${refId}` -> { project?|gallery?+members?|gone? }
-  const [bannerPicker, setBannerPicker] = useState(false);
-  const [avatarPicker, setAvatarPicker] = useState(false);
-  const [emojiInput, setEmojiInput] = useState('');
   const [appPick, setAppPick] = useState(null); // picking a picture that's in the app: { kind: 'banner' | 'avatar' | 'moodboard', blockId? }
   const [dragBlock, setDragBlock] = useState(null);
   const [savingTemplate, setSavingTemplate] = useState(false);
@@ -201,23 +176,6 @@ export default function PlanDetail() {
         setAppPick(null);
       }
     } catch (e) { toast(`Could not add it: ${e.message}`, 'error'); }
-  };
-  const pickGradient = async (gid) => {
-    try { if (plan.banner) await api.removePlanImage(id, 'banner'); setPlan(await api.updatePlan(id, { bannerGradient: gid })); setBannerPicker(false); }
-    catch (e) { toast(`Failed: ${e.message}`, 'error'); }
-  };
-  const removeBanner = async () => {
-    try { if (plan.banner) setPlan(await api.removePlanImage(id, 'banner')); else setPlan(await api.updatePlan(id, { bannerGradient: null })); }
-    catch (e) { toast(`Failed: ${e.message}`, 'error'); }
-  };
-  const pickEmoji = async (raw) => {
-    const emoji = firstEmoji(raw); if (!emoji) return;
-    try { if (plan.avatar) await api.removePlanImage(id, 'avatar'); setPlan(await api.updatePlan(id, { avatarEmoji: emoji })); setEmojiInput(''); setAvatarPicker(false); }
-    catch (e) { toast(`Failed: ${e.message}`, 'error'); }
-  };
-  const removeAvatar = async () => {
-    try { if (plan.avatar) setPlan(await api.removePlanImage(id, 'avatar')); else setPlan(await api.updatePlan(id, { avatarEmoji: null })); setAvatarPicker(false); }
-    catch (e) { toast(`Failed: ${e.message}`, 'error'); }
   };
 
   const remove = async () => {
@@ -447,6 +405,12 @@ export default function PlanDetail() {
       return null;
     }, { immediate });
   };
+  // Dropping files onto a moodboard / PDF / files block uploads them into it.
+  const dropOn = (b, board = false) => ({
+    dragOver: dragBlock === b.id,
+    onDrag: (on) => setDragBlock(on ? b.id : null),
+    onDropFiles: (files) => { pending.current = b.id; if (board) lastMoodboard.current = b.id; onFiles(files); },
+  });
   const addFilesTo = (bid) => { pending.current = bid; filesRef.current?.click(); };
   const addPdfTo = (bid) => { pending.current = bid; pdfRef.current?.click(); };
   const onFiles = async (files) => {
@@ -523,20 +487,10 @@ export default function PlanDetail() {
       toast(`Added ${add.length} colour${add.length === 1 ? '' : 's'}`);
     } catch (e) { toast(`Could not extract colours: ${e.message}`, 'error'); }
   };
-  const copyHex = async (hex) => { try { await navigator.clipboard.writeText(hex); toast(`Copied ${hex}`); } catch { toast('Copy failed', 'error'); } };
-
-  // Table block — always persist columns + rows together so no edit is lost.
-  const saveTable = (b, columns, rows, immediate = false) => editBlock(b.id, { columns, rows }, immediate);
 
   if (error) return <div className="detail"><BackBtn /> <div className="center-msg">Couldn’t load: {error}</div></div>;
   if (!plan) return <div className="detail"><div className="spinner" /></div>;
 
-  const bannerUrl = plan.banner ? planFileUrl(plan, plan.banner) : null;
-  const bannerGrad = !bannerUrl ? gradientCss(plan.bannerGradient) : null;
-  const hasBanner = !!(bannerUrl || bannerGrad);
-  const bannerStyle = bannerUrl ? { backgroundImage: `url("${bannerUrl}")` } : bannerGrad ? { backgroundImage: bannerGrad } : undefined;
-  const avatarUrl = plan.avatar ? planFileUrl(plan, plan.avatar) : null;
-  const avatarEmoji = !avatarUrl ? (plan.avatarEmoji || null) : null;
 
   const blockMenu = (b, i) => [
     ...(b.type === 'script' ? [{ label: 'Storyboard from script', icon: <Clapperboard size={15} />, onClick: () => scriptToStoryboard(b) }] : []),
@@ -582,398 +536,62 @@ export default function PlanDetail() {
     }
 
     if (b.type === 'briefing') {
-      const fields = b.fields || [];
-      const setFields = (next, immediate = false) => editBlock(b.id, { fields: next }, immediate);
-      const patchField = (fid, p) => setFields(fields.map((f) => (f.id === fid ? { ...f, ...p } : f)));
-      const answered = fields.filter((f) => f.value.trim()).length;
-      return (
-        <div className="section block" key={b.id}>
-          <div className="section-head">
-            <h2><Meta.icon size={16} /> {b.title} {fields.length > 0 && <span className="count" title="Answered">{answered}/{fields.length}</span>}</h2>
-            <div className="moodboard-actions">
-              {fields.length > 0 && <button className="btn btn-sm" onClick={() => copyBriefing(b)}><Copy size={14} /> Copy</button>}
-              {menu}
-            </div>
-          </div>
-          <div className="brief">
-            {fields.map((f) => (
-              <div className={`brief-row ${f.value.trim() ? 'done' : ''}`} key={f.id}>
-                <input className="brief-label" value={f.label} placeholder="Question…" aria-label="Question"
-                  onChange={(e) => patchField(f.id, { label: e.target.value })} />
-                <AutoTextarea className="brief-value" value={f.value} placeholder="—" aria-label={f.label || 'Answer'}
-                  onChange={(e) => patchField(f.id, { value: e.target.value })} />
-                <button className="icon-btn brief-del" title="Remove field" onClick={() => removeField(b, f)}><X size={14} /></button>
-              </div>
-            ))}
-            <button className="btn btn-ghost btn-sm ms-add" onClick={() => setFields([...fields, { id: rid(), label: '', value: '' }], true)}><Plus size={15} /> Add field</button>
-          </div>
-        </div>
-      );
+      return <BriefingBlock key={b.id} block={b} menu={menu} icon={Meta.icon} editBlock={editBlock} onCopy={() => copyBriefing(b)} onRemoveField={(f) => removeField(b, f)} />;
     }
 
     if (b.type === 'moodboard') {
       return (
-        <div className={`section block moodboard ${dragBlock === b.id ? 'dragover' : ''}`} key={b.id}
-          onDragOver={(e) => { e.preventDefault(); setDragBlock(b.id); }}
-          onDragLeave={(e) => { if (e.target === e.currentTarget) setDragBlock(null); }}
-          onDrop={(e) => { e.preventDefault(); setDragBlock(null); pending.current = b.id; lastMoodboard.current = b.id; onFiles(e.dataTransfer.files); }}>
-          <div className="moodboard-head">
-            <button className="mb-collapse" onClick={() => editBlock(b.id, { collapsed: !b.collapsed }, true)}>
-              {b.collapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-              <Meta.icon size={16} /><span className="mb-name">{b.title}</span>
-              <span className="count">{(b.images || []).length}</span>
-            </button>
-            <div className="moodboard-actions">
-              <button className="btn btn-sm" onClick={() => { lastMoodboard.current = b.id; addFilesTo(b.id); }}><UploadCloud size={14} /> Add images</button>
-              <button className="btn btn-sm btn-ghost" onClick={() => { lastMoodboard.current = b.id; setAppPick({ kind: 'moodboard', blockId: b.id }); }} title="Pictures that are already in the app"><Library size={14} /><span className="mb-long"> From the app</span></button>
-              {menu}
-            </div>
-          </div>
-          {!b.collapsed && ((b.images || []).length ? (
-            <div className="masonry">
-              {b.images.map((im, idx) => (
-                <div className="masonry-item" key={im.id}>
-                  <img src={planFileUrl(plan, im.file)} alt="" loading="lazy"
-                    onClick={() => setLightbox({ items: b.images.map((x) => ({ src: planFileUrl(plan, x.file) })), index: idx })} />
-                  <div className="masonry-menu" onClick={(e) => e.stopPropagation()}>
-                    <button className="icon-btn masonry-menu-btn" title="Remove" onClick={() => removeFile(b.id, im.id)}><X size={15} /></button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="dropzone" onClick={() => { lastMoodboard.current = b.id; addFilesTo(b.id); }}>
-              <UploadCloud size={20} /><div>Drop or select images · or paste (⌘V)</div>
-            </div>
-          ))}
-        </div>
+        <MoodboardBlock key={b.id} plan={plan} block={b} menu={menu} icon={Meta.icon} editBlock={editBlock} {...dropOn(b, true)}
+          onAddFiles={() => { lastMoodboard.current = b.id; addFilesTo(b.id); }}
+          onFromApp={() => { lastMoodboard.current = b.id; setAppPick({ kind: 'moodboard', blockId: b.id }); }}
+          onRemoveFile={(fid) => removeFile(b.id, fid)} onLightbox={(items, index) => setLightbox({ items, index })} />
       );
     }
 
     if (b.type === 'text') {
-      return (
-        <div className="section block" key={b.id}>
-          <div className="section-head"><h2><Meta.icon size={16} /> {b.title}</h2>{menu}</div>
-          <textarea className="textarea notes-textarea" value={b.content || ''}
-            onChange={(e) => editBlock(b.id, { content: e.target.value })} placeholder="Write here…" />
-        </div>
-      );
+      return <TextBlock key={b.id} block={b} menu={menu} icon={Meta.icon} editBlock={editBlock} />;
     }
 
     if (b.type === 'todos') {
-      const items = b.items || [];
-      const setItems = (next) => editBlock(b.id, { items: next });
-      return (
-        <div className="section block" key={b.id}>
-          <div className="section-head">
-            <h2><Meta.icon size={16} /> {b.title} {items.length > 0 && <span className="count">{items.filter((t) => t.done).length}/{items.length}</span>}</h2>{menu}
-          </div>
-          <div className="milestones">
-            {items.map((t) => (
-              <div className={`milestone ${t.done ? 'done' : ''} ${t.urgent ? 'urgent' : ''}`} key={t.id}>
-                <button className={`ms-check ${t.done ? 'on' : ''}`} onClick={() => setItems(items.map((x) => (x.id === t.id ? { ...x, done: !x.done } : x)))}>{t.done && <Check size={13} />}</button>
-                <input className="ms-title input" value={t.text} placeholder="To-do…" onChange={(e) => setItems(items.map((x) => (x.id === t.id ? { ...x, text: e.target.value } : x)))} />
-                <button className={`ms-urgent icon-btn ${t.urgent ? 'on' : ''}`} title={t.urgent ? 'Unmark urgent' : 'Mark urgent'} onClick={() => setItems(items.map((x) => (x.id === t.id ? { ...x, urgent: !x.urgent } : x)))}><AlertTriangle size={13} /></button>
-                <button className="ms-del icon-btn" onClick={() => setItems(items.filter((x) => x.id !== t.id))}><X size={14} /></button>
-              </div>
-            ))}
-            <button className="btn btn-ghost btn-sm ms-add" onClick={() => setItems([...items, { id: rid(), text: '', done: false }])}><Plus size={15} /> Add to-do</button>
-          </div>
-        </div>
-      );
+      return <TodosBlock key={b.id} block={b} menu={menu} icon={Meta.icon} editBlock={editBlock} />;
     }
 
     if (b.type === 'links') {
-      const items = b.items || [];
-      const setItems = (next) => editBlock(b.id, { items: next });
-      return (
-        <div className="section block" key={b.id}>
-          <div className="section-head">
-            <h2><Meta.icon size={16} /> {b.title} {items.length > 0 && <span className="count">{items.length}</span>}</h2>
-            <div className="moodboard-actions">
-              <button className="btn btn-sm" onClick={() => setItems([...items, { id: rid(), url: '', title: '' }])}><Plus size={14} /> Add link</button>{menu}
-            </div>
-          </div>
-          {items.length ? (
-            <div className="linklist">
-              {items.map((it) => (
-                <div className="linkrow" key={it.id}>
-                  <Link2 size={17} className="linkrow-icon" />
-                  <input className="input linkrow-title" value={it.title} placeholder={hostOf(it.url) || 'Label…'}
-                    onChange={(e) => setItems(items.map((x) => (x.id === it.id ? { ...x, title: e.target.value } : x)))} />
-                  <input className="input linkrow-url" value={it.url} placeholder="https://…"
-                    onChange={(e) => setItems(items.map((x) => (x.id === it.id ? { ...x, url: e.target.value } : x)))} />
-                  <a className={`icon-btn linkrow-open ${it.url ? '' : 'is-disabled'}`} href={it.url ? normalizeUrl(it.url) : undefined}
-                    target="_blank" rel="noopener noreferrer" title="Open link"><ExternalLink size={15} /></a>
-                  <button className="icon-btn linkrow-del" onClick={() => setItems(items.filter((x) => x.id !== it.id))} title="Remove"><X size={15} /></button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="dropzone" onClick={() => setItems([{ id: rid(), url: '', title: '' }])}>
-              <Link2 size={20} /><div>Add a link — inspiration, references, client sites…</div>
-            </div>
-          )}
-        </div>
-      );
+      return <LinksBlock key={b.id} block={b} menu={menu} icon={Meta.icon} editBlock={editBlock} />;
     }
 
     if (b.type === 'refs') {
-      const items = b.items || [];
       return (
-        <div className="section block" key={b.id}>
-          <div className="section-head">
-            <h2><Meta.icon size={16} /> {b.title} {items.length > 0 && <span className="count">{items.length}</span>}</h2>
-            <div className="moodboard-actions">
-              <button className="btn btn-sm" onClick={() => setRefPickerBlock(b.id)}><Plus size={14} /> Add reference</button>{menu}
-            </div>
-          </div>
-          {items.length ? (
-            <div className="grid ref-grid">
-              {items.map((r) => {
-                const data = refCache[`${r.refKind}:${r.refId}`];
-                if (data?.project) return <ProjectCard key={r.id} project={data.project} onRemove={() => removeRef(b.id, r.id)} removeTitle="Remove reference" />;
-                if (data?.gallery) {
-                  const covers = (data.members || []).filter((m) => m.thumb).slice(0, 4);
-                  const count = (data.gallery.projectIds || []).length;
-                  return (
-                    <div className="card gallery-card" key={r.id} onClick={() => openRef(r)}>
-                      <button className="card-remove icon-btn" title="Remove reference" onClick={(e) => { e.stopPropagation(); removeRef(b.id, r.id); }}><X size={15} /></button>
-                      <div className="gallery-mosaic">
-                        {covers.length ? covers.map((m) => <img key={m.id} src={fileUrl(m, m.thumb)} alt="" loading="lazy" />)
-                          : <div className="card-thumb-empty"><FolderOpen size={26} /></div>}
-                      </div>
-                      <div className="card-meta"><span className="card-title">{data.gallery.name}</span></div>
-                      <div className="card-sub">{count} {count === 1 ? 'project' : 'projects'}</div>
-                    </div>
-                  );
-                }
-                if (data?.gone) return (
-                  <div className="card ref-gone" key={r.id}>
-                    <button className="card-remove icon-btn" title="Remove reference" onClick={() => removeRef(b.id, r.id)}><X size={15} /></button>
-                    <div className="card-thumb"><div className="card-thumb-empty"><FileIcon size={22} /></div></div>
-                    <div className="card-meta"><span className="card-title">{r.title || 'Missing item'}</span></div>
-                    <div className="card-sub">No longer in your library</div>
-                  </div>
-                );
-                return (
-                  <div className="card ref-loading" key={r.id}>
-                    <div className="card-thumb"><div className="spinner" /></div>
-                    <div className="card-meta"><span className="card-title">{r.title || '…'}</span></div>
-                    <div className="card-sub">{r.subtitle || 'Loading…'}</div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="dropzone" onClick={() => setRefPickerBlock(b.id)}>
-              <Library size={20} /><div>Attach references or galleries from your library</div>
-            </div>
-          )}
-        </div>
+        <RefsBlock key={b.id} block={b} menu={menu} icon={Meta.icon} refCache={refCache}
+          onPick={() => setRefPickerBlock(b.id)} onRemove={(itemId) => removeRef(b.id, itemId)} onOpen={openRef} />
       );
     }
 
     if (b.type === 'palette') {
-      const items = b.items || [];
-      const setItems = (next) => editBlock(b.id, { items: next });
-      const patchSwatch = (sid, p) => setItems(items.map((s) => (s.id === sid ? { ...s, ...p } : s)));
       return (
-        <div className="section block" key={b.id}>
-          <div className="section-head">
-            <h2><Meta.icon size={16} /> {b.title} {items.length > 0 && <span className="count">{items.length}</span>}</h2>
-            <div className="moodboard-actions">
-              <Menu align="right" title="Extract colours" trigger={<button className="btn btn-sm"><Wand2 size={14} /> Extract from image</button>} items={[
-                { label: 'Upload a picture…', icon: <UploadCloud size={15} />, onClick: () => extractInto(b.id) },
-                { label: 'A picture from the app…', icon: <Library size={15} />, onClick: () => setAppPick({ kind: 'palette', blockId: b.id }) },
-              ]} />
-              <button className="btn btn-sm" onClick={() => setItems([...items, { id: rid(), hex: '#5B8CFF', name: '' }])}><Plus size={14} /> Add color</button>
-              {menu}
-            </div>
-          </div>
-          {items.length ? (
-            <div className="swatchlist">
-              {items.map((sw) => {
-                const rgb = hexToRgb(sw.hex);
-                const colorVal = rgb ? rgbToHex(rgb).toLowerCase() : '#000000';
-                return (
-                  <div className="swatch" key={sw.id}>
-                    <label className="swatch-chip" style={{ background: sw.hex || 'var(--surface-2)' }} title="Pick colour">
-                      <input type="color" value={colorVal} onChange={(e) => patchSwatch(sw.id, { hex: e.target.value.toUpperCase() })} />
-                      <span className="swatch-actions" onClick={(e) => e.preventDefault()}>
-                        <button className="icon-btn" title="Copy hex" onClick={() => copyHex(sw.hex)}><Copy size={13} /></button>
-                        <button className="icon-btn" title="Remove" onClick={() => setItems(items.filter((x) => x.id !== sw.id))}><X size={13} /></button>
-                      </span>
-                    </label>
-                    <div className="swatch-body">
-                      <input className="input swatch-hex" value={sw.hex} onChange={(e) => patchSwatch(sw.id, { hex: e.target.value })} spellCheck={false} />
-                      <input className="input swatch-name" value={sw.name} placeholder="Name…" onChange={(e) => patchSwatch(sw.id, { name: e.target.value })} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="dropzone" onClick={() => extractInto(b.id)}>
-              <PaletteIcon size={20} /><div>Extract colours from an image · or add them by hand</div>
-              <div className="dropzone-or"><span>or</span>
-                <button type="button" className="btn btn-sm" onClick={(e) => { e.stopPropagation(); setAppPick({ kind: 'palette', blockId: b.id }); }}><Library size={14} /> From the app…</button>
-              </div>
-            </div>
-          )}
-        </div>
+        <PaletteBlock key={b.id} block={b} menu={menu} icon={Meta.icon} editBlock={editBlock} toast={toast}
+          onExtract={() => extractInto(b.id)} onFromApp={() => setAppPick({ kind: 'palette', blockId: b.id })} />
       );
     }
 
     if (b.type === 'heading') {
-      return (
-        <div className="section block block-structural" key={b.id}>
-          <div className="heading-row">
-            <div className="heading-fields">
-              <input className="heading-input" value={b.title} placeholder="Section heading"
-                onChange={(e) => editBlock(b.id, { title: e.target.value })} />
-              <input className="heading-sub" value={b.content || ''} placeholder="Add a description…"
-                onChange={(e) => editBlock(b.id, { content: e.target.value })} />
-            </div>
-            {menu}
-          </div>
-        </div>
-      );
+      return <HeadingBlock key={b.id} block={b} menu={menu} editBlock={editBlock} />;
     }
 
     if (b.type === 'divider') {
-      return (
-        <div className="section block block-structural block-divider" key={b.id}>
-          <div className="divider-row"><hr className="block-hr" />{menu}</div>
-        </div>
-      );
+      return <DividerBlock key={b.id} menu={menu} />;
     }
 
     if (b.type === 'table') {
-      const columns = b.columns || [];
-      const rows = b.rows || [];
-      const colSums = columns.map((c) => {
-        const vals = rows.map((r) => String(r.cells?.[c.id] ?? '').trim()).filter((v) => v !== '');
-        if (!vals.length || !vals.every((v) => isFinite(toNum(v)))) return null;
-        return vals.reduce((s, v) => s + toNum(v), 0);
-      });
-      const showSums = colSums.some((s) => s !== null);
-      return (
-        <div className="section block" key={b.id}>
-          <div className="section-head">
-            <h2><Meta.icon size={16} /> {b.title}</h2>
-            <div className="moodboard-actions">
-              <button className="btn btn-sm" onClick={() => saveTable(b, columns, [...rows, { id: rid(), cells: {} }], true)}><Plus size={14} /> Add row</button>
-              {menu}
-            </div>
-          </div>
-          <div className="table-scroll">
-            <table className="plan-table">
-              <thead>
-                <tr>
-                  {columns.map((c) => (
-                    <th key={c.id}>
-                      <div className="th-inner">
-                        <input className="cell-input th-input" value={c.name} placeholder=""
-                          onChange={(e) => saveTable(b, columns.map((x) => (x.id === c.id ? { ...x, name: e.target.value } : x)), rows)} />
-                        <button className="icon-btn th-del" title="Remove column"
-                          onClick={() => saveTable(b, columns.filter((x) => x.id !== c.id), rows.map((r) => { const cells = { ...r.cells }; delete cells[c.id]; return { ...r, cells }; }), true)}><X size={13} /></button>
-                      </div>
-                    </th>
-                  ))}
-                  <th className="th-add"><button className="icon-btn" title="Add column" onClick={() => saveTable(b, [...columns, { id: rid(), name: '' }], rows, true)}><Plus size={15} /></button></th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id}>
-                    {columns.map((c) => (
-                      <td key={c.id}>
-                        <input className="cell-input" value={r.cells?.[c.id] || ''}
-                          onChange={(e) => saveTable(b, columns, rows.map((x) => (x.id === r.id ? { ...x, cells: { ...x.cells, [c.id]: e.target.value } } : x)))} />
-                      </td>
-                    ))}
-                    <td className="row-del-cell"><button className="icon-btn row-del" title="Remove row" onClick={() => saveTable(b, columns, rows.filter((x) => x.id !== r.id), true)}><X size={14} /></button></td>
-                  </tr>
-                ))}
-              </tbody>
-              {showSums && (
-                <tfoot>
-                  <tr>
-                    {columns.map((c, ci) => <td key={c.id} className="sum-cell">{colSums[ci] === null ? '' : `Σ ${fmtSum(colSums[ci])}`}</td>)}
-                    <td className="row-del-cell" />
-                  </tr>
-                </tfoot>
-              )}
-            </table>
-          </div>
-          {!rows.length && <div className="table-empty">No rows yet — “Add row” to start.</div>}
-        </div>
-      );
+      return <TableBlock key={b.id} block={b} menu={menu} icon={Meta.icon} editBlock={editBlock} />;
     }
 
     if (b.type === 'pdf') {
-      return (
-        <div className={`section block ${dragBlock === b.id ? 'dragover' : ''}`} key={b.id}
-          onDragOver={(e) => { e.preventDefault(); setDragBlock(b.id); }}
-          onDragLeave={(e) => { if (e.target === e.currentTarget) setDragBlock(null); }}
-          onDrop={(e) => { e.preventDefault(); setDragBlock(null); pending.current = b.id; onFiles(e.dataTransfer.files); }}>
-          <div className="section-head">
-            <h2><Meta.icon size={16} /> {b.title} {(b.files || []).length > 0 && <span className="count">{b.files.length}</span>}</h2>
-            <div className="moodboard-actions">
-              <button className="btn btn-sm" onClick={() => addPdfTo(b.id)}><Plus size={14} /> Add PDF</button>{menu}
-            </div>
-          </div>
-          {(b.files || []).length ? (
-            <PlanPdfBlock plan={plan} files={b.files} onRemove={(fid) => removeFile(b.id, fid)} />
-          ) : (
-            <div className="dropzone" onClick={() => addPdfTo(b.id)}>
-              <FileText size={20} /><div>Add a PDF — it renders inline, page by page (like Branding)</div>
-            </div>
-          )}
-        </div>
-      );
+      return <PdfBlock key={b.id} plan={plan} block={b} menu={menu} icon={Meta.icon} {...dropOn(b)} onAdd={() => addPdfTo(b.id)} onRemoveFile={(fid) => removeFile(b.id, fid)} />;
     }
 
     // files — each file shows a square example image before it.
-    return (
-      <div className={`section block ${dragBlock === b.id ? 'dragover' : ''}`} key={b.id}
-        onDragOver={(e) => { e.preventDefault(); setDragBlock(b.id); }}
-        onDragLeave={(e) => { if (e.target === e.currentTarget) setDragBlock(null); }}
-        onDrop={(e) => { e.preventDefault(); setDragBlock(null); pending.current = b.id; onFiles(e.dataTransfer.files); }}>
-        <div className="section-head">
-          <h2><Meta.icon size={16} /> {b.title} {(b.files || []).length > 0 && <span className="count">{b.files.length}</span>}</h2>
-          <div className="moodboard-actions">
-            <button className="btn btn-sm" onClick={() => setFileModalBlock(b.id)}><Plus size={14} /> Add file</button>{menu}
-          </div>
-        </div>
-
-        {(b.files || []).length ? (
-          <div className="filelist">
-            {b.files.map((f) => {
-              const ex = f.example ? planFileUrl(plan, f.example) : null;
-              return (
-                <div className="filerow" key={f.id}>
-                  <a className="filerow-ex" href={planFileUrl(plan, f.file)} target="_blank" rel="noopener noreferrer" title={f.title || f.name}>
-                    {ex ? <img src={ex} alt="" loading="lazy" /> : <FileIcon size={20} />}
-                  </a>
-                  <div className="filerow-main">
-                    <a className="filerow-name" href={planFileUrl(plan, f.file)} target="_blank" rel="noopener noreferrer" title={f.title || f.name}>{f.title || f.name}</a>
-                    <span className="filerow-meta">{[f.title ? f.name : null, fmtBytes(f.size)].filter(Boolean).join(' · ')}</span>
-                  </div>
-                  <a className="icon-btn filerow-open" href={planFileUrl(plan, f.file)} target="_blank" rel="noopener noreferrer" title="Open"><ExternalLink size={15} /></a>
-                  <button className="icon-btn filerow-del" onClick={() => removeFile(b.id, f.id)} title="Move to Trash"><X size={15} /></button>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="dropzone" onClick={() => setFileModalBlock(b.id)}>
-            <UploadCloud size={20} /><div>Add a file — with an optional example image</div>
-          </div>
-        )}
-      </div>
-    );
+    return <FilesBlock key={b.id} plan={plan} block={b} menu={menu} icon={Meta.icon} {...dropOn(b)} onAdd={() => setFileModalBlock(b.id)} onRemoveFile={(fid) => removeFile(b.id, fid)} />;
   };
 
   // Tabs: which tab each block sits in, how many each holds, fold / unfold all.
@@ -1050,62 +668,8 @@ export default function PlanDetail() {
         </div>
       </div>
 
-      {/* Banner + avatar */}
-      <div className={`plan-banner ${hasBanner ? '' : 'empty'}`} style={bannerStyle}>
-        <div className="plan-banner-actions">
-          <button className="btn btn-sm" onClick={() => setBannerPicker((v) => !v)}><ImageIcon size={15} /> {hasBanner ? 'Change banner' : 'Add banner'}</button>
-          {hasBanner && <button className="btn btn-sm btn-ghost" onClick={removeBanner}>Remove</button>}
-        </div>
-        {bannerPicker && <div className="banner-picker-backdrop" onClick={() => setBannerPicker(false)} />}
-        {bannerPicker && (
-          <div className="banner-picker" onMouseDown={(e) => e.stopPropagation()}>
-            <div className="banner-picker-head">Gradients</div>
-            <div className="banner-picker-grid">
-              {PLAN_GRADIENTS.map((g) => (
-                <button key={g.id} className={`banner-swatch ${plan.bannerGradient === g.id && !bannerUrl ? 'on' : ''}`}
-                  style={{ backgroundImage: g.css }} title={g.id} onClick={() => pickGradient(g.id)} />
-              ))}
-            </div>
-            <div className="banner-picker-row">
-              <button className="btn btn-sm banner-picker-upload" onClick={() => { setBannerPicker(false); bannerRef.current?.click(); }}>
-                <UploadCloud size={14} /> Upload…
-              </button>
-              <button className="btn btn-sm banner-picker-upload" onClick={() => { setBannerPicker(false); setAppPick({ kind: 'banner' }); }}>
-                <Library size={14} /> From the app…
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-      <div className={`plan-idrow ${avatarPicker ? 'picking' : ''}`}>
-        <div className="plan-avatar-wrap">
-          <button className="plan-avatar" onClick={() => setAvatarPicker((v) => !v)} title="Change profile image">
-            {avatarUrl ? <img src={avatarUrl} alt="" />
-              : avatarEmoji ? <span className="plan-avatar-emoji">{avatarEmoji}</span>
-                : <span>{(plan.name || '?').charAt(0).toUpperCase()}</span>}
-            <span className="plan-avatar-edit"><Camera size={15} /></span>
-          </button>
-          {avatarPicker && <div className="avatar-picker-backdrop" onClick={() => setAvatarPicker(false)} />}
-          {avatarPicker && (
-            <div className="avatar-picker" onMouseDown={(e) => e.stopPropagation()}>
-              <div className="avatar-picker-emojis">
-                {PLAN_EMOJIS.map((e) => (
-                  <button key={e} className={`ap-emoji ${plan.avatarEmoji === e && !avatarUrl ? 'on' : ''}`} onClick={() => pickEmoji(e)}>{e}</button>
-                ))}
-              </div>
-              <input className="input ap-input" value={emojiInput} placeholder="Type or paste an emoji…"
-                onChange={(ev) => setEmojiInput(ev.target.value)}
-                onKeyDown={(ev) => { if (ev.key === 'Enter') { ev.preventDefault(); pickEmoji(emojiInput); } }} />
-              <div className="ap-actions">
-                <button className="btn btn-sm" onClick={() => { setAvatarPicker(false); avatarRef.current?.click(); }}><UploadCloud size={14} /> Upload…</button>
-                <button className="btn btn-sm" onClick={() => { setAvatarPicker(false); setAppPick({ kind: 'avatar' }); }}><Library size={14} /> From the app…</button>
-                {(avatarUrl || plan.avatarEmoji) && <button className="btn btn-sm btn-ghost" onClick={removeAvatar}>Remove</button>}
-              </div>
-            </div>
-          )}
-        </div>
-        <h1 className="plan-name">{plan.name}</h1>
-      </div>
+      <PlanIdentity plan={plan} setPlan={setPlan} toast={toast} onFromApp={(kind) => setAppPick({ kind })}
+        onUpload={(kind) => (kind === 'banner' ? bannerRef : avatarRef).current?.click()} />
       <div className="plan-meta">
         <Menu
           align="left"
@@ -1123,29 +687,8 @@ export default function PlanDetail() {
       </div>
       {/* Timeframe + milestones: one line in the header, the details on click */}
       {whenOpen && (
-        <div className="plan-when-panel">
-          <div className="row-2">
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label>Start</label>
-              <input type="date" className="input" value={plan.start || ''} onChange={(e) => patch({ start: e.target.value })} />
-            </div>
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label>End</label>
-              <input type="date" className="input" value={plan.end || ''} onChange={(e) => patch({ end: e.target.value })} />
-            </div>
-          </div>
-          <div className="milestones">
-            {milestones.map((m) => (
-              <div className={`milestone ${m.done ? 'done' : ''}`} key={m.id}>
-                <button className={`ms-check ${m.done ? 'on' : ''}`} onClick={() => editMilestone(m.id, { done: !m.done })} title="Toggle done">{m.done && <Check size={13} />}</button>
-                <input className="ms-title input" value={m.title} placeholder="Milestone…" onChange={(e) => editMilestone(m.id, { title: e.target.value })} />
-                <input className="ms-date input" type="date" value={m.date || ''} onChange={(e) => editMilestone(m.id, { date: e.target.value })} />
-                <button className="ms-del icon-btn" onClick={() => removeMilestone(m.id)}><X size={14} /></button>
-              </div>
-            ))}
-            <button className="btn btn-ghost btn-sm ms-add" onClick={addMilestone}><Plus size={15} /> Add milestone</button>
-          </div>
-        </div>
+        <PlanWhenPanel plan={plan} milestones={milestones} onPatch={patch}
+          onAdd={addMilestone} onEdit={editMilestone} onRemove={removeMilestone} />
       )}
 
       <LibraryChips items={plan.archivedAs} />
@@ -1241,37 +784,6 @@ function BackBtn({ to, label = 'Back' }) {
     <button className="detail-back" style={{ margin: 0 }} onClick={() => (to ? navigate(to) : navigate(-1))}>
       <ArrowLeft size={16} /> {label}
     </button>
-  );
-}
-
-// A PDF block: renders the active PDF inline (like Branding), with tabs when
-// there is more than one, an "Open" link and a Remove button.
-function PlanPdfBlock({ plan, files, onRemove }) {
-  const [activeId, setActiveId] = useState(files[0]?.id);
-  const active = files.find((f) => f.id === activeId) || files[0];
-  const shorten = (n) => (n && n.length > 22 ? `${n.slice(0, 20)}…` : n);
-  return (
-    <div>
-      {files.length > 1 && (
-        <div className="asset-tabs">
-          {files.map((f, i) => (
-            <button key={f.id} className={`asset-tab ${active?.id === f.id ? 'on' : ''}`} onClick={() => setActiveId(f.id)}>
-              <FileText size={14} /> {shorten(f.title || f.name) || `PDF ${i + 1}`}
-            </button>
-          ))}
-        </div>
-      )}
-      {active && (
-        <>
-          <PdfViewer key={active.id} url={planFileUrl(plan, active.file)} />
-          <div className="plan-pdf-bar">
-            <span className="plan-pdf-name" title={active.name}>{active.name}</span>
-            <a className="btn btn-sm" href={planFileUrl(plan, active.file)} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} /> Open</a>
-            <button className="btn btn-sm btn-danger" onClick={() => onRemove(active.id)}><Trash2 size={14} /> Remove</button>
-          </div>
-        </>
-      )}
-    </div>
   );
 }
 
