@@ -1,6 +1,6 @@
 // A plan's banner (a gradient or a picture) and its profile picture (an
 // emoji or a picture), with their pickers, above the plan's name.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image as ImageIcon, UploadCloud, Library, Camera } from 'lucide-react';
 import { api, planFileUrl } from '../../lib/api.js';
 import { PLAN_GRADIENTS, gradientCss } from '../../lib/types.js';
@@ -15,9 +15,15 @@ function firstEmoji(str) {
   catch { return [...t][0]; }
 }
 
-/** onUpload(kind) / onFromApp(kind): a new 'banner' or 'avatar' picture from a file or from the app. */
-export default function PlanIdentity({ plan, setPlan, toast, onUpload, onFromApp }) {
+/**
+ * onUpload(kind) / onFromApp(kind): a new 'banner' or 'avatar' picture from a
+ * file or from the app. `pickBanner` (a counter) opens the banner choices —
+ * from the Edit menu, where phones find them (they have no hover to show the
+ * buttons on the banner).
+ */
+export default function PlanIdentity({ plan, setPlan, toast, onUpload, onFromApp, pickBanner = 0 }) {
   const [bannerPicker, setBannerPicker] = useState(false);
+  useEffect(() => { if (pickBanner) setBannerPicker(true); }, [pickBanner]);
   const [avatarPicker, setAvatarPicker] = useState(false);
   const [emojiInput, setEmojiInput] = useState('');
 
@@ -69,6 +75,7 @@ export default function PlanIdentity({ plan, setPlan, toast, onUpload, onFromApp
               <button className="btn btn-sm banner-picker-upload" onClick={() => { setBannerPicker(false); onFromApp('banner'); }}>
                 <Library size={14} /> From the app…
               </button>
+              {hasBanner && <button className="btn btn-sm btn-ghost banner-picker-remove" onClick={() => { setBannerPicker(false); removeBanner(); }}>Remove</button>}
             </div>
           </div>
         )}

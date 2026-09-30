@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft, Trash2, Pencil, MoreHorizontal, Images, Plus, ChevronDown, ArrowUp, ArrowDown, Library, Palette as PaletteIcon,
+  ArrowLeft, Trash2, Pencil, MoreHorizontal, Images, Image as ImageIcon, Plus, ChevronDown, ArrowUp, ArrowDown, Library, Palette as PaletteIcon,
   LayoutTemplate, Clapperboard, PackageCheck, Archive, Film, ChevronUp, ChevronsDownUp, ChevronsUpDown, Columns2, RectangleHorizontal,
   GripVertical, GripHorizontal, Pin, PinOff, Megaphone,
 } from 'lucide-react';
@@ -67,6 +67,7 @@ export default function PlanDetail() {
   const [dragBlock, setDragBlock] = useState(null);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [bannerAsk, setBannerAsk] = useState(0); // Edit → Banner…: opens the banner choices
   const [params, setParams] = useSearchParams();
   const [tab, setTabState] = useState('overview');     // which tab shows (set when the plan loads)
   const [opened, setOpened] = useState(() => new Set()); // empty blocks opened on this visit
@@ -638,7 +639,7 @@ export default function PlanDetail() {
     return (
       <div className={`tab-block ${sort.itemState(b.id).className}`} key={b.id} data-block={b.id} data-sort-id={b.id} style={{ '--tab-fg': color }}>
         {gripOf(b)}
-        {renderFull(b, i, fold ? <>{fold}{menuEl}</> : menuEl)}
+        {renderFull(b, i, <span className="block-actions">{fold}{menuEl}</span>)}
       </div>
     );
   };
@@ -658,6 +659,7 @@ export default function PlanDetail() {
           items={[
             { label: plan.pinned ? 'Unpin from the top' : 'Pin to the top', icon: plan.pinned ? <PinOff size={15} /> : <Pin size={15} />, onClick: () => patch({ pinned: !plan.pinned }) },
             { label: 'Rename', icon: <Pencil size={15} />, onClick: () => setRenaming(true) },
+            { label: plan.banner || plan.bannerGradient ? 'Change banner…' : 'Add a banner…', icon: <ImageIcon size={15} />, onClick: () => { window.scrollTo({ top: 0, behavior: 'smooth' }); setBannerAsk((n) => n + 1); } },
             { label: 'Save as template…', icon: <LayoutTemplate size={15} />, onClick: () => setSavingTemplate(true) },
             { label: 'Archive as reference…', icon: <Archive size={15} />, onClick: () => setArchiving(true) },
             { label: 'Make a post…', icon: <Megaphone size={15} />, hint: 'In Content: with its latest review cut and banner', onClick: () => makePost({ kind: 'plan', planId: plan.id }) },
@@ -668,7 +670,7 @@ export default function PlanDetail() {
         </div>
       </div>
 
-      <PlanIdentity plan={plan} setPlan={setPlan} toast={toast} onFromApp={(kind) => setAppPick({ kind })}
+      <PlanIdentity plan={plan} setPlan={setPlan} toast={toast} onFromApp={(kind) => setAppPick({ kind })} pickBanner={bannerAsk}
         onUpload={(kind) => (kind === 'banner' ? bannerRef : avatarRef).current?.click()} />
       <div className="plan-meta">
         <Menu

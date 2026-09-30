@@ -1196,8 +1196,9 @@ img { max-width: 100%; display: block; }
 .banner-swatch:hover { border-color: var(--border-strong); }
 .banner-swatch.on { border-color: #fff; box-shadow: 0 0 0 2px var(--accent); }
 .banner-picker-upload { width: 100%; justify-content: center; }
-.banner-picker-row { display: flex; gap: 8px; }
+.banner-picker-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .banner-picker-row .banner-picker-upload { flex: 1 1 auto; width: auto; white-space: nowrap; }
+.banner-picker-row .banner-picker-remove { flex: 1 1 100%; justify-content: center; }
 .dash-picker-remove { margin-top: 8px; color: var(--text-muted); }
 /* The avatar overlaps the banner by 40px; the name starts just below the
    banner's edge, so it stays readable on any banner image. */
@@ -1274,11 +1275,13 @@ img { max-width: 100%; display: block; }
 /* Header action rows, the ⋯ menu, and the table's add-column button stay hidden
    until you point at the block, keeping the canvas calm (Notion-style). */
 .block .moodboard-actions,
-.block > .section-head > .menu-wrap { opacity: 0; transition: opacity .12s; }
+.block > .section-head > .block-actions { opacity: 0; transition: opacity .12s; }
 .block:hover .moodboard-actions,
 .block:focus-within .moodboard-actions,
-.block:hover > .section-head > .menu-wrap,
-.block:focus-within > .section-head > .menu-wrap { opacity: 1; }
+.block:hover > .section-head > .block-actions,
+.block:focus-within > .section-head > .block-actions { opacity: 1; }
+/* A block's fold button and ⋯ menu, side by side at the end of its head. */
+.block-actions { display: inline-flex; align-items: center; gap: 8px; }
 /* Structural blocks (heading / divider) reveal their ⋯ the same way. */
 .block-structural .menu-wrap { opacity: 0; transition: opacity .12s; }
 .block-structural:hover .menu-wrap,
@@ -2053,13 +2056,15 @@ img { max-width: 100%; display: block; }
    they can be found; hovering the block brings them to full strength. */
 @media (hover: hover) {
   .block .moodboard-actions,
-    .block > .section-head > .menu-wrap,
+    .block > .section-head > .block-actions,
     .block-structural .menu-wrap { opacity: .4; }
 }
 /* Touch screens have no hover: show every control that was hover-revealed. */
 @media (hover: none) {
-  .frame-del, .media-fs, .logo-stage .media-fs, .card-remove, .rend-edit-x, .masonry-menu, .plan-banner-actions, .dash-hero .plan-banner-actions, .block-divider .icon-btn, .block .moodboard-actions, .block > .section-head > .menu-wrap, .block-structural .menu-wrap { opacity: 1; }
+  .frame-del, .media-fs, .logo-stage .media-fs, .card-remove, .rend-edit-x, .masonry-menu, .dash-hero .plan-banner-actions, .block-divider .icon-btn, .block .moodboard-actions, .block > .section-head > .block-actions, .block-structural .menu-wrap { opacity: 1; }
   .tag .x, .tagchip button, .color-swatch .del { opacity: .9; }
+  /* A project's banner buttons would sit on it all the time: its Edit menu has them (Change banner…). */
+  .plan-banner > .plan-banner-actions { display: none; }
   /* No sticky hover-zoom after tapping a card. */
   .card:hover .card-thumb img { transform: none; }
   /* The avatar's full "change" overlay would hide the image — show a small badge instead. */
@@ -2258,9 +2263,6 @@ img { max-width: 100%; display: block; }
 }
 .shot.dragover { border-color: var(--accent); }
 @media (max-width: 640px) {
-  /* Block headers: the buttons wrap under the title instead of pushing the page wider */
-  .block > .section-head { flex-wrap: wrap; row-gap: 8px; }
-  .block > .section-head > .moodboard-actions { flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
   .shot { padding: 6px; }
 }
 /* Animatic player */
@@ -2559,6 +2561,30 @@ img { max-width: 100%; display: block; }
 @media (min-width: 900px) {
   .block-duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 22px; align-items: start; margin-top: 30px; }
   .block-duo + .block-row { margin-top: 26px; }
+}
+/* Narrow block heads — every block on a phone, a half-width one beside
+   another: the title with fold and ⋯ on the first line, the block's own
+   buttons (Add images, Copy, Add row …) together on a line below. */
+@media (max-width: 640px) {
+  .block > :is(.section-head, .moodboard-head) { flex-wrap: wrap; justify-content: flex-start; row-gap: 10px; column-gap: 8px; }
+  .block > .section-head > h2, .block > .moodboard-head > .mb-collapse { flex: 1 1 0; min-width: 0; }
+  .block > :is(.section-head, .moodboard-head) > .moodboard-actions { display: contents; }
+  .block > :is(.section-head, .moodboard-head) .block-actions { order: 1; margin-left: auto; }
+  .block > :is(.section-head, .moodboard-head):has(> .moodboard-actions > :not(.block-actions))::after { content: ''; flex-basis: 100%; order: 2; }
+  .block > :is(.section-head, .moodboard-head) > .moodboard-actions > :not(.block-actions) { order: 3; }
+}
+@media (min-width: 900px) and (hover: hover) {
+  /* …faint until you point at the block, like the others */
+  .block-duo .block > :is(.section-head, .moodboard-head) > .moodboard-actions > * { opacity: .4; transition: opacity .12s; }
+  .block-duo .block:is(:hover, :focus-within) > :is(.section-head, .moodboard-head) > .moodboard-actions > * { opacity: 1; }
+}
+@media (min-width: 900px) {
+  .block-duo .block > :is(.section-head, .moodboard-head) { flex-wrap: wrap; justify-content: flex-start; row-gap: 10px; column-gap: 8px; }
+  .block-duo .block > .section-head > h2, .block-duo .block > .moodboard-head > .mb-collapse { flex: 1 1 0; min-width: 0; }
+  .block-duo .block > :is(.section-head, .moodboard-head) > .moodboard-actions { display: contents; }
+  .block-duo .block > :is(.section-head, .moodboard-head) .block-actions { order: 1; margin-left: auto; }
+  .block-duo .block > :is(.section-head, .moodboard-head):has(> .moodboard-actions > :not(.block-actions))::after { content: ''; flex-basis: 100%; order: 2; }
+  .block-duo .block > :is(.section-head, .moodboard-head) > .moodboard-actions > :not(.block-actions) { order: 3; }
 }
 .sort-dragging { position: relative; z-index: 20; opacity: .92; box-shadow: 0 18px 50px rgba(0, 0, 0, .55); cursor: grabbing; transition: none !important; pointer-events: none; }
 .sort-before { box-shadow: -4px 0 0 var(--accent) !important; }
