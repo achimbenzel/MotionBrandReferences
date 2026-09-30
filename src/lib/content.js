@@ -1,4 +1,7 @@
 // Content planning: the platforms, formats and stages a post goes through.
+import { dayKey, fmtDay, addDays } from './dates.js';
+
+export { dayKey, fmtDay, addDays };
 
 export const PLATFORMS = {
   instagram: { label: 'Instagram', color: '#e1306c', caption: 2200, hashtags: 30, tip: '3–5 focused hashtags work best; max. 30' },
@@ -40,12 +43,6 @@ export const fullText = (c) => [c.caption?.trim(), hashtagsOf(c.hashtags).join('
 // X counts characters differently from JS (emoji = 2, links = 23) — close enough here: code points.
 export const charCount = (s) => [...String(s || '')].length;
 
-export const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-export const fmtDay = (iso, opts = { weekday: 'short', day: 'numeric', month: 'short' }) => {
-  if (!iso) return '';
-  const [y, m, d] = iso.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, opts);
-};
 export const fmtNum = (n) => (n == null ? '—' : n >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e7 ? 0 : 1)}M` : n >= 1e4 ? `${Math.round(n / 1e3)}K` : n.toLocaleString());
 
 // ---- Per platform: its own text, else caption + hashtags ----------------------
@@ -119,7 +116,6 @@ export const PILLAR_IDEAS = ['Breakdowns', 'Behind the scenes', 'Client work', '
 export const pillarOf = (pillars, id) => (id ? (pillars || []).find((p) => p.id === id) || null : null);
 export const WEEKDAY_LONG = Array.from({ length: 7 }, (_, i) => new Date(2024, 0, 1 + i).toLocaleDateString(undefined, { weekday: 'long' })); // Monday first
 export const weekdayOf = (iso) => { const [y, m, d] = iso.split('-').map(Number); return (new Date(y, m - 1, d).getDay() + 6) % 7; };
-export const addDays = (iso, n) => { const [y, m, d] = iso.split('-').map(Number); return dayKey(new Date(y, m - 1, d + n)); };
 export const mondayOf = (iso) => addDays(iso, -weekdayOf(iso));
 
 /**

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { X, Download, FolderInput, Film, Image as ImageIcon } from 'lucide-react';
 import Range from './Range.jsx';
+import { getJSONPref, setJSONPref } from '../lib/prefs.js';
 
 const EXT = { png: 'png', jpg: 'jpg', webp: 'webp', mp4: 'mp4', webm: 'webm' };
 const MIME = { png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp', mp4: 'video/mp4', webm: 'video/webm' };
@@ -8,8 +9,6 @@ const FORMAT_LABEL = { png: 'PNG', jpg: 'JPG', webp: 'WebP', mp4: 'MP4', webm: '
 const clampInt = (v, a, b) => Math.min(b, Math.max(a, Math.round(Number(v) || a)));
 const slug = (s) => String(s || 'export').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'export';
 
-function load(key) { try { return JSON.parse(localStorage.getItem(key) || '{}'); } catch { return {}; } }
-function save(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* private mode */ } }
 
 /**
  * Export options, shared by the mockup editor and the Brand Tester: what to
@@ -24,7 +23,7 @@ function save(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } ca
  * `onExport(target, opts, { onProgress, signal })` → Blob.
  */
 export default function ExportDialog({ title = 'Export', targets, initial, storeKey, name: name0, onExport, onSaveToPlan, onClose }) {
-  const saved = useMemo(() => (storeKey ? load(storeKey) : {}), [storeKey]);
+  const saved = useMemo(() => (storeKey ? getJSONPref(storeKey, {}) : {}), [storeKey]);
   const [targetKey, setTargetKey] = useState(() => (targets.some((t) => t.key === (initial || saved.target)) ? (initial || saved.target) : targets[0].key));
   const target = targets.find((t) => t.key === targetKey) || targets[0];
   const mem = saved[target.key] || {};
@@ -84,7 +83,7 @@ export default function ExportDialog({ title = 'Export', targets, initial, store
     const ctrl = new AbortController();
     abort.current = ctrl;
     const o = { width, height, background: bg, color, format, mime: MIME[format], quality, fps, ...opts };
-    if (storeKey) save(storeKey, { ...saved, target: target.key, [target.key]: { sizeIdx, custom, bg, color, format, quality, fps, opts } });
+    if (storeKey) setJSONPref(storeKey, { ...saved, target: target.key, [target.key]: { sizeIdx, custom, bg, color, format, quality, fps, opts } });
     try {
       const blob = await onExport(target, o, { onProgress: setProgress, signal: ctrl.signal });
       if (!blob) throw new Error('Rendering failed');

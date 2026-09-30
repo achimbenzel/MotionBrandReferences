@@ -3,6 +3,7 @@
 // comes to (business part, private part, both), and what has to come in each
 // month to cover it (and pay you). Plain functions, used by the app and by
 // the server's Excel export alike.
+import { dayKey, addDays } from './dates.js';
 
 export const EXPENSE_CATEGORIES = [
   { key: 'software', label: 'Software & subscriptions', color: '#a78bfa' },
@@ -64,7 +65,7 @@ export const EXPENSE_IDEAS = [
 const pad = (n) => String(n).padStart(2, '0');
 const iso = (y, m, d) => `${y}-${pad(m)}-${pad(d)}`;
 export const isDayStr = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
-export const todayIso = () => { const d = new Date(); return iso(d.getFullYear(), d.getMonth() + 1, d.getDate()); };
+export const todayIso = () => dayKey();
 
 /** Every day `e` is paid between `from` and `to` (inclusive, yyyy-mm-dd) — the day of the month of its start, or the month's last. */
 export function paymentsIn(e, from, to) {
@@ -106,9 +107,7 @@ export function cancelBy(e, from = todayIso()) {
   if (!e.notice || e.interval === 'once') return '';
   const next = nextPayment(e, from);
   if (!next) return '';
-  const [y, m, d] = next.split('-').map(Number);
-  const t = new Date(y, m - 1, d - e.notice);
-  return iso(t.getFullYear(), t.getMonth() + 1, t.getDate());
+  return addDays(next, -e.notice);
 }
 
 /** Each month of a year: what's paid (all, the business part, the private rest) → [{ month: 1…12, all, business, private, items: [{ e, date }] }]. */

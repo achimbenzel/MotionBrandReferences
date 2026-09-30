@@ -1,5 +1,8 @@
 import { useSyncExternalStore } from 'react';
 import { api } from './api.js';
+import { dayKey } from './dates.js';
+
+export { dayKey };
 
 /**
  * The running time tracker, for the whole app (the sidebar shows it while it
@@ -17,8 +20,7 @@ function sync() {
   if (!state.running && tick) { clearInterval(tick); tick = 0; }
 }
 const pad = (n) => String(n).padStart(2, '0');
-/** Local yyyy-mm-dd and HH:MM of a time. */
-export const dayKey = (t = new Date()) => { const d = new Date(t); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+/** Local HH:MM of a time (its day: dayKey). */
 export const hhmm = (t = new Date()) => { const d = new Date(t); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 export const fmtElapsed = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 3600)}:${pad(Math.floor(s / 60) % 60)}:${pad(s % 60)}`; };
 /** 5 min, 1 h 05 */

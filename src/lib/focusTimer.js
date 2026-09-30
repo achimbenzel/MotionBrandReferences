@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { api } from './api.js';
+import { getJSONPref, setJSONPref } from './prefs.js';
 
 /**
  * The focus timer (Pomodoro): one for the whole app, so it keeps running when
@@ -22,7 +23,7 @@ export const validMinutes = (m) => Number.isInteger(m) && m >= 1 && m <= MAX_MIN
 
 function load() {
   try {
-    const s = JSON.parse(localStorage.getItem(KEY) || 'null');
+    const s = getJSONPref(KEY, null);
     if (!s || !TIMER_MODES[s.mode]) return { ...DEFAULT };
     const st = { ...DEFAULT, ...s };
     st.customs = Object.fromEntries(Object.keys(TIMER_MODES).map((k) => [k, (Array.isArray(s.customs?.[k]) ? s.customs[k] : []).filter(validMinutes).slice(0, MAX_CUSTOM)]));
@@ -35,7 +36,7 @@ const subs = new Set();
 let tick = 0;
 let baseTitle = null;
 
-const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* private mode */ } };
+const persist = () => setJSONPref(KEY, state);
 const set = (patch) => { state = { ...state, ...patch }; persist(); subs.forEach((f) => f()); sync(); };
 
 /** Seconds left right now. */

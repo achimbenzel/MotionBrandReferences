@@ -5,6 +5,7 @@ import {
   FORMATS, WEEKDAY_LONG, fmtNum, fmtDay, weekdayOf, mondayOf, addDays, goalOf, pillarOf,
 } from '../../lib/content.js';
 import PostCover from './PostCover.jsx';
+import { usePref } from '../../lib/prefs.js';
 
 const PERIODS = [
   { key: '30', label: '30 days', days: 30 },
@@ -18,8 +19,6 @@ const SORTS = [
   { key: 'saves', label: 'Saves', icon: Bookmark },
   { key: 'follows', label: 'Follows', icon: UserPlus },
 ];
-const load = (k, f) => { try { return localStorage.getItem(k) || f; } catch { return f; } };
-const save = (k, v) => { try { localStorage.setItem(k, v); } catch { /* private window */ } };
 
 /** Likes, comments, shares and saves per view (null without views). */
 export const rateOf = (c) => {
@@ -67,10 +66,9 @@ function groupBy(posts, keyOf) {
  * format, weekday, time of day and length, with what stands out.
  */
 export default function Insights({ items, all, pillars, rhythm, today, onOpen }) {
-  const [period, setPeriodState] = useState(() => (PERIODS.some((p) => p.key === load('contentInsights', '')) ? load('contentInsights', '') : '90'));
+  const [period, setPeriod] = usePref('contentInsights', '90', (v) => PERIODS.some((p) => p.key === v));
   const [sort, setSort] = useState('views');
   const [by, setBy] = useState('views'); // what the bars compare
-  const setPeriod = (p) => { setPeriodState(p); save('contentInsights', p); };
   const days = PERIODS.find((p) => p.key === period).days;
   const from = days ? addDays(today, -days + 1) : '';
   const prevFrom = days ? addDays(today, -days * 2 + 1) : '';

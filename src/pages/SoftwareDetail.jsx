@@ -14,6 +14,7 @@ import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
 import MediaPicker from '../components/mockups/MediaPicker.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
+import { usePref } from '../lib/prefs.js';
 import '../styles/software.css';
 
 const rid = () => Math.random().toString(36).slice(2, 10);
@@ -61,11 +62,7 @@ export default function SoftwareDetail() {
   const softRef = useRef(null); softRef.current = soft;
   // Plugins as cards (with preview images) or as a compact list — remembered
   // per browser; phones default to the list.
-  const [pluginView, setPluginViewState] = useState(() => {
-    try { const v = localStorage.getItem('pluginView'); if (v === 'list' || v === 'cards') return v; } catch { /* ignore */ }
-    return window.matchMedia?.(PHONE).matches ? 'list' : 'cards';
-  });
-  const setPluginView = (v) => { setPluginViewState(v); try { localStorage.setItem('pluginView', v); } catch { /* ignore */ } };
+  const [pluginView, setPluginView] = usePref('pluginView', () => (window.matchMedia?.(PHONE).matches ? 'list' : 'cards'), (v) => v === 'list' || v === 'cards');
   const pending = useRef({});
   const saver = useSaver();
   const bannerRef = useRef(null);

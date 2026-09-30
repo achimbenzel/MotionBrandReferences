@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { fmtMoney } from '../lib/clients.js';
+import { addDays, fmtDay as fmtDate } from '../lib/dates.js';
 import { useSaver } from '../lib/autosave.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
@@ -13,13 +14,11 @@ import {
   EXPENSE_CATEGORIES, EXPENSE_IDEAS, INTERVALS, categoryOf, intervalOf, paymentsIn, yearOf, monthlyOf, nextPayment, cancelBy, monthsOf,
   targetFor, isActive, todayIso, VIEWS, partOf, inView, incomeMonthsOf, incomeNow, INCOME_INTERVALS,
 } from '../lib/expenses.js';
+import { usePref } from '../lib/prefs.js';
 import '../styles/expenses.css';
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => new Date(2024, i, 1).toLocaleDateString(undefined, { month: 'short' }));
-const fmtDay = (iso, opts = { day: 'numeric', month: 'short' }) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString(undefined, opts); };
-const addDays = (iso, n) => { const [y, m, d] = iso.split('-').map(Number); const t = new Date(y, m - 1, d + n); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; };
-const load = (k, f) => { try { return localStorage.getItem(k) || f; } catch { return f; } };
-const save = (k, v) => { try { localStorage.setItem(k, v); } catch { /* private window */ } };
+const fmtDay = (iso, opts = { day: 'numeric', month: 'short' }) => fmtDate(iso, opts);
 const AHEAD = 45; // days of "coming up"
 const VIEW_WORD = { business: 'business', private: 'private', both: 'business + private' };
 const TARGET_WORD = { business: 'business', private: 'private', both: 'all' };
@@ -43,11 +42,9 @@ export default function ExpensesPage({ reloadKey }) {
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [editing, setEditing] = useState(null); // id | 'new'
   const [editingIncome, setEditingIncome] = useState(null); // id | 'new'
-  const [show, setShowState] = useState(() => load('exShow', 'active')); // active | ended | all
+  const [show, setShow] = usePref('exShow', 'active'); // active | ended | all
   const [q, setQ] = useState('');
-  const setShow = (v) => { setShowState(v); save('exShow', v); };
-  const [view, setViewState] = useState(() => { const v = load('exView', 'business'); return VIEWS.some((x) => x.key === v) ? v : 'business'; });
-  const setView = (v) => { setViewState(v); save('exView', v); };
+  const [view, setView] = usePref('exView', 'business', (v) => VIEWS.some((x) => x.key === v));
 
   useEffect(() => {
     let alive = true;

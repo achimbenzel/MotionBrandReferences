@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { X, Printer } from 'lucide-react';
 import { fmtClock, fmtDur } from '../../lib/timing.js';
 import { ratioOf, timing, sectionLabel, shotStatus } from '../../lib/storyboard.js';
+import { getBoolPref, setBoolPref, getJSONPref, setJSONPref } from '../../lib/prefs.js';
 
 // Panels per page by frame shape: [columns, rows, side] for "large" and
 // "compact". `side`: frame on the left, the texts next to it (one shot a row).
@@ -73,11 +74,8 @@ function Pages({ plan, block, shots, fileUrl, perPage, cols, rows, side, show, f
 export default function PrintSheet({ plan, block, fileUrl, onClose }) {
   const shots = block.shots || [];
   const ratio = ratioOf(block.aspect);
-  const [compact, setCompact] = useState(() => { try { return localStorage.getItem('sbPrintCompact') === '1'; } catch { return false; } });
-  const [show, setShow] = useState(() => {
-    try { return { vo: true, onscreen: true, camera: true, sfx: false, notes: false, status: false, ...JSON.parse(localStorage.getItem('sbPrintFields') || '{}') }; }
-    catch { return { vo: true, onscreen: true, camera: true, sfx: false, notes: false, status: false }; }
-  });
+  const [compact, setCompact] = useState(() => getBoolPref('sbPrintCompact'));
+  const [show, setShow] = useState(() => ({ vo: true, onscreen: true, camera: true, sfx: false, notes: false, status: false, ...getJSONPref('sbPrintFields', {}) }));
   const [busy, setBusy] = useState(false);
   const rootRef = useRef(null);
   const previewRef = useRef(null);
@@ -86,7 +84,7 @@ export default function PrintSheet({ plan, block, fileUrl, onClose }) {
   const perPage = cols * rows;
 
   useEffect(() => {
-    try { localStorage.setItem('sbPrintCompact', compact ? '1' : '0'); localStorage.setItem('sbPrintFields', JSON.stringify(show)); } catch { /* ignore */ }
+    setBoolPref('sbPrintCompact', compact); setJSONPref('sbPrintFields', show);
   }, [compact, show]);
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape' && !busy) onClose(); };

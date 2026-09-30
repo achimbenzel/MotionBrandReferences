@@ -8,15 +8,16 @@ import { api } from '../lib/api.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
 import { useTimeTracker, tracker, fmtElapsed, fmtPause, segmentsOf, dayKey, hhmm } from '../lib/timeTracker.js';
+import { dateOf, fmtDay as fmtDate } from '../lib/dates.js';
 import { whoOf, entryLabel } from '../lib/clients.js';
+import { getPref, setPref } from '../lib/prefs.js';
 import '../styles/time.css';
 
 const OTHER = '__other__';
 const minutesOf = (e) => { const t = (x) => { const [h, m] = x.split(':').map(Number); return h * 60 + m; }; return (t(e.end) - t(e.start) + 1440) % 1440; };
 const fmtH = (min) => `${(min / 60).toFixed(2)} h`;
 const fmtHM = (min) => `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}`;
-const dateOf = (iso) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d); };
-const fmtDay = (iso) => dateOf(iso).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: dateOf(iso).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
+const fmtDay = (iso) => fmtDate(iso, { weekday: 'short', day: 'numeric', month: 'short', year: dateOf(iso)?.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
 
 // The periods to look at.
 function periodRange(key, custom) {
@@ -104,10 +105,10 @@ function EntryEditor({ initial, plans, clients, activities, onSave, onCancel }) 
 
 /** The export: which period (from the filters), language, look. */
 function ExportDialog({ query, count, scope, onClose }) {
-  const [lang, setLang] = useState(() => { try { return localStorage.getItem('ttExportLang') || 'de'; } catch { return 'de'; } });
-  const [style, setStyle] = useState(() => { try { return localStorage.getItem('ttExportStyle') || 'app'; } catch { return 'app'; } });
+  const [lang, setLang] = useState(() => getPref('ttExportLang', 'de'));
+  const [style, setStyle] = useState(() => getPref('ttExportStyle', 'app'));
   const url = api.timeExportUrl({ ...query, lang, style });
-  const keep = () => { try { localStorage.setItem('ttExportLang', lang); localStorage.setItem('ttExportStyle', style); } catch { /* ignore */ } };
+  const keep = () => { setPref('ttExportLang', lang); setPref('ttExportStyle', style); };
   return (
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal tt-export" role="dialog" aria-modal="true" aria-label="Export as Excel">
@@ -152,7 +153,7 @@ export default function TimeTracker() {
   const [entries, setEntries] = useState(null);
   const [plans, setPlans] = useState([]);
   const [clients, setClients] = useState([]);
-  const [period, setPeriod] = useState(() => { try { return localStorage.getItem('ttPeriod') || 'week'; } catch { return 'week'; } });
+  const [period, setPeriod] = useState(() => getPref('ttPeriod', 'week'));
   const [custom, setCustom] = useState({ from: '', to: '' });
   const [planF, setPlanF] = useState(params.get('plan') || '');
   const [clientF, setClientF] = useState(params.get('client') || '');
@@ -168,7 +169,7 @@ export default function TimeTracker() {
     api.listClients().then(setClients).catch(() => {});
   }, [toast]);
   useEffect(() => { if (params.get('plan') || params.get('client')) setParams({}, { replace: true }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { try { localStorage.setItem('ttPeriod', period); } catch { /* ignore */ } }, [period]);
+  useEffect(() => { setPref('ttPeriod', period); }, [period]);
   // While it runs, the tracker's own fields are the draft.
   useEffect(() => {
     if (t.running) setDraft({ planId: t.running.planId, clientId: t.running.clientId || null, project: t.running.project, activity: t.running.activity, details: t.running.details });

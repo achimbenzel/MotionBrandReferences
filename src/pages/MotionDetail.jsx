@@ -14,6 +14,7 @@ import SegmentTimeline from '../components/SegmentTimeline.jsx';
 import EmbedPlayer from '../components/EmbedPlayer.jsx';
 import { PROVIDER_LABEL } from '../lib/videoLinks.js';
 import MomentsPanel from '../components/MomentsPanel.jsx';
+import { getPref, setPref, getBoolPref, setBoolPref } from '../lib/prefs.js';
 
 const rid = () => Math.random().toString(36).slice(2, 8);
 const RATES = [0.25, 0.5, 1, 2];
@@ -55,14 +56,12 @@ export default function MotionDetail({ project, setProject }) {
   // Remember the player volume across reloads (a global per-viewer preference).
   useEffect(() => {
     const v = videoRef.current; if (!(v instanceof HTMLMediaElement)) return; // an embed keeps its own volume
-    try {
-      const vol = parseFloat(localStorage.getItem('videoVolume'));
-      if (Number.isFinite(vol)) v.volume = Math.min(1, Math.max(0, vol));
-      v.muted = localStorage.getItem('videoMuted') === '1';
-    } catch { /* ignore */ }
+    const vol = parseFloat(getPref('videoVolume'));
+    if (Number.isFinite(vol)) v.volume = Math.min(1, Math.max(0, vol));
+    v.muted = getBoolPref('videoMuted');
   }, [project.id]);
   const saveVolume = (e) => {
-    try { localStorage.setItem('videoVolume', String(e.target.volume)); localStorage.setItem('videoMuted', e.target.muted ? '1' : '0'); } catch { /* ignore */ }
+    setPref('videoVolume', e.target.volume); setBoolPref('videoMuted', e.target.muted);
   };
 
   // YouTube-style frame stepping: when the video is paused, "," and "." step

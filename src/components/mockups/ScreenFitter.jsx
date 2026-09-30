@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { X, Maximize, Minimize, Crosshair, RotateCcw, Grid3x3 } from 'lucide-react';
 import { contentBox } from '../../lib/mockup3d/fit.js';
 import Range from '../Range.jsx';
+import { getPref, setPref, usePref } from '../../lib/prefs.js';
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const round = (v, d = 4) => Math.round(v * 10 ** d) / 10 ** d;
@@ -68,10 +69,9 @@ function viewGuide(guide, aspect, q, widthPx) {
 export default function ScreenFitter({ info, src, kind, fit: fit0, adjust: adj0, onChange, onClose, title = 'Position & size on the screen' }) {
   const [fit, setFit] = useState(fit0 || 'cover');
   const [adj, setAdj] = useState(() => ({ scale: 1, x: 0, y: 0, ...adj0 }));
-  const [grid, setGrid] = useState(() => { try { return localStorage.getItem('mkFitterGrid') || 'thirds'; } catch { return 'thirds'; } });
+  const [grid, setGrid] = useState(() => getPref('mkFitterGrid', 'thirds'));
   const [showSafe, setShowSafe] = useState(true);
-  const [backdrop, setBackdropState] = useState(() => { try { return localStorage.getItem('mkFitterBackdrop') || 'checker'; } catch { return 'checker'; } });
-  const setBackdrop = (b) => { setBackdropState(b); try { localStorage.setItem('mkFitterBackdrop', b); } catch { /* only remembered for this visit */ } };
+  const [backdrop, setBackdrop] = usePref('mkFitterBackdrop', 'checker');
   const [snapped, setSnapped] = useState({ x: null, y: null });
   const [natural, setNatural] = useState(info?.contentAspect || null);
   const [box, setBox] = useState({ w: 0, h: 0 });
@@ -85,7 +85,7 @@ export default function ScreenFitter({ info, src, kind, fit: fit0, adjust: adj0,
   const base = useMemo(() => contentBox({ screenAspect: aspect, contentAspect: cAspect, turn: q, fit }), [aspect, cAspect, q, fit]);
   const view = base.viewAspect;
 
-  useEffect(() => { try { localStorage.setItem('mkFitterGrid', grid); } catch { /* private mode */ } }, [grid]);
+  useEffect(() => { setPref('mkFitterGrid', grid); }, [grid]);
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);

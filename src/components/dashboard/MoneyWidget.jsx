@@ -3,13 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { Wallet, ArrowRight, BellRing, Target, CalendarClock, Repeat } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { fmtMoney } from '../../lib/clients.js';
+import { addDays, fmtDay } from '../../lib/dates.js';
 import { monthsOf, yearOf, targetFor, paymentsIn, cancelBy, todayIso, inView, partOf, incomeNow, VIEWS } from '../../lib/expenses.js';
+import { getPref } from '../../lib/prefs.js';
 
-const fmtDay = (iso) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }); };
 // The same view as the switch on the Expenses page (business, private or both).
-const viewOf = () => { try { const v = localStorage.getItem('exView'); return VIEWS.some((x) => x.key === v) ? v : 'business'; } catch { return 'business'; } };
+const viewOf = () => { const v = getPref('exView'); return VIEWS.some((x) => x.key === v) ? v : 'business'; };
 const WORD = { business: 'business', private: 'private', both: 'all' };
-const plusDays = (iso, n) => { const [y, m, d] = iso.split('-').map(Number); const t = new Date(y, m - 1, d + n); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; };
 
 /**
  * Money on the dashboard: what this month has to bring in (costs, your pay,
@@ -70,7 +70,7 @@ export default function MoneyWidget({ reloadKey, compact = false }) {
   const lastDay = new Date(year, m, 0).getDate();
   const daysLeft = lastDay - Number(today.slice(8, 10));
 
-  const until = plusDays(today, 30);
+  const until = addDays(today, 30);
   const next = [
     ...list.map((e) => ({ kind: 'cancel', e, date: cancelBy(e, today) })).filter((x) => x.date && x.date >= today && x.date <= until),
     ...list.flatMap((e) => paymentsIn(e, today, until).map((date) => ({ kind: 'pay', e, date }))),

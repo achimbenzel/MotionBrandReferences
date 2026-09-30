@@ -7,10 +7,9 @@ import { isTouch } from '../../lib/useMedia.js';
 import { PLATFORMS, textFor, threadParts, clipOf, coverOf, fmtDay, fmtNum, charCount } from '../../lib/content.js';
 import { AutoCover } from './PostCover.jsx';
 import PlatformIcon from './PlatformIcon.jsx';
+import { getBoolPref, setBoolPref } from '../../lib/prefs.js';
 
 const PREVIEWABLE = ['instagram', 'tiktok', 'x'];
-const load = (k) => { try { return localStorage.getItem(k) === '1'; } catch { return false; } };
-const save = (k, v) => { try { localStorage.setItem(k, v ? '1' : '0'); } catch { /* private window */ } };
 
 // Hashtags, @mentions and links in the platform's link colour.
 const RICH = /(#[\p{L}\p{N}_]+|@[\w.]+|https?:\/\/\S+)/gu;
@@ -188,7 +187,7 @@ export default function PostPreview({ c, profile, onProfile, platform, onPlatfor
   const tabs = PREVIEWABLE.filter((p) => c.platforms.includes(p));
   const list = tabs.length ? tabs : PREVIEWABLE;
   const tab = list.includes(platform) ? platform : list[0];
-  const [safe, setSafe] = useState(() => load('contentSafe'));
+  const [safe, setSafe] = useState(() => getBoolPref('contentSafe'));
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(profile);
   useEffect(() => { if (!editing) setDraft(profile); }, [profile, editing]);
@@ -205,7 +204,7 @@ export default function PostPreview({ c, profile, onProfile, platform, onPlatfor
           </button>
         ))}
         {(kind === 'reel' || kind === 'tiktok') && (
-          <button type="button" className={`pv-safe-btn ${safe ? 'on' : ''}`} onClick={() => { setSafe(!safe); save('contentSafe', !safe); }} aria-pressed={safe} title="Show what the app's buttons and text cover">
+          <button type="button" className={`pv-safe-btn ${safe ? 'on' : ''}`} onClick={() => { setSafe(!safe); setBoolPref('contentSafe', !safe); }} aria-pressed={safe} title="Show what the app's buttons and text cover">
             <ScanLine size={14} /> Safe zone
           </button>
         )}

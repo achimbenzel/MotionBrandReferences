@@ -4,6 +4,7 @@ import { api } from '../lib/api.js';
 import { isTouch } from '../lib/useMedia.js';
 import { useConfirm } from './ConfirmDialog.jsx';
 import { useToast } from './Toast.jsx';
+import { getPref, setPref } from '../lib/prefs.js';
 
 const BLANK = '';
 const NEW_CLIENT = '__new__';
@@ -18,7 +19,7 @@ export default function NewPlanModal({ clientId: initialClient = '', onClose, on
   const toast = useToast();
   const [dialog, ask] = useConfirm();
   const [templates, setTemplates] = useState(null);
-  const [choice, setChoice] = useState(() => { try { return localStorage.getItem(LAST_KEY) || BLANK; } catch { return BLANK; } });
+  const [choice, setChoice] = useState(() => getPref(LAST_KEY, BLANK));
   const [name, setName] = useState('');
   const [clients, setClients] = useState([]);
   const [clientId, setClientId] = useState(initialClient || '');
@@ -50,7 +51,7 @@ export default function NewPlanModal({ clientId: initialClient = '', onClose, on
         name: name.trim() || undefined, template: choice || undefined,
         ...(clientId === NEW_CLIENT ? { client: newClient.trim() } : { clientId: clientId || null }),
       });
-      try { localStorage.setItem(LAST_KEY, choice); } catch { /* ignore */ }
+      setPref(LAST_KEY, choice);
       onCreated(plan);
     } catch (e) {
       toast(`Could not create the project: ${e.message}`, 'error');

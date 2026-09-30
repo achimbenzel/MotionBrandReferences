@@ -20,6 +20,7 @@ import PlatformIcon from '../components/content/PlatformIcon.jsx';
 import PostCover, { AutoCover } from '../components/content/PostCover.jsx';
 import { XPost } from '../components/content/PostPreview.jsx';
 import useContentSettings, { useContentProfile } from '../components/content/useContentSettings.js';
+import { getPref, setPref, usePref } from '../lib/prefs.js';
 import '../styles/content.css';
 
 const VIEWS = [
@@ -29,8 +30,6 @@ const VIEWS = [
   { key: 'list', label: 'List', icon: List },
   { key: 'insights', label: 'Insights', icon: BarChart3 },
 ];
-const load = (k, fallback) => { try { return localStorage.getItem(k) || fallback; } catch { return fallback; } };
-const save = (k, v) => { try { localStorage.setItem(k, v); } catch { /* private window */ } };
 const WEEKDAYS = Array.from({ length: 7 }, (_, i) => new Date(2024, 0, 1 + i).toLocaleDateString(undefined, { weekday: 'short' })); // 1 Jan 2024 was a Monday
 const POSTED_SHOWN = 12;
 // Your pillars and rhythm, for every view on the page.
@@ -63,21 +62,18 @@ export default function ContentPage({ reloadKey }) {
   const toast = useToast();
   const [items, setItems] = useState(null);
   const [error, setError] = useState(null);
-  const [view, setViewState] = useState(() => (VIEWS.some((v) => v.key === load('contentView', '')) ? load('contentView', '') : 'feed'));
-  const [platform, setPlatformState] = useState(() => (PLATFORMS[load('contentPlatform', '')] ? load('contentPlatform', '') : ''));
+  const [view, setView] = usePref('contentView', 'feed', (v) => VIEWS.some((x) => x.key === v));
+  const [platform, setPlatform] = usePref('contentPlatform', '', (v) => !!PLATFORMS[v]);
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
   const [changed, setChanged] = useState(0);
   const [profile] = useContentProfile();
   const [cs] = useContentSettings();
-  const [pillar, setPillarState] = useState(() => load('contentPillar', ''));
+  const [pillar, setPillar] = usePref('contentPillar', '');
   const [planOpen, setPlanOpen] = useState(false);
   const [fromKind, setFromKind] = useState(null);
   const [libOpen, setLibOpen] = useState(false);
   const plan = useMemo(() => ({ pillars: cs.contentPillars, rhythm: cs.contentRhythm }), [cs.contentPillars, cs.contentRhythm]);
-  const setPillar = (p) => { setPillarState(p); save('contentPillar', p); };
-  const setView = (v) => { setViewState(v); save('contentView', v); };
-  const setPlatform = (p) => { setPlatformState(p); save('contentPlatform', p); };
 
   useEffect(() => {
     const on = () => setChanged((n) => n + 1);
@@ -294,8 +290,8 @@ function Feed({ items, all, platform, today, profile, onOpen, onMove, onSwap, on
   const { pillars, rhythm } = useContext(PlanCtx);
   const [dragging, setDragging] = useState(null);
   const [over, setOver] = useState(null);
-  const [clean, setCleanState] = useState(() => load('contentFeedClean', '') === '1');
-  const setClean = (v) => { setCleanState(v); save('contentFeedClean', v ? '1' : ''); };
+  const [clean, setCleanState] = useState(() => getPref('contentFeedClean') === '1');
+  const setClean = (v) => { setCleanState(v); setPref('contentFeedClean', v ? '1' : ''); };
   if (platform === 'x') return <XTimeline items={items} today={today} profile={profile} onOpen={onOpen} />;
 
   const inGrid = items.filter((c) => !NOT_IN_GRID.includes(c.format));

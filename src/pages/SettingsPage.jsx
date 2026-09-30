@@ -9,6 +9,7 @@ import Range from '../components/Range.jsx';
 import { edgeLabel } from '../components/ImageUploadPrompt.jsx';
 import StoredPicturesDialog from '../components/StoredPicturesDialog.jsx';
 import { FORMATS, EDGES, IMAGE_DEFAULTS } from '../lib/imageOptimize.js';
+import { getPref, setPref } from '../lib/prefs.js';
 import '../styles/settings.css';
 
 const K = (s) => <kbd className="sc-key" key={s}>{s}</kbd>;
@@ -57,9 +58,7 @@ const GROUPS = [
 
 export default function SettingsPage() {
   const toast = useToast();
-  const [vol, setVol] = useState(() => {
-    try { const v = parseFloat(localStorage.getItem('videoVolume')); return Number.isFinite(v) ? v : null; } catch { return null; }
-  });
+  const [vol, setVol] = useState(() => { const v = parseFloat(getPref('videoVolume')); return Number.isFinite(v) ? v : null; });
 
   // The currency hourly rates and invoice amounts are in (stored with the library).
   const [currency, setCurrency] = useState(null);
@@ -86,7 +85,7 @@ export default function SettingsPage() {
   };
 
   const resetVolume = () => {
-    try { localStorage.removeItem('videoVolume'); localStorage.removeItem('videoMuted'); } catch { /* ignore */ }
+    setPref('videoVolume', null); setPref('videoMuted', null);
     setVol(null);
     toast('Remembered volume reset');
   };

@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { Crosshair, Plus, X, Check, Search, ListTodo, PencilRuler, CornerDownLeft } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { useToast } from '../Toast.jsx';
+import { dayKey } from '../../lib/dates.js';
 
 const MAX = 5;
 const DONE_LIST = /^(done|erledigt|fertig|finished|complete(d)?)$/i;
-const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const undated = ({ doneOn: _done, ...rest }) => rest;
 const keyOf = (it) => (it.kind === 'card' ? `card:${it.id}` : `todo:${it.planId}:${it.blockId}:${it.itemId}`);
 
@@ -51,7 +51,7 @@ export default function FocusToday({ board, setBoard, plans, setPlans, settings,
   // Tidy up once everything is loaded: gone ones out, yesterday's ticked ones out, today's ticks dated.
   useEffect(() => {
     if (!ready || !items.length) return;
-    const today = todayKey();
+    const today = dayKey();
     const next = [];
     items.forEach((it, i) => {
       const r = rows[i];
@@ -72,7 +72,7 @@ export default function FocusToday({ board, setBoard, plans, setPlans, settings,
         const plan = await api.setTodoDone(r.it.planId, r.it.blockId, r.it.itemId, done);
         setPlans((ps) => ps.map((p) => (p.id === plan.id ? plan : p)));
       }
-      save(items.map((it) => (keyOf(it) === keyOf(r.it) ? (done ? { ...it, doneOn: todayKey() } : undated(it)) : it)));
+      save(items.map((it) => (keyOf(it) === keyOf(r.it) ? (done ? { ...it, doneOn: dayKey() } : undated(it)) : it)));
     } catch (e) { toast(`Could not update it: ${e.message}`, 'error'); }
   };
   const unpin = (r) => save(items.filter((it) => keyOf(it) !== keyOf(r.it)));

@@ -1,5 +1,6 @@
 // Achievements: rarities (and the XP each is worth), your rank, and the
 // numbers (yours to type in) an achievement can unlock by itself.
+import { fmtDay } from './dates.js';
 
 export const RARITIES = {
   stone: { label: 'Stone', xp: 10, color: '#8a8a92' },
@@ -78,8 +79,4 @@ export const progressOf = (a, metrics) => (a.achievedAt || !a.metric || !a.targe
 export const wouldUnlock = (list, metric, value) => list.filter((a) => !a.achievedAt && a.metric === metric && a.target != null && value >= a.target);
 /** The next milestone on a number (the smallest target not reached yet). */
 export const nextOn = (list, metric) => list.filter((a) => !a.achievedAt && a.metric === metric && a.target != null).sort((x, y) => x.target - y.target)[0] || null;
-export const fmtDate = (iso) => {
-  if (!iso) return '';
-  const [y, m, d] = iso.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric' });
-};
+export const fmtDate = (iso) => fmtDay(iso, { day: '2-digit', month: '2-digit', year: 'numeric' });

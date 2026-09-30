@@ -10,6 +10,7 @@ import { api, planFileUrl, dashboardFileUrl } from '../lib/api.js';
 import { gradientCss, PLAN_GRADIENTS, PLAN_STATUSES, TABS, tagColor } from '../lib/types.js';
 import Menu from '../components/Menu.jsx';
 import { upcomingBirthdays } from '../lib/clients.js';
+import { dayKey, dateOf, fmtDay } from '../lib/dates.js';
 import { useToast } from '../components/Toast.jsx';
 import MediaPicker from '../components/mockups/MediaPicker.jsx';
 import ActivityMap from '../components/dashboard/ActivityMap.jsx';
@@ -54,20 +55,13 @@ function layoutOf(saved) {
 }
 const DAY = 86400000;
 
-// A yyyy-mm-dd date as a local Date (midnight).
-function dateOf(iso) {
-  const [y, m, d] = String(iso || '').split('-').map(Number);
-  return y && m && d ? new Date(y, m - 1, d) : null;
-}
 const today0 = () => { const t = new Date(); t.setHours(0, 0, 0, 0); return t; };
-const isoOf = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
 // Days from today to a yyyy-mm-dd date (negative = past), in local time.
 function daysFromToday(iso) {
   const dt = dateOf(iso);
   return dt ? Math.round((dt - today0()) / DAY) : NaN;
 }
 const whenLabel = (n) => (n === 0 ? 'Today' : n === 1 ? 'Tomorrow' : n === -1 ? 'Yesterday' : n > 1 ? `In ${n} days` : `${-n} days ago`);
-const fmtDay = (iso) => dateOf(iso).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
 const DUE_AHEAD = 14; // days ahead shown under "Coming up"
 const DUE_BEHIND = 30; // overdue items stay this long
 const DONE_LIST = /^(done|erledigt|fertig|finished|complete(d)?)$/i;
@@ -223,8 +217,8 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
   const bdays = upcomingBirthdays(clients, 13, monday); // your clients' people's birthdays
   const days = Array.from({ length: 14 }, (_, i) => {
     const dt = new Date(monday); dt.setDate(monday.getDate() + i);
-    const iso = isoOf(dt);
-    return { iso, dt, items: allDue.filter((x) => x.date === iso), bdays: bdays.filter((b) => b.date === iso), past: dt < today0(), today: iso === isoOf(today0()) };
+    const iso = dayKey(dt);
+    return { iso, dt, items: allDue.filter((x) => x.date === iso), bdays: bdays.filter((b) => b.date === iso), past: dt < today0(), today: iso === dayKey(today0()) };
   });
 
   const hour = now.getHours();

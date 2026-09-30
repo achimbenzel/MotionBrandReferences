@@ -3,9 +3,8 @@ import { BookMarked, Search, Plus, Check, Sparkles } from 'lucide-react';
 import { IDEAS, IDEA_LANGS, SNIPPET_KINDS } from '../../lib/contentIdeas.js';
 import { useToast } from '../Toast.jsx';
 import useContentLibrary from './useContentLibrary.js';
+import { usePref } from '../../lib/prefs.js';
 
-const loadLang = () => { try { return localStorage.getItem('contentIdeaLang') || 'de'; } catch { return 'de'; } };
-const saveLang = (v) => { try { localStorage.setItem('contentIdeaLang', v); } catch { /* private window */ } };
 const norm = (s) => String(s || '').trim().toLowerCase();
 
 /**
@@ -18,7 +17,7 @@ export default function SnippetPicker({ kind, current = '', onPick, label = 'Lib
   const [items, lib] = useContentLibrary();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
-  const [lang, setLang] = useState(loadLang);
+  const [lang, setLang] = usePref('contentIdeaLang', 'de');
   const [naming, setNaming] = useState(null); // a hashtag set's name while saving it
   const wrap = useRef(null);
   useEffect(() => {
@@ -70,7 +69,7 @@ export default function SnippetPicker({ kind, current = '', onPick, label = 'Lib
               <Sparkles size={12} /> Ideas
               {kind !== 'hashtags' && (
                 <span className="snp-lang">
-                  {IDEA_LANGS.map((l) => <button key={l.key} type="button" className={lang === l.key ? 'on' : ''} onClick={() => { setLang(l.key); saveLang(l.key); }}>{l.label}</button>)}
+                  {IDEA_LANGS.map((l) => <button key={l.key} type="button" className={lang === l.key ? 'on' : ''} onClick={() => setLang(l.key)}>{l.label}</button>)}
                 </span>
               )}
             </div>

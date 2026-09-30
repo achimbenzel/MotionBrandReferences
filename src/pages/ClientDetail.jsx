@@ -20,6 +20,7 @@ import { useTimeTracker, tracker, dayKey } from '../lib/timeTracker.js';
 import {
   minutesOf, fmtHours, fmtMoney, amountOf, budgetMinutes, budgetState, budgetText, nextBirthday, turnsOn, useCurrency,
 } from '../lib/clients.js';
+import { getPref } from '../lib/prefs.js';
 import '../styles/clients.css';
 
 const rid = () => Math.random().toString(36).slice(2, 10);
@@ -127,9 +128,7 @@ export default function ClientDetail({ onNewPlan }) {
     },
   });
   const exportUrl = (() => {
-    let lang = 'de'; let style = 'app';
-    try { lang = localStorage.getItem('ttExportLang') || 'de'; style = localStorage.getItem('ttExportStyle') || 'app'; } catch { /* ignore */ }
-    return api.timeExportUrl({ client: id, lang, style });
+    return api.timeExportUrl({ client: id, lang: getPref('ttExportLang', 'de'), style: getPref('ttExportStyle', 'app') });
   })();
 
   // ---- what's coming up: milestones and deadlines of open projects, birthdays

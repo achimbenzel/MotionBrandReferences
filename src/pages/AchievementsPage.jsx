@@ -3,6 +3,7 @@ import { Plus, Trophy, Layers, ChevronDown, Swords, CalendarDays, Pencil, ArrowU
 import { api } from '../lib/api.js';
 import { RARITIES, RARITY_ORDER, xpOf, rankOf, fmtValue } from '../lib/achievements.js';
 import { isTouch } from '../lib/useMedia.js';
+import { dayKey } from '../lib/dates.js';
 import Menu from '../components/Menu.jsx';
 import { useToast } from '../components/Toast.jsx';
 import AchievementCard, { RankEmblem } from '../components/achievements/AchievementCard.jsx';
@@ -10,11 +11,10 @@ import AchievementEditor from '../components/achievements/AchievementEditor.jsx'
 import AchievementSeries from '../components/achievements/AchievementSeries.jsx';
 import AchievementStats from '../components/achievements/AchievementStats.jsx';
 import AchievementInspect from '../components/achievements/AchievementInspect.jsx';
+import { getPref, setPref, usePref } from '../lib/prefs.js';
 import '../styles/achievements.css';
 
 const FILTERS = [{ key: 'all', label: 'All' }, { key: 'got', label: 'Unlocked' }, { key: 'locked', label: 'To go' }];
-const load = (k, fallback) => { try { return localStorage.getItem(k) || fallback; } catch { return fallback; } };
-const store = (k, v) => { try { localStorage.setItem(k, v); } catch { /* private window */ } };
 const xpSum = (list) => list.reduce((n, a) => n + xpOf(a), 0);
 
 /**
@@ -27,22 +27,21 @@ export default function AchievementsPage({ reloadKey }) {
   const toast = useToast();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
-  const [filter, setFilterState] = useState(() => (FILTERS.some((x) => x.key === load('achFilter', '')) ? load('achFilter', '') : 'all'));
-  const [numbersOpen, setNumbersOpen] = useState(() => load('achNumbers', 'open') === 'open');
+  const [filter, setFilter] = usePref('achFilter', 'all', (v) => FILTERS.some((x) => x.key === v));
+  const [numbersOpen, setNumbersOpen] = useState(() => getPref('achNumbers', 'open') === 'open');
   const [editor, setEditor] = useState(null); // { a } | { group }
   const [series, setSeries] = useState(false);
   const [celebrate, setCelebrate] = useState(null); // { list, rankUp }
   const [glow, setGlow] = useState(() => new Set());
   // Edit on: a click opens the editor and every group has its "Add to …" tile.
   // Off: a click shows the card big (to turn round), and the collection stays just cards.
-  const [editMode, setEditModeState] = useState(() => load('achEdit', 'off') === 'on');
+  const [editMode, setEditModeState] = useState(() => getPref('achEdit', 'off') === 'on');
   const [inspect, setInspect] = useState(null); // an index into the cards shown
   const [dragging, setDragging] = useState(null); // an achievement id (Edit on: drag to reorder / move)
   const [dropAt, setDropAt] = useState(null);     // { group, before: id | null }
   const [renaming, setRenaming] = useState(null); // a group's name
-  const setEditMode = (on) => { setEditModeState(on); store('achEdit', on ? 'on' : 'off'); };
-  const setFilter = (v) => { setFilterState(v); store('achFilter', v); };
-  const toggleNumbers = () => setNumbersOpen((o) => { store('achNumbers', o ? 'closed' : 'open'); return !o; });
+  const setEditMode = (on) => { setEditModeState(on); setPref('achEdit', on ? 'on' : 'off'); };
+  const toggleNumbers = () => setNumbersOpen((o) => { setPref('achNumbers', o ? 'closed' : 'open'); return !o; });
 
   // Fresh data; newly unlocked ones get their moment (and a new rank, when there's one).
   const take = (d, unlocked = d.unlocked || []) => {
@@ -363,14 +362,13 @@ function Celebration({ list, rankUp, metrics, onClose, onDates }) {
   );
 }
 
-const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
 /** The day each one was really reached — one by one, or one day for all. */
 function UnlockDates({ list, onClose, onSave }) {
   const sorted = [...list].sort((a, b) => (a.metric === b.metric ? (a.target || 0) - (b.target || 0) : a.metric.localeCompare(b.metric)));
-  const [dates, setDates] = useState(() => Object.fromEntries(sorted.map((a) => [a.id, a.achievedAt || todayKey()])));
+  const [dates, setDates] = useState(() => Object.fromEntries(sorted.map((a) => [a.id, a.achievedAt || dayKey()])));
   const [busy, setBusy] = useState(false);
-  const max = todayKey();
+  const max = dayKey();
   const setAll = (v) => { if (v) setDates(Object.fromEntries(sorted.map((a) => [a.id, v]))); };
   // Reached in order: a later milestone can't be before an earlier one on the same number.
   const wrong = sorted.filter((a, i) => sorted.slice(0, i).some((b) => b.metric === a.metric && dates[b.id] > dates[a.id]));

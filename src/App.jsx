@@ -4,9 +4,6 @@ import { ToastProvider, useToast } from './components/Toast.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import MobileBar from './components/MobileBar.jsx';
 import Sidebar from './components/Sidebar.jsx';
-import UploadModal from './components/UploadModal.jsx';
-import NewPlanModal from './components/NewPlanModal.jsx';
-import CommandPalette from './components/CommandPalette.jsx';
 import { StorageProvider } from './components/StorageMeter.jsx';
 // The two landing pages load eagerly (shown first); everything else is split
 // into its own chunk so, e.g., the Brand Tester isn't downloaded just to browse
@@ -37,18 +34,22 @@ const NoteDetail = lazy(() => import('./pages/NoteDetail.jsx'));
 const ContentPage = lazy(() => import('./pages/ContentPage.jsx'));
 const ContentDetail = lazy(() => import('./pages/ContentDetail.jsx'));
 const AchievementsPage = lazy(() => import('./pages/AchievementsPage.jsx'));
+// Dialogs that open now and then load when first opened. (The picture-size
+// prompt stays: it has to be there before the first upload asks for it.)
+const UploadModal = lazy(() => import('./components/UploadModal.jsx'));
+const NewPlanModal = lazy(() => import('./components/NewPlanModal.jsx'));
+const CommandPalette = lazy(() => import('./components/CommandPalette.jsx'));
 import { TABS, isWorkPath, WORK_HOME } from './lib/types.js';
 import { useMediaQuery, DESKTOP } from './lib/useMedia.js';
 import ImageUploadPrompt from './components/ImageUploadPrompt.jsx';
+import { getBoolPref, setBoolPref } from './lib/prefs.js';
 
 function Shell() {
   const [modalType, setModalType] = useState(null); // null = closed
   const [newPlan, setNewPlan] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(() => {
-    try { return localStorage.getItem('sidebarCollapsed') === '1'; } catch { return false; }
-  });
+  const [collapsed, setCollapsed] = useState(() => getBoolPref('sidebarCollapsed'));
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
@@ -81,7 +82,7 @@ function Shell() {
   }, []);
 
   useEffect(() => {
-    try { localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0'); } catch { /* ignore */ }
+    setBoolPref('sidebarCollapsed', collapsed);
   }, [collapsed]);
 
   const handleCreated = useCallback((project) => {
@@ -158,11 +159,13 @@ function Shell() {
         </div>
       </main>
 
-      {modalType && (
-        <UploadModal initialType={modalType} onClose={closeModal} onCreated={handleCreated} />
-      )}
-      {newPlan && <NewPlanModal clientId={newPlan.clientId} onClose={() => setNewPlan(false)} onCreated={planCreated} />}
-      {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
+      <ErrorBoundary>
+        {modalType && (
+          <Suspense fallback={null}><UploadModal initialType={modalType} onClose={closeModal} onCreated={handleCreated} /></Suspense>
+        )}
+        {newPlan && <Suspense fallback={null}><NewPlanModal clientId={newPlan.clientId} onClose={() => setNewPlan(false)} onCreated={planCreated} /></Suspense>}
+        {paletteOpen && <Suspense fallback={null}><CommandPalette onClose={() => setPaletteOpen(false)} /></Suspense>}
+      </ErrorBoundary>
       <ImageUploadPrompt />
     </div>
     </StorageProvider>

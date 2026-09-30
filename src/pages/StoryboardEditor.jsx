@@ -28,6 +28,7 @@ import DrawPad from '../components/storyboard/DrawPad.jsx';
 import ExportDialog from '../components/ExportDialog.jsx';
 import GalleryNameModal from '../components/GalleryNameModal.jsx';
 import useMakePost from '../components/content/useMakePost.js';
+import { getPref, setPref } from '../lib/prefs.js';
 import '../styles/plan.css';
 
 const VIEWS = [
@@ -35,9 +36,9 @@ const VIEWS = [
   { key: 'list', label: 'List', icon: List },
   { key: 'timeline', label: 'Timeline', icon: SquareChartGantt },
 ];
-const readView = () => { try { return localStorage.getItem('sbView') || 'grid'; } catch { return 'grid'; } };
+const readView = () => getPref('sbView', 'grid');
 const rid = () => Math.random().toString(36).slice(2, 8);
-const readCut = (blockId) => { try { return localStorage.getItem(`sbCut:${blockId}`) || ''; } catch { return ''; } };
+const readCut = (blockId) => getPref(`sbCut:${blockId}`, '');
 const CUT_LENGTHS = [6, 10, 15, 20, 30];
 const VIDEO_SIZES = [{ label: '720p', long: 1280 }, { label: '1080p', long: 1920 }, { label: '4K', long: 3840 }];
 
@@ -88,7 +89,7 @@ export default function StoryboardEditor() {
     return () => { alive = false; };
   }, [planId, blockId, saver]);
   useRefreshOnReturn(() => api.getPlan(planId), setPlan, saver);
-  useEffect(() => { try { localStorage.setItem('sbView', view); } catch { /* ignore */ } }, [view]);
+  useEffect(() => { setPref('sbView', view); }, [view]);
 
   const block = plan?.blocks?.find((b) => b.id === blockId && b.type === 'storyboard') || null;
   const shots = block?.shots || [];
@@ -193,7 +194,7 @@ export default function StoryboardEditor() {
   };
 
   // ---- Cutdowns: shorter versions — shots left out, shorter durations; the rest is shared.
-  const setCutId = (v) => { setCutIdState(v); try { localStorage.setItem(`sbCut:${blockId}`, v); } catch { /* ignore */ } };
+  const setCutId = (v) => { setCutIdState(v); setPref(`sbCut:${blockId}`, v); };
   const cutsNow = () => latest()?.cutdowns || [];
   const setCuts = (list) => edit({ cutdowns: list }, true);
   const patchCut = (id, p) => setCuts(cutsNow().map((c) => (c.id === id ? { ...c, ...p } : c)));

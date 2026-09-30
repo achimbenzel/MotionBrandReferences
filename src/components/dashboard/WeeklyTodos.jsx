@@ -3,8 +3,8 @@ import { Repeat, Check, Plus, X, Settings2 } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { useSaver } from '../../lib/autosave.js';
 import { useToast } from '../Toast.jsx';
+import { dayKey } from '../../lib/dates.js';
 
-const keyOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const MONDAY = new Date(2024, 0, 1); // a Monday: weekday names in your language, Monday first
 const dayName = (i, weekday = 'long') => new Date(MONDAY.getFullYear(), 0, 1 + i).toLocaleDateString(undefined, { weekday });
 const newId = () => `w${Math.random().toString(36).slice(2, 9)}`;
@@ -21,8 +21,8 @@ export default function WeeklyTodos({ settings, setSettings, editing, onCustomiz
   const todos = settings?.weeklyTodos || [];
   const now = new Date();
   const todayIdx = (now.getDay() + 6) % 7; // 0 = Monday
-  const today = keyOf(now);
-  const dateOf = (i) => { const d = new Date(now); d.setDate(now.getDate() - todayIdx + i); return keyOf(d); };
+  const today = dayKey(now);
+  const dateOf = (i) => { const d = new Date(now); d.setDate(now.getDate() - todayIdx + i); return dayKey(d); };
   const fresh = useRef(null); // the one just added (gets the focus)
 
   // Typing waits a moment; a tick saves right away.

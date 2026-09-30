@@ -43,6 +43,7 @@ import ClientPicker from '../components/ClientPicker.jsx';
 import { PLAN_TABS, BLOCK_TABS, STRUCTURAL, blockTabs, statusTab, isEmptyBlock, tabColor, planTab } from '../lib/planTabs.js';
 import { voEstimate } from '../lib/timing.js';
 import { useSortable, moveItem } from '../lib/useSortable.js';
+import { getPref, setPref } from '../lib/prefs.js';
 import '../styles/plan.css';
 
 const rid = () => Math.random().toString(36).slice(2, 8);
@@ -139,15 +140,14 @@ export default function PlanDetail() {
   function firstTab(p) {
     const asked = params.get('tab');
     if (asked) setParams({}, { replace: true });
-    let saved = null;
-    try { saved = localStorage.getItem(`planTab:${p.id}`); } catch { /* ignore */ }
+    const saved = getPref(`planTab:${p.id}`);
     const phase = statusTab(p.status);
     const phaseHasBlocks = phase && blockTabs(p.blocks).includes(phase);
     return [asked, saved].find((t) => PLAN_TABS.some((x) => x.key === t)) || (phaseHasBlocks ? phase : 'overview');
   }
   const setTab = (key) => {
     setTabState(key);
-    try { localStorage.setItem(`planTab:${id}`, key); } catch { /* ignore */ }
+    setPref(`planTab:${id}`, key);
     window.scrollTo({ top: Math.min(window.scrollY, document.querySelector('.plan-tabs-wrap')?.offsetTop ?? 0) });
   };
 

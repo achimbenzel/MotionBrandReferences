@@ -3,11 +3,11 @@ import { createPortal } from 'react-dom';
 import { Activity, Flame, CalendarDays, TrendingUp } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { useMediaQuery, PHONE } from '../../lib/useMedia.js';
+import { dateOf, fmtDay } from '../../lib/dates.js';
 
 const WD = ['Mon', '', 'Wed', '', 'Fri', '', ''];
 const WEEKDAYS = ['Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays', 'Sundays'];
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
-const dateOf = (iso) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d); };
 // One number per day: everything saved plus what was added.
 const added = (d) => d.refs + d.plans + d.mockups + d.inbox;
 // (a focus session counts like a few saves: 10 minutes ≈ 1)
@@ -129,7 +129,7 @@ export default function ActivityMap({ reloadKey, compact = false }) {
       {tip && createPortal(( // on the page itself: the section's entrance animation would otherwise be its frame
         <div className="dash-act-tip" style={{ left: tip.x, top: tip.y }} role="tooltip">
           <b>{plural(tip.c.v, 'thing')}</b>
-          <span className="dash-act-tip-date">{dateOf(tip.c.date).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+          <span className="dash-act-tip-date">{fmtDay(tip.c.date)}</span>
           <span className="dash-act-tip-what">{breakdown(tip.c)}</span>
         </div>
       ), document.body)}

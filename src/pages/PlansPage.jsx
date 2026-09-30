@@ -8,6 +8,7 @@ import Menu from '../components/Menu.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import ClientAvatar from '../components/ClientAvatar.jsx';
 import { minutesOf, budgetMinutes, budgetState, budgetText } from '../lib/clients.js';
+import { usePref } from '../lib/prefs.js';
 import '../styles/plan.css';
 
 const fmtRange = (s, e) => {
@@ -30,8 +31,6 @@ const SORTS = {
   status: { label: 'Status', cmp: (a, b) => stage(a) - stage(b) || byName(a, b) },
   hours: { label: 'Hours tracked', cmp: null }, // needs the entries — see below
 };
-const stored = (key, ok, fallback) => { try { const v = localStorage.getItem(key); return ok(v) ? v : fallback; } catch { return fallback; } };
-const store = (key, v) => { try { localStorage.setItem(key, v); } catch { /* ignore */ } };
 
 /**
  * Projects (stored as "plans"): pinned ones on top, then by client — each
@@ -48,8 +47,8 @@ export default function PlansPage({ reloadKey, onNewPlan }) {
   const [entries, setEntries] = useState([]);
   const [error, setError] = useState(null);
   const [q, setQ] = useState('');
-  const [view, setViewState] = useState(() => stored(VIEW_KEY, (v) => v === 'client' || v === 'all', 'client'));
-  const [sort, setSortState] = useState(() => stored(SORT_KEY, (v) => !!SORTS[v], 'recent'));
+  const [view, setView] = usePref(VIEW_KEY, 'client', (v) => v === 'client' || v === 'all');
+  const [sort, setSort] = usePref(SORT_KEY, 'recent', (v) => !!SORTS[v]);
   const filter = params.get('status') || ''; // '' = everything but archived
   const clientFilter = params.get('client') || '';
 
@@ -62,8 +61,6 @@ export default function PlansPage({ reloadKey, onNewPlan }) {
     return () => { alive = false; };
   }, [reloadKey]);
 
-  const setView = (v) => { setViewState(v); store(VIEW_KEY, v); };
-  const setSort = (v) => { setSortState(v); store(SORT_KEY, v); };
   const setParam = (key, value) => {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value); else next.delete(key);

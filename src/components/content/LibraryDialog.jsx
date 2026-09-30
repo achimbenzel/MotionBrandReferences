@@ -6,9 +6,9 @@ import { IDEAS, IDEA_LANGS, SNIPPET_KINDS } from '../../lib/contentIdeas.js';
 import { useToast } from '../Toast.jsx';
 import AutoTextarea from '../AutoTextarea.jsx';
 import useContentLibrary from './useContentLibrary.js';
+import { usePref } from '../../lib/prefs.js';
 
 const norm = (s) => String(s || '').trim().toLowerCase();
-const loadLang = () => { try { return localStorage.getItem('contentIdeaLang') || 'de'; } catch { return 'de'; } };
 
 /** The posts a snippet went into: the same hook, all of a set's hashtags, the call to action in the caption or on screen. */
 export function postsWith(snippet, items) {
@@ -39,7 +39,7 @@ export default function LibraryDialog({ items = [], onClose }) {
   const [kind, setKind] = useState('hook');
   const [draft, setDraft] = useState('');
   const [name, setName] = useState('');
-  const [lang, setLang] = useState(loadLang);
+  const [lang, setLang] = usePref('contentIdeaLang', 'de');
   useEffect(() => () => { saver.flush(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
@@ -98,7 +98,7 @@ export default function LibraryDialog({ items = [], onClose }) {
                 <Sparkles size={13} /> Ideas to start from
                 {kind !== 'hashtags' && (
                   <span className="snp-lang">
-                    {IDEA_LANGS.map((l) => <button key={l.key} type="button" className={lang === l.key ? 'on' : ''} onClick={() => { setLang(l.key); try { localStorage.setItem('contentIdeaLang', l.key); } catch { /* */ } }}>{l.label}</button>)}
+                    {IDEA_LANGS.map((l) => <button key={l.key} type="button" className={lang === l.key ? 'on' : ''} onClick={() => setLang(l.key)}>{l.label}</button>)}
                   </span>
                 )}
               </div>
