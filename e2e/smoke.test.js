@@ -33,13 +33,14 @@ before(async () => {
   await made('/api/expenses', { name: 'Adobe CC', category: 'software', amount: 66, interval: 'month', start: '2026-01-15' }, 'expense');
   const mockup = await made('/api/mockups', { kind: '2d', name: 'Smoke post', d2: { type: 'ig-post' } }, 'mockup');
   const board = await made('/api/plans/plan2/storyboards', { template: 'launch' }, 'block');
+  const deck = await made('/api/presentations', { template: 'proposal', clientId: client.id }, 'presentation');
   pages = [
     '/work', '/branding', '/motion', '/logo', '/businesscard', '/color', '/imagegallery', '/font', '/logonogo',
     '/project/brand1', '/project/mot1', '/project/logo2', '/project/bc1', '/project/col1', '/project/font1', '/project/img1', '/project/nogo1', '/gallery/gal1',
     '/plan', '/plan/plan1', '/plan/plan2', '/plan/plan3', '/board', '/logo-tester', '/software', '/software/sw1',
     '/storyboards', `/storyboards/plan2/${board.id}`, '/mockups', `/mockups/${mockup.id}`,
     '/time', '/expenses', '/clients', `/clients/${client.id}`, '/notes', `/notes/${note.id}`,
-    '/content', `/content/${post.id}`, '/achievements', '/inbox', '/trash', '/settings',
+    '/content', `/content/${post.id}`, '/presentations', `/presentations/${deck.id}`, '/achievements', '/inbox', '/trash', '/settings',
   ];
   // PW_CHANNEL=chrome: an installed Google Chrome (CI) instead of Playwright's own Chromium.
   browser = await chromium.launch(process.env.PW_CHANNEL ? { channel: process.env.PW_CHANNEL } : {});

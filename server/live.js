@@ -28,7 +28,7 @@ const KEYS = [
   /^\/api\/(plans\/[\w-]+\/blocks\/[\w-]+)/,
   /^\/api\/(board\/cards\/[\w-]+)/,
   /^\/api\/(time\/(?:entries\/[\w-]+|activities))/,
-  /^\/api\/((?:plans|notes|content|content-library|software|mockups|mockup-models|mockup-hdris|clients|projects|galleries|expenses|income|achievements)\/[\w-]+)/,
+  /^\/api\/((?:plans|notes|content|content-library|software|mockups|mockup-models|mockup-hdris|clients|projects|galleries|expenses|income|achievements|presentations)\/[\w-]+)/,
   /^\/api\/(board|settings)(?:\/|$)/,
 ];
 export const keyOf = (path) => { for (const re of KEYS) { const m = re.exec(path); if (m) return m[1]; } return null; };

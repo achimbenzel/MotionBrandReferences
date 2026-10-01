@@ -34,6 +34,8 @@ const NoteDetail = lazy(() => import('./pages/NoteDetail.jsx'));
 const ContentPage = lazy(() => import('./pages/ContentPage.jsx'));
 const ContentDetail = lazy(() => import('./pages/ContentDetail.jsx'));
 const AchievementsPage = lazy(() => import('./pages/AchievementsPage.jsx'));
+const PresentationsPage = lazy(() => import('./pages/PresentationsPage.jsx'));
+const PresentationEditor = lazy(() => import('./pages/PresentationEditor.jsx'));
 // Dialogs that open now and then load when first opened. (The picture-size
 // prompt stays: it has to be there before the first upload asks for it.)
 const UploadModal = lazy(() => import('./components/UploadModal.jsx'));
@@ -115,6 +117,7 @@ function Shell() {
   const onAdd = (key) => { setDrawer(false); (workMode ? createPlan : openModal)(key); };
   const openSearch = () => { setDrawer(false); setPaletteOpen(true); };
   const wide = location.pathname === '/board'; // the board uses the full desktop width
+  const roomy = /^\/presentations\/[^/]+$/.test(location.pathname); // a presentation's editor: more room for the slide
 
   return (
     <StorageProvider refreshKey={reloadKey}>
@@ -130,7 +133,7 @@ function Shell() {
       {!isDesktop && <div className="drawer-backdrop" onClick={() => setDrawer(false)} aria-hidden="true" />}
       <MobileBar onMenu={() => setDrawer(true)} onSearch={openSearch} onAdd={onAdd} />
       <main className="main">
-        <div className={`main-inner${wide ? ' wide' : ''}`}>
+        <div className={`main-inner${wide ? ' wide' : ''}${roomy ? ' roomy' : ''}`}>
           <ErrorBoundary>
             <Suspense fallback={<div className="spinner" />}>
               <Routes>
@@ -156,6 +159,8 @@ function Shell() {
                 <Route path="/clients" element={<ClientsPage reloadKey={reloadKey} />} />
                 <Route path="/clients/:id" element={<ClientDetail onNewPlan={createPlan} />} />
                 <Route path="/notes" element={<NotesPage reloadKey={reloadKey} />} />
+                <Route path="/presentations" element={<PresentationsPage reloadKey={reloadKey} />} />
+                <Route path="/presentations/:id" element={<PresentationEditor />} />
                 <Route path="/notes/:id" element={<NoteDetail />} />
                 <Route path="/content" element={<ContentPage reloadKey={reloadKey} />} />
                 <Route path="/content/:id" element={<ContentDetail />} />

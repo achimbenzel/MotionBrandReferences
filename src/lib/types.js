@@ -50,6 +50,7 @@ export const WORK_TABS = [
   { key: 'logotester', label: 'Brand Tester', path: '/logo-tester' },
   { key: 'storyboards', label: 'Storyboards', path: '/storyboards' },
   { key: 'mockups', label: 'Mockups', path: '/mockups' },
+  { key: 'presentations', label: 'Presentations', path: '/presentations' },
   { key: 'time', label: 'Time Tracker', path: '/time' },
   { key: 'expenses', label: 'Expenses', path: '/expenses' },
   { key: 'notes', label: 'Notes', path: '/notes' },

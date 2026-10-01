@@ -80,6 +80,18 @@ router.get('/api/search', async (req, res) => {
       thumb: n.images?.[0]?.file ? `/data/note/${n.id}/${n.images[0].file}` : null, score,
     });
   }
+  // Presentations: their title, who they're for and every slide's text.
+  const textOf = (v) => (typeof v === 'string' ? v : Array.isArray(v) ? v.map(textOf).join(' ') : v && typeof v === 'object' ? Object.values(v).map(textOf).join(' ') : '');
+  for (const p of db.presentations || []) {
+    const client = (db.clients || []).find((c) => c.id === p.clientId);
+    const hay = [p.title, p.label, client?.name, p.meta?.preparedFor, ...p.slides.map((s) => textOf(s.data))].filter(Boolean).join(' ').replace(/\*/g, '').toLowerCase();
+    const score = scoreMatch(terms, p.title || '', hay);
+    const pic = p.slides.find((s) => s.data?.image?.file)?.data.image.file;
+    if (score > 0) results.push({
+      kind: 'presentation', id: p.id, title: p.title || 'Presentation', subtitle: `Presentation${client ? ` · ${client.name}` : ''} · ${p.slides.length} slides`,
+      thumb: pic ? `/data/presentation/${p.id}/${pic}` : null, score,
+    });
+  }
   for (const c of db.content || []) {
     const hay = [c.title, c.hook, c.caption, c.hashtags, c.script, c.notes, ...(c.beats || []).flatMap((b) => [b.text, b.screen]), ...Object.values(c.captions || {}), ...c.platforms, c.format].filter(Boolean).join(' ').toLowerCase();
     const score = scoreMatch(terms, c.title || '', hay);

@@ -22,6 +22,7 @@ import { logoActive, logoNeedsMigration, logoRenditionList, logoSource, normaliz
 import { CURRENCIES } from './schema/base.js';
 import { normalizeDashboardFocus, normalizeDashboardLayout, normalizeImageUploads, normalizeWeeklyTodos, normalizeFormats } from './schema/settings.js';
 import { normalizeBoard } from './schema/board.js';
+import { normalizePresentation, normalizeDeckDefaults } from './schema/presentations.js';
 
 // Each area's record shapes live in schema/ — all of them are exported from here too.
 export * from './schema/base.js';
@@ -37,12 +38,13 @@ export * from './schema/time.js';
 export * from './schema/clients.js';
 export * from './schema/notes.js';
 export * from './schema/achievements.js';
+export * from './schema/presentations.js';
 
 export const SCHEMA_VERSION = 2;
 export const schemaVersionOf = (db) => (Number.isInteger(db?.schemaVersion) ? db.schemaVersion : 1);
 export const emptyDB = () => ({
   schemaVersion: SCHEMA_VERSION, projects: [], galleries: [], plans: [], planTemplates: [], software: [], trash: [], inbox: [], mockups: [], mockupModels: [], mockupHdris: [], timeEntries: [], clients: [], notes: [],
-  content: [], achievements: [], storyboardTemplates: [],
+  content: [], achievements: [], storyboardTemplates: [], presentations: [],
   settings: { storageLimitBytes: DEFAULT_STORAGE_LIMIT },
 });
 // ---------------------------------------------------------------------------
@@ -79,6 +81,8 @@ export function normalizeDB(db) {
   if (!Array.isArray(db.achievements)) db.achievements = [];          // milestones (gamified)
   db.achievements = db.achievements.filter((a) => a && typeof a === 'object').map(normalizeAchievement);
   db.achievementStats = normalizeAchievementStats(db.achievementStats);
+  if (!Array.isArray(db.presentations)) db.presentations = [];        // decks: proposals, brand identities …
+  db.presentations = db.presentations.filter((p) => p && typeof p === 'object').map(normalizePresentation);
   for (const plan of db.plans) normalizePlan(plan);
   linkClients(db);
   for (const s of db.software) normalizeSoftware(s);
@@ -102,6 +106,7 @@ export function normalizeDB(db) {
   db.settings.contentRhythm = normalizeContentRhythm(db.settings.contentRhythm);
   db.settings.dashboardLayout = normalizeDashboardLayout(db.settings.dashboardLayout);
   db.settings.formats = normalizeFormats(db.settings.formats); // how dates and numbers are shown
+  db.settings.presentationDefaults = normalizeDeckDefaults(db.settings.presentationDefaults); // what new decks start with
   return db;
 }
 // What a migration would change, computed from the RAW (unnormalized) db.

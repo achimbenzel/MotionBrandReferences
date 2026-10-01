@@ -623,6 +623,19 @@ export const api = {
   async updateIncome(id, patch) { const { income } = await request(`/api/income/${id}`, { method: 'PATCH', json: patch }); return income; },
   async removeIncome(id) { return request(`/api/income/${id}`, { method: 'DELETE' }); }, // → { trashId }
   expensesExportUrl: (year, lang = 'de') => `/api/expenses/export.xlsx?year=${year}&lang=${lang}`,
+  // --- Presentations (decks: proposals, brand identities, case studies) ---
+  async listPresentations() { return request('/api/presentations'); }, // → { presentations, defaults }
+  async presentationTemplates() { const { templates } = await request('/api/presentations/templates'); return templates; },
+  async getPresentation(id) { const { presentation } = await request(`/api/presentations/${id}`); return presentation; },
+  async createPresentation(body) { const { presentation } = await request('/api/presentations', { method: 'POST', json: body }); return presentation; },
+  async updatePresentation(id, patch) { const { presentation } = await request(`/api/presentations/${id}`, { method: 'PATCH', json: patch }); return presentation; },
+  // A picture for a slide: a File, or { source } — one already in the app. → { file, name }
+  async addPresentationImage(id, pic) {
+    return request(`/api/presentations/${id}/images`, { method: 'POST', ...picBody('file', pic), pictures: true });
+  },
+  async duplicatePresentation(id) { const { presentation } = await request(`/api/presentations/${id}/duplicate`, { method: 'POST' }); return presentation; },
+  async savePresentationDefaults(id) { const { defaults } = await request(`/api/presentations/${id}/defaults`, { method: 'POST' }); return defaults; },
+  async removePresentation(id) { return request(`/api/presentations/${id}`, { method: 'DELETE' }); }, // → { trashId }
   // --- Achievements ---
   async getAchievements() { return request('/api/achievements'); }, // → { achievements, stats, metrics, unlocked, ideas }
   async createAchievement(body) { return request('/api/achievements', { method: 'POST', json: body }); }, // → { achievement, unlocked }

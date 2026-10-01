@@ -69,6 +69,7 @@ function subjectOf(p) {
   if ((m = /^\/api\/mockups\/([\w-]+)/.exec(p))) return { kind: 'mockup', id: m[1] };
   if ((m = /^\/api\/projects\/([\w-]+)/.exec(p))) return { kind: 'project', id: m[1] };
   if ((m = /^\/api\/software\/([\w-]+)/.exec(p))) return { kind: 'software', id: m[1] };
+  if ((m = /^\/api\/presentations\/([\w-]+)/.exec(p)) && m[1] !== 'templates') return { kind: 'presentation', id: m[1] };
   if (/^\/api\/board(\/|$)/.test(p)) return { kind: 'board', id: 'board' };
   return null;
 }
@@ -100,7 +101,7 @@ export function countActivity(req, res, next) {
   const full = `${req.baseUrl}${req.path}`;
   if (req.method !== 'GET' && req.method !== 'HEAD' && !/\/thumb$/.test(full) && !/^\/api\/activity(\/|$)/.test(full)) {
     // Deleting something isn't somewhere to continue.
-    const subject = req.method === 'DELETE' && /^\/api\/(plans|mockups|projects|software|clients)\/[\w-]+$/.test(full) ? null : subjectOf(full);
+    const subject = req.method === 'DELETE' && /^\/api\/(plans|mockups|projects|software|clients|presentations)\/[\w-]+$/.test(full) ? null : subjectOf(full);
     res.on('finish', () => { if (res.statusCode < 400) noteActivity(subject).catch(() => {}); });
   }
   next();
@@ -169,6 +170,12 @@ export async function recentItems(db, limit = 8) {
       item = { key: `software:${s.id}`, kind: 'software', title: s.name || 'Software', sub: 'Software', href: `/software/${s.id}`,
         thumb: typeof s.banner === 'string' && s.banner ? `/data/software/${s.id}/${s.banner}` : null, gradient: s.banner ? null : s.bannerGradient || null,
         emoji: s.avatar ? null : s.avatarEmoji || null };
+    } else if (r.kind === 'presentation') {
+      const d = (db.presentations || []).find((x) => x.id === r.id);
+      if (!d) continue;
+      const pic = d.slides.find((s) => s.data?.image?.file)?.data.image.file;
+      item = { key: `presentation:${d.id}`, kind: 'presentation', title: d.title || 'Presentation', sub: 'Presentation', href: `/presentations/${d.id}`,
+        thumb: pic ? `/data/presentation/${d.id}/${pic}` : null };
     } else if (r.kind === 'board') {
       item = { key: 'board', kind: 'board', title: 'To-Do board', sub: 'To-dos', href: '/board', thumb: null };
     }

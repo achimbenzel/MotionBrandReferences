@@ -1997,6 +1997,7 @@ img { max-width: 100%; display: block; }
   /* Full-bleed pages (the To-Do board) use the whole width right of the sidebar
        so extra lists can run past the usual content margins left and right. */
   .main-inner.wide { max-width: none; padding-left: 0; padding-right: 0; }
+  .main-inner.roomy { max-width: 1840px; }
   .main-inner.wide .page-head-row { padding-left: 34px; padding-right: 34px; }
 }
 @media (prefers-reduced-motion: reduce) {

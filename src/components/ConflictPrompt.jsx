@@ -8,7 +8,7 @@ const groupOf = (key) => String(key || '').split('/').slice(0, 2).join('/');
 const THING = {
   plans: 'project', notes: 'note', software: 'software page', content: 'post', board: 'To-Do board', mockups: 'mockup',
   clients: 'client', settings: 'setting', expenses: 'expense', income: 'income', projects: 'reference', galleries: 'gallery',
-  time: 'time entry', achievements: 'achievement',
+  time: 'time entry', achievements: 'achievement', presentations: 'presentation',
 };
 
 /**

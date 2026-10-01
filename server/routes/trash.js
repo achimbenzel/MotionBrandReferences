@@ -15,6 +15,7 @@ import { noteDir } from './notes.js';
 import { contentDir } from './content.js';
 import { achievementDir } from './achievements.js';
 import { expenseDir } from './expenses.js';
+import { presentationDir } from './presentations.js';
 
 const router = createRouter();
 export default router;
@@ -57,6 +58,7 @@ const trashThumb = (t) => {
                         : t.kind === 'content' ? t.data.media?.find((m) => m.kind === 'image')?.file
                           : t.kind === 'contentMedia' ? (t.data.media?.kind === 'image' ? t.data.media.file : null)
                             : t.kind === 'achievement' ? (t.data.iconImage || t.data.sticker)
+                              : t.kind === 'presentation' ? (t.data.slides?.[0]?.data?.image?.file || t.data.brand?.logo || null)
                               : t.kind === 'receipt' ? (t.data.receipt?.kind === 'image' && IMAGE_EXT.test(t.data.receipt.file) ? t.data.receipt.file : null)
                               : t.kind === 'pictures' ? t.data.items?.[0]?.rel : null;
   return rel ? trashedFileUrl(t, rel) : null;
@@ -72,6 +74,7 @@ function describe(t) {
     case 'contentMedia': return { title: t.data.media?.name || 'Media', subtitle: `${t.data.media?.kind === 'video' ? 'Video' : 'Picture'} · ${t.data.contentTitle || 'Content'}` };
     case 'achievement': return { title: t.data.title || 'Achievement', subtitle: `Achievement · ${t.data.group || ''}` };
     case 'expense': return { title: t.data.name || 'Expense', subtitle: `Expense${t.data.receipts?.length ? ` · ${t.data.receipts.length} receipt${t.data.receipts.length === 1 ? '' : 's'}` : ''}` };
+    case 'presentation': return { title: t.data.title || 'Presentation', subtitle: `Presentation · ${t.data.slides?.length || 0} slide${t.data.slides?.length === 1 ? '' : 's'}` };
     case 'receipt': return { title: t.data.receipt?.name || 'Receipt', subtitle: `Receipt · ${t.data.expenseName || 'Expense'}` };
     case 'income': return { title: t.data.name || 'Income', subtitle: 'Recurring income' };
     case 'contentSnippet': return { title: t.data.name || String(t.data.text || '').slice(0, 80) || 'Snippet', subtitle: `Content library · ${{ hook: 'Hook', hashtags: 'Hashtags', cta: 'Call to action' }[t.data.kind] || 'Snippet'}` };
@@ -195,6 +198,10 @@ router.post('/api/trash/:trashId/restore', async (req, res) => {
       if (!Array.isArray(db.expenses)) db.expenses = [];
       if (!db.expenses.some((x) => x.id === data.id)) db.expenses.push(data);
       move = { from, to: expenseDir(data.id) }; // its receipts (nothing on disk for one without)
+    } else if (entry.kind === 'presentation') {
+      if (!Array.isArray(db.presentations)) db.presentations = [];
+      if (!db.presentations.some((x) => x.id === data.id)) db.presentations.push(data);
+      move = { from, to: presentationDir(data.id) };
     } else if (entry.kind === 'receipt') {
       const e = (db.expenses || []).find((x) => x.id === data.expenseId);
       if (!e) { gone = true; return null; }

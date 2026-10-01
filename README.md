@@ -186,6 +186,7 @@ data/
                                     # (moodboard images, files + example images)
 ├── client/<id>/                    # a client's logo + invoices/*.pdf
 ├── expense/<id>/receipts/*         # an expense's receipts (PDFs, photos, e-invoices)
+├── presentation/<id>/images/*      # a presentation's pictures
 ├── software/<id>/*                 # plugin installers + your own script files
 ├── mockup/<id>/                    # a mockup's screen pictures / videos, 2D pictures + thumb.webp
 ├── mockup-model/<id>/model.<ext>   # an imported 3D model (.glb / .gltf / .usdz)
@@ -407,7 +408,7 @@ A toggle switches between two modes:
 - **Work** — the **default** mode (left in the toggle), your working area. It
   opens on a **Dashboard** and holds **Clients**, **Projects**, **Software**,
   the **To-Do board**, the **Brand Tester**, **Storyboards**, **Mockups**,
-  the **Time Tracker**, **Expenses**, **Notes**, **Content** and **Achievements** (see below).
+  **Presentations**, the **Time Tracker**, **Expenses**, **Notes**, **Content** and **Achievements** (see below).
 - **Reference** — the library (Branding, Motion Design, Logos, Business Cards,
   Colors, Image Gallery, Fonts, Logo No Go).
 
@@ -1044,6 +1045,58 @@ looks printed.
 Everything **saves as you go**; the list shows a small picture of each mockup.
 ⋯ **Duplicate** / **Delete** (→ Trash, with Undo).
 
+### Presentations
+**Presentations** (sidebar, under Mockups) are decks for clients — a
+**project proposal**, a **brand identity**, a **case study** — in the style of
+the proposal template: a near-black ground, warm white type, one accent colour
+(petrol by default), **DM Sans** ExtraBold headlines and **JetBrains Mono**
+labels, your mark in each slide's corner, the deck's label top right, the page
+(02/16) bottom left and the slide's section bottom right.
+
+- **New presentation** starts from a template, each shown by its cover in your
+  look: **Project proposal** (14 slides — cover, “Hello, it's nice to meet
+  you”, works, why work with me, how I work, the project goals, five phases, a
+  case study with pictures and a testimonial, three packages, a side-by-side
+  table, add-ons, contact), **Brand identity** (12 — the brief, values, mood,
+  the logo on its backgrounds, the idea behind it, colour palette, typography,
+  applications, next steps), **Case study** (6) or **Blank**. Pick a
+  **client**: their name goes on the cover (“Prepared for”) and into the text
+  where the template says so (“Project goals for Gute Stube”).
+- **Slides** — 17 kinds: Cover, Introduction, Works, Text & picture, Cards
+  (big and numbered, or compact), Phases, Case study (with Client / Year /
+  Industry / Scope), Case pictures, Testimonial, Pricing (packages or add-ons,
+  one can be *Recommended*), Comparison (a table — ✓ and — become marks),
+  Colours (with HEX, RGB and CMYK worked out), Typography, Logo, Big picture,
+  Chapter and Closing.
+- **The editor** — the slides in a strip (drag to reorder; ⋯ duplicate, hide
+  when presenting, move, delete with Undo; **Add a slide** after the one
+  picked), the slide big in the middle, its fields beside it. **A click on a
+  text or picture in the slide finds its field.** In any text `*word*` shows a
+  word in the accent colour; line breaks stay. Pictures: upload or **from the
+  app**, a click on the preview sets the point they're cropped around, Fill or
+  Fit; a slide without one shows an accent-coloured frame. ↑ / ↓ go between
+  slides. Everything saves as you type.
+- **Presentation** (the tab beside **Slide**) — name, kind, client, project,
+  the label on every slide, **Dark** or **Light**, the **accent colour**, who
+  it's from (**name**, **logo** for the cover, **mark** for the corners,
+  **contact lines** for the cover and the closing slide) and the cover's
+  prepared for / by, version and date. **Use this look for new ones** keeps
+  the look and details (logo and mark too) for every new deck.
+- **Present** — fullscreen from the slide picked: → / Space / a click on the
+  right for the next, ← back, a swipe on a phone, Esc to leave. Hidden slides
+  are skipped.
+- **PDF** — every shown slide on a page of its own (1920 × 1080) through the
+  print dialog: choose *Save as PDF*. Text stays text — sharp and searchable.
+- The list shows each deck's cover; ⋯ Present, Pin, Duplicate, Delete (→
+  Trash with its pictures, with Undo). Presentations are in the ⌘K search
+  (their slides' text too) and in the dashboard's *Continue where you left
+  off*.
+
+Stored in `data/db.json` (`presentations`; what new decks start with in
+`settings.presentationDefaults`), the pictures in
+`data/presentation/<id>/images/` (the default logo and mark in
+`data/dashboard/`), so they're part of the library export / import.
+
 ### Time Tracker
 **Time Tracker** (sidebar, under Mockups) logs your working hours per project
 and client.
@@ -1623,7 +1676,7 @@ it, the Work / Reference toggle, the section list (with icons, current one
 highlighted), an **Add** button, and a footer with **Settings**, **Trash** and
 the storage meter. In **Work** mode the section list is **Dashboard**,
 **Clients**, **Projects**, **Software**, **To-Dos**, **Brand Tester**,
-**Storyboards**, **Mockups**, **Time Tracker**, **Expenses**, **Notes**, **Content** and **Achievements**; a running focus timer or time tracker shows
+**Storyboards**, **Mockups**, **Presentations**, **Time Tracker**, **Expenses**, **Notes**, **Content** and **Achievements**; a running focus timer or time tracker shows
 as a small pill under the search.
 The collapse button folds the sidebar into a slim **rail of icons** (names show
 as tooltips; Work and Reference stand one above the other) for a wider canvas;
@@ -1727,7 +1780,7 @@ lookup off with `LINK_LOOKUP=off`).
   ├── zip.js          # dependency-free ZIP64 export/import
   ├── xlsx.js         # dependency-free .xlsx writer (time sheet export)
   ├── achievements.js # what achievements unlock from, Special Quests, quest ideas
-  └── routes/         # projects (references), projects (projects), clients, software, board, mockups, time, notes, content, achievements, trash, search, settings, library, maintenance
+  └── routes/         # projects (references), projects (projects), clients, software, board, mockups, time, notes, content, achievements, expenses, presentations, trash, search, settings, library, maintenance
   ```
 - **Tests:** `npm test` starts the real server against throwaway data folders —
   including a library with every data shape older versions wrote — and checks
@@ -1737,7 +1790,9 @@ lookup off with `LINK_LOOKUP=off`).
   in Chromium — on a desktop and on 320 / 390 px phones — and fails on any
   error, a page that doesn't render or a page that scrolls sideways; it also
   plays two devices on one library (live updates, keep mine / load theirs)
-  and adds receipts to an expense (a missing payment, delete and undo).
+  and adds receipts to an expense (a missing payment, delete and undo) and
+  builds a presentation (edit by clicking the slide, a slide with a picture,
+  presenting, the PDF).
 
 ### Scripts
 
@@ -1748,7 +1803,7 @@ lookup off with `LINK_LOOKUP=off`).
 | `npm run serve` | build, then serve app + API from a single port (4300) |
 | `npm start` | serve a pre-built `dist/` + API from 4300 |
 | `npm test` | API / migration / security tests and the helpers' unit tests (Node's built-in test runner) |
-| `npm run test:e2e` | every page in a real browser, desktop + phones, two devices on one library, receipts (after `npm run build`; once: `npx playwright install chromium` — or use your installed Chrome with `PW_CHANNEL=chrome`) |
+| `npm run test:e2e` | every page in a real browser, desktop + phones, two devices on one library, receipts, presentations (after `npm run build`; once: `npx playwright install chromium` — or use your installed Chrome with `PW_CHANNEL=chrome`) |
 | `npm run lint` | ESLint (incl. React hook rules) |
 | `npm run check` | lint + tests + build (CI also runs `test:e2e` on every push) |
 
