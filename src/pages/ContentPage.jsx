@@ -22,6 +22,7 @@ import { XPost } from '../components/content/PostPreview.jsx';
 import useContentSettings, { useContentProfile } from '../components/content/useContentSettings.js';
 import { getPref, setPref, usePref } from '../lib/prefs.js';
 import '../styles/content.css';
+import { weekdayName, fmtDate } from '../lib/format.js';
 
 const VIEWS = [
   { key: 'feed', label: 'Feed', icon: Grid3x3 },
@@ -30,7 +31,7 @@ const VIEWS = [
   { key: 'list', label: 'List', icon: List },
   { key: 'insights', label: 'Insights', icon: BarChart3 },
 ];
-const WEEKDAYS = Array.from({ length: 7 }, (_, i) => new Date(2024, 0, 1 + i).toLocaleDateString(undefined, { weekday: 'short' })); // 1 Jan 2024 was a Monday
+const WEEKDAYS = Array.from({ length: 7 }, (_, i) => weekdayName(i)); // Monday first
 const POSTED_SHOWN = 12;
 // Your pillars and rhythm, for every view on the page.
 const PlanCtx = createContext({ pillars: [], rhythm: { goal: 0, slots: [] } });
@@ -528,7 +529,7 @@ function Calendar({ items, all, today, onOpen, onMove, onCreate, busy }) {
       <div className="ctp-cal">
         <div className="ctp-cal-head">
           <button type="button" className="icon-btn" onClick={() => shift(-1)} aria-label="Previous month"><ChevronLeft size={16} /></button>
-          <b>{first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</b>
+          <b>{fmtDate(first, { month: 'long', year: 'numeric' })}</b>
           <button type="button" className="icon-btn" onClick={() => shift(1)} aria-label="Next month"><ChevronRight size={16} /></button>
           {month !== today.slice(0, 7) && <button type="button" className="btn btn-sm btn-ghost" onClick={() => { setMonth(today.slice(0, 7)); setPicked(today); }}>Today</button>}
         </div>

@@ -10,6 +10,7 @@ import ClientAvatar from '../components/ClientAvatar.jsx';
 import { minutesOf, budgetMinutes, budgetState, budgetText } from '../lib/clients.js';
 import { usePref } from '../lib/prefs.js';
 import '../styles/plan.css';
+import { fmtDec } from '../lib/format.js';
 
 const fmtRange = (s, e) => {
   if (s && e) return `${s} – ${e}`;
@@ -141,7 +142,7 @@ export default function PlansPage({ reloadKey, onNewPlan }) {
         <div className="card-sub plan-card-sub">
           {withClient && p.client && <span><Building2 size={13} /> {p.client}</span>}
           {fmtRange(p.start, p.end) && <span><CalendarRange size={13} /> {fmtRange(p.start, p.end)}</span>}
-          {(min > 0 || b) && <span className={b ? `budget-${b.level}` : ''}><Clock size={13} /> {b ? budgetText(p, used) : `${(min / 60).toFixed(1)} h`}</span>}
+          {(min > 0 || b) && <span className={b ? `budget-${b.level}` : ''}><Clock size={13} /> {b ? budgetText(p, used) : `${fmtDec(min / 60, 1)} h`}</span>}
           <span><Images size={13} /> {imgCount}</span>
         </div>
         {b && <span className={`plan-card-budget budget-${b.level}`} aria-hidden="true"><span style={{ width: `${Math.min(100, b.ratio * 100)}%` }} /></span>}

@@ -4,6 +4,7 @@ import { Activity, Flame, CalendarDays, TrendingUp } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { useMediaQuery, PHONE } from '../../lib/useMedia.js';
 import { dateOf, fmtDay } from '../../lib/dates.js';
+import { monthName } from '../../lib/format.js';
 
 const WD = ['Mon', '', 'Wed', '', 'Fri', '', ''];
 const WEEKDAYS = ['Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays', 'Sundays'];
@@ -75,7 +76,7 @@ export default function ActivityMap({ reloadKey, compact = false }) {
       const c = cells[w * 7];
       if (!c || c.future || c.empty) continue;
       const dt = dateOf(c.date);
-      if (w === 0 || dt.getDate() <= 7) months.push({ w, label: dt.toLocaleDateString(undefined, { month: 'short' }) });
+      if (w === 0 || dt.getDate() <= 7) months.push({ w, label: monthName(dt.getMonth()) });
     }
     return { cells, streak, week, best: Math.max(...byDay) > 0 ? WEEKDAYS[best] : '—', sum, active, addedSum, months };
   }, [days, weeks]);

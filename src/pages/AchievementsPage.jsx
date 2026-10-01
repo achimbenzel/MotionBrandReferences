@@ -13,6 +13,7 @@ import AchievementStats from '../components/achievements/AchievementStats.jsx';
 import AchievementInspect from '../components/achievements/AchievementInspect.jsx';
 import { getPref, setPref, usePref } from '../lib/prefs.js';
 import '../styles/achievements.css';
+import { fmtInt } from '../lib/format.js';
 
 const FILTERS = [{ key: 'all', label: 'All' }, { key: 'got', label: 'Unlocked' }, { key: 'locked', label: 'To go' }];
 const xpSum = (list) => list.reduce((n, a) => n + xpOf(a), 0);
@@ -197,10 +198,10 @@ export default function AchievementsPage({ reloadKey }) {
       <section className="ach-hero" aria-label="Your rank" style={{ '--rc': RARITIES[rank.tier].color }}>
         <RankEmblem rank={rank} size={92} />
         <div className="ach-hero-main">
-          <div className="ach-hero-title"><em>Rank</em><b>{rank.label}</b><span>{xp.toLocaleString()} XP</span></div>
+          <div className="ach-hero-title"><em>Rank</em><b>{rank.label}</b><span>{fmtInt(xp)} XP</span></div>
           <div className="ach-xpbar" role="progressbar" aria-valuemin={rank.from} aria-valuemax={rank.to} aria-valuenow={xp}><i style={{ width: `${rank.progress * 100}%` }} /></div>
           <div className="ach-hero-sub">
-            <span>{rank.top ? 'The top rank — legend.' : `${(rank.to - xp).toLocaleString()} XP to ${rank.next.label}`}</span>
+            <span>{rank.top ? 'The top rank — legend.' : `${fmtInt(rank.to - xp)} XP to ${rank.next.label}`}</span>
             <span>{got} / {list.length} unlocked{openQuests ? ` · ${openQuests} open quest${openQuests > 1 ? 's' : ''}` : ''}</span>
           </div>
         </div>
@@ -343,7 +344,7 @@ function Celebration({ list, rankUp, metrics, onClose, onDates }) {
           {shown.map((a, i) => <div key={a.id} className="ach-celebrate-card" style={{ '--i': i }}><AchievementCard a={a} metrics={metrics} as="div" /></div>)}
         </div>
         {list.length > 3 && <div className="ach-celebrate-more">+ {list.length - 3} more</div>}
-        <div className="ach-celebrate-xp">+{xp.toLocaleString()} XP</div>
+        <div className="ach-celebrate-xp">+{fmtInt(xp)} XP</div>
         {rankUp && (
           <div className="ach-celebrate-rank" style={{ '--rc': RARITIES[rankUp.tier].color }}>
             <RankEmblem rank={rankUp} size={46} /><span><small>New rank</small><b>{rankUp.label}</b></span>

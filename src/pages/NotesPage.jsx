@@ -5,6 +5,7 @@ import { api, noteFileUrl } from '../lib/api.js';
 import { tagColor } from '../lib/types.js';
 import { useToast } from '../components/Toast.jsx';
 import '../styles/notes.css';
+import { fmtDate } from '../lib/format.js';
 
 const ago = (t) => {
   if (!t) return '';
@@ -13,7 +14,7 @@ const ago = (t) => {
   if (s < 3600) return `${Math.round(s / 60)} min ago`;
   if (s < 86400) return `${Math.round(s / 3600)} h ago`;
   const d = new Date(t);
-  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
+  return fmtDate(d, { day: 'numeric', month: 'short', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
 };
 
 /**

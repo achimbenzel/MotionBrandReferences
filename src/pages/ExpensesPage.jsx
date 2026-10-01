@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { cloneElement, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Plus, Wallet, ChevronLeft, ChevronRight, FileSpreadsheet, ExternalLink, Trash2, Check, X, Search, BellRing, CalendarClock, Target, TrendingUp, Tag,
@@ -13,12 +13,13 @@ import Menu from '../components/Menu.jsx';
 import Receipts from '../components/expenses/Receipts.jsx';
 import {
   EXPENSE_CATEGORIES, EXPENSE_IDEAS, INTERVALS, categoryOf, intervalOf, paymentsIn, yearOf, monthlyOf, nextPayment, cancelBy, monthsOf,
-  targetFor, isActive, todayIso, VIEWS, partOf, inView, incomeMonthsOf, incomeNow, INCOME_INTERVALS, missingReceipts,
+  targetFor, isActive, todayIso, VIEWS, partOf, inView, incomeMonthsOf, incomeNow, INCOME_INTERVALS, missingReceipts, needsReceipts, needsReceiptsByDefault,
 } from '../lib/expenses.js';
 import { usePref } from '../lib/prefs.js';
 import '../styles/expenses.css';
+import { monthName, parseNum, fmtInput } from '../lib/format.js';
 
-const MONTHS = Array.from({ length: 12 }, (_, i) => new Date(2024, i, 1).toLocaleDateString(undefined, { month: 'short' }));
+const MONTHS = Array.from({ length: 12 }, (_, i) => monthName(i));
 const fmtDay = (iso, opts = { day: 'numeric', month: 'short' }) => fmtDate(iso, opts);
 const AHEAD = 45; // days of "coming up"
 const VIEW_WORD = { business: 'business', private: 'private', both: 'business + private' };
@@ -134,7 +135,7 @@ export default function ExpensesPage({ reloadKey }) {
     saver.schedule('finance', () => api.updateSettings({ finance: next }).catch((e) => toast(`Could not save: ${e.message}`, 'error')));
   };
   const saveExpense = async (e) => {
-    const body = { name: e.name, category: e.category, amount: Number(String(e.amount).replace(',', '.')) || 0, interval: e.interval, start: e.start, end: e.end || '', share: Number(e.share), notice: Number(e.notice) || 0, link: e.link || '', notes: e.notes || '' };
+    const body = { name: e.name, category: e.category, amount: parseNum(e.amount) || 0, interval: e.interval, start: e.start, end: e.end || '', share: Number(e.share), notice: Number(e.notice) || 0, link: e.link || '', notes: e.notes || '', needsReceipt: typeof e.needsReceipt === 'boolean' ? e.needsReceipt : null };
     try {
       if (e.id) { const x = await api.updateExpense(e.id, body); setData((d) => ({ ...d, expenses: d.expenses.map((y) => (y.id === x.id ? x : y)) })); }
       else { const x = await api.createExpense(body); setData((d) => ({ ...d, expenses: [...d.expenses, x] })); }
@@ -160,7 +161,7 @@ export default function ExpensesPage({ reloadKey }) {
     } catch (err) { toast(`Could not change it: ${err.message}`, 'error'); }
   };
   const saveIncome = async (x) => {
-    const body = { name: x.name, clientId: x.clientId || '', amount: Number(String(x.amount).replace(',', '.')) || 0, interval: x.interval, start: x.start, end: x.end || '', notes: x.notes || '' };
+    const body = { name: x.name, clientId: x.clientId || '', amount: parseNum(x.amount) || 0, interval: x.interval, start: x.start, end: x.end || '', notes: x.notes || '' };
     try {
       if (x.id) { const y = await api.updateIncome(x.id, body); setData((d) => ({ ...d, income: d.income.map((z) => (z.id === y.id ? y : z)) })); }
       else { const y = await api.createIncome(body); setData((d) => ({ ...d, income: [...d.income, y] })); }
@@ -314,11 +315,11 @@ export default function ExpensesPage({ reloadKey }) {
           <section className="ex-card ex-calc">
             <header><Calculator size={14} /> <b>What has to come in</b></header>
             <div className="ex-calc-fields">
-              <label><span>Your pay a month <em>net</em></span><span className="ex-in"><input className="input" inputMode="decimal" value={finance.salary || ''} placeholder={sums.private > 0 ? 'your private costs' : '0'} onChange={(e) => setFinance({ salary: Number(e.target.value.replace(',', '.')) || 0 })} /><i>{cur}</i></span></label>
-              <label><span>Tax on profit</span><span className="ex-in"><input className="input" inputMode="decimal" value={finance.taxRate ?? ''} onChange={(e) => setFinance({ taxRate: Number(e.target.value) || 0 })} /><i>%</i></span></label>
-              <label><span>Reserve on top</span><span className="ex-in"><input className="input" inputMode="decimal" value={finance.reserve ?? ''} onChange={(e) => setFinance({ reserve: Number(e.target.value) || 0 })} /><i>%</i></span></label>
-              <label><span>Your hourly rate</span><span className="ex-in"><input className="input" inputMode="decimal" value={finance.rate || ''} placeholder="—" onChange={(e) => setFinance({ rate: Number(e.target.value.replace(',', '.')) || 0 })} /><i>{cur}/h</i></span></label>
-              <label><span>Weeks off a year</span><span className="ex-in"><input className="input" inputMode="numeric" value={finance.weeksOff ?? ''} onChange={(e) => setFinance({ weeksOff: Number(e.target.value) || 0 })} /><i>weeks</i></span></label>
+              <label><span>Your pay a month <em>net</em></span><span className="ex-in"><NumInput value={finance.salary || null} placeholder={sums.private > 0 ? 'your private costs' : '0'} onValue={(v) => setFinance({ salary: v })} /><i>{cur}</i></span></label>
+              <label><span>Tax on profit</span><span className="ex-in"><NumInput value={finance.taxRate} onValue={(v) => setFinance({ taxRate: v })} /><i>%</i></span></label>
+              <label><span>Reserve on top</span><span className="ex-in"><NumInput value={finance.reserve} onValue={(v) => setFinance({ reserve: v })} /><i>%</i></span></label>
+              <label><span>Your hourly rate</span><span className="ex-in"><NumInput value={finance.rate || null} placeholder="—" onValue={(v) => setFinance({ rate: v })} /><i>{cur}/h</i></span></label>
+              <label><span>Weeks off a year</span><span className="ex-in"><NumInput value={finance.weeksOff} digits={0} inputMode="numeric" onValue={(v) => setFinance({ weeksOff: Math.round(v) })} /><i>weeks</i></span></label>
             </div>
             <div className="ex-calc-sum">
               {view !== 'private' && <div><span>Business costs, ⌀ a month</span><b>{money(target.costs)}</b></div>}
@@ -455,7 +456,7 @@ function ExpenseRow({ e, year, today, money, view, missing, onOpen, onLink }) {
 
 /** An expense being added or changed. */
 function ExpenseEditor({ initial, currency, onSave, onCancel, onDelete, onPrice, onDuplicate, receipts }) {
-  const [e, setE] = useState({ ...initial, amount: initial.amount === '' ? '' : String(initial.amount) });
+  const [e, setE] = useState({ ...initial, amount: fmtInput(initial.amount) });
   const [price, setPrice] = useState(null); // { amount, from } — a new price from a day on
   const [split, setSplit] = useState(() => Number(initial.share) > 0 && Number(initial.share) < 100); // part business, part private
   const set = (p) => setE((x) => ({ ...x, ...p }));
@@ -466,14 +467,14 @@ function ExpenseEditor({ initial, currency, onSave, onCancel, onDelete, onPrice,
     else if (k === 'private') set({ share: 0 });
     else if (!(Number(e.share) > 0 && Number(e.share) < 100)) set({ share: 50 });
   };
-  const ok = e.name.trim() && Number(String(e.amount).replace(',', '.')) > 0 && e.start;
+  const ok = e.name.trim() && parseNum(e.amount) > 0 && e.start;
   const save = () => { if (ok) onSave(e); };
   const pickName = (v) => {
     const idea = EXPENSE_IDEAS.find(([n]) => n.toLowerCase() === v.trim().toLowerCase());
     if (idea && !initial.id && idea[2] != null) setSplit(false);
     set({ name: v, ...(idea && !initial.id ? { category: idea[1], ...(idea[2] != null ? { share: idea[2] } : {}) } : {}) });
   };
-  const perYear = e.interval === 'once' ? null : (Number(String(e.amount).replace(',', '.')) || 0) * (12 / (intervalOf(e.interval).months || 12));
+  const perYear = e.interval === 'once' ? null : (parseNum(e.amount) || 0) * (12 / (intervalOf(e.interval).months || 12));
   return (
     <div className="ex-editor" onKeyDown={(ev) => { if (ev.key === 'Escape') onCancel(); if (ev.key === 'Enter' && ev.target.tagName === 'INPUT') { ev.preventDefault(); save(); } }}>
       <div className="ex-editor-row">
@@ -506,6 +507,13 @@ function ExpenseEditor({ initial, currency, onSave, onCancel, onDelete, onPrice,
         {e.interval !== 'once' && (
           <label className="ex-f"><span>Notice to cancel</span><span className="ex-in"><input className="input" inputMode="numeric" value={e.notice || ''} placeholder="—" onChange={(ev) => set({ notice: ev.target.value.replace(/[^\d]/g, '').slice(0, 3) })} /><i>days</i></span></label>
         )}
+        <div className="ex-f ex-use"><span>Receipts</span>
+          <div className="segmented segmented-sm" role="group" aria-label="Receipts" title="Does each payment need a receipt (an invoice, a bill)? On its own: business costs do; private costs, health insurance, pension and taxes don’t">
+            {[[true, 'Needed'], [false, 'Not needed']].map(([k, l]) => (
+              <button key={l} type="button" className={needsReceipts(e) === k ? 'on' : ''} aria-pressed={needsReceipts(e) === k} onClick={() => set({ needsReceipt: k === needsReceiptsByDefault(e) ? null : k })}>{l}</button>
+            ))}
+          </div>
+        </div>
         <label className="ex-f grow"><span>Link <em>account, contract</em></span><input className="input" value={e.link} placeholder="https://…" inputMode="url" onChange={(ev) => set({ link: ev.target.value })} /></label>
       </div>
       <label className="ex-f grow"><span>Notes</span><input className="input" value={e.notes} placeholder="Contract number, what it's for…" onChange={(ev) => set({ notes: ev.target.value })} /></label>
@@ -514,24 +522,25 @@ function ExpenseEditor({ initial, currency, onSave, onCancel, onDelete, onPrice,
         <div className="ex-price" onKeyDown={(ev) => {
           if (ev.key !== 'Enter') return;
           ev.stopPropagation(); ev.preventDefault();
-          const a = Number(String(price.amount).replace(',', '.'));
+          const a = parseNum(price.amount);
           if (a > 0 && price.from) onPrice(a, price.from);
         }}>
           <span>New price</span>
           <span className="ex-in"><input className="input" inputMode="decimal" value={price.amount} autoFocus onChange={(ev) => setPrice({ ...price, amount: ev.target.value })} aria-label="New amount" /><i>{currency}</i></span>
           <span>from</span>
           <input className="input" type="date" value={price.from} onChange={(ev) => setPrice({ ...price, from: ev.target.value })} aria-label="From" />
-          <button type="button" className="btn btn-sm btn-primary" disabled={!(Number(String(price.amount).replace(',', '.')) > 0) || !price.from}
-            onClick={() => onPrice(Number(String(price.amount).replace(',', '.')), price.from)}><Check size={13} /> Apply</button>
+          <button type="button" className="btn btn-sm btn-primary" disabled={!(parseNum(price.amount) > 0) || !price.from}
+            onClick={() => onPrice(parseNum(price.amount), price.from)}><Check size={13} /> Apply</button>
           <button type="button" className="icon-btn" onClick={() => setPrice(null)} aria-label="Cancel"><X size={14} /></button>
           <p className="hint">The payments before stay at the old price.</p>
         </div>
       )}
       <datalist id="ex-ideas">{EXPENSE_IDEAS.map(([n]) => <option key={n} value={n} />)}</datalist>
-      {receipts || <p className="hint ex-rc-later"><Paperclip size={13} /> Receipts can be added once it’s saved.</p>}
+      {receipts ? cloneElement(receipts, { need: needsReceipts({ ...initial, share: Number(e.share), category: e.category, needsReceipt: e.needsReceipt }) })
+        : <p className="hint ex-rc-later"><Paperclip size={13} /> Receipts can be added once it’s saved.</p>}
       <div className="ex-editor-foot">
         {onDelete && <button type="button" className="btn btn-sm btn-ghost ex-del" onClick={onDelete}><Trash2 size={14} /> Delete</button>}
-        {onPrice && e.interval !== 'once' && !price && <button type="button" className="btn btn-sm btn-ghost" onClick={() => setPrice({ amount: String(initial.amount), from: nextPayment(initial) || todayIso() })}><TrendingUp size={14} /> Price changes…</button>}
+        {onPrice && e.interval !== 'once' && !price && <button type="button" className="btn btn-sm btn-ghost" onClick={() => setPrice({ amount: fmtInput(initial.amount), from: nextPayment(initial) || todayIso() })}><TrendingUp size={14} /> Price changes…</button>}
         {onDuplicate && <button type="button" className="btn btn-sm btn-ghost" onClick={onDuplicate}><Copy size={14} /> Duplicate</button>}
         <span className="ex-gap" />
         <button type="button" className="btn btn-sm" onClick={onCancel}>Cancel</button>
@@ -539,6 +548,14 @@ function ExpenseEditor({ initial, currency, onSave, onCancel, onDelete, onPrice,
       </div>
     </div>
   );
+}
+
+/** A number field that keeps what you type ("12," on the way to "12,5") and passes on the number. */
+function NumInput({ value, onValue, digits = 2, inputMode = 'decimal', ...rest }) {
+  const [text, setText] = useState(() => fmtInput(value, digits));
+  // A change from elsewhere (another device, a reload) shows; your own typing stays as typed.
+  useEffect(() => { if (parseNum(text, 0) !== (value ?? 0)) setText(fmtInput(value, digits)); }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+  return <input className="input" inputMode={inputMode} value={text} {...rest} onChange={(ev) => { setText(ev.target.value); onValue(parseNum(ev.target.value, 0)); }} />;
 }
 
 function IncomeRow({ x, client, today, money, onOpen }) {
@@ -562,16 +579,16 @@ function IncomeRow({ x, client, today, money, onOpen }) {
 
 /** Money that comes in regularly, being added or changed. */
 function IncomeEditor({ initial, clients, currency, onSave, onCancel, onDelete }) {
-  const [x, setX] = useState({ ...initial, amount: initial.amount === '' ? '' : String(initial.amount) });
+  const [x, setX] = useState({ ...initial, amount: fmtInput(initial.amount) });
   const set = (p) => setX((v) => ({ ...v, ...p }));
-  const ok = x.name.trim() && Number(String(x.amount).replace(',', '.')) > 0 && x.start;
+  const ok = x.name.trim() && parseNum(x.amount) > 0 && x.start;
   const save = () => { if (ok) onSave(x); };
   // Picking a client names an unnamed one after it.
   const pickClient = (id) => {
     const c = clients.find((y) => y.id === id);
     set({ clientId: id, ...(c && !x.name.trim() ? { name: `Retainer ${c.name}` } : {}) });
   };
-  const perMonth = (Number(String(x.amount).replace(',', '.')) || 0) / (intervalOf(x.interval).months || 1);
+  const perMonth = (parseNum(x.amount) || 0) / (intervalOf(x.interval).months || 1);
   return (
     <div className="ex-editor ex-inc-editor" onKeyDown={(ev) => { if (ev.key === 'Escape') onCancel(); if (ev.key === 'Enter' && ev.target.tagName === 'INPUT') { ev.preventDefault(); save(); } }}>
       <div className="ex-editor-row">

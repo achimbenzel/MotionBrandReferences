@@ -23,6 +23,7 @@ import {
 import { getPref } from '../lib/prefs.js';
 import { daysFromToday, fmtDay } from '../lib/dates.js';
 import '../styles/clients.css';
+import { fmtFixed, parseNum } from '../lib/format.js';
 
 const rid = () => Math.random().toString(36).slice(2, 10);
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
@@ -480,8 +481,8 @@ function Invoices({ client, setClient, invoices, plans, currency, openSum, paidS
           <div className="client-inv-fields">
             <input type="date" className="input" value={inv.date} onChange={(e) => edit(inv, { date: e.target.value })} aria-label="Invoice date" />
             <span className="client-inv-amount">
-              <input className="input" inputMode="decimal" defaultValue={inv.amount != null ? inv.amount.toFixed(2) : ''} key={`${inv.id}:${inv.amount ?? ''}`} placeholder="Amount"
-                onBlur={(e) => { const v = e.target.value.trim().replace(',', '.'); const n = v === '' ? null : Number(v); if (v === '' || Number.isFinite(n)) edit(inv, { amount: n }); }} aria-label="Amount" />
+              <input className="input" inputMode="decimal" defaultValue={inv.amount != null ? fmtFixed(inv.amount, 2) : ''} key={`${inv.id}:${inv.amount ?? ''}`} placeholder="Amount"
+                onBlur={(e) => { const v = e.target.value.trim(); const n = v === '' ? null : parseNum(v); if (v === '' || Number.isFinite(n)) edit(inv, { amount: n }); }} aria-label="Amount" />
               <i>{currency}</i>
             </span>
             <select className="input" value={inv.planId || ''} onChange={(e) => edit(inv, { planId: e.target.value || null })} aria-label="Project">

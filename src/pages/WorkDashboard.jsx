@@ -24,6 +24,7 @@ import AchievementsWidget from '../components/dashboard/AchievementsWidget.jsx';
 import WeeklyTodos from '../components/dashboard/WeeklyTodos.jsx';
 import MoneyWidget from '../components/dashboard/MoneyWidget.jsx';
 import { useSortable, moveItem } from '../lib/useSortable.js';
+import { fmtDate } from '../lib/format.js';
 
 const DEFAULT_BANNER = 'linear-gradient(120deg,#6a11cb,#2575fc)';
 const today0 = () => { const t = new Date(); t.setHours(0, 0, 0, 0); return t; };
@@ -420,7 +421,7 @@ export default function WorkDashboard({ reloadKey, onNewPlan }) {
           <span className="dash-hero-grain" />
         </div>
         <div className="dash-hero-main">
-          <span className="dash-hero-eyebrow"><Sparkles size={13} /> Dashboard · {now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+          <span className="dash-hero-eyebrow"><Sparkles size={13} /> Dashboard · {fmtDate(now, { weekday: 'long', day: 'numeric', month: 'long' })}</span>
           <h1>{greeting(hour)}</h1>
           <p>{plans === null ? 'Getting your day ready…' : summary}</p>
           <div className="dash-hero-actions">

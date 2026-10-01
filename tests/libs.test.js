@@ -13,6 +13,7 @@ import { hashtagsOf, threadParts, charCount, weekdayOf, mondayOf, fmtSec } from 
 import { parseVideoLink, firstUrl } from '../src/lib/videoLinks.js';
 import { normalizeUrl, hostOf, youtubeId } from '../src/lib/types.js';
 import { WIDGETS, layoutOf, lonelyHalves } from '../src/lib/dashboardLayout.js';
+import { setFormats, fmtDate, fmtTime, fmtCurrency, fmtInt, fmtFixed, fmtBytes, parseNum, monthName, weekdayName } from '../src/lib/format.js';
 
 // Germany: a day starts an hour or two before UTC's does.
 process.env.TZ = 'Europe/Berlin';
@@ -168,7 +169,7 @@ test('content: hashtags, threads, weeks and lengths', () => {
   assert.equal(weekdayOf('2026-10-04'), 6);
   assert.equal(mondayOf('2026-10-04'), '2026-09-28');
   assert.equal(mondayOf('2027-01-01'), '2026-12-28');
-  assert.equal(fmtSec(7.25), '7.3 s');
+  assert.equal(fmtSec(7.25), '7,3 s'); // Germany's numbers, unless chosen otherwise
   assert.equal(fmtSec(15), '15 s');
   assert.equal(fmtSec(75), '1:15');
 });
@@ -204,4 +205,26 @@ test('dashboard: half-width widgets pair up in your order; a lone one takes the 
   assert.deepEqual([...lonelyHalves(['a', 'b', 'c', 'd', 'e'], (id) => size[id])], ['a', 'e']);
   assert.deepEqual([...lonelyHalves(['c', 'd'], (id) => size[id])], []);
   assert.deepEqual([...lonelyHalves([], (id) => size[id])], []);
+});
+
+test('formats: Germany by default — dates, times, money and typed numbers; the others on request', () => {
+  const d = new Date(2026, 9, 27, 14, 5);
+  setFormats({ date: 'de', number: 'de' });
+  assert.deepEqual([fmtDate(d), fmtDate(d, { day: 'numeric', month: 'short', year: 'numeric' }), fmtDate(d, { weekday: 'short', day: 'numeric', month: 'short' }), fmtTime(d)],
+    ['27.10.2026', '27 Oct 2026', 'Tue 27 Oct', '14:05']);
+  assert.equal(fmtDay('2026-10-27', { day: 'numeric', month: 'numeric', year: 'numeric' }), '27.10.2026');
+  assert.deepEqual([fmtCurrency(1234.5).replace(/\s/g, ' '), fmtInt(12345), fmtFixed(12.5, 2), fmtBytes(1300000)], ['1.234,50 €', '12.345', '12,50', '1,2 MB']);
+  // Typed in any of the usual ways.
+  assert.deepEqual(['66,45', '66.45', '1.234,56', '1,234.56', '1.234', '0.500', '1’234.5', '€ 12', '-3,5', 'abc'].map((x) => parseNum(x)),
+    [66.45, 66.45, 1234.56, 1234.56, 1234, 0.5, 1234.5, 12, -3.5, NaN]);
+  assert.equal(parseNum('', 0), 0);
+  // Names stay English (the app's language), Monday first.
+  assert.deepEqual([monthName(9), monthName(9, 'long'), weekdayName(0), weekdayName(6, 'long')], ['Oct', 'October', 'Mon', 'Sunday']);
+  setFormats({ date: 'us', number: 'en' });
+  assert.deepEqual([fmtDate(d), fmtDate(d, { day: 'numeric', month: 'short' }), fmtTime(d), fmtCurrency(1234.5), parseNum('1,234')], ['10/27/2026', 'Oct 27', '2:05 PM', '€1,234.50', 1234]);
+  setFormats({ date: 'iso' });
+  assert.equal(fmtDate(d), '2026-10-27');
+  setFormats({ date: 'nonsense', number: 'de' }); // unknown → stays
+  assert.equal(fmtDate(d), '2026-10-27');
+  setFormats({ date: 'de', number: 'de' });
 });

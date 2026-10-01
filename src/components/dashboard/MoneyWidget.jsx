@@ -6,6 +6,7 @@ import { fmtMoney } from '../../lib/clients.js';
 import { addDays, fmtDay } from '../../lib/dates.js';
 import { monthsOf, yearOf, targetFor, paymentsIn, cancelBy, todayIso, inView, partOf, incomeNow, VIEWS } from '../../lib/expenses.js';
 import { getPref } from '../../lib/prefs.js';
+import { monthName } from '../../lib/format.js';
 
 // The same view as the switch on the Expenses page (business, private or both).
 const viewOf = () => { const v = getPref('exView'); return VIEWS.some((x) => x.key === v) ? v : 'business'; };
@@ -82,7 +83,7 @@ export default function MoneyWidget({ reloadKey, compact = false }) {
       {head}
       <div className="dash-money-body">
         <button type="button" className="dash-money-goal" onClick={() => navigate('/expenses')}>
-          <span className="dash-money-goal-top"><Target size={13} /> To earn in {new Date(year, m - 1, 1).toLocaleDateString(undefined, { month: 'long' })} · {WORD[view]}</span>
+          <span className="dash-money-goal-top"><Target size={13} /> To earn in {monthName(m - 1, 'long')} · {WORD[view]}</span>
           <b>{money(invoiced)} <em>/ {money(target.total)}</em></b>
           <span className="dash-money-bar"><i style={{ width: `${Math.max(pct ? 2 : 0, pct * 100)}%` }} /></span>
           <small>

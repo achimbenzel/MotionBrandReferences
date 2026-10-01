@@ -345,6 +345,17 @@ volume** (and mute) is remembered across reloads in this browser, and can be
 reset from here. The **currency** (EUR, USD, GBP, CHF, JPY, CAD, AUD) is
 what hourly rates, amounts in the Excel export and invoice sums are shown in.
 
+**Dates & numbers** — how days, times and amounts are shown everywhere,
+**Germany** unless you choose otherwise: dates **27.10.2026** (with names:
+27 Oct 2026, Tue 27 Oct), the 24-hour clock and numbers **1.234,56 €**. Dates
+can also be **UK** (27/10/2026), **US** (10/27/2026, 2:05 PM) or **ISO**
+(2026-10-27); numbers **Switzerland** (1’234.56) or **English** (€1,234.56).
+Month and weekday names stay English, like the rest of the app. Only the
+display changes — days are stored as 2026-10-27 and amounts as plain numbers,
+so nothing saved is touched; the choice is kept with the library
+(`settings.formats`), so every device shows the same. Amounts can be typed
+either way — 66,45 · 66.45 · 1.234,56 · 1,234.56 — and are read right.
+
 ### Smaller picture uploads
 
 Wherever you add a picture — new references (every section), covers, client
@@ -1171,8 +1182,14 @@ less the money that comes in regularly anyway (retainers).
   open months. **Missing in 2026** lists the payments up to today that have
   none; a click on one adds the receipt for exactly that payment. The day can
   be changed; a click on the name opens the file; delete goes to the Trash
-  (with Undo). Private costs need none (you can still keep them). Files are
-  kept as they are — never made smaller.
+  (with Undo). Files are kept as they are — never made smaller.
+  **Receipts: Needed / Not needed** (in the editor) decides whether an
+  expense's payments need one. On its own it follows the expense: business
+  costs do; private costs, health insurance, pension and taxes (category
+  *Health & pension*, *Taxes & fees* — they come with a yearly statement)
+  don't. Choosing sets it for that expense; choosing what it would be anyway
+  lets it follow again. Not needed: nothing shows as missing — you can still
+  keep receipts there.
 - **Export** — the year as **Excel** (German or English): every payment with
   date, name, category, rhythm, amount, business %, business and private
   amount (as formulas, with totals that follow a filter) and its **receipt**

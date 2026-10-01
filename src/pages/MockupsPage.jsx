@@ -7,7 +7,8 @@ import Menu from '../components/Menu.jsx';
 import { DEVICES, itemIcon, OBJECTS, OBJECT_ICON, defaultObject } from '../lib/mockup3d/catalog.js';
 import { TYPES_2D, defaults2D } from '../lib/mockup2d.js';
 import '../styles/mockups.css';
-const fmtSize = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+import { fmtBytes } from '../lib/format.js';
+const fmtSize = (n) => fmtBytes(Math.max(1024, n || 0));
 const ago = (ts) => {
   const d = Math.floor((Date.now() - ts) / 86400000);
   return d <= 0 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`;

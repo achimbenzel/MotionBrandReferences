@@ -3,11 +3,10 @@ import { X, ImageDown, Check } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { setImagePrompter, optimizeImage, FORMATS, EDGES } from '../lib/imageOptimize.js';
 import Range from './Range.jsx';
+import { fmtBytes as fmtSize } from '../lib/format.js';
 
 export const fmtBytes = (n) => {
-  const u = ['B', 'KB', 'MB', 'GB']; let v = n || 0; let i = 0;
-  while (v >= 1024 && i < u.length - 1) { v /= 1024; i += 1; }
-  return `${v.toFixed(v < 10 && i > 0 ? 1 : 0)} ${u[i]}`;
+  return fmtSize(n);
 };
 export const edgeLabel = (e) => (e ? `${e} px` : 'Original');
 

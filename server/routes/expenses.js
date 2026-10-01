@@ -22,7 +22,7 @@ const router = createRouter();
 export default router;
 
 export const expenseDir = (id) => path.join(DATA_DIR, 'expense', id);
-const EDITABLE = ['name', 'category', 'amount', 'interval', 'start', 'end', 'share', 'notice', 'link', 'notes'];
+const EDITABLE = ['name', 'category', 'amount', 'interval', 'start', 'end', 'share', 'notice', 'link', 'notes', 'needsReceipt'];
 const sorted = (list) => [...list].sort((a, b) => a.category.localeCompare(b.category) || b.amount - a.amount);
 // Every invoice (date, amount, paid or not) — what came in, for "earned this month".
 const invoicesOf = (db) => (db.clients || []).flatMap((c) => (c.invoices || []).filter((i) => i.date && i.amount != null)
@@ -229,7 +229,7 @@ function receiptFiles(db, year, w) {
   const out = new Map();
   for (const { e, r } of list) {
     const ext = path.extname(r.file).toLowerCase();
-    const stem = `${needsReceipts(e) ? '' : `${w.privateFolder}/`}${r.date} ${clean(e.name)}`;
+    const stem = `${e.share > 0 ? '' : `${w.privateFolder}/`}${r.date} ${clean(e.name)}`;
     let name = `${stem}${ext}`;
     for (let n = 2; used.has(name.toLowerCase()); n += 1) name = `${stem} (${n})${ext}`;
     used.add(name.toLowerCase());

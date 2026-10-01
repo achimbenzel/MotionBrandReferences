@@ -1,5 +1,6 @@
 // Content planning: the platforms, formats and stages a post goes through.
 import { dayKey, fmtDay, addDays } from './dates.js';
+import { fmtFixed, fmtInt, fmtDec, weekdayName } from './format.js';
 
 export { dayKey, fmtDay, addDays };
 
@@ -43,7 +44,7 @@ export const fullText = (c) => [c.caption?.trim(), hashtagsOf(c.hashtags).join('
 // X counts characters differently from JS (emoji = 2, links = 23) — close enough here: code points.
 export const charCount = (s) => [...String(s || '')].length;
 
-export const fmtNum = (n) => (n == null ? '—' : n >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e7 ? 0 : 1)}M` : n >= 1e4 ? `${Math.round(n / 1e3)}K` : n.toLocaleString());
+export const fmtNum = (n) => (n == null ? '—' : n >= 1e6 ? `${fmtFixed(n / 1e6, n >= 1e7 ? 0 : 1)}M` : n >= 1e4 ? `${Math.round(n / 1e3)}K` : fmtInt(n));
 
 // ---- Per platform: its own text, else caption + hashtags ----------------------
 /** The text as it goes out on one platform: its own (if written), else caption + hashtags. */
@@ -86,7 +87,7 @@ export const lengthNote = (sec) => REEL_LENGTHS.find((l) => sec <= l.max)?.label
 export const fmtSpan = (a, b) => (b < 60 ? `${fmtSec(a).replace(' s', '')}–${fmtSec(b)}` : `${fmtSec(a)}–${fmtSec(b)}`);
 export const fmtSec = (s) => {
   const v = Math.round((s || 0) * 10) / 10;
-  if (v < 60) return `${v % 1 ? v.toFixed(1) : v} s`;
+  if (v < 60) return `${fmtDec(v, 1)} s`;
   return `${Math.floor(v / 60)}:${String(Math.round(v % 60)).padStart(2, '0')}`;
 };
 
@@ -114,7 +115,7 @@ export const checklistFor = (format) => CHECKLISTS[format] || VIDEO_CHECKS;
 // ---- Pillars and rhythm ----------------------------------------------------------
 export const PILLAR_IDEAS = ['Breakdowns', 'Behind the scenes', 'Client work', 'Tips & tricks', 'Process', 'Showreel', 'Personal'];
 export const pillarOf = (pillars, id) => (id ? (pillars || []).find((p) => p.id === id) || null : null);
-export const WEEKDAY_LONG = Array.from({ length: 7 }, (_, i) => new Date(2024, 0, 1 + i).toLocaleDateString(undefined, { weekday: 'long' })); // Monday first
+export const WEEKDAY_LONG = Array.from({ length: 7 }, (_, i) => weekdayName(i, 'long')); // Monday first
 export const weekdayOf = (iso) => { const [y, m, d] = iso.split('-').map(Number); return (new Date(y, m - 1, d).getDay() + 6) % 7; };
 export const mondayOf = (iso) => addDays(iso, -weekdayOf(iso));
 

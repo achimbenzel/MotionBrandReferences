@@ -1,6 +1,7 @@
 // Achievements: rarities (and the XP each is worth), your rank, and the
 // numbers (yours to type in) an achievement can unlock by itself.
 import { fmtDay } from './dates.js';
+import { fmtInt } from './format.js';
 
 export const RARITIES = {
   stone: { label: 'Stone', xp: 10, color: '#8a8a92' },
@@ -70,7 +71,7 @@ export const shortNum = (n) => {
 };
 export const fmtValue = (metric, n) => {
   if (n == null) return '';
-  const s = Math.round(n).toLocaleString();
+  const s = fmtInt(n);
   return METRICS[metric]?.unit ? `${s} ${METRICS[metric].unit}` : s;
 };
 /** How far a locked achievement with a number is: 0–1 (null without one). */

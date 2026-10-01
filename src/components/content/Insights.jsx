@@ -6,6 +6,7 @@ import {
 } from '../../lib/content.js';
 import PostCover from './PostCover.jsx';
 import { usePref } from '../../lib/prefs.js';
+import { fmtFixed } from '../../lib/format.js';
 
 const PERIODS = [
   { key: '30', label: '30 days', days: 30 },
@@ -28,7 +29,7 @@ export const rateOf = (c) => {
 };
 const avg = (list) => (list.length ? list.reduce((n, x) => n + x, 0) / list.length : null);
 const sum = (list, k) => list.reduce((n, c) => n + (c.metrics?.[k] || 0), 0);
-const pct = (v) => (v == null ? '—' : `${v.toFixed(v < 10 ? 1 : 0)} %`);
+const pct = (v) => (v == null ? '—' : `${fmtFixed(v, v < 10 ? 1 : 0)} %`);
 const lengthOf = (c) => (c.beats || []).reduce((n, b) => n + (b.sec || 0), 0);
 const LENGTHS = [
   { key: 'l1', label: 'under 15 s', test: (s) => s > 0 && s < 15 },
@@ -103,13 +104,13 @@ export default function Insights({ items, all, pillars, rhythm, today, onOpen })
         const f = best.views / overall;
         if (f < 1.25) continue;
         const who = k === 'format' ? `${best.label}s` : k === 'daypart' ? `${NAMES[k]} ${best.label.split(' (')[0].toLowerCase()}` : `${NAMES[k]} ${best.label}`;
-        notes.push({ f, text: <><b>{who}</b> get <b>{f.toFixed(1)}×</b> your average views (⌀ {fmtNum(Math.round(best.views))} over {best.posts.length} posts).</> });
+        notes.push({ f, text: <><b>{who}</b> get <b>{fmtFixed(f, 1)}×</b> your average views (⌀ {fmtNum(Math.round(best.views))} over {best.posts.length} posts).</> });
       }
       const rates = nums.map(rateOf).filter((x) => x != null);
       const saves = nums.filter((c) => c.metrics.saves != null && c.metrics.views);
       if (saves.length >= 3) {
         const top = [...saves].sort((a, b) => b.metrics.saves / b.metrics.views - a.metrics.saves / a.metrics.views)[0];
-        notes.push({ f: 1.1, text: <>Saved most often: <b>“{top.title || 'Untitled post'}”</b> ({((top.metrics.saves / top.metrics.views) * 100).toFixed(1)} % of viewers saved it) — worth a part two.</> });
+        notes.push({ f: 1.1, text: <>Saved most often: <b>“{top.title || 'Untitled post'}”</b> ({fmtFixed((top.metrics.saves / top.metrics.views) * 100, 1)} % of viewers saved it) — worth a part two.</> });
       }
       if (rates.length >= 3) {
         const r = avg(rates);

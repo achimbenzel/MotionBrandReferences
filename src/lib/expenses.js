@@ -88,8 +88,12 @@ export function paymentsIn(e, from, to) {
 }
 // ---- Receipts ---------------------------------------------------------------------
 // What the business pays needs a receipt (an invoice, a bill) for each payment;
-// a receipt counts for the payment in its month. Private costs need none.
-export const needsReceipts = (e) => Number(e?.share ?? 100) > 0;
+// a receipt counts for the payment in its month. Unless chosen for the expense
+// (`needsReceipt`), private costs need none, and neither do health insurance,
+// pension and taxes (they come with a yearly statement, not a bill each time).
+export const NO_RECEIPT_CATEGORIES = ['health', 'taxes'];
+export const needsReceiptsByDefault = (e) => Number(e?.share ?? 100) > 0 && !NO_RECEIPT_CATEGORIES.includes(e?.category);
+export const needsReceipts = (e) => (typeof e?.needsReceipt === 'boolean' ? e.needsReceipt : needsReceiptsByDefault(e));
 /** Each payment of `e` from `from` to `to`, and whether a receipt from its month is there → [{ date, covered }]. */
 export function receiptCheck(e, from, to) {
   if (!needsReceipts(e)) return [];

@@ -1,3 +1,4 @@
+import { fmtDate } from './format.js';
 // Brand Tester helpers: load a logo and find its visible bounds, recolour it,
 // the app-icon squircle, and the test sheet drawn on a canvas (PNG).
 
@@ -125,7 +126,7 @@ export async function renderSheet(logo, o) {
   if (T.page) { ctx.fillStyle = T.page; ctx.fillRect(0, 0, W, H); }
 
   label(ctx, `Brand test — ${o.name || 'Logo'}`, M, 62, { size: 30, color: T.ink, weight: 700 });
-  label(ctx, [o.tint === 'original' ? 'Original colours' : `Colour ${o.tint}`, new Date().toLocaleDateString()].join(' · '), W - M, 62, { size: 14, align: 'right' });
+  label(ctx, [o.tint === 'original' ? 'Original colours' : `Colour ${o.tint}`, fmtDate(new Date())].join(' · '), W - M, 62, { size: 14, align: 'right' });
 
   // Row A: on white, on black, on the chosen background
   const pw = (W - M * 2 - 24 * 2) / 3; const ph = 300; let y = 100;

@@ -4,12 +4,11 @@ import { useState } from 'react';
 import { UploadCloud, Library, ChevronDown, ChevronRight, X, Plus, FileText, ExternalLink, Trash2, File as FileIcon } from 'lucide-react';
 import PdfViewer from '../PdfViewer.jsx';
 import { planFileUrl } from '../../lib/api.js';
+import { fmtBytes as fmtSize } from '../../lib/format.js';
 
 const fmtBytes = (n) => {
   if (n == null) return '';
-  const u = ['B', 'KB', 'MB', 'GB']; let v = n; let i = 0;
-  while (v >= 1024 && i < u.length - 1) { v /= 1024; i += 1; }
-  return `${v.toFixed(v < 10 && i > 0 ? 1 : 0)} ${u[i]}`;
+  return fmtSize(n);
 };
 
 /** Pictures in a masonry grid; drop, add, paste or pick them from the app. */

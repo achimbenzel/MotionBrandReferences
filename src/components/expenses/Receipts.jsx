@@ -3,11 +3,12 @@ import { Paperclip, UploadCloud, FileText, Image as ImageIcon, FileCode2, Trash2
 import { api } from '../../lib/api.js';
 import { fmtDay } from '../../lib/dates.js';
 import { missingReceipts, needsReceipts } from '../../lib/expenses.js';
+import { fmtBytes } from '../../lib/format.js';
 
 const ACCEPT = 'application/pdf,.pdf,image/*,.heic,.heif,.xml,text/xml,application/xml';
 const OK = /\.(pdf|png|jpe?g|webp|gif|heic|heif|avif|xml)$/i;
 const ICON = { pdf: FileText, image: ImageIcon, xml: FileCode2, other: FileText };
-const sizeOf = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round((n || 0) / 1024))} KB`);
+const sizeOf = (n) => fmtBytes(Math.max(1024, n || 0));
 const LONG = { day: 'numeric', month: 'short', year: 'numeric' };
 const SHORT = { day: 'numeric', month: 'short' };
 const SHOW_MISSING = 6;
@@ -20,15 +21,15 @@ const SHOW_MISSING = 6;
  * right away — apart from the editor's Save. The year's receipts are listed;
  * those of other years on request.
  */
-export default function Receipts({ expense, year, today, onChange, onReload, toast }) {
+export default function Receipts({ expense, need, year, today, onChange, onReload, toast }) {
   const fileRef = useRef(null);
   const forDate = useRef(null); // the payment picked from "missing"
   const [drag, setDrag] = useState(false);
   const [busy, setBusy] = useState(false);
   const [all, setAll] = useState(false);
   const receipts = expense.receipts || [];
-  const needed = needsReceipts(expense);
-  const missing = missingReceipts(expense, year, today);
+  const needed = need ?? needsReceipts(expense); // as set in the editor, before it's saved
+  const missing = missingReceipts({ ...expense, needsReceipt: needed }, year, today);
   const inYear = receipts.filter((r) => r.date.startsWith(`${year}-`));
   const shown = all ? receipts : inYear;
   const others = receipts.length - inYear.length;
@@ -67,7 +68,7 @@ export default function Receipts({ expense, year, today, onChange, onReload, toa
       onDrop={(e) => { e.preventDefault(); setDrag(false); upload(e.dataTransfer.files); }}>
       <div className="ex-rc-head">
         <b><Paperclip size={14} /> Receipts <span className="count">{receipts.length || ''}</span></b>
-        <em>{needed ? 'saved right away' : 'private — none needed'}</em>
+        <em>{needed ? 'saved right away' : 'not needed — you can still keep some'}</em>
         <button type="button" className="btn btn-sm" onClick={() => pick()} disabled={busy}><UploadCloud size={14} /> {busy ? 'Uploading…' : 'Add'}</button>
       </div>
       <input ref={fileRef} type="file" accept={ACCEPT} multiple hidden onChange={(e) => { upload(e.target.files); e.target.value = ''; }} />

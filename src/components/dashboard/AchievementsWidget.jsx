@@ -4,6 +4,7 @@ import { Trophy, ArrowRight, Sparkles, Target, Clock } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { RARITIES, xpOf, rankOf, progressOf, fmtValue, fmtDate } from '../../lib/achievements.js';
 import { RankEmblem, Badge } from '../achievements/AchievementCard.jsx';
+import { fmtInt } from '../../lib/format.js';
 
 /**
  * Achievements on the dashboard: your rank and XP, how many you have (and
@@ -47,7 +48,7 @@ export default function AchievementsWidget({ reloadKey, compact = false }) {
           <span className="dash-ach-rank-main">
             <b>{rank.label}</b>
             <span className="ach-xpbar"><i style={{ width: `${rank.progress * 100}%` }} /></span>
-            <small>{xp.toLocaleString()} XP{rank.top ? ' · top rank' : ` · ${(rank.to - xp).toLocaleString()} to ${rank.next.label}`}</small>
+            <small>{fmtInt(xp)} XP{rank.top ? ' · top rank' : ` · ${fmtInt(rank.to - xp)} to ${rank.next.label}`}</small>
           </span>
         </button>
         <div className="dash-ach-nums">

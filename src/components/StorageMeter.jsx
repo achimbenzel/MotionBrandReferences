@@ -5,12 +5,13 @@ import { api } from '../lib/api.js';
 import { useToast } from './Toast.jsx';
 import Menu from './Menu.jsx';
 import { useConfirm } from './ConfirmDialog.jsx';
+import { fmtFixed, parseNum } from '../lib/format.js';
 
 const GB = 1024 * 1024 * 1024;
 const fmt = (bytes) => {
-  if (bytes >= GB) return `${(bytes / GB).toFixed(1)} GB`;
+  if (bytes >= GB) return `${fmtFixed(bytes / GB, 1)} GB`;
   const mb = bytes / (1024 * 1024);
-  if (mb >= 1) return `${mb.toFixed(mb < 10 ? 1 : 0)} MB`;
+  if (mb >= 1) return `${fmtFixed(mb, mb < 10 ? 1 : 0)} MB`;
   return `${Math.max(0, Math.round(bytes / 1024))} KB`;
 };
 
@@ -43,7 +44,7 @@ export default function StorageMeter({ menuUp = false }) {
   };
 
   const saveLimit = async () => {
-    const v = parseFloat(String(gb).replace(',', '.'));
+    const v = parseNum(gb);
     if (!(v > 0)) { toast('Enter a number greater than 0', 'error'); return; }
     try {
       await api.setStorageLimit(Math.round(v * GB));

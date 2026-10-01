@@ -20,7 +20,7 @@ import { normalizeAchievement, normalizeAchievementStats } from './schema/achiev
 import { isLegacySoftware, normalizeSoftware } from './schema/software.js';
 import { logoActive, logoNeedsMigration, logoRenditionList, logoSource, normalizeSegments } from './schema/references.js';
 import { CURRENCIES } from './schema/base.js';
-import { normalizeDashboardFocus, normalizeDashboardLayout, normalizeImageUploads, normalizeWeeklyTodos } from './schema/settings.js';
+import { normalizeDashboardFocus, normalizeDashboardLayout, normalizeImageUploads, normalizeWeeklyTodos, normalizeFormats } from './schema/settings.js';
 import { normalizeBoard } from './schema/board.js';
 
 // Each area's record shapes live in schema/ — all of them are exported from here too.
@@ -101,6 +101,7 @@ export function normalizeDB(db) {
   db.settings.finance = normalizeFinance(db.settings.finance);
   db.settings.contentRhythm = normalizeContentRhythm(db.settings.contentRhythm);
   db.settings.dashboardLayout = normalizeDashboardLayout(db.settings.dashboardLayout);
+  db.settings.formats = normalizeFormats(db.settings.formats); // how dates and numbers are shown
   return db;
 }
 // What a migration would change, computed from the RAW (unnormalized) db.

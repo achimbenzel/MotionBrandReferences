@@ -4,7 +4,7 @@ import { DATA_DIR } from '../config.js';
 import { readDB, mutateDB } from '../db.js';
 import { getUsedBytes, replaceImage, safeRm } from '../files.js';
 import { upload } from '../upload.js';
-import { str, normalizeDashboardFocus, normalizeDashboardLayout, normalizeWeeklyTodos, normalizeImageUploads, normalizeContentProfile, normalizeContentPillars, normalizeContentRhythm, normalizeFinance, CURRENCIES } from '../schema.js';
+import { str, normalizeDashboardFocus, normalizeDashboardLayout, normalizeWeeklyTodos, normalizeImageUploads, normalizeContentProfile, normalizeContentPillars, normalizeContentRhythm, normalizeFinance, normalizeFormats, CURRENCIES } from '../schema.js';
 import { createRouter } from '../http.js';
 import { sourceAsUpload } from '../sources.js';
 import { activityDays, noteFocus, recentItems } from '../activity.js';
@@ -44,6 +44,7 @@ router.patch('/api/settings', async (req, res) => {
     if (req.body.contentRhythm && typeof req.body.contentRhythm === 'object') db.settings.contentRhythm = normalizeContentRhythm({ ...db.settings.contentRhythm, ...req.body.contentRhythm });
     if (req.body.contentProfile && typeof req.body.contentProfile === 'object') db.settings.contentProfile = normalizeContentProfile({ ...db.settings.contentProfile, ...req.body.contentProfile });
     if ('currency' in req.body && CURRENCIES.has(req.body.currency)) db.settings.currency = req.body.currency; // rates, invoices
+    if (req.body.formats && typeof req.body.formats === 'object') db.settings.formats = normalizeFormats(req.body.formats, db.settings.formats); // an unknown choice keeps the one before
     return db.settings;
   });
   res.json({ settings });

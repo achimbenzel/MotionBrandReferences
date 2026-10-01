@@ -4,6 +4,7 @@ import { X, Printer } from 'lucide-react';
 import { fmtClock, fmtDur } from '../../lib/timing.js';
 import { ratioOf, timing, sectionLabel, shotStatus } from '../../lib/storyboard.js';
 import { getBoolPref, setBoolPref, getJSONPref, setJSONPref } from '../../lib/prefs.js';
+import { fmtDate } from '../../lib/format.js';
 
 // Panels per page by frame shape: [columns, rows, side] for "large" and
 // "compact". `side`: frame on the left, the texts next to it (one shot a row).
@@ -26,7 +27,7 @@ function Pages({ plan, block, shots, fileUrl, perPage, cols, rows, side, show, f
   const { starts, total } = timing(shots);
   const pages = [];
   for (let i = 0; i < Math.max(1, shots.length); i += perPage) pages.push(shots.slice(i, i + perPage).map((s, k) => ({ s, i: i + k })));
-  const date = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  const date = fmtDate(new Date(), { year: 'numeric', month: 'short', day: 'numeric' });
   return (firstOnly ? pages.slice(0, 1) : pages).map((list, p) => (
     <section className="sbp-page" key={p}>
       <header className="sbp-head">

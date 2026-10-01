@@ -4,9 +4,9 @@ import { api } from '../../lib/api.js';
 import { useSaver } from '../../lib/autosave.js';
 import { useToast } from '../Toast.jsx';
 import { dayKey } from '../../lib/dates.js';
+import { weekdayName } from '../../lib/format.js';
 
-const MONDAY = new Date(2024, 0, 1); // a Monday: weekday names in your language, Monday first
-const dayName = (i, weekday = 'long') => new Date(MONDAY.getFullYear(), 0, 1 + i).toLocaleDateString(undefined, { weekday });
+const dayName = (i, weekday = 'long') => weekdayName(i, weekday); // Monday first
 const newId = () => `w${Math.random().toString(36).slice(2, 9)}`;
 
 /**

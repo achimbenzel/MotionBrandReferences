@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
 import { dayKey } from './timeTracker.js';
+import { fmtCurrency, fmtDec } from './format.js';
 
 // The currency rates and invoices are in (Settings), loaded once.
 let currencyP = null;
@@ -19,7 +20,7 @@ export const minutesOf = (e) => {
   const t = (x) => { const [h, m] = x.split(':').map(Number); return h * 60 + m; };
   return (t(e.end) - t(e.start) + 1440) % 1440;
 };
-export const fmtHours = (min) => `${(min / 60).toFixed(1)} h`;
+export const fmtHours = (min) => `${fmtDec(min / 60, 1)} h`;
 
 /** Who an entry is for → { plan, client, project } (a project's client, or the entry's own). */
 export function whoOf(e, planById, clientById) {
@@ -50,13 +51,11 @@ export function budgetState(plan, usedMin) {
   return { used: usedMin, of, ratio, level: ratio > 1 ? 'over' : ratio >= 0.8 ? 'warn' : 'ok' };
 }
 export const budgetText = (plan, usedMin) => (plan?.budget
-  ? `${(usedMin / 60).toFixed(1)} / ${+plan.budget.hours.toFixed(2)} h${plan.budget.per === 'month' ? ' this month' : ''}`
+  ? `${fmtDec(usedMin / 60, 1)} / ${fmtDec(plan.budget.hours, 2)} h${plan.budget.per === 'month' ? ' this month' : ''}`
   : '');
 
-export function fmtMoney(v, currency = 'EUR') {
-  if (v == null || !Number.isFinite(v)) return '';
-  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency, maximumFractionDigits: currency === 'JPY' ? 0 : 2 }).format(v); } catch { return `${v.toFixed(2)} ${currency}`; }
-}
+/** Money in the chosen number format — 1.234,56 €. */
+export const fmtMoney = (v, currency = 'EUR') => (v == null || !Number.isFinite(v) ? '' : fmtCurrency(v, currency));
 /** Hours × the project's rate. */
 export const amountOf = (min, rate) => (rate ? Math.round((min / 60) * rate * 100) / 100 : null);
 

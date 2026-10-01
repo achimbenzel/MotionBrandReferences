@@ -27,6 +27,7 @@ import SnippetPicker from '../components/content/SnippetPicker.jsx';
 import { placeholderIn } from '../lib/contentIdeas.js';
 import useContentSettings, { useContentProfile } from '../components/content/useContentSettings.js';
 import '../styles/content.css';
+import { fmtFixed, fmtInt } from '../lib/format.js';
 
 const mediaFiles = (list) => [...(list || [])].filter((f) => /^(image|video)\//.test(f.type || '') || /\.(png|jpe?g|gif|webp|avif|svg|mp4|m4v|mov|webm)$/i.test(f.name || ''));
 
@@ -384,7 +385,7 @@ export default function ContentDetail() {
           </Section>
 
           <Section icon={Send} title="Caption & hashtags" now={now === 'publish'} open={isOpen('publish')} onToggle={() => toggle('publish')}
-            summary={text ? `${charCount(text).toLocaleString()} characters · ${tags.length} hashtag${tags.length === 1 ? '' : 's'}${owns.length ? ` · own text for ${owns.map((p) => PLATFORMS[p].label).join(', ')}` : ''}` : 'Not written yet'}>
+            summary={text ? `${fmtInt(charCount(text))} characters · ${tags.length} hashtag${tags.length === 1 ? '' : 's'}${owns.length ? ` · own text for ${owns.map((p) => PLATFORMS[p].label).join(', ')}` : ''}` : 'Not written yet'}>
             {capPlatforms.length > 0 && (
               <div className="ct-captabs" role="tablist" aria-label="Text for">
                 <button type="button" role="tab" aria-selected={tab === 'all'} className={tab === 'all' ? 'on' : ''} onClick={() => pickCapTab('all')}>Caption</button>
@@ -416,7 +417,7 @@ export default function ContentDetail() {
                     const k = count(p);
                     return (
                       <button key={p} type="button" className={`ct-count ${k.cls}`} title={`${PLATFORMS[p].tip}${ownText(item, p) ? ' · its own text' : ''}`} onClick={() => pickCapTab(p)}>
-                        <PlatformIcon platform={p} size={12} /> {k.len.toLocaleString()} / {k.max.toLocaleString()}{ownText(item, p) && <PenLine size={10} />}
+                        <PlatformIcon platform={p} size={12} /> {fmtInt(k.len)} / {fmtInt(k.max)}{ownText(item, p) && <PenLine size={10} />}
                       </button>
                     );
                   })}
@@ -441,7 +442,7 @@ export default function ContentDetail() {
                       {k.parts ? k.parts.map((t, i) => {
                         const n = charCount(t);
                         return <span key={i} className={`ct-count ${n > 280 ? 'over' : n > 252 ? 'near' : ''}`}>{i + 1}/{k.parts.length} · {n} / 280</span>;
-                      }) : <span className={`ct-count ${k.cls}`} title={PLATFORMS[tab].tip}><PlatformIcon platform={tab} size={12} /> {k.len.toLocaleString()} / {k.max.toLocaleString()}</span>}
+                      }) : <span className={`ct-count ${k.cls}`} title={PLATFORMS[tab].tip}><PlatformIcon platform={tab} size={12} /> {fmtInt(k.len)} / {fmtInt(k.max)}</span>}
                       {tab === 'x' && item.format === 'thread' && <span className="hint">A line of <code>---</code> starts the next post of the thread.</span>}
                       <span className="ct-gap" />
                       <button type="button" className="btn btn-sm btn-ghost" onClick={() => copy(textFor(item, tab), `${PLATFORMS[tab].label} text`)}><Copy size={13} /> Copy</button>
@@ -452,7 +453,7 @@ export default function ContentDetail() {
               </>
             ) : (
               <div className="ct-inherit">
-                <p><PlatformIcon platform={tab} size={14} /> {PLATFORMS[tab].label} gets the caption + hashtags{(() => { const k = count(tab); return k.len > k.max ? <> — <b className="ct-over-text">{k.len.toLocaleString()} characters, {k.max.toLocaleString()} fit</b></> : null; })()}.</p>
+                <p><PlatformIcon platform={tab} size={14} /> {PLATFORMS[tab].label} gets the caption + hashtags{(() => { const k = count(tab); return k.len > k.max ? <> — <b className="ct-over-text">{fmtInt(k.len)} characters, {fmtInt(k.max)} fit</b></> : null; })()}.</p>
                 {text && <blockquote>{text}</blockquote>}
                 <div className="ct-inherit-tools">
                   <button type="button" className="btn btn-sm" onClick={() => writeOwn(tab)}><PenLine size={14} /> Write its own for {PLATFORMS[tab].label}</button>
@@ -466,7 +467,7 @@ export default function ContentDetail() {
 
           {item.status === 'posted' && (
             <Section icon={BarChart3} title="Link & numbers" now={now === 'results'} open={isOpen('results')} onToggle={() => toggle('results')} className="ct-results"
-              summary={[mt.views != null && `${fmtNum(mt.views)} views`, mt.likes != null && `${fmtNum(mt.likes)} likes`, rate != null && `${rate.toFixed(1)} % engaged`].filter(Boolean).join(' · ') || 'Add the link and how it did'}>
+              summary={[mt.views != null && `${fmtNum(mt.views)} views`, mt.likes != null && `${fmtNum(mt.likes)} likes`, rate != null && `${fmtFixed(rate, 1)} % engaged`].filter(Boolean).join(' · ') || 'Add the link and how it did'}>
               <label className="ct-field"><span><Link2 size={12} /> Live at</span>
                 <span className="ct-link-row">
                   <input className="input" value={item.link} placeholder="https://www.instagram.com/reel/…" inputMode="url" onChange={(e) => patch({ link: e.target.value })} />
@@ -483,9 +484,9 @@ export default function ContentDetail() {
               </div>
               {rate != null && (
                 <div className="ct-rate">
-                  <b>{rate.toFixed(1)} %</b> engaged <em>— likes, comments, shares and saves per view</em>
-                  {mt.saves != null && mt.views ? <span>· {((mt.saves / mt.views) * 100).toFixed(1)} % saved</span> : null}
-                  {mt.follows != null && mt.views ? <span>· 1 follow per {Math.max(1, Math.round(mt.views / Math.max(1, mt.follows))).toLocaleString()} views</span> : null}
+                  <b>{fmtFixed(rate, 1)} %</b> engaged <em>— likes, comments, shares and saves per view</em>
+                  {mt.saves != null && mt.views ? <span>· {fmtFixed((mt.saves / mt.views) * 100, 1)} % saved</span> : null}
+                  {mt.follows != null && mt.views ? <span>· 1 follow per {fmtInt(Math.max(1, Math.round(mt.views / Math.max(1, mt.follows))))} views</span> : null}
                 </div>
               )}
             </Section>

@@ -4,6 +4,7 @@ import { api } from '../../lib/api.js';
 import { RARITIES, RANK_TIERS, METRICS, FOLLOWER_METRICS, WORK_METRICS, seriesSteps, shortNum, fmtValue } from '../../lib/achievements.js';
 import { useToast } from '../Toast.jsx';
 import AchievementCard from './AchievementCard.jsx';
+import { fmtInt } from '../../lib/format.js';
 
 const RARITY_CHOICES = [...RANK_TIERS, 'quest', 'dream'];
 // Rising with the steps: Stone, Bronze … Mythic (and Mythic from there on).
@@ -86,7 +87,7 @@ export default function AchievementSeries({ groups, metrics, existing, onClose, 
                 <datalist id="ser-groups">{groups.map((g) => <option key={g} value={g} />)}</datalist>
               </div>
               <div className="field">
-                <label htmlFor="ser-title">Name <span className="ach-opt">— {'{n}'} = {shortNum(2000)}, {'{N}'} = {(2000).toLocaleString()}</span></label>
+                <label htmlFor="ser-title">Name <span className="ach-opt">— {'{n}'} = {shortNum(2000)}, {'{N}'} = {fmtInt(2000)}</span></label>
                 <input id="ser-title" className="input" value={title} maxLength={100} onChange={(e) => setTitle(e.target.value)} />
               </div>
             </div>

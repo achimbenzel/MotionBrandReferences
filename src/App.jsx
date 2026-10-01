@@ -44,6 +44,8 @@ import { useMediaQuery, DESKTOP } from './lib/useMedia.js';
 import ImageUploadPrompt from './components/ImageUploadPrompt.jsx';
 import ConflictPrompt from './components/ConflictPrompt.jsx';
 import { getBoolPref, setBoolPref } from './lib/prefs.js';
+import { api } from './lib/api.js';
+import { setFormats } from './lib/format.js';
 
 function Shell() {
   const [modalType, setModalType] = useState(null); // null = closed
@@ -61,6 +63,14 @@ function Shell() {
   // The drawer closes on navigation and when switching to the desktop layout;
   // while open, the page behind it doesn't scroll and Esc closes it.
   useEffect(() => { setDrawer(false); }, [location.pathname, isDesktop]);
+  // Dates and numbers in the format chosen in the settings; everything shows it again when it changes.
+  const [, setFormatsSeen] = useState(0);
+  useEffect(() => {
+    api.getSettings().then((st) => setFormats(st?.formats)).catch(() => {});
+    const changed = () => setFormatsSeen((n) => n + 1);
+    window.addEventListener('confinium:formats', changed);
+    return () => window.removeEventListener('confinium:formats', changed);
+  }, []);
   useEffect(() => {
     if (!drawer) return undefined;
     const prev = document.body.style.overflow;

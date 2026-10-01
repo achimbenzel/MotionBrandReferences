@@ -2,18 +2,19 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, AppWindow, Puzzle } from 'lucide-react';
 import { api, softwareFileUrl } from '../lib/api.js';
-import { currencySymbol, gradientCss } from '../lib/types.js';
+import { gradientCss } from '../lib/types.js';
 import GalleryNameModal from '../components/GalleryNameModal.jsx';
 import '../styles/software.css';
+import { fmtCurrency, parseNum } from '../lib/format.js';
 
 // Sum plugin prices per currency → e.g. "€ 129.99 · $ 40".
 function spendLabel(plugins) {
   const by = {};
   for (const p of plugins || []) {
-    const n = parseFloat(String(p.price || '').replace(',', '.'));
+    const n = parseNum(p.price);
     if (Number.isFinite(n) && n > 0) by[p.currency || 'EUR'] = (by[p.currency || 'EUR'] || 0) + n;
   }
-  const parts = Object.entries(by).map(([c, v]) => `${currencySymbol(c)} ${v % 1 ? v.toFixed(2) : v}`);
+  const parts = Object.entries(by).map(([c, v]) => fmtCurrency(v, c, { minimumFractionDigits: v % 1 ? 2 : 0 }));
   return parts.join(' · ');
 }
 

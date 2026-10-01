@@ -26,6 +26,7 @@ import { buildObject } from '../lib/mockup3d/objects.js';
 import Range from '../components/Range.jsx';
 import ObjectSettings, { Seg } from '../components/mockups/ObjectSettings.jsx';
 import { LightSection, BackgroundSection } from '../components/mockups/ScenePanels.jsx';
+import { fmtFixed } from '../lib/format.js';
 
 const MOCKUP_BOARD = /mockup/i;
 const IMAGE_SIZES = [
@@ -359,7 +360,7 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
     if (trackId === 'camera') {
       if (!st) return;
       patchAnim({ camera: putKey(anim.camera, { t: r2(time), ...st.getCamera() }) });
-      toast(`Camera key at ${time.toFixed(1)} s`);
+      toast(`Camera key at ${fmtFixed(time, 1)} s`);
     } else {
       const it = itemOfTrack(trackId);
       if (it) patchItem(it.id, { keys: { ...it.keys, hinge: putKey(it.keys.hinge, { t: r2(time), v: Math.round(hingeValue(it)) }) } });
@@ -568,7 +569,7 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
     return [
       {
         key: 'image', label: 'Image', kind: 'image', aspect, sizes: sizes(IMAGE_SIZES), defaultSize: 3,
-        note: keyed ? `The frame at the playhead (${time.toFixed(1)} s).` : null,
+        note: keyed ? `The frame at the playhead (${fmtFixed(time, 1)} s).` : null,
         backgrounds: [{ key: 'scene', label: 'As in the scene' }, { key: 'transparent', label: 'Transparent' }, { key: 'white', label: 'White', swatch: '#fff' }, { key: 'black', label: 'Black', swatch: '#000' }],
         allowColor: true, formats: ['png', 'jpg', 'webp'], maxSize: stageRef.current?.maxExport() || 8192,
       },
@@ -877,7 +878,7 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
                 <div className="mke-video">
                   <label className="mke-range">Starts at
                     <Range min="0" max={Math.max(0.1, vlen || 0)} step="0.1" value={Math.min(sel.videoStart, vlen || sel.videoStart)} onChange={(e) => { const s = Number(e.target.value); patchItem(sel.id, { videoStart: s }); stageRef.current?.setItemTimeline(sel.id, { videoStart: s }); stageRef.current?.syncVideos(time, playing); }} />
-                    <span>{sel.videoStart.toFixed(1)} s</span>
+                    <span>{fmtFixed(sel.videoStart, 1)} s</span>
                   </label>
                   <div className="mke-row">
                     <button type="button" className={`btn btn-sm ${sel.sound ? 'btn-on' : ''}`} onClick={() => { patchItem(sel.id, { sound: !sel.sound }); stageRef.current?.setItemTimeline(sel.id, { sound: !sel.sound }); }}>
@@ -885,7 +886,7 @@ export default function MockupEditor({ initial, initialModels, initialHdris }) {
                     </button>
                     {sel.sound && <Range className="mke-vol" min="0" max="1" step="0.05" value={sel.volume} onChange={(e) => patchItem(sel.id, { volume: Number(e.target.value) })} aria-label="Volume" />}
                   </div>
-                  <div className="hint">The part from {sel.videoStart.toFixed(1)} s plays on the screen during the timeline{sel.sound ? ' — with its sound, also in the exported video' : ''}.</div>
+                  <div className="hint">The part from {fmtFixed(sel.videoStart, 1)} s plays on the screen during the timeline{sel.sound ? ' — with its sound, also in the exported video' : ''}.</div>
                 </div>
               )}
             </section>

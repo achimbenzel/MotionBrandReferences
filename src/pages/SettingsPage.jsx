@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Keyboard, SlidersHorizontal, RotateCcw, Database, Sparkles, Download, CheckCircle2, ChevronDown, ChevronRight, ImageDown } from 'lucide-react';
+import { Settings, Keyboard, SlidersHorizontal, RotateCcw, Database, Sparkles, Download, CheckCircle2, ChevronDown, ChevronRight, ImageDown, CalendarDays } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { rememberCurrency } from '../lib/clients.js';
 import { useToast } from '../components/Toast.jsx';
@@ -11,6 +11,7 @@ import StoredPicturesDialog from '../components/StoredPicturesDialog.jsx';
 import { FORMATS, EDGES, IMAGE_DEFAULTS } from '../lib/imageOptimize.js';
 import { getPref, setPref } from '../lib/prefs.js';
 import '../styles/settings.css';
+import { fmtBytes as fmtSize, fmtDate, fmtTime, fmtCurrency, fmtFixed, DATE_FORMATS, NUMBER_FORMATS, formats, setFormats } from '../lib/format.js';
 
 const K = (s) => <kbd className="sc-key" key={s}>{s}</kbd>;
 
@@ -79,6 +80,14 @@ export default function SettingsPage() {
       api.updateSettings({ imageUploads: body }).catch((e) => toast(`Could not save: ${e.message}`, 'error'));
     }, sliding ? 400 : 0);
   };
+  // How dates and numbers are shown (stored with the library, so every device shows the same).
+  const [fmt, setFmt] = useState(formats);
+  const pickFormat = async (patch) => {
+    const before = fmt;
+    setFmt({ ...fmt, ...patch }); setFormats(patch);
+    try { await api.updateSettings({ formats: patch }); } catch (e) { setFmt(before); setFormats(before); toast(`Could not save: ${e.message}`, 'error'); }
+  };
+  const sampleDay = new Date(new Date().getFullYear(), 9, 27, 14, 5);
   const pickCurrency = async (c) => {
     setCurrency(c);
     try { await api.updateSettings({ currency: c }); rememberCurrency(c); toast(`Amounts in ${c}`); } catch (e) { toast(`Could not save: ${e.message}`, 'error'); }
@@ -150,6 +159,27 @@ export default function SettingsPage() {
           </div>
           <div className="pref-row pref-row-wide">
             <div>
+              <div className="pref-title"><CalendarDays size={15} style={{ verticalAlign: '-2px', marginRight: 6 }} />Dates & numbers</div>
+              <div className="pref-sub">How days, times and amounts are shown everywhere. Only the display changes — what’s saved stays the same.</div>
+            </div>
+            <div className="pref-pics pref-formats">
+              <div className="pref-pics-row"><span>Dates</span>
+                <div className="segmented segmented-sm" role="group" aria-label="Date format">
+                  {DATE_FORMATS.map((f) => <button key={f.key} type="button" className={fmt.date === f.key ? 'on' : ''} aria-pressed={fmt.date === f.key} title={f.hint} onClick={() => pickFormat({ date: f.key })}>{f.label}</button>)}
+                </div>
+              </div>
+              <div className="pref-pics-row"><span>Numbers</span>
+                <div className="segmented segmented-sm" role="group" aria-label="Number format">
+                  {NUMBER_FORMATS.map((f) => <button key={f.key} type="button" className={fmt.number === f.key ? 'on' : ''} aria-pressed={fmt.number === f.key} title={f.hint} onClick={() => pickFormat({ number: f.key })}>{f.label}</button>)}
+                </div>
+              </div>
+              <p className="pref-sample" aria-live="polite">
+                {fmtDate(sampleDay)} · {fmtDate(sampleDay, { weekday: 'short', day: 'numeric', month: 'short' })} · {fmtTime(sampleDay)} · {fmtCurrency(1234.56, currency || 'EUR')} · {fmtFixed(12.5, 1)} h
+              </p>
+            </div>
+          </div>
+          <div className="pref-row pref-row-wide">
+            <div>
               <div className="pref-title"><ImageDown size={15} style={{ verticalAlign: '-2px', marginRight: 6 }} />Picture uploads</div>
               <div className="pref-sub">Pictures can be made smaller before they’re uploaded — everywhere you add one (references, covers, logos, notes, content, mockups …) — to save space. Files, deliverables and review versions always stay as they are; see-through pictures never become JPEG.</div>
             </div>
@@ -190,9 +220,7 @@ export default function SettingsPage() {
 }
 
 const fmtBytes = (n) => {
-  const u = ['B', 'KB', 'MB', 'GB']; let v = n || 0; let i = 0;
-  while (v >= 1024 && i < u.length - 1) { v /= 1024; i += 1; }
-  return `${v.toFixed(v < 10 && i > 0 ? 1 : 0)} ${u[i]}`;
+  return fmtSize(n);
 };
 
 /** Data-format migration, unused-file cleanup and backups. */
@@ -262,7 +290,7 @@ function LibrarySection() {
             {status === false && <div className="pref-sub">Couldn’t check the data format.</div>}
             {status && !status.needsMigration && (
               <div className="pref-sub">
-                Version {status.schemaVersion}{status.migratedAt ? ` · migrated ${new Date(status.migratedAt).toLocaleDateString()}` : ''}.
+                Version {status.schemaVersion}{status.migratedAt ? ` · migrated ${fmtDate(status.migratedAt)}` : ''}.
                 Everything is stored in the current format.
               </div>
             )}

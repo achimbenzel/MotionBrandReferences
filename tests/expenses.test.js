@@ -9,7 +9,7 @@ import path from 'node:path';
 import { startServer, tempDir } from './helpers.js';
 import { readCentralDirectory, readEntryBuffer } from '../server/zip.js';
 import { paymentsIn, yearOf, monthlyOf, nextPayment, cancelBy, monthsOf, targetOf, targetFor, incomeMonthsOf, incomeNow, isActive, partOf, inView, EXPENSE_CATEGORIES,
-  receiptCheck, missingReceipts, receiptDateFor, dateFromName } from '../src/lib/expenses.js';
+  receiptCheck, missingReceipts, receiptDateFor, dateFromName, needsReceipts } from '../src/lib/expenses.js';
 import { addDays } from '../src/lib/dates.js';
 import { EXPENSE_CATEGORY_KEYS, localDay } from '../server/schema.js';
 
@@ -138,6 +138,10 @@ test('receipts: which payments have one, the month a new one is for, dates in fi
   assert.equal(receiptDateFor(cc, '2026-04-20'), '2026-04-15');
   assert.equal(receiptDateFor({ ...cc, receipts: [...cc.receipts, { date: '2026-04-01' }, { date: '2026-03-30' }, { date: '2026-01-15' }] }, '2026-04-20'), '2026-04-20'); // all there → today
   assert.deepEqual(missingReceipts({ ...cc, share: 0 }, 2026, '2026-04-20'), []); // private: none needed
+  // Health insurance, pension and taxes need none either — unless chosen; and anything can be set either way.
+  assert.deepEqual([needsReceipts({ share: 100, category: 'health' }), needsReceipts({ share: 100, category: 'taxes' }), needsReceipts({ share: 100, category: 'software' })], [false, false, true]);
+  assert.deepEqual([needsReceipts({ share: 100, category: 'health', needsReceipt: true }), needsReceipts({ share: 100, category: 'software', needsReceipt: false }), needsReceipts({ share: 0, needsReceipt: true })], [true, false, true]);
+  assert.deepEqual(missingReceipts({ ...cc, needsReceipt: false }, 2026, '2026-04-20'), []);
   assert.deepEqual(['Invoice_2026-03-15.pdf', 'Rechnung 15.03.2026.pdf', 'adobe-202603.pdf', 'Beleg 1.3.2026.jpg', 'order 202612345.pdf', '31.02.2026.pdf', 'scan.jpg'].map(dateFromName),
     ['2026-03-15', '2026-03-15', '2026-03-01', '2026-03-01', null, null, null]);
 });
@@ -209,11 +213,19 @@ test('receipts: upload (each finds its payment), served, dated, Trash and back, 
   assert.equal(await onDisk(scan.file), true);
   assert.equal((await srv.api('/api/expenses')).data.expenses.find((e) => e.id === cc.id).receipts.length, 4);
 
+  // Not needed for this one (chosen) → nothing missing; null again → by its category and business part.
+  let nr = (await srv.api(`/api/expenses/${cc.id}`, { method: 'PATCH', json: { needsReceipt: false } })).data.expense;
+  assert.equal(nr.needsReceipt, false);
+  nr = (await srv.api(`/api/expenses/${cc.id}`, { method: 'PATCH', json: { needsReceipt: 'yes' } })).data.expense;
+  assert.equal(nr.needsReceipt, null);
+  assert.equal(nr.receipts.length, 4);
+
   // The year as a ZIP: the workbook with a receipt column, each receipt named by its day and expense; private ones apart.
   const host = (await srv.api('/api/expenses', { method: 'POST', json: { name: 'Hosting / Server', amount: 10, interval: 'month', start: '2021-01-10', end: '2021-06-30' } })).data.expense;
   await srv.api(`/api/expenses/${host.id}/receipts`, { method: 'POST', body: form(['a.pdf', 'b.pdf'], '2021-03-10') });
   const tv = (await srv.api('/api/expenses', { method: 'POST', json: { name: 'Netflix', amount: 13.99, interval: 'month', start: '2021-01-02', end: '2021-02-28', share: 0 } })).data.expense;
   await srv.api(`/api/expenses/${tv.id}/receipts`, { method: 'POST', body: form(['n.pdf'], '2021-02-02') });
+  await srv.api('/api/expenses', { method: 'POST', json: { name: 'Krankenkasse', category: 'health', amount: 400, interval: 'month', start: '2021-01-01', end: '2021-12-31' } }); // needs none
   res = await fetch(`${srv.base}/api/expenses/receipts.zip?year=2021&lang=de`);
   assert.equal(res.status, 200);
   assert.match(res.headers.get('content-disposition'), /Belege_2021\.zip/);

@@ -4,10 +4,11 @@
 import { Copy, X, Plus, Check, AlertTriangle, Link2, ExternalLink } from 'lucide-react';
 import AutoTextarea from '../AutoTextarea.jsx';
 import { hostOf, normalizeUrl } from '../../lib/types.js';
+import { fmtInt, fmtFixed, parseNum } from '../../lib/format.js';
 
 const rid = () => Math.random().toString(36).slice(2, 8);
-const fmtSum = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
-const toNum = (v) => Number(String(v ?? '').trim().replace(',', '.'));
+const fmtSum = (n) => (Number.isInteger(n) ? fmtInt(n) : fmtFixed(n, 2));
+const toNum = (v) => parseNum(v);
 
 /** Questions and answers; Copy puts them all on the clipboard. */
 export function BriefingBlock({ block: b, menu, icon: Icon, editBlock, onCopy, onRemoveField }) {

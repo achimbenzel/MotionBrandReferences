@@ -7,6 +7,7 @@ import { SEGMENT_KINDS, segmentKind, segmentColor, segmentName } from '../lib/se
 import { tagColor } from '../lib/types.js';
 import { isTouch } from '../lib/useMedia.js';
 import Waveform from './Waveform.jsx';
+import { fmtFixed } from '../lib/format.js';
 
 const rid = () => Math.random().toString(36).slice(2, 8);
 const NEAR = 0.25; // seconds — a mark this close to a boundary retypes that section
@@ -199,7 +200,7 @@ export default function SegmentTimeline({ videoRef, current, duration, segments,
                 />
                 <input className="input seg-note" value={s.label} placeholder={k ? 'Note…' : 'Name…'}
                   onChange={(e) => patchSeg(s.id, { label: e.target.value })} />
-                <span className="seg-dur">{(s.end - s.start).toFixed(1)} s</span>
+                <span className="seg-dur">{fmtFixed(s.end - s.start, 1)} s</span>
                 <span className="seg-row-tools">
                   {onLoop && (
                     <button className={`icon-btn ${loopKey === s.id ? 'on' : ''}`} title={loopKey === s.id ? 'Stop looping' : 'Loop this section'}

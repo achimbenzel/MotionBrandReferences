@@ -36,6 +36,7 @@ export function normalizeExpense(e) {
     link: str(e?.link, 500).trim(),
     notes: str(e?.notes, 2000),
     receipts: (Array.isArray(e?.receipts) ? e.receipts : []).map(normalizeReceipt).filter(Boolean),
+    needsReceipt: typeof e?.needsReceipt === 'boolean' ? e.needsReceipt : null, // null: by its category and business part
     createdAt: num(e?.createdAt, 0, 1e14, 0) || Date.now(),
     updatedAt: num(e?.updatedAt, 0, 1e14, 0) || Date.now(),
   };

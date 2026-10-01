@@ -16,6 +16,7 @@ import MediaPicker from '../components/mockups/MediaPicker.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import { usePref } from '../lib/prefs.js';
 import '../styles/software.css';
+import { fmtBytes as fmtSize, fmtCurrency, parseNum } from '../lib/format.js';
 
 const rid = () => Math.random().toString(36).slice(2, 10);
 const firstEmoji = (str) => {
@@ -24,9 +25,7 @@ const firstEmoji = (str) => {
   catch { return [...t][0]; }
 };
 const fmtBytes = (n) => {
-  if (!n) return ''; const u = ['B', 'KB', 'MB', 'GB']; let v = n; let i = 0;
-  while (v >= 1024 && i < u.length - 1) { v /= 1024; i += 1; }
-  return `${v.toFixed(v < 10 && i > 0 ? 1 : 0)} ${u[i]}`;
+  return n ? fmtSize(n) : '';
 };
 // Give a category a stable colour so the same word is always the same chip.
 const catColor = (cat) => {
@@ -169,8 +168,8 @@ export default function SoftwareDetail() {
 
   // Spend per currency
   const by = {};
-  for (const p of (soft.plugins || [])) { const n = parseFloat(String(p.price || '').replace(',', '.')); if (Number.isFinite(n) && n > 0) by[p.currency || 'EUR'] = (by[p.currency || 'EUR'] || 0) + n; }
-  const spend = Object.entries(by).map(([c, v]) => `${currencySymbol(c)} ${v % 1 ? v.toFixed(2) : v}`).join(' · ');
+  for (const p of (soft.plugins || [])) { const n = parseNum(p.price); if (Number.isFinite(n) && n > 0) by[p.currency || 'EUR'] = (by[p.currency || 'EUR'] || 0) + n; }
+  const spend = Object.entries(by).map(([c, v]) => fmtCurrency(v, c, { minimumFractionDigits: v % 1 ? 2 : 0 })).join(' · ');
   const exprCount = (soft.expressionGroups || []).reduce((n, g) => n + (g.items || []).length, 0);
   const counts = { plugins: (soft.plugins || []).length, expressions: exprCount, tutorials: (soft.tutorials || []).length };
 
@@ -465,7 +464,7 @@ function PluginCard({ soft, plugin: p, onOpen, onDelete, onDownload }) {
 function PluginRow({ soft, plugin: p, onOpen, onDelete, onDownload }) {
   const imgUrl = p.image ? softwareFileUrl(soft.id, p.image) : null;
   const col = catColor(p.category);
-  const price = parseFloat(String(p.price || '').replace(',', '.'));
+  const price = parseNum(p.price);
   const sub = [p.version && `v${p.version}`, p.size ? fmtBytes(p.size) : null].filter(Boolean).join(' · ');
   return (
     <div className="prow" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(); }}>

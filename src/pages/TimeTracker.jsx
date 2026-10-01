@@ -12,10 +12,11 @@ import { dateOf, fmtDay as fmtDate } from '../lib/dates.js';
 import { whoOf, entryLabel } from '../lib/clients.js';
 import { getPref, setPref } from '../lib/prefs.js';
 import '../styles/time.css';
+import { fmtFixed } from '../lib/format.js';
 
 const OTHER = '__other__';
 const minutesOf = (e) => { const t = (x) => { const [h, m] = x.split(':').map(Number); return h * 60 + m; }; return (t(e.end) - t(e.start) + 1440) % 1440; };
-const fmtH = (min) => `${(min / 60).toFixed(2)} h`;
+const fmtH = (min) => `${fmtFixed(min / 60, 2)} h`;
 const fmtHM = (min) => `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}`;
 const fmtDay = (iso) => fmtDate(iso, { weekday: 'short', day: 'numeric', month: 'short', year: dateOf(iso)?.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
 

@@ -7,16 +7,15 @@ import AutoTextarea from '../AutoTextarea.jsx';
 import FromAppButton from '../FromApp.jsx';
 import { fmtClock } from '../../lib/timing.js';
 import { resolveDuration } from '../../lib/media.js';
+import { fmtBytes as fmtSize, fmtDate } from '../../lib/format.js';
 
 const rid = () => Math.random().toString(36).slice(2, 8);
 const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
 const fmtBytes = (n) => {
   if (!n) return '';
-  const u = ['B', 'KB', 'MB', 'GB']; let v = n; let i = 0;
-  while (v >= 1024 && i < u.length - 1) { v /= 1024; i += 1; }
-  return `${v.toFixed(v < 10 && i > 0 ? 1 : 0)} ${u[i]}`;
+  return fmtSize(n);
 };
-const fmtDate = (ms) => (ms ? new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '');
+const fmtDay = (ms) => (ms ? fmtDate(ms, { day: 'numeric', month: 'short' }) : '');
 
 /**
  * Review block: upload each render as a version (v1, v2 …), watch it and write
@@ -171,7 +170,7 @@ export default function ReviewBlock({ plan, block: b, menu, icon: Icon, editBloc
               const open = (v.comments || []).filter((c) => !c.done).length;
               return (
                 <button key={v.id} role="tab" aria-selected={v.id === active.id} className={`rv-ver ${v.id === active.id ? 'on' : ''}`}
-                  onClick={() => { setActiveId(v.id); if (compareId === v.id) setCompareId(null); }} title={`${v.name} · ${fmtDate(v.createdAt)}`}>
+                  onClick={() => { setActiveId(v.id); if (compareId === v.id) setCompareId(null); }} title={`${v.name} · ${fmtDay(v.createdAt)}`}>
                   {v.label || 'v?'}
                   {v.approved ? <BadgeCheck size={14} className="rv-ok" /> : open > 0 && <span className="rv-open">{open}</span>}
                 </button>
@@ -181,7 +180,7 @@ export default function ReviewBlock({ plan, block: b, menu, icon: Icon, editBloc
 
           <div className="rv-toolbar">
             <input className="input rv-label" value={active.label} aria-label="Version name" onChange={(e) => patchVersion(active.id, { label: e.target.value })} />
-            <span className="rv-file" title={active.name}>{[active.name, fmtBytes(active.size), fmtDate(active.createdAt)].filter(Boolean).join(' · ')}</span>
+            <span className="rv-file" title={active.name}>{[active.name, fmtBytes(active.size), fmtDay(active.createdAt)].filter(Boolean).join(' · ')}</span>
             <button className={`btn btn-sm ${active.approved ? 'btn-on' : ''}`} onClick={() => patchVersion(active.id, { approved: !active.approved }, true)} aria-pressed={active.approved}>
               <BadgeCheck size={14} /> {active.approved ? 'Approved' : 'Approve'}
             </button>

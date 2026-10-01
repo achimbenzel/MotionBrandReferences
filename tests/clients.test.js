@@ -33,6 +33,12 @@ test('older projects: their client names become clients (one per name, the same 
   assert.deepEqual([of('p1').clientId, of('p2').clientId, of('p3').clientId], [a[0].id, a[0].id, null]);
   assert.deepEqual([of('p2').client, of('p1').budget, of('p1').rate], ['Acme', null, null]);
   assert.equal((await srv.api('/api/settings')).data.settings.currency, 'EUR');
+  // Dates and numbers: shown the German way until chosen otherwise; unknown choices are ignored.
+  assert.deepEqual((await srv.api('/api/settings')).data.settings.formats, { date: 'de', number: 'de' });
+  let f = (await srv.api('/api/settings', { method: 'PATCH', json: { formats: { date: 'us' } } })).data.settings.formats;
+  assert.deepEqual(f, { date: 'us', number: 'de' });
+  f = (await srv.api('/api/settings', { method: 'PATCH', json: { formats: { date: 'klingon', number: 'en' } } })).data.settings.formats;
+  assert.deepEqual(f, { date: 'us', number: 'en' });
 });
 
 test('clients: created with contacts and billing details, one per name, renamed everywhere', async () => {

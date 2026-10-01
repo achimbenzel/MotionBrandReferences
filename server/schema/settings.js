@@ -66,3 +66,10 @@ export function normalizeDashboardLayout(v) {
       return out;
     });
 }
+/** How dates and numbers are shown (only shown — what's stored never changes). Germany unless chosen otherwise. */
+export const DATE_FORMAT_KEYS = ['de', 'uk', 'us', 'iso'];
+export const NUMBER_FORMAT_KEYS = ['de', 'ch', 'en'];
+export const normalizeFormats = (f, base = { date: 'de', number: 'de' }) => ({
+  date: DATE_FORMAT_KEYS.includes(f?.date) ? f.date : base.date,
+  number: NUMBER_FORMAT_KEYS.includes(f?.number) ? f.number : base.number,
+});

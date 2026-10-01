@@ -5,6 +5,7 @@ import { api } from '../../lib/api.js';
 import { useTimeTracker, tracker, fmtElapsed } from '../../lib/timeTracker.js';
 import { minutesOf, budgetMinutes, budgetState, budgetText, amountOf, fmtMoney, useCurrency } from '../../lib/clients.js';
 import Popover from '../Popover.jsx';
+import { fmtDec, parseNum, currencySign, fmtInput } from '../../lib/format.js';
 
 /**
  * A project's tracked time in its header — a click shows its entries in the
@@ -37,7 +38,7 @@ export default function PlanTime({ plan, toast, onChange }) {
   const used = budgetMinutes(plan, entries || [], liveMin);
   const budget = budgetState(plan, used);
   const amount = amountOf(total, plan.rate);
-  const label = budget ? budgetText(plan, used) : `${(total / 60).toFixed(1)} h${amount ? ` · ${fmtMoney(amount, currency)}` : ''}`;
+  const label = budget ? budgetText(plan, used) : `${fmtDec(total / 60, 1)} h${amount ? ` · ${fmtMoney(amount, currency)}` : ''}`;
 
   return (
     <span className={`plan-time ${mine ? 'running' : ''} ${mine && t.paused ? 'paused' : ''} ${budget ? `budget-${budget.level}` : ''}`}>
@@ -61,12 +62,12 @@ export default function PlanTime({ plan, toast, onChange }) {
 
 /** Budget (hours, for the project or per month) and hourly rate — both optional, saved as you type. */
 function BudgetForm({ plan, currency, used, total, onChange }) {
-  const [hours, setHours] = useState(plan.budget ? String(plan.budget.hours) : '');
+  const [hours, setHours] = useState(plan.budget ? fmtInput(plan.budget.hours) : '');
   const [per, setPer] = useState(plan.budget?.per || 'project');
-  const [rate, setRate] = useState(plan.rate ? String(plan.rate) : '');
-  const num = (v) => { const n = Number(String(v).replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; };
+  const [rate, setRate] = useState(plan.rate ? fmtInput(plan.rate) : '');
+  const num = (v) => { const n = parseNum(v); return Number.isFinite(n) && n > 0 ? n : null; };
   const save = (h, p, r) => onChange({ budget: num(h) ? { hours: num(h), per: p } : null, rate: num(r) });
-  const symbol = (() => { try { return new Intl.NumberFormat(undefined, { style: 'currency', currency }).formatToParts(0).find((x) => x.type === 'currency')?.value || currency; } catch { return currency; } })();
+  const symbol = currencySign(currency);
   return (
     <div className="budget-form">
       <label className="budget-f">
@@ -83,8 +84,8 @@ function BudgetForm({ plan, currency, used, total, onChange }) {
         <span className="budget-in"><input className="input" inputMode="decimal" value={rate} placeholder="—" onChange={(e) => { setRate(e.target.value); save(hours, per, e.target.value); }} aria-label="Hourly rate" /><i>{symbol}/h</i></span>
       </label>
       <p className="budget-note">
-        {num(hours) ? `${(used / 60).toFixed(1)} of ${num(hours)} h used${per === 'month' ? ' this month' : ''}. ` : 'No budget — '}
-        {num(rate) ? `${(total / 60).toFixed(1)} h × ${fmtMoney(num(rate), currency)} = ${fmtMoney(amountOf(total, num(rate)), currency)}.` : 'no hourly rate. Both are optional.'}
+        {num(hours) ? `${fmtDec(used / 60, 1)} of ${fmtDec(num(hours), 2)} h used${per === 'month' ? ' this month' : ''}. ` : 'No budget — '}
+        {num(rate) ? `${fmtDec(total / 60, 1)} h × ${fmtMoney(num(rate), currency)} = ${fmtMoney(amountOf(total, num(rate)), currency)}.` : 'no hourly rate. Both are optional.'}
       </p>
     </div>
   );
