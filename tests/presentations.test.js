@@ -110,3 +110,78 @@ test('presentations: from a template for a client, saved, pictures, copy, defaul
   assert.equal((await srv.api(`/api/presentations/${deck.id}`)).data.presentation.slides[0].data.image.file, file);
   assert.equal((await srv.api('/api/presentations/nope', { method: 'PATCH', json: { title: 'x' } })).status, 404);
 });
+
+test('your own templates: a deck saved as one (client neutral, with its pictures), a new deck from it, renamed, Trash and back', async () => {
+  const client = (await srv.api('/api/clients', { method: 'POST', json: { name: 'Nordlicht' } })).data.client;
+  let deck = (await srv.api('/api/presentations', { method: 'POST', json: { template: 'proposal', clientId: client.id } })).data.presentation;
+  const { file } = (await srv.api(`/api/presentations/${deck.id}/images`, { method: 'POST', body: picture('hero.png') })).data;
+  deck = (await srv.api(`/api/presentations/${deck.id}`, { method: 'PATCH', json: {
+    theme: { preset: 'light', accent: '#3fa34d' }, label: 'ANGEBOT',
+    slides: deck.slides.slice(0, 6).map((s, i) => (i === 0 ? { ...s, data: { ...s.data, image: { file } } } : s)),
+  } })).data.presentation;
+  assert.ok(deck.slides.some((s) => s.data.title === 'Project *goals* for Nordlicht:'));
+
+  let r = await srv.api(`/api/presentations/${deck.id}/template`, { method: 'POST', json: {} });
+  assert.equal(r.status, 201);
+  const tpl = r.data.template;
+  assert.deepEqual([tpl.name, tpl.label, tpl.kind, tpl.theme, tpl.slides.length], ['Project proposal', 'ANGEBOT', 'proposal', { preset: 'light', accent: '#3fa34d' }, 6]);
+  assert.ok(tpl.slides.some((s) => s.data.title === 'Project *goals* for [Client]:'));
+  assert.ok(await exists(path.join(srv.dataDir, 'presentation-template', tpl.id, file)));
+  const list = (await srv.api('/api/presentations/templates')).data;
+  assert.deepEqual([list.templates.length, list.own.map((t) => t.id)], [4, [tpl.id]]);
+
+  // A new deck from it, for another client: their name where [Client] was, its own copy of the pictures, its look.
+  const other = (await srv.api('/api/clients', { method: 'POST', json: { name: 'Gute Stube 2' } })).data.client;
+  const made = (await srv.api('/api/presentations', { method: 'POST', json: { template: `own:${tpl.id}`, clientId: other.id } })).data.presentation;
+  assert.deepEqual([made.title, made.label, made.theme.accent, made.slides.length, made.meta.preparedFor], ['Project proposal · Gute Stube 2', 'ANGEBOT', '#3fa34d', 6, 'Gute Stube 2']);
+  assert.ok(made.slides.some((s) => s.data.title === 'Project *goals* for Gute Stube 2:'));
+  assert.equal(made.slides[0].data.image.file, file);
+  assert.ok(await exists(path.join(srv.dataDir, 'presentation', made.id, file)));
+  assert.notEqual(made.slides[0].id, tpl.slides[0].id);
+  assert.equal((await srv.api('/api/presentations', { method: 'POST', json: { template: 'own:nope' } })).status, 404);
+
+  // Renamed; → Trash (decks made from it keep their pictures) and back.
+  r = await srv.api(`/api/presentation-templates/${tpl.id}`, { method: 'PATCH', json: { name: 'Proposal (short)', hint: 'Six slides' } });
+  assert.deepEqual([r.data.template.name, r.data.template.hint], ['Proposal (short)', 'Six slides']);
+  r = await srv.api(`/api/presentation-templates/${tpl.id}`, { method: 'DELETE' });
+  assert.equal((await srv.api('/api/presentations/templates')).data.own.length, 0);
+  assert.ok(await exists(path.join(srv.dataDir, 'presentation', made.id, file)));
+  const t = (await srv.api('/api/trash')).data.items.find((i) => i.trashId === r.data.trashId);
+  assert.deepEqual([t.kind, t.title], ['deckTemplate', 'Proposal (short)']);
+  await srv.api(`/api/trash/${r.data.trashId}/restore`, { method: 'POST' });
+  assert.equal((await srv.api('/api/presentations/templates')).data.own[0].id, tpl.id);
+  assert.ok(await exists(path.join(srv.dataDir, 'presentation-template', tpl.id, file)));
+});
+
+test('a case study from a project (briefing, client, deliverables, pictures) or a reference', async () => {
+  const deck = (await srv.api('/api/presentations', { method: 'POST', json: { template: 'case' } })).data.presentation;
+  const client = (await srv.api('/api/clients', { method: 'POST', json: { name: 'Café Kiara' } })).data.client;
+  const plan = (await srv.api('/api/plans', { method: 'POST', json: { name: 'Café rebrand', clientId: client.id } })).data.plan;
+  await srv.api(`/api/plans/${plan.id}`, { method: 'PATCH', json: { end: '2025-11-30' } });
+  const brief = (await srv.api(`/api/plans/${plan.id}/blocks`, { method: 'POST', json: { type: 'briefing' } })).data.block;
+  await srv.api(`/api/plans/${plan.id}/blocks/${brief.id}`, { method: 'PATCH', json: { fields: [{ label: 'Project goal', value: 'A warm, nostalgic identity for a café and bistro.\n\nMore later.' }] } });
+  const deliv = (await srv.api(`/api/plans/${plan.id}/blocks`, { method: 'POST', json: { type: 'deliverables' } })).data.block;
+  await srv.api(`/api/plans/${plan.id}/blocks/${deliv.id}`, { method: 'PATCH', json: { items: [{ name: 'Logo' }, { name: 'Menu' }, { name: 'Logo' }] } });
+  const mood = (await srv.api(`/api/plans/${plan.id}/blocks`, { method: 'POST', json: { type: 'moodboard' } })).data.block;
+  const fd = new FormData();
+  for (const n of ['a.png', 'b.png']) fd.append('files', new Blob([PNG], { type: 'image/png' }), n);
+  await srv.api(`/api/plans/${plan.id}/blocks/${mood.id}/files`, { method: 'POST', body: fd });
+
+  let r = await srv.api(`/api/presentations/${deck.id}/case-from`, { method: 'POST', json: { kind: 'plan', id: plan.id } });
+  assert.equal(r.status, 200);
+  assert.deepEqual([r.data.title, r.data.text], ['Café rebrand', 'A warm, nostalgic identity for a café and bistro.']);
+  assert.deepEqual(r.data.facts, [{ label: 'Client', value: 'Café Kiara' }, { label: 'Year', value: '2025' }, { label: 'Scope', value: 'Logo - Menu' }]);
+  assert.match(r.data.image.file, /^images\/[\w-]{6}-[\w-]+\.png$/); // moodboard pictures: the first for the cover …
+  assert.equal(r.data.images.length, 1);                                // … the rest for the case pictures
+  assert.ok(await exists(path.join(srv.dataDir, 'presentation', deck.id, r.data.image.file)));
+
+  // A reference: its title, notes, year, kind, tags and picture.
+  const ref = new FormData();
+  ref.append('type', 'imagegallery'); ref.append('title', 'Joeys Picknick'); ref.append('year', '2026'); ref.append('notes', 'A food truck by the Rhine.');
+  ref.append('tags', JSON.stringify(['Brand Identity', 'Print'])); ref.append('image', new Blob([PNG], { type: 'image/png' }), 'joeys.png');
+  const project = (await srv.api('/api/projects', { method: 'POST', body: ref })).data.project;
+  r = await srv.api(`/api/presentations/${deck.id}/case-from`, { method: 'POST', json: { kind: 'project', id: project.id } });
+  assert.deepEqual([r.data.title, r.data.text, r.data.facts.map((f) => f.value), r.data.images], ['Joeys Picknick', 'A food truck by the Rhine.', ['2026', 'Image Gallery', 'Brand Identity - Print'], []]);
+  assert.ok(r.data.image.file);
+  assert.equal((await srv.api(`/api/presentations/${deck.id}/case-from`, { method: 'POST', json: { kind: 'plan', id: 'nope' } })).status, 404);
+});

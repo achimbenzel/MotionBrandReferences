@@ -93,3 +93,15 @@ export const normalizeDeckDefaults = (d) => ({
   },
   preparedBy: str(d?.preparedBy, 80),
 });
+/** Your own template: a deck's slides, label, kind and look, saved to start new decks from (pictures in data/presentation-template/<id>/). */
+export const normalizeDeckTemplate = (t) => ({
+  id: typeof t?.id === 'string' && ID.test(t.id) ? t.id : nanoid(10),
+  name: str(t?.name, 120).trim() || 'My template',
+  hint: str(t?.hint, 300),
+  kind: DECK_KIND_KEYS.includes(t?.kind) ? t.kind : 'other',
+  label: str(t?.label, 60),
+  theme: normalizeDeckTheme(t?.theme),
+  slides: (Array.isArray(t?.slides) ? t.slides : []).slice(0, 200).map(normalizeSlide).filter(Boolean),
+  createdAt: num(t?.createdAt, 0, 1e14, 0) || Date.now(),
+  updatedAt: num(t?.updatedAt, 0, 1e14, 0) || Date.now(),
+});

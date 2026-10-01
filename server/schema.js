@@ -22,7 +22,7 @@ import { logoActive, logoNeedsMigration, logoRenditionList, logoSource, normaliz
 import { CURRENCIES } from './schema/base.js';
 import { normalizeDashboardFocus, normalizeDashboardLayout, normalizeImageUploads, normalizeWeeklyTodos, normalizeFormats } from './schema/settings.js';
 import { normalizeBoard } from './schema/board.js';
-import { normalizePresentation, normalizeDeckDefaults } from './schema/presentations.js';
+import { normalizePresentation, normalizeDeckDefaults, normalizeDeckTemplate } from './schema/presentations.js';
 
 // Each area's record shapes live in schema/ — all of them are exported from here too.
 export * from './schema/base.js';
@@ -44,7 +44,7 @@ export const SCHEMA_VERSION = 2;
 export const schemaVersionOf = (db) => (Number.isInteger(db?.schemaVersion) ? db.schemaVersion : 1);
 export const emptyDB = () => ({
   schemaVersion: SCHEMA_VERSION, projects: [], galleries: [], plans: [], planTemplates: [], software: [], trash: [], inbox: [], mockups: [], mockupModels: [], mockupHdris: [], timeEntries: [], clients: [], notes: [],
-  content: [], achievements: [], storyboardTemplates: [], presentations: [],
+  content: [], achievements: [], storyboardTemplates: [], presentations: [], deckTemplates: [],
   settings: { storageLimitBytes: DEFAULT_STORAGE_LIMIT },
 });
 // ---------------------------------------------------------------------------
@@ -83,6 +83,8 @@ export function normalizeDB(db) {
   db.achievementStats = normalizeAchievementStats(db.achievementStats);
   if (!Array.isArray(db.presentations)) db.presentations = [];        // decks: proposals, brand identities …
   db.presentations = db.presentations.filter((p) => p && typeof p === 'object').map(normalizePresentation);
+  if (!Array.isArray(db.deckTemplates)) db.deckTemplates = [];        // your own presentation templates
+  db.deckTemplates = db.deckTemplates.filter((t) => t && typeof t === 'object').map(normalizeDeckTemplate);
   for (const plan of db.plans) normalizePlan(plan);
   linkClients(db);
   for (const s of db.software) normalizeSoftware(s);

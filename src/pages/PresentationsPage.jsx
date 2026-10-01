@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Presentation as DeckIcon, MoreHorizontal, Play, Copy, Trash2, Pin, PinOff, Search, X, Check } from 'lucide-react';
+import { Plus, Presentation as DeckIcon, MoreHorizontal, Play, Copy, Trash2, Pin, PinOff, Search } from 'lucide-react';
 import { api } from '../lib/api.js';
-import { DECK_TEMPLATES, DECK_KINDS } from '../lib/slides.js';
+import { DECK_KINDS } from '../lib/slides.js';
 import { fmtDate } from '../lib/format.js';
 import { useToast } from '../components/Toast.jsx';
 import Menu from '../components/Menu.jsx';
 import { SlideView } from '../components/presentations/Slide.jsx';
 import Presenter from '../components/presentations/Presenter.jsx';
+import NewPresentation from '../components/presentations/NewPresentation.jsx';
 import '@fontsource/dm-sans/600.css';
 import '@fontsource/dm-sans/800.css';
 import '@fontsource/dm-sans/400-italic.css';
@@ -98,70 +99,6 @@ export default function PresentationsPage({ reloadKey }) {
       )}
       {creating && <NewPresentation defaults={data.defaults} clients={clients} onClose={() => setCreating(false)} onMade={(p) => navigate(`/presentations/${p.id}`)} />}
       {presenting && <Presenter deck={presenting} onClose={() => setPresenting(null)} />}
-    </div>
-  );
-}
-
-/** Pick what to start from — each shown by its cover in your look — and who it's for. */
-function NewPresentation({ defaults, clients, onClose, onMade }) {
-  const toast = useToast();
-  const [template, setTemplate] = useState('proposal');
-  const [clientId, setClientId] = useState('');
-  const [title, setTitle] = useState('');
-  const [busy, setBusy] = useState(false);
-  const client = clients.find((c) => c.id === clientId);
-  // The covers in your look (pictures aside): what a new deck from each will start like.
-  const preview = (key) => {
-    const t = DECK_TEMPLATES[key];
-    const first = t.slides()[0];
-    const fill = (v) => String(v).replaceAll('[Client]', client?.name || 'Client');
-    return {
-      deck: { id: 'preview', title: t.label, label: t.deckLabel, theme: defaults?.theme || {}, brand: { ...(defaults?.brand || {}), logo: null, mark: null }, meta: { preparedFor: client?.name || '', preparedBy: defaults?.preparedBy || defaults?.brand?.name || '', version: 'v1.0' } },
-      slide: { ...first, id: key, data: { ...first.data, title: fill(first.data.title) } },
-    };
-  };
-  const make = async () => {
-    setBusy(true);
-    try { onMade(await api.createPresentation({ template, clientId, title })); } catch (e) { toast(e.message, 'error'); setBusy(false); }
-  };
-  return (
-    <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
-      <div className="modal pz-new" role="dialog" aria-modal="true" aria-label="New presentation">
-        <div className="modal-head">
-          <h2>New presentation</h2>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close"><X size={18} /></button>
-        </div>
-        <div className="modal-body">
-          <div className="pz-templates" role="radiogroup" aria-label="Start from">
-            {Object.entries(DECK_TEMPLATES).map(([key, t]) => {
-              const { deck, slide } = preview(key);
-              return (
-                <button key={key} type="button" role="radio" aria-checked={template === key} className={`pz-template ${template === key ? 'on' : ''}`} onClick={() => setTemplate(key)}>
-                  <SlideView deck={deck} slide={slide} index={0} total={1} />
-                  <b>{template === key && <Check size={14} />}{t.label} <em>{t.slides().length} slides</em></b>
-                  <small>{t.hint}</small>
-                </button>
-              );
-            })}
-          </div>
-          <div className="pz-new-fields">
-            <label className="field"><span>For <em>optional</em></span>
-              <select className="input" value={clientId} onChange={(e) => setClientId(e.target.value)}>
-                <option value="">No client</option>
-                {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </label>
-            <label className="field"><span>Name <em>optional</em></span>
-              <input className="input" value={title} placeholder={`${DECK_TEMPLATES[template].label}${client ? ` · ${client.name}` : ''}`} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') make(); }} />
-            </label>
-          </div>
-          {!defaults?.brand?.name && <p className="hint">Your logo, name and contact go in once (Presentation → From) — “Use this look for new ones” keeps them for every new deck.</p>}
-        </div>
-        <div className="modal-foot">
-          <button type="button" className="btn" onClick={onClose} disabled={busy}>Cancel</button>
-          <button type="button" className="btn btn-primary" onClick={make} disabled={busy}><Plus size={16} /> {busy ? 'Creating…' : 'Create'}</button>
-        </div>
-      </div>
     </div>
   );
 }

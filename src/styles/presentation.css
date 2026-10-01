@@ -225,6 +225,9 @@
   .pz-print-page { width: 1920px; height: 1080px; overflow: hidden; break-after: page; page-break-after: always; }
   .pz-print-page:last-child { break-after: auto; page-break-after: auto; }
 }
+/* PowerPoint: the slides drawn at full size, out of sight, while they're measured */
+.pz-pptx-root { position: fixed; left: -40000px; top: 0; width: 1920px; pointer-events: none; }
+.pz-pptx-page { width: 1920px; height: 1080px; overflow: hidden; }
 
 /* ---------- Presenting ---------- */
 .pz-present { position: fixed; inset: 0; z-index: 2000; background: #000; display: grid; place-items: center; cursor: pointer; user-select: none; }
@@ -253,10 +256,16 @@
 .pz-empty p { max-width: 520px; margin-left: auto; margin-right: auto; }
 .pz-new { max-width: 980px; }
 .pz-templates { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; margin-bottom: 18px; }
-.pz-template { display: flex; flex-direction: column; gap: 6px; padding: 8px 8px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); color: var(--text); text-align: left; font: inherit; cursor: pointer; }
+.pz-template { position: relative; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+.pz-template-pick { display: flex; flex-direction: column; gap: 6px; width: 100%; padding: 8px 8px 12px; border: 0; border-radius: inherit; background: none; color: var(--text); text-align: left; font: inherit; cursor: pointer; }
+.pz-template b span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pz-template > .menu-wrap { position: absolute; right: 12px; top: 12px; }
+.pz-template-menu { width: 26px; height: 26px; background: rgba(10, 10, 15, .7); color: #e8e4dc; }
+.pz-template-rename { margin: -2px 8px 8px; width: auto; height: 32px; padding: 0 8px; }
+.pz-templates-h { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-faint); }
 .pz-template .pz-view { border-radius: 7px; }
 .pz-template b { display: flex; align-items: center; gap: 6px; margin-top: 4px; padding: 0 4px; font-size: 14px; }
-.pz-template b em { margin-left: auto; font-style: normal; font-weight: 400; font-size: 12px; color: var(--text-faint); }
+.pz-template b em { margin-left: auto; flex: none; white-space: nowrap; font-style: normal; font-weight: 400; font-size: 12px; color: var(--text-faint); }
 .pz-template small { padding: 0 4px; font-size: 12px; line-height: 1.35; color: var(--text-muted); }
 .pz-template:hover { border-color: var(--border-strong); }
 .pz-template.on { border-color: var(--accent); background: var(--accent-dim); }
@@ -369,3 +378,30 @@
   .pz-stage-foot { font-size: 11px; }
 }
 html.pz-presenting, html.pz-presenting body { overflow: hidden; }
+/* own templates, case studies from a project */
+.pzf-fill { align-self: flex-start; }
+.pz-save-tpl { max-width: 520px; }
+.pz-save-tpl .field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-muted); }
+.pz-save-tpl .field em { font-style: normal; color: var(--text-faint); }
+.pz-save-tpl .modal-foot, .pz-from .modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 20px; border-top: 1px solid var(--border); }
+.pz-from { max-width: 720px; }
+.pz-from-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 8px; }
+.pz-from-tools .segmented button { display: inline-flex; align-items: center; gap: 6px; }
+.pz-from-search { flex: 1 1 200px; height: 34px; margin: 0; }
+.pz-from-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin-top: 10px; }
+.pz-from-item { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.pz-from-item:hover { border-color: var(--accent); }
+.pz-from-thumb { flex: none; width: 54px; height: 40px; border-radius: 6px; overflow: hidden; display: grid; place-items: center; background: var(--surface-3); }
+.pz-from-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.pz-from-thumb i { font-style: normal; font-weight: 700; color: var(--text-muted); }
+.pz-from-text { display: flex; flex-direction: column; min-width: 0; }
+.pz-from-text b { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pz-from-text small { font-size: 11.5px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* a client's presentations (client page) */
+.client-decks { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.client-deck { display: flex; flex-direction: column; gap: 0; padding: 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--surface-2); color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: border-color .15s; }
+.client-deck:hover { border-color: var(--accent); }
+.client-deck .pz-view { border-bottom: 1px solid var(--border); }
+.client-deck-meta { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; min-width: 0; }
+.client-deck-meta b { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.client-deck-meta small { font-size: 11.5px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

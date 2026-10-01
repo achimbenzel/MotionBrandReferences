@@ -11,16 +11,34 @@ import { moveInto, safeRm, sanitize, extOf, sniffImageExt } from '../files.js';
 import { trashFiles } from '../trashMoves.js';
 import { upload } from '../upload.js';
 import {
-  normalizePresentation, normalizeDeckTheme, normalizeDeckBrand, normalizeDeckMeta, normalizeDeckDefaults, normalizeSlide, localDay, isDay, str, DECK_KIND_KEYS,
+  normalizePresentation, normalizeDeckTheme, normalizeDeckBrand, normalizeDeckMeta, normalizeDeckDefaults, normalizeDeckTemplate, normalizeSlide, localDay, isDay, str, DECK_KIND_KEYS,
 } from '../schema.js';
 import { createRouter, HttpError } from '../http.js';
 import { sourceAsUpload, IMAGE_EXT } from '../sources.js';
+import { caseSource } from '../caseFrom.js';
 import { DECK_TEMPLATES } from '../../src/lib/slides.js';
 
 const router = createRouter();
 export default router;
 
 export const presentationDir = (id) => path.join(DATA_DIR, 'presentation', id);
+export const deckTemplateDir = (id) => path.join(DATA_DIR, 'presentation-template', id);
+/** Every picture a list of slides shows ('images/…'). */
+const picturesOf = (slides) => {
+  const out = new Set();
+  const walk = (v) => { if (v && typeof v === 'object') { if (typeof v.file === 'string' && v.file.startsWith('images/')) out.add(v.file); Object.values(v).forEach(walk); } };
+  walk(slides);
+  return [...out];
+};
+/** Copy these pictures ('images/…') from one folder to another. */
+async function copyPictures(fromDir, toDir, files) {
+  if (!files.length) return;
+  await fsp.mkdir(path.join(toDir, 'images'), { recursive: true });
+  for (const f of files) {
+    const from = path.join(fromDir, f);
+    if (fs.existsSync(from)) await fsp.copyFile(from, path.join(toDir, f));
+  }
+}
 const dashboardDir = () => path.join(DATA_DIR, 'dashboard');
 // Pinned first, then the one changed last.
 const ordered = (list) => [...list].sort((a, b) => Number(b.pinned) - Number(a.pinned) || (b.updatedAt || 0) - (a.updatedAt || 0));
@@ -30,8 +48,13 @@ router.get('/api/presentations', async (_req, res) => {
   res.json({ presentations: ordered(db.presentations), defaults: db.settings.presentationDefaults });
 });
 
-router.get('/api/presentations/templates', (_req, res) => {
-  res.json({ templates: Object.entries(DECK_TEMPLATES).map(([key, t]) => ({ key, label: t.label, hint: t.hint, kind: t.kind, count: t.slides().length })) });
+// The templates: the built-in ones and your own (with their slides, to show them by their covers).
+router.get('/api/presentations/templates', async (_req, res) => {
+  const db = await readDB();
+  res.json({
+    templates: Object.entries(DECK_TEMPLATES).map(([key, t]) => ({ key, label: t.label, hint: t.hint, kind: t.kind, count: t.slides().length })),
+    own: [...db.deckTemplates].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)),
+  });
 });
 
 router.get('/api/presentations/:id', async (req, res) => {
@@ -52,10 +75,16 @@ function fillIn(slides, names) {
 // details saved for new decks — their pictures are copied into its folder.
 router.post('/api/presentations', async (req, res) => {
   const b = req.body || {};
-  const key = DECK_TEMPLATES[b.template] ? b.template : 'proposal';
-  const tpl = DECK_TEMPLATES[key];
   const id = nanoid(10);
   const db = await readDB();
+  // Your own template ('own:<id>'): its slides, label, kind and look, its pictures copied.
+  const own = typeof b.template === 'string' && b.template.startsWith('own:') ? db.deckTemplates.find((t) => t.id === b.template.slice(4)) : null;
+  if (typeof b.template === 'string' && b.template.startsWith('own:') && !own) return res.status(404).json({ error: 'not_found', message: 'That template is gone.' });
+  const builtIn = DECK_TEMPLATES[b.template] || DECK_TEMPLATES.proposal;
+  const tpl = own
+    ? { label: own.name, kind: own.kind, deckLabel: own.label, theme: own.theme, slides: () => structuredClone(own.slides).map((x) => ({ ...x, id: undefined })) }
+    : builtIn;
+  if (own) await copyPictures(deckTemplateDir(own.id), presentationDir(id), picturesOf(own.slides));
   const d = db.settings.presentationDefaults;
   const client = (db.clients || []).find((c) => c.id === b.clientId);
   const brand = { name: d.brand.name, lines: d.brand.lines, logo: null, mark: null };
@@ -73,7 +102,7 @@ router.post('/api/presentations', async (req, res) => {
     const p = normalizePresentation({
       id, title: str(b.title, 200).trim() || (client ? `${tpl.label} · ${client.name}` : tpl.label), kind: tpl.kind,
       clientId: client?.id || '', planId: typeof b.planId === 'string' ? b.planId : '', label: tpl.deckLabel,
-      theme: d.theme, brand, meta: { preparedFor: client?.name || '', preparedBy: d.preparedBy || brand.name, version: 'v1.0', date: localDay() },
+      theme: tpl.theme || d.theme, brand, meta: { preparedFor: client?.name || '', preparedBy: d.preparedBy || brand.name, version: 'v1.0', date: localDay() },
       slides: fillIn(tpl.slides(), { client: client?.name, me: first }), createdAt: now, updatedAt: now,
     });
     dbw.presentations.push(p);
@@ -159,6 +188,79 @@ router.post('/api/presentations/:id/defaults', async (req, res) => {
   });
   for (const k of ['logo', 'mark']) if (old.brand[k] && old.brand[k] !== defaults.brand[k]) await safeRm(path.join(dashboardDir(), old.brand[k]), { force: true }).catch(() => {});
   res.json({ defaults });
+});
+
+// ---- Your own templates
+// This deck as a template: its slides (the client's name becomes [Client],
+// filled in again for the next one), label, kind, look and pictures.
+router.post('/api/presentations/:id/template', async (req, res) => {
+  const db = await readDB();
+  const p = db.presentations.find((x) => x.id === req.params.id);
+  if (!p) return res.status(404).json({ error: 'not_found' });
+  const client = (db.clients || []).find((c) => c.id === p.clientId)?.name?.trim();
+  const neutral = (v) => (typeof v === 'string' ? (client ? v.split(client).join('[Client]') : v)
+    : Array.isArray(v) ? v.map(neutral) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, neutral(x)])) : v);
+  const id = nanoid(10);
+  await copyPictures(presentationDir(p.id), deckTemplateDir(id), picturesOf(p.slides));
+  const template = await mutateDB((dbw) => {
+    const now = Date.now();
+    const t = normalizeDeckTemplate({
+      id, name: str(req.body?.name, 120).trim() || (client ? p.title.replace(client, '').replace(/[\s·:–-]+$/, '').trim() : p.title) || 'My template',
+      hint: str(req.body?.hint, 300), kind: p.kind, label: p.label, theme: p.theme,
+      slides: neutral(p.slides).map((x) => ({ ...x, id: undefined })), createdAt: now, updatedAt: now,
+    });
+    dbw.deckTemplates.push(t);
+    return t;
+  });
+  res.status(201).json({ template });
+});
+router.patch('/api/presentation-templates/:id', async (req, res) => {
+  const template = await mutateDB((db) => {
+    const t = db.deckTemplates.find((x) => x.id === req.params.id);
+    if (!t) return null;
+    if ('name' in (req.body || {}) && String(req.body.name || '').trim()) t.name = str(req.body.name, 120).trim();
+    if ('hint' in (req.body || {})) t.hint = str(req.body.hint, 300);
+    t.updatedAt = Date.now();
+    return t;
+  });
+  if (!template) return res.status(404).json({ error: 'not_found' });
+  res.json({ template });
+});
+// → Trash, with its pictures (decks made from it keep theirs).
+router.delete('/api/presentation-templates/:id', async (req, res) => {
+  const trashId = nanoid(10);
+  const ok = await mutateDB((db) => {
+    const i = db.deckTemplates.findIndex((x) => x.id === req.params.id);
+    if (i === -1) return false;
+    const [t] = db.deckTemplates.splice(i, 1);
+    db.trash.unshift({ trashId, kind: 'deckTemplate', deletedAt: Date.now(), data: t });
+    return true;
+  });
+  if (!ok) return res.status(404).json({ error: 'not_found' });
+  await trashFiles(trashId, [{ from: deckTemplateDir(req.params.id), to: path.join(TRASH_DIR, trashId) }]);
+  res.json({ trashId });
+});
+
+// ---- A case study from one of your projects or a reference: its name, text,
+// facts and up to four pictures (copied into the deck). → { title, text, facts, image, images }
+router.post('/api/presentations/:id/case-from', async (req, res) => {
+  const db = await readDB();
+  if (!db.presentations.some((p) => p.id === req.params.id)) return res.status(404).json({ error: 'not_found' });
+  const src = caseSource(db, req.body?.kind, String(req.body?.id || ''));
+  if (!src) return res.status(404).json({ error: 'not_found', message: 'That project is gone.' });
+  const dir = path.join(presentationDir(req.params.id), 'images');
+  const files = [];
+  for (const pic of src.pictures) {
+    if (files.length >= 4) break;
+    if (!fs.existsSync(pic.abs)) continue;
+    await fsp.mkdir(dir, { recursive: true });
+    const ext = extOf(pic.name) || '.png';
+    const name = `${nanoid(6)}-${sanitize(path.basename(pic.name, path.extname(pic.name))).slice(0, 50) || 'picture'}${ext}`;
+    await fsp.copyFile(pic.abs, path.join(dir, name));
+    files.push(`images/${name}`);
+  }
+  const img = (file) => (file ? { file, fit: 'cover', x: 50, y: 50 } : null);
+  res.json({ title: src.title, text: src.text, facts: src.facts, image: img(files[0]), images: files.slice(1).map(img) });
 });
 
 // → Trash, with its pictures.

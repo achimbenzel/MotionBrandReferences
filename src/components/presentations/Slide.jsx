@@ -11,7 +11,8 @@ import { hexToRgb, rgbToCmyk } from '../../lib/color.js';
 const W = 1920;
 const H = 1080;
 const pad2 = (n) => String(n).padStart(2, '0');
-export const deckFileUrl = (deck, file) => (deck && file ? `/data/presentation/${deck.id}/${file}` : null);
+// A deck's pictures (a template's live elsewhere: `base`).
+export const deckFileUrl = (deck, file) => (deck && file ? `${deck.base || `/data/presentation/${deck.id}`}/${file}` : null);
 
 /** The deck's look as CSS variables on a slide. */
 export function themeVars(deck) {

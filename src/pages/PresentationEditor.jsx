@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Play, FileDown, MoreHorizontal, Plus, Copy, Trash2, Eye, EyeOff, ChevronUp, ChevronDown, Presentation as DeckIcon, Pin, PinOff, LayoutTemplate, Settings2,
+  Library, X, FileText, FileSliders,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useSaver, useRefreshOnReturn } from '../lib/autosave.js';
@@ -15,6 +16,8 @@ import SlideFields from '../components/presentations/SlideFields.jsx';
 import DeckPanel from '../components/presentations/DeckPanel.jsx';
 import Presenter from '../components/presentations/Presenter.jsx';
 import PrintDeck from '../components/presentations/PrintDeck.jsx';
+import PptxDeck from '../components/presentations/PptxDeck.jsx';
+import CaseFromPicker from '../components/presentations/CaseFromPicker.jsx';
 import '@fontsource/dm-sans/600.css';
 import '@fontsource/dm-sans/800.css';
 import '@fontsource/dm-sans/400-italic.css';
@@ -48,8 +51,11 @@ export default function PresentationEditor() {
   const [error, setError] = useState(null);
   const [panel, setPanel] = useState('slide'); // slide | deck
   const [busy, setBusy] = useState(false);
+  const [caseFor, setCaseFor] = useState(null); // { mode: 'fill', slideId } | { mode: 'add' } — picking a project for a case study
+  const [tplDialog, setTplDialog] = useState(null); // { name, hint } — saving as a template
   const [presenting, setPresenting] = useState(null); // index to start at
   const [printing, setPrinting] = useState(false);
+  const [exportingPptx, setExportingPptx] = useState(false);
   const [lists, setLists] = useState({ clients: [], plans: [] });
   const deckRef = useRef(null);
   deckRef.current = deck;
@@ -168,12 +174,49 @@ export default function PresentationEditor() {
   const saveDefaults = async () => {
     try { await saver.flush(); await api.savePresentationDefaults(id); toast('New presentations start with this look and these details'); } catch (e) { toast(e.message, 'error'); }
   };
+  // A case study from a project or reference: this slide filled, or a case study's slides added after the one picked.
+  const takeCase = async (src) => {
+    const target = caseFor;
+    setCaseFor(null); setBusy(true);
+    try {
+      const c = await api.caseFrom(id, src.kind, src.id);
+      const facts = c.facts.map((f) => ({ id: rid(), ...f }));
+      const pics = (list) => list.filter(Boolean).slice(0, 3).map((image) => ({ id: rid(), image }));
+      if (target?.mode === 'fill') {
+        patchSlide(target.slideId, (s) => (s.type === 'caseGallery'
+          ? { ...s, data: { ...s.data, images: c.image ? pics([c.image, ...c.images]) : s.data.images } }
+          : { ...s, data: { ...s.data, title: c.title, text: c.text || s.data.text, image: c.image || s.data.image, facts: facts.length ? facts : s.data.facts } }));
+      } else {
+        const n = deckRef.current.slides.filter((s) => s.type === 'caseCover').length + 1;
+        const section = `CASE STUDY ${n}`;
+        const added = [{ id: rid(), type: 'caseCover', hidden: false, section, data: { ...blankData('caseCover'), title: c.title, text: c.text, image: c.image, facts } }];
+        if (c.images.length) added.push({ id: rid(), type: 'caseGallery', hidden: false, section, data: { ...blankData('caseGallery'), title: 'How it\n*came together*', text: '', images: pics(c.images) } });
+        setSlides((list) => { const i = list.findIndex((x) => x.id === selId); const next = [...list]; next.splice(i + 1, 0, ...added); return next; });
+        pick(added[0].id); setPanel('slide');
+      }
+      toast(`Filled from “${src.name}”`);
+    } catch (e) { toast(`Could not fill it: ${e.message}`, 'error'); } finally { setBusy(false); }
+  };
+  const saveTemplate = async () => {
+    const t = tplDialog;
+    setTplDialog(null);
+    try {
+      await saver.flush();
+      const tpl = await api.saveDeckTemplate(id, { name: t.name, hint: t.hint });
+      toast(`Saved as the template “${tpl.name}” — it’s in New presentation`);
+    } catch (e) { toast(`Could not save it: ${e.message}`, 'error'); }
+  };
   const exportPdf = async () => { await saver.flush(); setPrinting(true); toast('Choose “Save as PDF” in the print dialog'); };
+  const exportPowerPoint = async () => { await saver.flush(); setExportingPptx(true); };
 
   if (error) return <div className="detail"><button className="detail-back" onClick={() => navigate('/presentations')}><ArrowLeft size={16} /> Presentations</button><div className="center-msg">Couldn’t load: {error}</div></div>;
   if (!deck) return <div className="spinner" />;
 
-  const addMenu = SLIDE_TYPE_KEYS.map((k) => ({ label: SLIDE_TYPES[k].label, note: '', icon: <LayoutTemplate size={15} />, onClick: () => addSlide(k), title: SLIDE_TYPES[k].hint }));
+  const addMenu = [
+    { label: 'Case study from a project…', icon: <Library size={15} />, onClick: () => setCaseFor({ mode: 'add' }) },
+    { separator: true },
+    ...SLIDE_TYPE_KEYS.map((k) => ({ label: SLIDE_TYPES[k].label, icon: <LayoutTemplate size={15} />, onClick: () => addSlide(k) })),
+  ];
   const shown = slides.filter((s) => !s.hidden).length;
   return (
     <div className="pz-editor">
@@ -181,11 +224,18 @@ export default function PresentationEditor() {
         <button className="detail-back" style={{ margin: 0 }} onClick={() => navigate('/presentations')}><ArrowLeft size={16} /> <span className="pz-hide-s">Presentations</span></button>
         <input className="pz-title" value={deck.title} placeholder="Untitled presentation" onChange={(e) => onDeck({ title: e.target.value })} aria-label="Name of the presentation" />
         <div className="pz-bar-tools">
-          <button type="button" className="btn" onClick={exportPdf} disabled={!shown}><FileDown size={16} /> <span className="pz-hide-s">PDF</span></button>
+          <Menu align="right" trigger={<button type="button" className="btn" aria-label="Export" disabled={!shown || exportingPptx}><FileDown size={16} /> <span className="pz-hide-s">{exportingPptx ? 'Exporting…' : 'Export'}</span></button>} items={[
+            { label: 'PDF', icon: <FileText size={15} />, onClick: exportPdf },
+            { label: 'PowerPoint (.pptx)', icon: <FileSliders size={15} />, onClick: exportPowerPoint },
+          ]} />
           <button type="button" className="btn btn-primary" onClick={async () => { await saver.flush(); setPresenting(Math.max(0, slides.filter((s) => !s.hidden).indexOf(sel))); }} disabled={!shown}><Play size={16} /> Present</button>
           <Menu align="right" trigger={<button type="button" className="icon-btn" aria-label="More"><MoreHorizontal size={18} /></button>} items={[
             { label: deck.pinned ? 'Unpin' : 'Pin to the top', icon: deck.pinned ? <PinOff size={15} /> : <Pin size={15} />, onClick: () => onDeck({ pinned: !deck.pinned }) },
             { label: 'Duplicate the presentation', icon: <Copy size={15} />, onClick: duplicate },
+            { label: 'Save as template…', icon: <LayoutTemplate size={15} />, onClick: () => {
+              const client = lists.clients.find((c) => c.id === deck.clientId)?.name;
+              setTplDialog({ name: (client ? deck.title.replace(client, '').replace(/[\s·:–-]+$/, '').trim() : deck.title) || 'My template', hint: '' });
+            } },
             { label: 'Use this look for new ones', icon: <Settings2 size={15} />, onClick: saveDefaults },
             { separator: true },
             { label: 'Delete', icon: <Trash2 size={15} />, danger: true, onClick: remove },
@@ -238,12 +288,35 @@ export default function PresentationEditor() {
             <button type="button" role="tab" className={panel === 'slide' ? 'on' : ''} aria-selected={panel === 'slide'} onClick={() => setPanel('slide')}>Slide</button>
             <button type="button" role="tab" className={panel === 'deck' ? 'on' : ''} aria-selected={panel === 'deck'} onClick={() => setPanel('deck')}>Presentation</button>
           </div>
-          {panel === 'slide' && sel && <SlideFields key={sel.id} deck={deck} slide={sel} onData={onData} onSlide={(p) => patchSlide(sel.id, (s) => ({ ...s, ...p }))} onUpload={upload} busy={busy} />}
+          {panel === 'slide' && sel && <SlideFields key={sel.id} deck={deck} slide={sel} onData={onData} onSlide={(p) => patchSlide(sel.id, (s) => ({ ...s, ...p }))} onUpload={upload} busy={busy}
+            onFillCase={sel.type === 'caseCover' || sel.type === 'caseGallery' ? () => setCaseFor({ mode: 'fill', slideId: sel.id }) : null} />}
           {panel === 'deck' && <DeckPanel deck={deck} clients={lists.clients} plans={lists.plans} onDeck={onDeck} onUpload={upload} onDefaults={saveDefaults} busy={busy} />}
         </section>
       </div>
       {presenting != null && <Presenter deck={deck} start={presenting} onClose={() => setPresenting(null)} />}
       {printing && <PrintDeck deck={deck} onDone={() => setPrinting(false)} />}
+      {exportingPptx && (
+        <PptxDeck deck={deck}
+          onDone={(n) => { setExportingPptx(false); toast(`PowerPoint with ${n} slide${n === 1 ? '' : 's'} downloaded — it looks right with DM Sans and JetBrains Mono installed`); }}
+          onError={(e) => { setExportingPptx(false); toast(`Could not export it: ${e.message}`, 'error'); }} />
+      )}
+      {caseFor && <CaseFromPicker onPick={takeCase} onClose={() => setCaseFor(null)} />}
+      {tplDialog && (
+        <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setTplDialog(null); }}>
+          <div className="modal pz-save-tpl" role="dialog" aria-modal="true" aria-label="Save as template">
+            <div className="modal-head"><h2>Save as template</h2><button type="button" className="icon-btn" onClick={() => setTplDialog(null)} aria-label="Close"><X size={18} /></button></div>
+            <div className="modal-body">
+              <label className="field"><span>Name</span><input className="input" value={tplDialog.name} autoFocus onChange={(e) => setTplDialog({ ...tplDialog, name: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') saveTemplate(); }} /></label>
+              <label className="field"><span>A line about it <em>optional</em></span><input className="input" value={tplDialog.hint} placeholder="e.g. Short proposal for restaurants" onChange={(e) => setTplDialog({ ...tplDialog, hint: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') saveTemplate(); }} /></label>
+              <p className="hint">Its slides, pictures, label and look become a template in <b>New presentation</b>.{deck.clientId ? ' The client’s name becomes [Client] — filled in with the next client’s.' : ' Write [Client] where the next client’s name should go.'}</p>
+            </div>
+            <div className="modal-foot">
+              <button type="button" className="btn" onClick={() => setTplDialog(null)}>Cancel</button>
+              <button type="button" className="btn btn-primary" onClick={saveTemplate} disabled={!tplDialog.name.trim()}><LayoutTemplate size={15} /> Save template</button>
+            </div>
+          </div>
+        </div>
+      )}
       {dialog}
     </div>
   );

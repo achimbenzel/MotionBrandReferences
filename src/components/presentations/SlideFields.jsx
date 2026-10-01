@@ -146,11 +146,12 @@ function TableField({ value, path, onChange }) {
 }
 
 /** The fields of one slide. `onUpload(pic, path)` uploads a picture and puts it at `path` ('image', 'items.2.image'). */
-export default function SlideFields({ deck, slide, onData, onSlide, onUpload, busy }) {
+export default function SlideFields({ deck, slide, onData, onSlide, onUpload, onFillCase, busy }) {
   const t = SLIDE_TYPES[slide.type];
   const d = slide.data || {};
   return (
     <div className="pzf">
+      {onFillCase && <button type="button" className="btn btn-sm pzf-fill" onClick={onFillCase} disabled={busy}><Library size={14} /> Fill from a project or reference…</button>}
       <p className="hint pzf-hint">{t.hint}{t.fields.some((x) => x.kind === 'textarea') ? ' — *word* shows a word in your accent colour.' : ''}</p>
       {t.fields.map((fd) => (
         <div key={fd.key} className="pzf-row">

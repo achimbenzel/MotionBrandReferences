@@ -70,6 +70,7 @@ export async function scanUnused() {
   for (const a of db.achievements || []) if (a?.id) owners.set(`achievement/${a.id}`, refSet(a)); // icon, sticker
   for (const e of db.expenses || []) if (e?.id) owners.set(`expense/${e.id}`, refSet(e));         // receipts
   for (const p of db.presentations || []) if (p?.id) owners.set(`presentation/${p.id}`, refSet(p)); // a deck's pictures
+  for (const t of db.deckTemplates || []) if (t?.id) owners.set(`presentation-template/${t.id}`, refSet(t)); // a template's pictures
   owners.set('dashboard', refSet(db.settings));
 
   // Files of a trashed item that are still waiting to be moved into the Trash (a locked file) aren't unused.
@@ -86,7 +87,7 @@ export async function scanUnused() {
     found.push({ rel: `${key}/${rel}`, size: st.size });
   });
 
-  for (const root of [...TYPES, 'plan', 'software', 'inbox', 'mockup', 'mockup-model', 'mockup-hdri', 'client', 'note', 'content', 'achievement', 'expense', 'presentation']) {
+  for (const root of [...TYPES, 'plan', 'software', 'inbox', 'mockup', 'mockup-model', 'mockup-hdri', 'client', 'note', 'content', 'achievement', 'expense', 'presentation', 'presentation-template']) {
     const rootDir = path.join(DATA_DIR, root);
     const entries = await fsp.readdir(rootDir, { withFileTypes: true }).catch(() => []);
     for (const e of entries) {

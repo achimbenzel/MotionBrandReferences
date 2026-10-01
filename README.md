@@ -187,6 +187,7 @@ data/
 ├── client/<id>/                    # a client's logo + invoices/*.pdf
 ├── expense/<id>/receipts/*         # an expense's receipts (PDFs, photos, e-invoices)
 ├── presentation/<id>/images/*      # a presentation's pictures
+├── presentation-template/<id>/images/*  # the pictures of your own deck templates
 ├── software/<id>/*                 # plugin installers + your own script files
 ├── mockup/<id>/                    # a mockup's screen pictures / videos, 2D pictures + thumb.webp
 ├── mockup-model/<id>/model.<ext>   # an imported 3D model (.glb / .gltf / .usdz)
@@ -536,6 +537,9 @@ back, you start a new project for them, and everything stays together.
     (“3/5 delivered”), hourly rate, and its hours — against its **budget**
     (“12.0 / 20 h”, amber from 80 %, red over it) or with the amount
     (hours × rate).
+  - **Presentations** — the client's decks, each by its cover (kind, slides,
+    last change); **New presentation** starts one with the client already
+    picked (their name on the cover and in the text).
   - **Deliverables** — every deliverable of every project, by project,
     **Open / Delivered / All**; a click opens it in its project.
   - **Time** — hours per project (and without one) and the latest entries.
@@ -1062,12 +1066,26 @@ labels, your mark in each slide's corner, the deck's label top right, the page
   applications, next steps), **Case study** (6) or **Blank**. Pick a
   **client**: their name goes on the cover (“Prepared for”) and into the text
   where the template says so (“Project goals for Gute Stube”).
+- **Your own templates** — ⋯ **Save as template…** in a deck's editor keeps
+  its slides, pictures, label and look as a template (a name and a line about
+  it); the client's name in it becomes `[Client]`, filled in with the next
+  client's. They're under **Your templates** in New presentation (by their
+  cover), ⋯ **Rename** / **Delete** (→ Trash, with Undo).
 - **Slides** — 17 kinds: Cover, Introduction, Works, Text & picture, Cards
   (big and numbered, or compact), Phases, Case study (with Client / Year /
   Industry / Scope), Case pictures, Testimonial, Pricing (packages or add-ons,
   one can be *Recommended*), Comparison (a table — ✓ and — become marks),
   Colours (with HEX, RGB and CMYK worked out), Typography, Logo, Big picture,
   Chapter and Closing.
+- **A case study from a project or reference** — **Add a slide → Case study
+  from a project…** (or **Fill from a project or reference…** on a Case study
+  / Case pictures slide) picks one of your projects or a library reference:
+  its name, a few sentences (a project's briefing — the goal or task — or a
+  reference's notes), the facts (Client, Year, Scope from the deliverables; a
+  reference's year, kind and tags) and up to four of its pictures (banner,
+  moodboard, storyboard frames; a reference's images) fill a case study slide
+  and, with more pictures, a Case pictures slide after it. The pictures are
+  copied into the deck, so the project can change without the deck changing.
 - **The editor** — the slides in a strip (drag to reorder; ⋯ duplicate, hide
   when presenting, move, delete with Undo; **Add a slide** after the one
   picked), the slide big in the middle, its fields beside it. **A click on a
@@ -1085,8 +1103,17 @@ labels, your mark in each slide's corner, the deck's label top right, the page
 - **Present** — fullscreen from the slide picked: → / Space / a click on the
   right for the next, ← back, a swipe on a phone, Esc to leave. Hidden slides
   are skipped.
-- **PDF** — every shown slide on a page of its own (1920 × 1080) through the
-  print dialog: choose *Save as PDF*. Text stays text — sharp and searchable.
+- **Export → PDF** — every shown slide on a page of its own (1920 × 1080)
+  through the print dialog: choose *Save as PDF*. Text stays text — sharp and
+  searchable.
+- **Export → PowerPoint (.pptx)** — every shown slide rebuilt from how it's
+  drawn here, editable in PowerPoint, Keynote, Google Slides or LibreOffice:
+  text as text boxes (accent words as coloured runs, the lines broken where
+  they are here), cards, frames, bands and lines as shapes, pictures cropped
+  the way they're shown; gradients and icons go in as pictures. The fonts
+  aren't embedded — with **DM Sans** and **JetBrains Mono** installed (free,
+  Google Fonts; Google Slides has both) it looks like here, headlines in Bold
+  rather than ExtraBold. The file is named after the deck.
 - The list shows each deck's cover; ⋯ Present, Pin, Duplicate, Delete (→
   Trash with its pictures, with Undo). Presentations are in the ⌘K search
   (their slides' text too) and in the dashboard's *Continue where you left
@@ -1095,7 +1122,9 @@ labels, your mark in each slide's corner, the deck's label top right, the page
 Stored in `data/db.json` (`presentations`; what new decks start with in
 `settings.presentationDefaults`), the pictures in
 `data/presentation/<id>/images/` (the default logo and mark in
-`data/dashboard/`), so they're part of the library export / import.
+`data/dashboard/`); your templates in `deckTemplates`, their pictures in
+`data/presentation-template/<id>/images/` — all part of the library export /
+import.
 
 ### Time Tracker
 **Time Tracker** (sidebar, under Mockups) logs your working hours per project
@@ -1737,6 +1766,7 @@ without going back to the grid; stepping past the last one wraps to the first.
   (`@fontsource/jetbrains-mono`) so the digits don't jump as they count.
 - **Icons:** [lucide](https://lucide.dev) via `lucide-react`, bundled locally.
 - **PDF rendering:** `pdfjs-dist` with a locally-bundled worker.
+- **PowerPoint files:** `pptxgenjs` (MIT), loaded only when a deck is exported.
 
 Nothing is fetched from a third-party CDN at runtime. The one exception is
 what you ask for yourself: a **YouTube / Vimeo link** plays in their embedded

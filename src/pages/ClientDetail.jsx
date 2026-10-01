@@ -22,6 +22,7 @@ import {
 } from '../lib/clients.js';
 import { getPref } from '../lib/prefs.js';
 import { daysFromToday, fmtDay } from '../lib/dates.js';
+import ClientDecks from '../components/presentations/ClientDecks.jsx';
 import '../styles/clients.css';
 import { fmtFixed, parseNum } from '../lib/format.js';
 
@@ -199,6 +200,7 @@ export default function ClientDetail({ onNewPlan }) {
       <div className="client-layout">
         <div className="client-main">
           <Projects plans={mine} entriesOf={byPlan} liveFor={liveFor} currency={currency} onOpen={(pid) => navigate(`/plan/${pid}`)} onNew={() => onNewPlan({ clientId: id })} />
+          <ClientDecks client={client} />
           <Deliverables list={deliverables} onOpen={(d) => navigate(`/plan/${d.plan.id}?block=${d.blockId}`)} />
           <TimeSection entries={entries} plans={mine} liveMin={liveMin} running={running} exportUrl={exportUrl} onAll={() => navigate(`/time?client=${id}`)} />
           <Invoices client={client} setClient={setClient} invoices={invoices} plans={mine} currency={currency} openSum={openSum} paidSum={paidSum} saver={saver} toast={toast} />

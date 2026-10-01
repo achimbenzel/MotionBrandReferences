@@ -14,6 +14,7 @@ import { parseVideoLink, firstUrl } from '../src/lib/videoLinks.js';
 import { normalizeUrl, hostOf, youtubeId } from '../src/lib/types.js';
 import { WIDGETS, layoutOf, lonelyHalves } from '../src/lib/dashboardLayout.js';
 import { setFormats, fmtDate, fmtTime, fmtCurrency, fmtInt, fmtFixed, fmtBytes, parseNum, monthName, weekdayName } from '../src/lib/format.js';
+import { fileName } from '../src/lib/pptxExport.js';
 
 // Germany: a day starts an hour or two before UTC's does.
 process.env.TZ = 'Europe/Berlin';
@@ -227,4 +228,13 @@ test('formats: Germany by default — dates, times, money and typed numbers; the
   setFormats({ date: 'nonsense', number: 'de' }); // unknown → stays
   assert.equal(fmtDate(d), '2026-10-27');
   setFormats({ date: 'de', number: 'de' });
+});
+
+test('PowerPoint: the file is named after the deck, in plain letters browsers keep', () => {
+  assert.equal(fileName('Project proposal · Gute Stube'), 'Project proposal - Gute Stube');
+  assert.equal(fileName('Brand-Identity für Müller & Söhne'), 'Brand-Identity fuer Mueller & Soehne');
+  assert.equal(fileName('Café Crème — Pitch'), 'Cafe Creme - Pitch');
+  assert.equal(fileName('A/B: Test?'), 'A-B-Test');
+  assert.equal(fileName('Straße 2026 | v2'), 'Strasse 2026 - v2');
+  for (const t of ['', '  ...  ', '日本語', null]) assert.equal(fileName(t), 'Presentation');
 });

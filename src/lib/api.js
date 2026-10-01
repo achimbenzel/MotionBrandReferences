@@ -625,7 +625,12 @@ export const api = {
   expensesExportUrl: (year, lang = 'de') => `/api/expenses/export.xlsx?year=${year}&lang=${lang}`,
   // --- Presentations (decks: proposals, brand identities, case studies) ---
   async listPresentations() { return request('/api/presentations'); }, // → { presentations, defaults }
-  async presentationTemplates() { const { templates } = await request('/api/presentations/templates'); return templates; },
+  async presentationTemplates() { return request('/api/presentations/templates'); }, // → { templates (built in), own }
+  async saveDeckTemplate(id, body = {}) { const { template } = await request(`/api/presentations/${id}/template`, { method: 'POST', json: body }); return template; },
+  async updateDeckTemplate(id, patch) { const { template } = await request(`/api/presentation-templates/${id}`, { method: 'PATCH', json: patch }); return template; },
+  async removeDeckTemplate(id) { return request(`/api/presentation-templates/${id}`, { method: 'DELETE' }); }, // → { trashId }
+  // A case study from a project ('plan') or a reference ('project'): → { title, text, facts, image, images }
+  async caseFrom(id, kind, sourceId) { return request(`/api/presentations/${id}/case-from`, { method: 'POST', json: { kind, id: sourceId } }); },
   async getPresentation(id) { const { presentation } = await request(`/api/presentations/${id}`); return presentation; },
   async createPresentation(body) { const { presentation } = await request('/api/presentations', { method: 'POST', json: body }); return presentation; },
   async updatePresentation(id, patch) { const { presentation } = await request(`/api/presentations/${id}`, { method: 'PATCH', json: patch }); return presentation; },
