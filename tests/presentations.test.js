@@ -60,7 +60,7 @@ test('presentations: from a template for a client, saved, pictures, copy, defaul
   r = await srv.api(`/api/presentations/${deck.id}/images`, { method: 'POST', body: picture() });
   assert.equal(r.status, 201);
   const { file } = r.data;
-  assert.match(file, /^images\/\w{6}-cover\.png$/);
+  assert.match(file, /^images\/[\w-]{6}-cover\.png$/); // the id may hold - and _
   assert.equal((await fetch(`${srv.base}/data/presentation/${deck.id}/${file}`)).status, 200);
   const bad = new FormData(); bad.append('file', new Blob(['x'], { type: 'text/plain' }), 'notes.txt');
   assert.equal((await srv.api(`/api/presentations/${deck.id}/images`, { method: 'POST', body: bad })).status, 400);
