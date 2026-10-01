@@ -1051,19 +1051,26 @@ Everything **saves as you go**; the list shows a small picture of each mockup.
 
 ### Presentations
 **Presentations** (sidebar, under Mockups) are decks for clients — a
-**project proposal**, a **brand identity**, a **case study** — in the style of
-the proposal template: a near-black ground, warm white type, one accent colour
-(petrol by default), **DM Sans** ExtraBold headlines and **JetBrains Mono**
-labels, your mark in each slide's corner, the deck's label top right, the page
-(02/16) bottom left and the slide's section bottom right.
+**project proposal**, a **case study** — in the style of the proposal
+template: a near-black ground, warm white type, one accent colour (petrol by
+default), **DM Sans** ExtraBold headlines and **JetBrains Mono** labels, your
+mark in each slide's corner (without one of your own: the A-mark,
+`src/assets/logo-02.svg`, in the accent colour), the deck's label top right,
+the page (02/16) bottom left and the slide's section bottom right. A cover
+without a picture shows **smoke from the Confinium hero shader** (swirl and
+chroma flow, smooth — no grain or streaks) in the deck's accent, dark or light;
+**Another swirl** (Presentation → Look) picks another moment of it. It's drawn
+once as a picture, so it's in the PDF and the PowerPoint too, and moves slowly
+while presenting (not with *reduce motion*; without WebGL a soft glow
+instead).
 
 - **New presentation** starts from a template, each shown by its cover in your
   look: **Project proposal** (14 slides — cover, “Hello, it's nice to meet
   you”, works, why work with me, how I work, the project goals, five phases, a
   case study with pictures and a testimonial, three packages, a side-by-side
-  table, add-ons, contact), **Brand identity** (12 — the brief, values, mood,
-  the logo on its backgrounds, the idea behind it, colour palette, typography,
-  applications, next steps), **Case study** (6) or **Blank**. Pick a
+  table, add-ons, contact), **Case study** (6) or **Blank**. (There's no brand
+  guidelines template — too individual; decks made from the earlier *Brand
+  identity* template keep their slides and kind.) Pick a
   **client**: their name goes on the cover (“Prepared for”) and into the text
   where the template says so (“Project goals for Gute Stube”).
 - **Your own templates** — ⋯ **Save as template…** in a deck's editor keeps
@@ -1093,7 +1100,11 @@ labels, your mark in each slide's corner, the deck's label top right, the page
   word in the accent colour; line breaks stay. Pictures: upload or **from the
   app**, a click on the preview sets the point they're cropped around, Fill or
   Fit; a slide without one shows an accent-coloured frame. ↑ / ↓ go between
-  slides. Everything saves as you type.
+  slides. Everything saves as you type. The strip keeps room for its
+  scrollbar, so it doesn't flicker in and out.
+- **Speaker notes** — under each slide's fields: only for you, shown in the
+  presenter view and written into the PowerPoint's notes (each line a
+  paragraph).
 - **Presentation** (the tab beside **Slide**) — name, kind, client, project,
   the label on every slide, **Dark** or **Light**, the **accent colour**, who
   it's from (**name**, **logo** for the cover, **mark** for the corners,
@@ -1101,13 +1112,21 @@ labels, your mark in each slide's corner, the deck's label top right, the page
   prepared for / by, version and date. **Use this look for new ones** keeps
   the look and details (logo and mark too) for every new deck.
 - **Present** — fullscreen from the slide picked: → / Space / a click on the
-  right for the next, ← back, a swipe on a phone, Esc to leave. Hidden slides
-  are skipped.
+  right for the next, ← back, a swipe on a phone, Esc to leave; slides fade
+  into each other. **G** (or the grid button) shows every slide to jump to,
+  **B** (or `.`) a black screen. Hidden slides are skipped.
+- **Presenter view** — the notes button while presenting (or ⋯ **Presenter
+  view** in the editor) opens a window of its own for you: the slide shown,
+  the next one, its speaker notes (A− / A+), a timer (pause, from zero) and
+  the time. Its arrows — and a clicker's — move the slides in the other
+  window, moves there show here, black screen in both. With the presenter
+  view open, leaving fullscreen doesn't end presenting (put the slides window
+  on the projector, then fullscreen again).
 - **Export → PDF** — every shown slide on a page of its own (1920 × 1080)
   through the print dialog: choose *Save as PDF*. Text stays text — sharp and
   searchable.
-- **Export → PowerPoint (.pptx)** — every shown slide rebuilt from how it's
-  drawn here, editable in PowerPoint, Keynote, Google Slides or LibreOffice:
+- **Export → PowerPoint (.pptx)** — every shown slide (with its speaker
+  notes) rebuilt from how it's drawn here, editable in PowerPoint, Keynote, Google Slides or LibreOffice:
   text as text boxes (accent words as coloured runs, the lines broken where
   they are here), cards, frames, bands and lines as shapes, pictures cropped
   the way they're shown; gradients and icons go in as pictures. The fonts

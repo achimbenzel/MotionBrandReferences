@@ -9,7 +9,7 @@
 
 export const DECK_KINDS = [
   { key: 'proposal', label: 'Project proposal' },
-  { key: 'identity', label: 'Brand identity' },
+  { key: 'identity', label: 'Brand identity', retired: true }, // no template any more; decks of this kind keep it
   { key: 'case', label: 'Case study' },
   { key: 'other', label: 'Presentation' },
 ];
@@ -169,29 +169,6 @@ export const DECK_TEMPLATES = {
         { name: 'Motion Design', price: '€ 300+', text: 'A motion design clip for your brand.\nAs: .mp4, .mov & animated .gif', bullets: '', featured: false },
       ] }),
       s('closing', 'CONTACT', { title: 'Let’s *start*.', text: 'Questions, ideas, a first call — I’m looking forward to hearing from you.', showContact: true }),
-    ],
-  },
-  identity: {
-    label: 'Brand identity', kind: 'identity', deckLabel: 'BRAND IDENTITY',
-    hint: 'Present a finished identity: the idea, logo, colours, type and applications',
-    slides: () => [
-      s('cover', '', { title: 'Brand *Identity*\n[Client]', showContact: true }),
-      s('textImage', 'THE BRIEF', { title: 'The *brief*', text: 'Where the brand stands, who it speaks to and what the new identity has to do.' }),
-      s('cards', 'STRATEGY', { title: 'Brand *values*', style: 'big', items: items([['*Value* one', 'What it means and how the identity shows it.'], ['*Value* two', 'What it means and how the identity shows it.'], ['*Value* three', 'What it means and how the identity shows it.']]) }),
-      s('caseGallery', 'DIRECTION', { title: '*Mood* &\ndirection', text: 'The world the brand lives in — pictures, textures and references that set the tone.', images: [{ image: null }, { image: null }, { image: null }] }),
-      s('logo', 'LOGO', { title: 'The *logo*', text: 'The logo and its versions on the brand’s backgrounds.', panels: [{ image: null, bg: 'surface' }, { image: null, bg: 'light' }, { image: null, bg: 'accent' }] }),
-      s('textImage', 'LOGO', { title: 'The idea\n*behind* it', text: 'Where the form comes from, how it’s built and what it stands for.', flip: true }),
-      s('palette', 'COLOUR', { title: 'Colour *palette*', colors: [
-        { name: 'Petrol', hex: '#007588', text: 'Accent' }, { name: 'Night', hex: '#0a0a0f', text: 'Background' }, { name: 'Paper', hex: '#f0eee8', text: 'Text & light' }, { name: 'Stone', hex: '#777b87', text: 'Secondary' },
-      ] }),
-      s('type', 'TYPOGRAPHY', { title: '*Typography*', fonts: [
-        { name: 'DM Sans', role: 'Headlines & text', family: 'DM Sans', weights: 'Regular · Bold · ExtraBold', sample: 'The quick brown fox jumps over the lazy dog' },
-        { name: 'JetBrains Mono', role: 'Labels & details', family: 'JetBrains Mono', weights: 'Medium · SemiBold', sample: 'PREPARED FOR · 01/16' },
-      ] }),
-      s('works', 'APPLICATIONS', { title: '*Applications*', items: [{ image: null, caption: 'Business cards' }, { image: null, caption: 'Social media' }, { image: null, caption: 'Packaging' }], closing: '' }),
-      s('image', 'APPLICATIONS', { caption: '', fit: 'cover' }),
-      s('phases', 'NEXT STEPS', { title: 'Next *steps*', items: items([['Feedback', 'Your thoughts on the identity.'], ['Refine', 'The last details, together.'], ['Guidelines', 'How to use it — all in one place.'], ['Handover', 'Every file, ready to use.']]) }),
-      s('closing', 'CONTACT', { title: 'Thank *you*.', text: 'Looking forward to your feedback.', showContact: true }),
     ],
   },
   case: {

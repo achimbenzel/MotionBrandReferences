@@ -34,14 +34,14 @@ test('slides: accent marks, names, blank data; every template slide survives the
 
 test('presentations: from a template for a client, saved, pictures, copy, defaults, search, Trash and back', async () => {
   const templates = (await srv.api('/api/presentations/templates')).data.templates;
-  assert.deepEqual(templates.map((t) => t.key), ['proposal', 'identity', 'case', 'blank']);
+  assert.deepEqual(templates.map((t) => t.key), ['proposal', 'case', 'blank']);
   const client = (await srv.api('/api/clients', { method: 'POST', json: { name: 'Gute Stube' } })).data.client;
 
   // A proposal for the client: its name where the template says [Client].
   let r = await srv.api('/api/presentations', { method: 'POST', json: { template: 'proposal', clientId: client.id } });
   assert.equal(r.status, 201);
   let deck = r.data.presentation;
-  assert.deepEqual([deck.title, deck.kind, deck.label, deck.meta.preparedFor, deck.theme], ['Project proposal · Gute Stube', 'proposal', 'PROJECT PROPOSAL', 'Gute Stube', { preset: 'dark', accent: '#007588' }]);
+  assert.deepEqual([deck.title, deck.kind, deck.label, deck.meta.preparedFor, deck.theme], ['Project proposal · Gute Stube', 'proposal', 'PROJECT PROPOSAL', 'Gute Stube', { preset: 'dark', accent: '#007588', glowSeed: 0 }]);
   assert.equal(deck.slides.length, DECK_TEMPLATES.proposal.slides().length);
   assert.ok(deck.slides.some((s) => s.data.title === 'Project *goals* for Gute Stube:'));
   assert.ok(deck.slides.every((s) => s.id));
@@ -54,7 +54,7 @@ test('presentations: from a template for a client, saved, pictures, copy, defaul
   assert.deepEqual([deck.slides.length, deck.slides[2].type, deck.slides[2].data.title, deck.theme.accent, deck.title, deck.meta.version], [slides.length, 'intro', 'Hi *there*', '#007588', 'Proposal GS', 'v2.0']);
   assert.match(deck.meta.date, /^\d{4}-\d{2}-\d{2}$/); // a wrong date leaves the one there
   r = await srv.api(`/api/presentations/${deck.id}`, { method: 'PATCH', json: { theme: { preset: 'light', accent: '#E4572E' } } });
-  assert.deepEqual(r.data.presentation.theme, { preset: 'light', accent: '#e4572e' });
+  assert.deepEqual(r.data.presentation.theme, { preset: 'light', accent: '#e4572e', glowSeed: 0 });
 
   // A picture: uploaded, served, put on the cover; a non-picture refused; a path outside the folder isn't taken.
   r = await srv.api(`/api/presentations/${deck.id}/images`, { method: 'POST', body: picture() });
@@ -90,8 +90,8 @@ test('presentations: from a template for a client, saved, pictures, copy, defaul
   // Its look for new decks: a new one starts with the logo (copied), the name, the contact and the colours.
   const defaults = (await srv.api(`/api/presentations/${deck.id}/defaults`, { method: 'POST' })).data.defaults;
   assert.deepEqual([defaults.brand.name, defaults.theme.accent, /^deck-logo-/.test(defaults.brand.logo)], ['Achim Benzel', '#e4572e', true]);
-  const next = (await srv.api('/api/presentations', { method: 'POST', json: { template: 'identity' } })).data.presentation;
-  assert.deepEqual([next.brand.name, next.brand.lines, next.theme.preset, next.meta.preparedBy, next.label], ['Achim Benzel', ['info@achimbenzel.com'], 'light', 'Achim Benzel', 'BRAND IDENTITY']);
+  const next = (await srv.api('/api/presentations', { method: 'POST', json: { template: 'case' } })).data.presentation;
+  assert.deepEqual([next.brand.name, next.brand.lines, next.theme.preset, next.meta.preparedBy, next.label], ['Achim Benzel', ['info@achimbenzel.com'], 'light', 'Achim Benzel', 'CASE STUDY']);
   assert.ok(next.brand.logo && await exists(path.join(srv.dataDir, 'presentation', next.id, next.brand.logo)));
   assert.ok(!next.slides.some((s) => JSON.stringify(s).includes('[Name]')));
 
@@ -111,6 +111,24 @@ test('presentations: from a template for a client, saved, pictures, copy, defaul
   assert.equal((await srv.api('/api/presentations/nope', { method: 'PATCH', json: { title: 'x' } })).status, 404);
 });
 
+test('speaker notes and the cover\'s swirl are kept; decks from before get none and the first swirl', async () => {
+  let deck = (await srv.api('/api/presentations', { method: 'POST', json: { template: 'blank' } })).data.presentation;
+  assert.equal(deck.slides[0].notes, '');
+  assert.equal(deck.theme.glowSeed, 0);
+  deck = (await srv.api(`/api/presentations/${deck.id}`, { method: 'PATCH', json: {
+    theme: { ...deck.theme, glowSeed: 37 },
+    slides: [{ ...deck.slides[0], notes: 'Welcome.\nThe agenda.' }, { type: 'closing', data: blankData('closing'), notes: 'x'.repeat(6000) }],
+  } })).data.presentation;
+  assert.equal(deck.theme.glowSeed, 37);
+  assert.deepEqual(deck.slides.map((x) => x.notes.length), ['Welcome.\nThe agenda.'.length, 5000]);
+  for (const [seed, kept] of [[5000, 999], [-3, 0], ['a', 0], [12.6, 13]]) {
+    deck = (await srv.api(`/api/presentations/${deck.id}`, { method: 'PATCH', json: { theme: { ...deck.theme, glowSeed: seed } } })).data.presentation;
+    assert.equal(deck.theme.glowSeed, kept, `seed ${seed}`);
+  }
+  // A slide saved before notes existed reads as one without.
+  assert.equal(normalizeSlide({ type: 'cover', data: blankData('cover') }).notes, '');
+});
+
 test('your own templates: a deck saved as one (client neutral, with its pictures), a new deck from it, renamed, Trash and back', async () => {
   const client = (await srv.api('/api/clients', { method: 'POST', json: { name: 'Nordlicht' } })).data.client;
   let deck = (await srv.api('/api/presentations', { method: 'POST', json: { template: 'proposal', clientId: client.id } })).data.presentation;
@@ -124,11 +142,11 @@ test('your own templates: a deck saved as one (client neutral, with its pictures
   let r = await srv.api(`/api/presentations/${deck.id}/template`, { method: 'POST', json: {} });
   assert.equal(r.status, 201);
   const tpl = r.data.template;
-  assert.deepEqual([tpl.name, tpl.label, tpl.kind, tpl.theme, tpl.slides.length], ['Project proposal', 'ANGEBOT', 'proposal', { preset: 'light', accent: '#3fa34d' }, 6]);
+  assert.deepEqual([tpl.name, tpl.label, tpl.kind, tpl.theme, tpl.slides.length], ['Project proposal', 'ANGEBOT', 'proposal', { preset: 'light', accent: '#3fa34d', glowSeed: 0 }, 6]);
   assert.ok(tpl.slides.some((s) => s.data.title === 'Project *goals* for [Client]:'));
   assert.ok(await exists(path.join(srv.dataDir, 'presentation-template', tpl.id, file)));
   const list = (await srv.api('/api/presentations/templates')).data;
-  assert.deepEqual([list.templates.length, list.own.map((t) => t.id)], [4, [tpl.id]]);
+  assert.deepEqual([list.templates.length, list.own.map((t) => t.id)], [3, [tpl.id]]);
 
   // A new deck from it, for another client: their name where [Client] was, its own copy of the pictures, its look.
   const other = (await srv.api('/api/clients', { method: 'POST', json: { name: 'Gute Stube 2' } })).data.client;

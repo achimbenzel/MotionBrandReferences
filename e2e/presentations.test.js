@@ -3,7 +3,8 @@
 // slide and is saved, a slide added and a picture put on it, presenting
 // (keys, Esc), the PDF (one page per shown slide) and PowerPoint; saved as a
 // template and a new deck from it on a client's page, a case study filled from
-// a project. On a phone it all fits.
+// a project; presenting with the presenter view, the overview and a black
+// screen. On a phone it all fits.
 // Needs `npm run build` first.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -180,6 +181,54 @@ test('saved as a template, a new deck from it on the client page; a case study f
   assert.equal(await sec.locator('.client-deck').count(), 1);
   await sec.locator('.client-deck').click();
   await page.waitForURL(`**/presentations/${newId}`);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('presenting: the presenter view follows and steers, G shows every slide, B a black screen; the default mark, the shader cover', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto(`${srv.base}/presentations/${deckId}`);
+  await page.waitForSelector('.pz-stage-slide');
+
+  // Speaker notes on the cover, from the editor.
+  await page.locator('.pz-thumb').nth(0).locator('.pz-thumb-btn').click();
+  await page.getByLabel('Speaker notes').fill('Welcome.\nThe agenda.');
+  await until(async () => (await saved()).slides[0].notes === 'Welcome.\nThe agenda.');
+  // Without a mark of its own the deck shows the default one (logo-02); the cover's smoke where there's WebGL.
+  assert.ok(await page.locator('.pz-thumb').nth(2).locator('svg.pz-corner.pz-mark-default').count());
+  if (await page.evaluate(() => !!document.createElement('canvas').getContext('webgl'))) await page.locator('.pz-stage-slide .pz-cover-glow-pic').waitFor();
+
+  await page.getByRole('button', { name: 'Present', exact: true }).click();
+  await page.locator('.pz-present').waitFor();
+  const [view] = await Promise.all([ctx.waitForEvent('page'), page.getByRole('button', { name: 'Presenter view' }).click()]);
+  view.on('pageerror', (e) => errors.push(`presenter view: ${e.message}`));
+  await view.locator('.pzv-link.on').waitFor();
+  assert.equal(await view.locator('.pzv-notes-text').innerText(), 'Welcome.\nThe agenda.');
+  // Its keys move the slides; the slides' keys move it.
+  await view.keyboard.press('ArrowRight');
+  await page.locator('.pz-present-bar span', { hasText: /^2 \// }).waitFor();
+  await page.keyboard.press('ArrowRight');
+  await view.locator('.pzv-count', { hasText: /^3 \// }).waitFor();
+  // G: every shown slide; a click jumps there.
+  const shown = (await saved()).slides.filter((x) => !x.hidden).length;
+  await page.keyboard.press('g');
+  await page.locator('.pz-overview').waitFor();
+  assert.equal(await page.locator('.pz-overview-item').count(), shown);
+  await page.locator('.pz-overview-item').first().click();
+  await page.locator('.pz-present-bar span', { hasText: /^1 \// }).waitFor();
+  await view.locator('.pzv-count', { hasText: /^1 \// }).waitFor();
+  // B: black, in both.
+  await page.keyboard.press('b');
+  await page.locator('.pz-present-black').waitFor();
+  await view.locator('.pzv-current.black').waitFor();
+  await page.keyboard.press('Escape'); // the black screen off …
+  await page.locator('.pz-present-black').waitFor({ state: 'detached' });
+  await page.keyboard.press('Escape'); // … then presenting ends, and the presenter view knows
+  await page.locator('.pz-present').waitFor({ state: 'detached' });
+  await view.locator('.pzv-link', { hasText: 'Presenting stopped' }).waitFor();
   assert.deepEqual(errors, []);
   await ctx.close();
 });

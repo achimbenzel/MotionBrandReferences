@@ -50,10 +50,12 @@ export function normalizeSlide(s) {
     type: s.type,
     hidden: !!s.hidden,
     section: str(s.section, 60),
+    notes: str(s.notes, 5000), // speaker notes: the presenter view and PowerPoint's notes, never on the slide
     data: cleanFields(t.fields, s.data),
   };
 }
-export const normalizeDeckTheme = (t) => ({ preset: THEMES[t?.preset] ? t.preset : 'dark', accent: hexOr(t?.accent, DEFAULT_ACCENT) });
+// glowSeed: which swirl of the shader's smoke the cover shows (0 = the hero's own).
+export const normalizeDeckTheme = (t) => ({ preset: THEMES[t?.preset] ? t.preset : 'dark', accent: hexOr(t?.accent, DEFAULT_ACCENT), glowSeed: Math.round(num(t?.glowSeed, 0, 999, 0)) });
 /** Who it's from: a name, a logo (wordmark) and a mark (the small sign in each slide's corner), contact lines. */
 export const normalizeDeckBrand = (b) => ({
   name: str(b?.name, 80),

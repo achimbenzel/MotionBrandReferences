@@ -14,7 +14,7 @@ import { parseVideoLink, firstUrl } from '../src/lib/videoLinks.js';
 import { normalizeUrl, hostOf, youtubeId } from '../src/lib/types.js';
 import { WIDGETS, layoutOf, lonelyHalves } from '../src/lib/dashboardLayout.js';
 import { setFormats, fmtDate, fmtTime, fmtCurrency, fmtInt, fmtFixed, fmtBytes, parseNum, monthName, weekdayName } from '../src/lib/format.js';
-import { fileName } from '../src/lib/pptxExport.js';
+import { fileName, notesInParagraphs } from '../src/lib/pptxExport.js';
 
 // Germany: a day starts an hour or two before UTC's does.
 process.env.TZ = 'Europe/Berlin';
@@ -237,4 +237,13 @@ test('PowerPoint: the file is named after the deck, in plain letters browsers ke
   assert.equal(fileName('A/B: Test?'), 'A-B-Test');
   assert.equal(fileName('Straße 2026 | v2'), 'Strasse 2026 - v2');
   for (const t of ['', '  ...  ', '日本語', null]) assert.equal(fileName(t), 'Presentation');
+});
+
+test('PowerPoint: each line of the speaker notes is a paragraph of its own', () => {
+  const xml = '<a:p><a:r><a:rPr lang="en-US" dirty="0"/><a:t>Welcome.\nThe agenda.</a:t></a:r></a:p><a:fld><a:t>1</a:t></a:fld>';
+  const out = notesInParagraphs(xml);
+  assert.equal((out.match(/<a:p>/g) || []).length, 2);
+  assert.match(out, /<a:t>Welcome\.<\/a:t><\/a:r><\/a:p><a:p><a:r><a:rPr lang="en-US" dirty="0"\/><a:t>The agenda\.<\/a:t>/);
+  assert.match(out, /<a:t>1<\/a:t>/);
+  assert.equal(notesInParagraphs('<a:t>One line</a:t>'), '<a:t>One line</a:t>');
 });

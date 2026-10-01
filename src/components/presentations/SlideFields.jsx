@@ -166,6 +166,11 @@ export default function SlideFields({ deck, slide, onData, onSlide, onUpload, on
           <input className="input" value={slide.section || ''} data-path="@section" placeholder="e.g. HOW I WORK" onChange={(e) => onSlide({ section: e.target.value.toUpperCase() })} aria-label="Label at the bottom right" />
         </div>
       )}
+      <div className="pzf-row pzf-notes">
+        <span className="pzf-label">Speaker notes <em>only for you — in the presenter view and PowerPoint</em></span>
+        <textarea className="input" rows={4} value={slide.notes || ''} maxLength={5000} placeholder="What to say on this slide…"
+          onChange={(e) => onSlide({ notes: e.target.value })} aria-label="Speaker notes" />
+      </div>
     </div>
   );
 }

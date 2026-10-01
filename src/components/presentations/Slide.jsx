@@ -2,6 +2,8 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { Check, Minus, Image as ImageIcon } from 'lucide-react';
 import { THEMES, DEFAULT_ACCENT, accentLines, showsChrome } from '../../lib/slides.js';
 import { hexToRgb, rgbToCmyk } from '../../lib/color.js';
+import markSvg from '../../assets/logo-02.svg?raw';
+import { glowPicture, makeGlowPicture, glowPainter, glowTime, glowLook } from '../../lib/deckShader.js';
 
 // The slides themselves: drawn at 1920 × 1080 (see styles/presentation.css)
 // and scaled to wherever they're shown — the editor, the strip of thumbnails,
@@ -52,13 +54,64 @@ function Pic({ deck, img, className = '', field, editing, contain }) {
   );
 }
 
-/** The small sign in the corner: the deck's mark, else the first letter of its name in a ring. */
+// The mark a deck has until it gets its own (src/assets/logo-02.svg), drawn in the accent colour.
+const DEFAULT_MARK = {
+  viewBox: /viewBox="([^"]+)"/.exec(markSvg)?.[1],
+  transform: /transform="([^"]+)"/.exec(markSvg)?.[1],
+  d: /\sd="([^"]+)"/.exec(markSvg)?.[1],
+};
+
+/** The small sign in the corner: the deck's mark, else the default mark in the accent colour. */
 function Mark({ deck, className = 'pz-mark' }) {
   const src = deckFileUrl(deck, deck?.brand?.mark);
   if (src) return <img className={className} src={src} alt="" draggable={false} />;
-  const letter = (deck?.brand?.name || deck?.title || '·').trim().charAt(0).toUpperCase();
-  return <span className={`${className} pz-mark-letter`}>{letter}</span>;
+  return (
+    <svg className={`${className} pz-mark-default`} viewBox={DEFAULT_MARK.viewBox} aria-hidden="true">
+      <path fill="currentColor" transform={DEFAULT_MARK.transform} d={DEFAULT_MARK.d} />
+    </svg>
+  );
 }
+/**
+ * The cover's background when it has no picture: the hero shader's smoke in the
+ * deck's accent and look — a picture drawn once (a soft CSS glow until then, or
+ * without WebGL); running slowly while presenting (`live`).
+ */
+function CoverGlow({ deck, live }) {
+  const look = glowLook(deck);
+  const key = `${look.accent}|${look.dark}|${look.seed}`;
+  const [url, setUrl] = useState(() => glowPicture(look));
+  useEffect(() => {
+    let alive = true;
+    setUrl(glowPicture(look));
+    // A colour being dragged in the picker: only the one it stops at is drawn.
+    const t = setTimeout(() => makeGlowPicture(look).then((u) => { if (alive) setUrl(u); }), glowPicture(look) ? 0 : 120);
+    return () => { alive = false; clearTimeout(t); };
+  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className={`pz-cover-glow ${url || live ? 'shaded' : ''}`} data-field="image">
+      {live ? <LiveGlow look={look} still={url} /> : url && <img className="pz-cover-glow-pic" src={url} alt="" draggable={false} />}
+    </div>
+  );
+}
+function LiveGlow({ look, still }) {
+  const canvas = useRef(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    const el = canvas.current;
+    if (!el || matchMedia('(prefers-reduced-motion: reduce)').matches) { setFailed(true); return undefined; }
+    el.width = 960; el.height = 360;
+    const painter = glowPainter(el, look);
+    if (!painter) { setFailed(true); return undefined; }
+    const t0 = performance.now();
+    let raf = 0;
+    const frame = (now) => { painter.draw(glowTime(look.seed) + ((now - t0) / 1000) * 0.4); raf = requestAnimationFrame(frame); };
+    raf = requestAnimationFrame(frame);
+    return () => { cancelAnimationFrame(raf); painter.dispose(); };
+  }, [look.accent, look.dark, look.seed]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (failed) return still ? <img className="pz-cover-glow-pic" src={still} alt="" draggable={false} /> : null;
+  return <canvas ref={canvas} className="pz-cover-glow-pic" />;
+}
+
 /** The logo (a wordmark picture), else the mark and the name. */
 function Logo({ deck }) {
   const src = deckFileUrl(deck, deck?.brand?.logo);
@@ -80,7 +133,7 @@ const Cell = ({ v }) => (/^(✓|✔|x|yes|ja)$/i.test(v.trim()) ? <Check classNa
 
 const cols = (n) => (n <= 3 ? n : n === 4 ? 2 : 3);
 
-function Body({ deck, slide, editing }) {
+function Body({ deck, slide, editing, live }) {
   const d = slide.data || {};
   const P = (props) => <Pic deck={deck} editing={editing} {...props} />;
   switch (slide.type) {
@@ -90,7 +143,7 @@ function Body({ deck, slide, editing }) {
       return (
         <>
           <div className="pz-cover-top">
-            {d.image ? <P img={d.image} className="pz-cover-pic" field="image" /> : <div className="pz-cover-glow" data-field="image" />}
+            {d.image ? <P img={d.image} className="pz-cover-pic" field="image" /> : <CoverGlow deck={deck} live={live} />}
             <div className="pz-cover-fade" />
             <div className="pz-cover-logo"><Logo deck={deck} /></div>
             {d.showContact && <Contact deck={deck} className="pz-cover-contact pz-mono" />}
@@ -348,12 +401,12 @@ function Body({ deck, slide, editing }) {
 }
 
 /** One slide at full size (1920 × 1080): the deck's header and footer around what it holds. */
-export function Slide({ deck, slide, index = 0, total = 1, editing = false }) {
+export function Slide({ deck, slide, index = 0, total = 1, editing = false, live = false }) {
   if (!slide) return null;
   const chrome = showsChrome(slide.type);
   return (
     <div className={`pz-slide pz-t-${slide.type} ${THEMES[deck?.theme?.preset] ? deck.theme.preset : 'dark'}`} style={themeVars(deck)}>
-      <Body deck={deck} slide={slide} editing={editing} />
+      <Body deck={deck} slide={slide} editing={editing} live={live} />
       {chrome && (
         <>
           <Mark deck={deck} className="pz-corner" />

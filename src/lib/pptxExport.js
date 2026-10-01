@@ -258,6 +258,22 @@ async function addSlide(pptx, el) {
       });
     }
   }
+  return slide;
+}
+
+// Speaker notes come out as one paragraph with the line breaks inside it, which
+// PowerPoint runs together: each line its own paragraph instead.
+const NOTE_LINE = '</a:t></a:r></a:p><a:p><a:r><a:rPr lang="en-US" dirty="0"/><a:t>';
+export const notesInParagraphs = (xml) => xml.replace(/<a:t>([^<]*\n[^<]*)<\/a:t>/g, (m, t) => `<a:t>${t.split(/\r?\n/).join(NOTE_LINE)}</a:t>`);
+async function splitNoteLines(blob) {
+  const { default: JSZip } = await import('jszip');
+  const zip = await JSZip.loadAsync(blob);
+  for (const name of Object.keys(zip.files).filter((n) => /^ppt\/notesSlides\/notesSlide\d+\.xml$/.test(n))) {
+    const xml = await zip.file(name).async('string');
+    const fixed = notesInParagraphs(xml);
+    if (fixed !== xml) zip.file(name, fixed);
+  }
+  return zip.generateAsync({ type: 'blob', compression: 'DEFLATE', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
 }
 
 // The file's name from the deck's: plain letters (browsers drop a download name
@@ -283,9 +299,15 @@ export async function exportPptx(deck, slideEls) {
   pptx.author = deck.brand?.name || deck.meta?.preparedBy || '';
   pptx.company = deck.brand?.name || '';
   pptx.theme = { headFontFace: 'DM Sans', bodyFontFace: 'DM Sans' };
-  for (const el of slideEls) await addSlide(pptx, el);
+  const shown = (deck.slides || []).filter((s) => !s.hidden); // the slides drawn, in order
+  for (const [i, el] of slideEls.entries()) {
+    const slide = await addSlide(pptx, el);
+    const notes = shown[i]?.notes?.trim();
+    if (notes) slide.addNotes(notes); // the speaker notes, in PowerPoint's notes
+  }
   const name = fileName(deck.title);
-  const blob = await pptx.write({ outputType: 'blob', compression: true });
+  let blob = await pptx.write({ outputType: 'blob', compression: true });
+  if (shown.some((s) => /\n/.test(s.notes || ''))) blob = await splitNoteLines(blob);
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([blob], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }));
   a.download = `${name}.pptx`;

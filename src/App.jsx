@@ -36,6 +36,7 @@ const ContentDetail = lazy(() => import('./pages/ContentDetail.jsx'));
 const AchievementsPage = lazy(() => import('./pages/AchievementsPage.jsx'));
 const PresentationsPage = lazy(() => import('./pages/PresentationsPage.jsx'));
 const PresentationEditor = lazy(() => import('./pages/PresentationEditor.jsx'));
+const PresenterView = lazy(() => import('./pages/PresenterView.jsx'));
 // Dialogs that open now and then load when first opened. (The picture-size
 // prompt stays: it has to be there before the first upload asks for it.)
 const UploadModal = lazy(() => import('./components/UploadModal.jsx'));
@@ -190,6 +191,19 @@ function Shell() {
 }
 
 export default function App() {
+  const { pathname } = useLocation();
+  // The presenter view opens in a window of its own beside the slides: just it, no sidebar.
+  if (/^\/presentations\/[^/]+\/presenter\/?$/.test(pathname)) {
+    return (
+      <ToastProvider>
+        <ErrorBoundary>
+          <Suspense fallback={<div className="spinner" />}>
+            <Routes><Route path="/presentations/:id/presenter" element={<PresenterView />} /></Routes>
+          </Suspense>
+        </ErrorBoundary>
+      </ToastProvider>
+    );
+  }
   return (
     <ToastProvider>
       <Shell />

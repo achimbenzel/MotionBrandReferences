@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Slide } from './Slide.jsx';
 import { exportPptx } from '../../lib/pptxExport.js';
+import { makeGlowPicture, glowLook } from '../../lib/deckShader.js';
 
 /**
  * The deck as a PowerPoint file: every slide that isn't hidden is drawn at full
@@ -14,6 +15,8 @@ export default function PptxDeck({ deck, onDone, onError }) {
     let alive = true;
     (async () => {
       try {
+        await makeGlowPicture(glowLook(deck)); // the cover's smoke, drawn
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
         const imgs = [...(root.current?.querySelectorAll('img') || [])];
         await Promise.all(imgs.map((img) => (img.complete ? null : new Promise((r) => { img.onload = r; img.onerror = r; }))));
         await document.fonts?.ready;

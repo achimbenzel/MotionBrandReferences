@@ -1,4 +1,4 @@
-import { Plus, Trash2, Sparkles } from 'lucide-react';
+import { Plus, Trash2, Sparkles, Shuffle } from 'lucide-react';
 import { THEMES, DECK_KINDS } from '../../lib/slides.js';
 import { ImageField } from './SlideFields.jsx';
 
@@ -20,7 +20,7 @@ export default function DeckPanel({ deck, clients, plans, onDeck, onUpload, onDe
       <div className="pzf-row"><span className="pzf-label">Name</span><input className="input" value={deck.title} onChange={(e) => onDeck({ title: e.target.value })} aria-label="Name" /></div>
       <div className="pzf-row"><span className="pzf-label">Kind</span>
         <div className="segmented segmented-sm pzf-seg" role="group" aria-label="Kind">
-          {DECK_KINDS.map((k) => <button key={k.key} type="button" className={deck.kind === k.key ? 'on' : ''} onClick={() => onDeck({ kind: k.key })}>{k.label}</button>)}
+          {DECK_KINDS.filter((k) => !k.retired || deck.kind === k.key).map((k) => <button key={k.key} type="button" className={deck.kind === k.key ? 'on' : ''} onClick={() => onDeck({ kind: k.key })}>{k.label}</button>)}
         </div>
       </div>
       <div className="pzf-two">
@@ -54,6 +54,11 @@ export default function DeckPanel({ deck, clients, plans, onDeck, onUpload, onDe
           <span className="pzf-color"><input type="color" value={deck.theme.accent} onChange={(e) => onDeck({ theme: { ...deck.theme, accent: e.target.value } })} aria-label="Own accent colour" /></span>
         </div>
       </div>
+      <div className="pzf-row"><span className="pzf-label">Smoke on the cover <em>when it has no picture</em></span>
+        <button type="button" className="btn btn-sm pzf-shuffle" onClick={() => onDeck({ theme: { ...deck.theme, glowSeed: ((deck.theme.glowSeed || 0) + 1 + Math.floor(Math.random() * 60)) % 1000 } })}>
+          <Shuffle size={14} /> Another swirl
+        </button>
+      </div>
 
       <h3 className="pzf-h">From</h3>
       <div className="pzf-row"><span className="pzf-label">Your name (or studio)</span><input className="input" value={brand.name} data-path="@brand" onChange={(e) => setBrand({ name: e.target.value })} aria-label="Your name" /></div>
@@ -61,7 +66,7 @@ export default function DeckPanel({ deck, clients, plans, onDeck, onUpload, onDe
         <ImageField deck={deck} value={brand.logo ? { file: brand.logo } : null} path="@logo" label="Logo" busy={busy}
           onChange={(v) => setBrand({ logo: v?.file || null })} onUpload={(pic) => onUpload(pic, '@brand.logo')} />
       </div>
-      <div className="pzf-row"><span className="pzf-label">Mark <em>the small sign in each slide’s corner</em></span>
+      <div className="pzf-row"><span className="pzf-label">Mark <em>the small sign in each slide’s corner — without one, the A-mark in your accent colour</em></span>
         <ImageField deck={deck} value={brand.mark ? { file: brand.mark } : null} path="@mark" label="Mark" busy={busy}
           onChange={(v) => setBrand({ mark: v?.file || null })} onUpload={(pic) => onUpload(pic, '@brand.mark')} />
       </div>

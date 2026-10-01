@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Slide } from './Slide.jsx';
+import { makeGlowPicture, glowLook } from '../../lib/deckShader.js';
 
 /**
  * The deck as a PDF: every slide that isn't hidden on a page of its own, at
@@ -24,7 +25,9 @@ export default function PrintDeck({ deck, onDone }) {
       onDone();
     };
     (async () => {
-      // Every picture and the fonts in before the print dialog takes its snapshot.
+      // Every picture (the cover's smoke too) and the fonts in before the print dialog takes its snapshot.
+      await makeGlowPicture(glowLook(deck));
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       const imgs = [...(root.current?.querySelectorAll('img') || [])];
       await Promise.all(imgs.map((img) => (img.complete ? null : new Promise((r) => { img.onload = r; img.onerror = r; }))));
       await document.fonts?.ready;

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Play, FileDown, MoreHorizontal, Plus, Copy, Trash2, Eye, EyeOff, ChevronUp, ChevronDown, Presentation as DeckIcon, Pin, PinOff, LayoutTemplate, Settings2,
-  Library, X, FileText, FileSliders,
+  Library, X, FileText, FileSliders, NotebookText,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useSaver, useRefreshOnReturn } from '../lib/autosave.js';
@@ -18,6 +18,7 @@ import Presenter from '../components/presentations/Presenter.jsx';
 import PrintDeck from '../components/presentations/PrintDeck.jsx';
 import PptxDeck from '../components/presentations/PptxDeck.jsx';
 import CaseFromPicker from '../components/presentations/CaseFromPicker.jsx';
+import { openPresenterView } from '../lib/presentSync.js';
 import '@fontsource/dm-sans/600.css';
 import '@fontsource/dm-sans/800.css';
 import '@fontsource/dm-sans/400-italic.css';
@@ -231,6 +232,7 @@ export default function PresentationEditor() {
           <button type="button" className="btn btn-primary" onClick={async () => { await saver.flush(); setPresenting(Math.max(0, slides.filter((s) => !s.hidden).indexOf(sel))); }} disabled={!shown}><Play size={16} /> Present</button>
           <Menu align="right" trigger={<button type="button" className="icon-btn" aria-label="More"><MoreHorizontal size={18} /></button>} items={[
             { label: deck.pinned ? 'Unpin' : 'Pin to the top', icon: deck.pinned ? <PinOff size={15} /> : <Pin size={15} />, onClick: () => onDeck({ pinned: !deck.pinned }) },
+            { label: 'Presenter view (notes, next slide, timer)', icon: <NotebookText size={15} />, onClick: async () => { await saver.flush(); openPresenterView(id); } },
             { label: 'Duplicate the presentation', icon: <Copy size={15} />, onClick: duplicate },
             { label: 'Save as template…', icon: <LayoutTemplate size={15} />, onClick: () => {
               const client = lists.clients.find((c) => c.id === deck.clientId)?.name;

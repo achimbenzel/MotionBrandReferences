@@ -5,10 +5,15 @@ import { TABS } from '../../lib/types.js';
 
 const TYPE_LABEL_BY_KEY = Object.fromEntries(TABS.map((t) => [t.key, t.label]));
 
-// A small picture for each: a project's banner, a reference's preview.
-const planThumb = (p) => (p.banner ? `/data/plan/${p.id}/${p.banner}` : p.avatar ? `/data/plan/${p.id}/${p.avatar}` : null);
+const PICTURE = /\.(png|jpe?g|webp|gif|avif|svg)$/i;
+// A small picture for each: a project's banner (else its first moodboard picture, else its avatar), a reference's preview.
+const planThumb = (p) => {
+  const mood = (p.blocks || []).filter((b) => b.type === 'moodboard').flatMap((b) => b.images || []).map((i) => i.file).find((f) => PICTURE.test(f || ''));
+  const f = [p.banner, mood, p.avatar].find((x) => typeof x === 'string' && x);
+  return f ? `/data/plan/${p.id}/${f}` : null;
+};
 const refThumb = (r) => {
-  const f = [r.thumb, r.image, r.front, r.shot, r.logoDark, r.logoLight].find((x) => typeof x === 'string' && /\.(png|jpe?g|webp|gif|avif|svg)$/i.test(x));
+  const f = [r.thumb, r.image, r.front, r.shot, r.logoDark, r.logoLight].find((x) => typeof x === 'string' && PICTURE.test(x));
   return f ? `/data/${r.type}/${r.id}/${f}` : null;
 };
 
